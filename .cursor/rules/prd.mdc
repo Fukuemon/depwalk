@@ -1,0 +1,113 @@
+---
+alwaysApply: true
+---
+
+# PRD: depwalk
+
+## 1. 概要
+
+depwalk は、Spring Boot（Java）プロジェクトに対して 指定位置（ファイル+行番号）を起点に、メソッド呼び出し依存関係（callers/callees）を再帰的に解析し、CLI ツリーと Mermaid で可視化するツールである。
+tree-sitter による高速な構文インデックスと、JavaParser + SymbolSolver による **型解決（厳密なメソッド束縛）**を組み合わせるハイブリッド構成とする。
+
+## 2. 目的 / なぜ作るか
+
+- 既存の IDE 機能（Call Hierarchy 等）は便利だが、CI や CLI での自動化、Mermaid での共有、レポート生成が弱い
+- リポジトリ横断で「影響範囲」「呼び出し連鎖」を把握する場面（設計/レビュー/障害調査）で、軽量に再現できるツールがほしい
+- 厳密性が必要（オーバーロード/継承/インターフェース/静的 import 等）なので、単なる grep/AST だけでは不足
+
+## 3. 対象ユーザー
+
+- Spring Boot / Java のバックエンド開発者
+- テックリード、アーキテクト、SRE（影響範囲調査）
+- コードレビュー担当（依存の見える化）
+
+## 4. ユースケース
+
+1. `FooService.java:120` を起点に `callees` を深さ 3 で確認
+2. 特定メソッドの `callers` を深さ 5 で追い、どこから呼ばれているか洗い出し
+3. Mermaid でグラフを出力して、Issue/PR/Docs に貼る
+4. CI で差分ファイルに対し影響範囲を生成してレビュー補助（将来）
+
+## 5. スコープ（MVP）
+
+機能要件
+
+- 入力：`file:line`（オプションで `file:line:col`）、および `file#method`
+- サブコマンド：
+  - `depwalk callees <selector> --depth N --format tree|mermaid`
+  - `depwalk callers <selector> --depth N --format tree|mermaid`
+- `selector`（起点指定）：
+  - `path/to/FooService.java:120`
+  - `path/to/FooService.java:120:7`
+  - `path/to/FooService.java#doThing`
+  - `file#method` 指定が曖昧（同名メソッドが複数）な場合は **エラーで停止し候補を提示**する
+- 解析対象：
+  - `src/main/java`（既定）
+  - `--include-tests` で `src/test/java` を含められる
+- 出力：
+  - CLI ツリー表示（人間が読みやすい）
+  - Mermaid（`graph TD` / `graph BT`）
+- 厳密解決：
+  - JavaParser + SymbolSolver により、呼び出し → 宣言を可能な限り解決
+  - 解決不能は「未解決」として残す（ただし表示/フィルタ可能）
+
+非機能要件
+
+- 大規模リポジトリでも実用（初回は数十秒〜許容、2 回目以降はキャッシュで高速）
+- 解析結果は再現性が高い（同一コードなら同一 ID）
+- 失敗時に原因（classpath 不足、ビルド失敗等）が分かるログ
+
+## 6. 非スコープ（MVP ではやらない）
+
+- 動的解析（実行時トレース）
+- Spring DI のビーン解決や AOP を含めた実行経路推定
+- マルチモジュール Gradle の 100%自動対応（まずは対応、難しいケースは明示的指定で逃げ道）
+- Kotlin（将来）
+
+## 7. CLI 仕様（確定）
+
+基本
+
+- `depwalk callees path/to/FooService.java:120 --depth 3 --format tree`
+- `depwalk callers path/to/FooService.java:120 --depth 5 --format mermaid`
+- `depwalk callees path/to/FooService.java#doThing --depth 3 --format tree`
+- `depwalk callers path/to/FooService.java#doThing --depth 5 --format mermaid`
+
+オプション
+
+- `--project-root <path>`（自動検出失敗時）
+- `--depth <n>`（既定 3）
+- `--format tree|mermaid`（既定 tree）
+- `--include-tests`
+- `--max-nodes <n>`（暴走防止）
+- `--cache-dir <path>`（既定 `.depwalk/`）
+- `--no-cache`
+- `--verbose`
+
+## 8. 出力仕様
+
+tree（例）
+
+callees: com.example.FooService#doThing(java.lang.String)
+└─ com.example.BarRepo#save(com.example.Bar)
+├─ com.example.Util#normalize(java.lang.String)
+└─ (unresolved) log.info(...)
+
+mermaid（例）
+
+- callees：`graph TD`
+- callers：`graph BT`
+
+## 9. 受け入れ基準（Acceptance Criteria）
+
+- `file:line` もしくは `file#method` を与えたとき、起点メソッド（宣言）を特定できる
+- `callees` / `callers` それぞれで、深さ N の探索結果を出せる
+- Mermaid 出力が、GitHub/Obsidian 等でそのまま描画できる
+- オーバーロード/継承を含むサンプルプロジェクトで、少なくとも主要ケースが正しく解決できる
+- classpath 不足などで解決失敗した場合、ユーザーが対処できるメッセージを出す
+
+## 10. リスク
+
+- SymbolSolver の型解決は classpath 依存（Gradle の依存解決が取れないと精度が落ちる）
+- Lombok/Annotation Processor による生成コードは解決が不安定になりうる
+- マルチモジュール Gradle の classpath 取得が難しいケースがある

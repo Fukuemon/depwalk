@@ -1,0 +1,184 @@
+---
+alwaysApply: true
+---
+
+# Design Doc: depwalk
+
+## 1. 背景とゴール
+
+- ゴール：Java/Spring Boot プロジェクトで、起点メソッドから callers/callees を厳密に探索し可視化する
+- 主要方針：
+  - Go + tree-sitter：高速な構文走査/インデックス
+  - JavaParser + SymbolSolver：型解決の厳密性を担保
+  - 「全部を Java で解析」ではなく、候補抽出を Go で絞ってから Java で確定する
+
+## 2. 主要コンポーネント
+
+### 2.1 Go（メイン CLI）
+
+- scanner：対象ファイル列挙、除外（build/、.gradle/、out/、target/ 等）
+- ts：tree-sitter パース、位置 → ノード特定、クエリ実行
+- index：
+  - MethodDeclIndex（宣言）
+  - CallNameIndex（呼び出し名 → 呼び出し候補）
+- graph：探索（BFS/DFS）、visited、depth、max-nodes
+- javahelper：Java 常駐プロセス起動、JSON で解決依頼（バッチ）
+- output：tree/mermaid 生成
+- cache：インデックスと解決結果の永続化
+
+### 2.2 Java（helper プロセス）
+
+- 役割：method 宣言/呼び出しを ResolvedMethodDeclaration に解決して、安定 ID に変換
+- 初期化：Gradle から得た classpath を CombinedTypeSolver に投入
+- I/O：stdin/stdout JSON（line-delimited JSON 推奨）
+
+## 3. データモデル
+
+### 3.1 MethodID（安定 ID）
+
+`<declaringTypeFQN>#<name>(<paramFQN1>,<paramFQN2>,...)`
+
+例: `com.example.FooService#doThing(java.lang.String,int)`
+
+### 3.2 CallSite（Go 側）
+
+- file（相対パス）
+- startByte, endByte（tree-sitter node range）
+- enclosingMethodDeclRange（呼び出し元メソッドの暫定識別）
+- calleeName（呼び出し名）
+- argsCount
+- receiverText（任意）
+
+### 3.3 Index
+
+- CallNameIndex: `map[string][]CallSite`
+- DeclRangeIndex: `map[DeclRange]DeclInfo`（ファイル+byte range をキーにする）
+
+## 4. 解析フロー
+
+```mermaid
+flowchart LR
+A["CLI: selector"] --> B{"selectorType"}
+B -->|"file:line"| C1["Go: tree-sitter で enclosing method_declaration 特定"]
+B -->|"file#method"| C2["Go: file内の method_declaration 列挙 + name一致で候補抽出"]
+C1 --> D["Java helper: resolveDecl -> MethodID"]
+C2 --> E{"candidates"}
+E -->|"1"| D
+E -->|"0 or >1"| X["Error: show candidates and exit"]
+D --> F{mode}
+F -->|callees| G["Go: method 内の呼び出しノード列挙"]
+F -->|callers| H1["Go: CallNameIndex で候補 callsite 取得"]
+G --> I1["Java helper: resolveCalls(バッチ)"]
+H1 --> I1
+I1 --> J["Go: edges 追加 & depth 探索"]
+J --> K["Output: tree / mermaid"]
+```
+
+## 5. callers / callees のアルゴリズム
+
+### 5.1 callees（outgoing）
+
+1. 起点メソッド範囲内から呼び出しノードを列挙（tree-sitter）
+2. 呼び出しノードの byte range を Java helper にバッチ送信
+3. 解決できたものを caller -> callee として辺追加
+4. depth 分、callee 側をキューに積んで再帰
+
+### 5.2 callers（incoming）
+
+1. 起点メソッドの name を使い CallNameIndex[name] から候補取得
+2. 候補 callsite を Java helper にバッチ送信
+3. 解決結果の MethodID が起点 MethodID と一致するものだけ採用
+4. 採用 callsite の呼び出し元 MethodID を次の探索キューへ
+
+※ callers は候補集合が大きくなりがちなので、--max-candidates や --package-filter を将来追加できる設計にする
+
+## 6. tree-sitter の使い方（Go）
+
+- 起点の解決
+  - `file:line[:col]`：NamedDescendantForPointRange 相当で位置を含むノードを取り、上位に辿って `method_declaration` を見つける
+  - `file#method`：ファイル内の `method_declaration` を列挙し、メソッド名一致で候補抽出する（候補が 1 件のみ採用。0 件または複数はエラーで候補提示）
+- クエリ：
+  - `method_declaration`
+  - `method_invocation`
+  - `object_creation_expression`
+  - `constructor_invocation`（必要に応じて）
+
+## 7. Java helper 設計
+
+### 7.1 起動
+
+- depwalk 実行時に `java -jar depwalk-helper.jar ...` を起動（常駐）
+- プロジェクトルート/クラスパス/ソースルートを初期化時に渡す
+
+### 7.2 Gradle classpath 取得（対応方針）
+
+- depwalk は Gradle プロジェクトを検出したら、基本は以下を実行して classpath を得る：
+  - `./gradlew -q depwalkClasspath`
+  - depwalkClasspath は depwalk が一時 init script を生成して注入（ユーザーの build.gradle を汚さない）
+  - `sourceSets.main.runtimeClasspath`（または compileClasspath + runtimeClasspath）を出力
+  - マルチモジュールは `:moduleName:` を指定できる余地（将来）
+
+逃げ道：
+
+- `--classpath-file` / `--classpath` を提供（CI や特殊構成で必須）
+
+### 7.3 JSON プロトコル（例）
+
+Request
+
+- op: resolveDecl（宣言ノードを MethodID へ）
+- op: resolveCalls（呼び出しノード群を MethodID へ）
+
+Response
+
+- ok: true/false
+- errors: []
+- results: []（byte range と MethodID）
+
+line-delimited JSON（1 行 1 メッセージ）にして、ストリーム処理しやすくする。
+
+## 8. キャッシュ
+
+### 8.1 Go 側
+
+- `.depwalk/index.sqlite` か `.depwalk/index.jsonl`（選択）
+- ファイルごとに hash（`mtime+size` でも可）を持ち、差分更新
+- CallNameIndex はファイル単位に再構築可能にする
+
+### 8.2 Java 側
+
+- (fileHash, startByte, endByte) -> MethodID のメモ化
+- helper 常駐中は LRU で保持、Go 側永続キャッシュに書いても良い（将来）
+
+## 9. エラーハンドリング方針
+
+- classpath 取得失敗：Gradle コマンド・stderr の要点を出し、`--classpath-file` を案内
+- 解決不能：(unresolved) として表示（ノード種別・文字列・位置は残す）
+- `file#method` が曖昧（候補が 0 件または複数）な場合：エラーで停止し、候補（最大 N 件）を提示する
+- helper 死活：タイムアウトで再起動、再送（ただし無限リトライしない）
+
+## 10. セキュリティ / 安全性
+
+- ローカル解析のみ（ネットワーク送信なし）
+- 外部コマンドは gradlew と java のみ（引数はサニタイズ）
+- 解析対象のパスはプロジェクト配下に制限可能（将来）
+
+## 11. テスト計画
+
+- Unit（Go）
+  - `file:line` → enclosing method 特定
+  - `file#method` → 候補抽出（1 件/複数/0 件）の挙動
+  - index 生成、探索（循環、depth 制限）
+  - mermaid/tree 出力のスナップショット
+- Integration
+  - 小さな Gradle サンプルを fixtures として同梱
+  - callers/callees の期待グラフ一致
+- E2E
+  - 実プロジェクトで smoke test（CI 想定）
+
+## 12. 将来拡張
+
+- `--module`（Gradle multi-module のターゲット指定）
+- `--package-filter`（探索範囲限定）
+- 出力：JSON（他ツール連携）
+- Kotlin 対応（kotlin tree-sitter + KSP/型解決は別設計）
