@@ -1,0 +1,156 @@
+---
+alwaysApply: true
+---
+
+# アーキテクチャルール
+
+depwalk はハイブリッド・パイプラインアーキテクチャを採用している。
+詳細は `docs/adr/0001-hybrid-pipeline-architecture.md` を参照。
+
+## パッケージ構成
+
+```
+depwalk/
+├── cmd/depwalk/     # CLI エントリポイント
+├── internal/
+│   ├── model/       # 純粋データ構造（外部依存なし）
+│   ├── pipeline/    # パイプライン定義 + インターフェース
+│   ├── infra/       # 外部依存の実装
+│   │   ├── treesitter/
+│   │   ├── javahelper/
+│   │   ├── gradle/
+│   │   ├── cache/
+│   │   └── output/
+│   └── driver/      # 言語ドライバ
+├── pkg/             # 再利用可能ユーティリティ
+└── java/            # Java ヘルパー
+```
+
+## 依存関係ルール（厳守）
+
+### 許可される依存
+
+```
+cmd/depwalk
+    │
+    ├──► internal/pipeline（インターフェース使用）
+    │
+    └──► internal/driver（ドライバ取得）
+              │
+              ├──► internal/pipeline（インターフェース）
+              │
+              └──► internal/infra/*（実装）
+                        │
+                        ├──► internal/model
+                        │
+                        ├─ ─► internal/pipeline（implements）
+                        │
+                        └──► pkg/*
+
+internal/pipeline
+    │
+    └──► internal/model
+
+internal/model
+    │
+    └──► pkg/*（最小限）
+```
+
+### 禁止される依存
+
+- `model` → `pipeline`: モデルはビジネスロジックに依存しない
+- `model` → `infra`: モデルは外部依存を持たない
+- `pipeline` → `infra`（具体実装）: パイプラインはインターフェースのみ使用
+- 循環依存: すべて禁止
+
+## パッケージ責務
+
+### internal/model/
+
+**純粋なデータ構造のみ**。IO やフレームワーク依存を入れない。
+
+含むもの:
+
+- `MethodID`: 安定したメソッド識別子
+- `DeclRange`: 宣言の位置情報
+- `CallSite`: 呼び出し箇所
+- `Graph`: 呼び出しグラフ
+- `Selector`: セレクタ解析
+- エラー型（`SelectorError` 等）
+
+### internal/pipeline/
+
+**インターフェース定義**と**オーケストレーション**。
+
+含むもの:
+
+- `stage.go`: Parser, Resolver, Index, Cache インターフェース
+- `config.go`: 設定構造体
+- `deps.go`: 依存バンドル
+- `callees.go`, `callers.go`: パイプライン実装
+
+重要: 具体的な実装（treesitter, javahelper）への依存は禁止。
+
+### internal/infra/
+
+**外部システムとの接続**。pipeline のインターフェースを実装。
+
+- `treesitter/`: pipeline.Parser を実装
+- `javahelper/`: pipeline.Resolver を実装
+- `gradle/`: pipeline.ClasspathProvider を実装
+- `cache/`: pipeline.Cache を実装
+- `output/`: Renderer（出力フォーマット）
+
+### internal/driver/
+
+**言語固有のコンポーネントバンドル**。
+
+- `Driver` 構造体で Parser, Resolver, Cache 等をまとめる
+- レジストリで言語名 → Driver のマッピング
+- 現在は Java のみ、将来 Kotlin 等を追加可能
+
+### pkg/
+
+**再利用可能なユーティリティ**。depwalk 固有でない汎用コード。
+
+- `execx/`: コマンド実行ヘルパー
+- `jsonl/`: JSON Lines エンコード/デコード
+- `pathx/`: プロジェクトルート探索
+
+## 新しいパッケージを追加する際の判断
+
+```
+新しいコード
+    │
+    ├── depwalk 固有? ──► internal/
+    │       │
+    │       ├── 純粋データ構造? ──► internal/model/
+    │       │
+    │       ├── インターフェース? ──► internal/pipeline/
+    │       │
+    │       ├── 外部依存実装? ──► internal/infra/
+    │       │
+    │       └── 言語固有設定? ──► internal/driver/
+    │
+    └── 汎用的で再利用可能? ──► pkg/
+```
+
+## インターフェース定義の場所
+
+外部依存を抽象化するインターフェースは **必ず** `internal/pipeline/stage.go` に定義。
+
+```go
+// ❌ 悪い例
+package treesitter
+type Parser interface { ... }
+
+// ✅ 良い例
+package pipeline
+type Parser interface { ... }
+```
+
+## 参照
+
+- docs/architecture-guide.md
+- docs/adr/0001-hybrid-pipeline-architecture.md
+- docs/adr/0002-package-structure.md
