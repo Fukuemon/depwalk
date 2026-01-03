@@ -1,0 +1,9 @@
+// Dummy build.gradle for project root detection
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+

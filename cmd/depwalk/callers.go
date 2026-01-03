@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Fukuemon/depwalk/internal/driver"
 	"github.com/Fukuemon/depwalk/internal/infra/output"
@@ -46,9 +47,22 @@ Examples:
 			// Detect project root
 			projectRoot := rf.projectRoot
 			if projectRoot == "" {
-				detected, err := pathx.FindProjectRoot(".")
+				// Try to detect from the selector's file path first
+				selectorDir := filepath.Dir(selectorRaw)
+				if idx := strings.Index(selectorRaw, ":"); idx > 0 {
+					selectorDir = filepath.Dir(selectorRaw[:idx])
+				}
+				if idx := strings.Index(selectorRaw, "#"); idx > 0 {
+					selectorDir = filepath.Dir(selectorRaw[:idx])
+				}
+
+				detected, err := pathx.FindProjectRoot(selectorDir, "build.gradle", "build.gradle.kts", "pom.xml", ".git")
 				if err != nil {
-					return fmt.Errorf("could not detect project root: %w", err)
+					// Fallback to current directory
+					detected, err = pathx.FindProjectRoot(".", "build.gradle", "build.gradle.kts", "pom.xml", ".git")
+					if err != nil {
+						return fmt.Errorf("could not detect project root: %w", err)
+					}
 				}
 				projectRoot = detected
 			}
