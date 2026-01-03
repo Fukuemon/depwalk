@@ -1,0 +1,30 @@
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.gocache/
+
+# depwalk runtime artifacts
+.depwalk/
+
+# Java / Gradle
+**/build/
+**/.gradle/
+**/out/
+**/target/
+**/*.class
+
+# (Optional) IntelliJ / Eclipse
+**/.classpath
+**/.project
+**/.settings/
+
+
