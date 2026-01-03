@@ -3,8 +3,10 @@ package driver
 import (
 	"github.com/Fukuemon/depwalk/internal/infra/cache"
 	"github.com/Fukuemon/depwalk/internal/infra/gradle"
+	"github.com/Fukuemon/depwalk/internal/infra/index"
 	"github.com/Fukuemon/depwalk/internal/infra/javahelper"
 	"github.com/Fukuemon/depwalk/internal/infra/treesitter"
+	"github.com/Fukuemon/depwalk/internal/pipeline"
 )
 
 // RegisterJava registers the Java language driver.
@@ -14,15 +16,20 @@ func RegisterJava() {
 	// In practice, these will be initialized with proper config
 	// when the pipeline runs (e.g., classpath from gradle).
 	resolver := javahelper.NewResolver("")
+	cacheInstance := cache.NewCache(".depwalk")
 
 	d := Driver{
 		Name:            "java",
 		Parser:          treesitter.NewParser(),
 		Resolver:        resolver,
-		Index:           nil, // TODO: implement
-		Cache:           cache.NewCache(".depwalk"),
+		Index:           nil, // Created dynamically via IndexFactory
+		Cache:           cacheInstance,
 		Classpath:       gradle.NewClasspathProvider(),
-		ResolverStarter: resolver, // javahelper.Resolver implements ResolverLifecycle
+		ResolverStarter: resolver,
+		CacheManager:    cacheInstance,
+		IndexFactory: func(sourceRoots []string, includeTests bool) pipeline.Index {
+			return index.NewCallNameIndex(sourceRoots, includeTests)
+		},
 	}
 	Register("java", d)
 }

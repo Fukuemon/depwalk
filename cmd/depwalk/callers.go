@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/Fukuemon/depwalk/internal/driver"
@@ -63,6 +64,17 @@ Examples:
 			// Find the Java helper jar
 			jarPath := findHelperJar(projectRoot)
 
+			// Open cache
+			if !rf.noCache {
+				if err := d.OpenCache(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to open cache: %v\n", err)
+				}
+				defer d.CloseCache()
+			}
+
+			// Create Index for callers lookup
+			d.CreateIndex(sourceRoots, rf.includeTS)
+
 			// Start the resolver
 			if err := d.StartResolver(ctx, sourceRoots, jarPath); err != nil {
 				return fmt.Errorf("failed to start resolver: %w", err)
@@ -81,8 +93,9 @@ Examples:
 				NoCache:      rf.noCache,
 			}
 
-			// Create and run pipeline
-			p := pipeline.NewCallersPipeline(d.Dependencies(), cfg)
+			// Create and run pipeline with updated dependencies
+			deps := d.Dependencies()
+			p := pipeline.NewCallersPipeline(deps, cfg)
 			result, err := p.Run(ctx, selectorRaw)
 			if err != nil {
 				return err

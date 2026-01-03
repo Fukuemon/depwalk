@@ -64,6 +64,15 @@ Examples:
 			// Find the Java helper jar
 			jarPath := findHelperJar(projectRoot)
 
+			// Open cache
+			if !rf.noCache {
+				if err := d.OpenCache(); err != nil {
+					// Log warning but continue without cache
+					fmt.Fprintf(os.Stderr, "Warning: failed to open cache: %v\n", err)
+				}
+				defer d.CloseCache()
+			}
+
 			// Start the resolver
 			if err := d.StartResolver(ctx, sourceRoots, jarPath); err != nil {
 				return fmt.Errorf("failed to start resolver: %w", err)

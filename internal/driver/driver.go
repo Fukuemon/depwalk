@@ -36,6 +36,12 @@ type Driver struct {
 	// ResolverStarter is an optional interface for starting the resolver.
 	// If set, it will be called before running the pipeline.
 	ResolverStarter ResolverLifecycle
+
+	// CacheManager is an optional interface for cache lifecycle.
+	CacheManager CacheLifecycle
+
+	// IndexFactory creates an Index for the given source roots.
+	IndexFactory IndexFactory
 }
 
 // ResolverLifecycle provides lifecycle management for resolvers that need it.
@@ -45,6 +51,15 @@ type ResolverLifecycle interface {
 	SetSourceRoots(roots []string)
 	SetJarPath(jarPath string)
 }
+
+// CacheLifecycle provides lifecycle management for caches.
+type CacheLifecycle interface {
+	Open() error
+	Close() error
+}
+
+// IndexFactory creates an Index for the given configuration.
+type IndexFactory func(sourceRoots []string, includeTests bool) pipeline.Index
 
 // Dependencies converts Driver to pipeline.Dependencies.
 func (d Driver) Dependencies() pipeline.Dependencies {
@@ -72,4 +87,27 @@ func (d Driver) StopResolver() error {
 		return d.ResolverStarter.Stop()
 	}
 	return nil
+}
+
+// OpenCache opens the cache if it implements CacheLifecycle.
+func (d Driver) OpenCache() error {
+	if d.CacheManager != nil {
+		return d.CacheManager.Open()
+	}
+	return nil
+}
+
+// CloseCache closes the cache if it implements CacheLifecycle.
+func (d Driver) CloseCache() error {
+	if d.CacheManager != nil {
+		return d.CacheManager.Close()
+	}
+	return nil
+}
+
+// CreateIndex creates an Index using the IndexFactory.
+func (d *Driver) CreateIndex(sourceRoots []string, includeTests bool) {
+	if d.IndexFactory != nil {
+		d.Index = d.IndexFactory(sourceRoots, includeTests)
+	}
 }

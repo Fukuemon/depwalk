@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/Fukuemon/depwalk/internal/infra/output"
 	"github.com/Fukuemon/depwalk/internal/model"
@@ -92,11 +93,13 @@ func (p *CalleesPipeline) findDeclaration(ctx context.Context, sel model.Selecto
 			}
 		}
 		if len(candidates) > 1 {
-			// TODO: format candidates for display
+			// Format candidates for display
+			candidateStrs := formatCandidates(sel.File, candidates)
 			return model.DeclRange{}, &model.SelectorError{
-				Kind:     model.SelectorErrorAmbiguous,
-				Selector: sel.Raw,
-				Message:  fmt.Sprintf("multiple methods named '%s' found", sel.MethodName),
+				Kind:       model.SelectorErrorAmbiguous,
+				Selector:   sel.Raw,
+				Message:    fmt.Sprintf("multiple methods named '%s' found in %s", sel.MethodName, sel.File),
+				Candidates: candidateStrs,
 			}
 		}
 		return candidates[0], nil
@@ -206,3 +209,39 @@ func (p *CalleesPipeline) traverse(ctx context.Context, root model.MethodID, roo
 	return graph, nil
 }
 
+// formatCandidates formats DeclRange candidates for display.
+// Returns a slice of strings like "line 12" for each candidate.
+func formatCandidates(file string, candidates []model.DeclRange) []string {
+	// Read file to calculate line numbers from byte offsets
+	content, err := os.ReadFile(file)
+	if err != nil {
+		// Fallback to byte offsets if we can't read the file
+		result := make([]string, len(candidates))
+		for i, c := range candidates {
+			result[i] = fmt.Sprintf("byte %d-%d", c.StartByte, c.EndByte)
+		}
+		return result
+	}
+
+	result := make([]string, len(candidates))
+	for i, c := range candidates {
+		line := byteOffsetToLine(content, c.StartByte)
+		result[i] = fmt.Sprintf("line %d", line)
+	}
+	return result
+}
+
+// byteOffsetToLine converts a byte offset to a 1-based line number.
+func byteOffsetToLine(content []byte, offset uint32) int {
+	if offset == 0 {
+		return 1
+	}
+
+	line := 1
+	for i := uint32(0); i < offset && int(i) < len(content); i++ {
+		if content[i] == '\n' {
+			line++
+		}
+	}
+	return line
+}
