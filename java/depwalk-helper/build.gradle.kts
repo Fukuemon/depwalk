@@ -10,7 +10,8 @@ repositories {
 }
 
 dependencies {
-    // TODO: add JavaParser + SymbolSolver dependencies.
+    implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.2")
+    implementation("com.google.code.gson:gson:2.11.0")
 }
 
 application {

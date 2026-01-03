@@ -95,26 +95,92 @@ func (r *Renderer) renderMermaid(root model.MethodID, g *model.Graph, direction 
 	}
 	sb.WriteString(fmt.Sprintf("graph %s\n", graphDir))
 
-	// Add edges
+	// Track which nodes we've defined to avoid duplicates
+	definedNodes := make(map[string]bool)
+
+	// Add edges with node definitions
 	for from, edges := range g.Edges {
+		fromID := mermaidNodeID(string(from))
+		fromLabel := mermaidNodeLabel(string(from))
+
+		// Define 'from' node if not yet defined
+		if !definedNodes[fromID] {
+			sb.WriteString(fmt.Sprintf("    %s[\"%s\"]\n", fromID, fromLabel))
+			definedNodes[fromID] = true
+		}
+
 		for to := range edges {
-			// Escape special characters in method IDs
-			fromEsc := escapeMermaidID(string(from))
-			toEsc := escapeMermaidID(string(to))
-			sb.WriteString(fmt.Sprintf("    %s --> %s\n", fromEsc, toEsc))
+			toID := mermaidNodeID(string(to))
+			toLabel := mermaidNodeLabel(string(to))
+
+			// Define 'to' node if not yet defined
+			if !definedNodes[toID] {
+				sb.WriteString(fmt.Sprintf("    %s[\"%s\"]\n", toID, toLabel))
+				definedNodes[toID] = true
+			}
+
+			sb.WriteString(fmt.Sprintf("    %s --> %s\n", fromID, toID))
 		}
 	}
 
 	return sb.String()
 }
 
-func escapeMermaidID(id string) string {
-	// Replace special characters that break Mermaid syntax
+// mermaidNodeID creates a valid Mermaid node ID from a MethodID.
+func mermaidNodeID(id string) string {
+	// Replace special characters that break Mermaid node IDs
 	id = strings.ReplaceAll(id, "#", "_")
-	id = strings.ReplaceAll(id, "(", "[")
-	id = strings.ReplaceAll(id, ")", "]")
+	id = strings.ReplaceAll(id, "(", "_")
+	id = strings.ReplaceAll(id, ")", "_")
 	id = strings.ReplaceAll(id, ",", "_")
 	id = strings.ReplaceAll(id, ".", "_")
+	id = strings.ReplaceAll(id, " ", "_")
 	return id
 }
 
+// mermaidNodeLabel creates a readable label for display.
+// Format: ClassName.methodName(params)
+func mermaidNodeLabel(id string) string {
+	// Parse: com.example.FooService#doThing(java.lang.String,int)
+	hashIdx := strings.LastIndex(id, "#")
+	if hashIdx == -1 {
+		return id
+	}
+
+	fqn := id[:hashIdx]
+	methodSig := id[hashIdx+1:]
+
+	// Extract simple class name from FQN
+	dotIdx := strings.LastIndex(fqn, ".")
+	className := fqn
+	if dotIdx >= 0 {
+		className = fqn[dotIdx+1:]
+	}
+
+	// Simplify parameter types
+	parenIdx := strings.Index(methodSig, "(")
+	if parenIdx == -1 {
+		return className + "." + methodSig
+	}
+
+	methodName := methodSig[:parenIdx]
+	paramsPart := methodSig[parenIdx+1 : len(methodSig)-1] // Remove ( and )
+
+	if paramsPart == "" {
+		return className + "." + methodName + "()"
+	}
+
+	// Simplify each parameter type
+	params := strings.Split(paramsPart, ",")
+	simpleParams := make([]string, len(params))
+	for i, p := range params {
+		dotIdx := strings.LastIndex(p, ".")
+		if dotIdx >= 0 {
+			simpleParams[i] = p[dotIdx+1:]
+		} else {
+			simpleParams[i] = p
+		}
+	}
+
+	return className + "." + methodName + "(" + strings.Join(simpleParams, ", ") + ")"
+}

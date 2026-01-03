@@ -13,13 +13,16 @@ func RegisterJava() {
 	// Note: Components are created with default/empty config.
 	// In practice, these will be initialized with proper config
 	// when the pipeline runs (e.g., classpath from gradle).
+	resolver := javahelper.NewResolver("")
+
 	d := Driver{
-		Name:      "java",
-		Parser:    treesitter.NewParser(),
-		Resolver:  javahelper.NewResolver(""), // classpath set later
-		Index:     nil,                        // TODO: implement
-		Cache:     cache.NewCache(".depwalk"),
-		Classpath: gradle.NewClasspathProvider(),
+		Name:            "java",
+		Parser:          treesitter.NewParser(),
+		Resolver:        resolver,
+		Index:           nil, // TODO: implement
+		Cache:           cache.NewCache(".depwalk"),
+		Classpath:       gradle.NewClasspathProvider(),
+		ResolverStarter: resolver, // javahelper.Resolver implements ResolverLifecycle
 	}
 	Register("java", d)
 }
@@ -28,4 +31,3 @@ func RegisterJava() {
 func RegisterDefaults() {
 	RegisterJava()
 }
-
