@@ -12,6 +12,7 @@ depwalk はハイブリッド・パイプラインアーキテクチャを採用
 ```
 depwalk/
 ├── cmd/depwalk/     # CLI エントリポイント
+├── config/          # アプリケーション設定（YAML + 環境変数）
 ├── internal/
 │   ├── model/       # 純粋データ構造（外部依存なし）
 │   ├── pipeline/    # パイプライン定義 + インターフェース
@@ -23,6 +24,10 @@ depwalk/
 │   │   └── output/
 │   └── driver/      # 言語ドライバ
 ├── pkg/             # 再利用可能ユーティリティ
+│   ├── execx/
+│   ├── jsonl/
+│   ├── logger/      # 構造化ログ（slog）
+│   └── pathx/
 └── java/            # Java ヘルパー
 ```
 
@@ -32,6 +37,10 @@ depwalk/
 
 ```
 cmd/depwalk
+    │
+    ├──► config（設定読み込み）
+    │       │
+    │       └──► pkg/logger（ログ設定）
     │
     ├──► internal/pipeline（インターフェース使用）
     │
@@ -54,6 +63,10 @@ internal/pipeline
 internal/model
     │
     └──► pkg/*（最小限）
+
+config
+    │
+    └──► pkg/logger
 ```
 
 ### 禁止される依存
@@ -115,7 +128,16 @@ internal/model
 
 - `execx/`: コマンド実行ヘルパー
 - `jsonl/`: JSON Lines エンコード/デコード
+- `logger/`: 構造化ログ（`log/slog` ベース）
 - `pathx/`: プロジェクトルート探索
+
+### config/
+
+**アプリケーション設定**。YAML + 環境変数からの設定読み込み。
+
+- `cleanenv` ライブラリを使用
+- 環境変数が YAML より優先
+- `pkg/logger` の設定を含む
 
 ## 新しいパッケージを追加する際の判断
 

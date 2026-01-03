@@ -1,0 +1,4 @@
+logger:
+  level: info
+  add_source: true
+  json_format: true

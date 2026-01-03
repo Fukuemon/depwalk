@@ -16,6 +16,7 @@
 graph TD
     subgraph "depwalk"
         CMD[cmd/depwalk]
+        CONFIG[config]
 
         subgraph "internal"
             PIPELINE[pipeline]
@@ -24,13 +25,15 @@ graph TD
             INFRA[infra]
         end
 
-        PKG[pkg]
+        PKG[pkg<br/>execx / jsonl / logger / pathx]
     end
 
     JAVA[java/depwalk-helper]
 
+    CMD --> CONFIG
     CMD --> PIPELINE
     CMD --> DRIVER
+    CONFIG --> PKG
     PIPELINE --> MODEL
     DRIVER --> INFRA
     INFRA --> MODEL

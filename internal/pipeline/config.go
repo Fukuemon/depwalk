@@ -43,4 +43,3 @@ func DefaultConfig() Config {
 		NoCache:      false,
 	}
 }
-
