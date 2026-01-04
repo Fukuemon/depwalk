@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+depwalk
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Cache
+.depwalk/
+*.db
+
+# Test data (optional: remove this line if you need testdata in Docker)
+testdata/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Java build artifacts (will be rebuilt)
+java/depwalk-helper/build/
+java/depwalk-helper/bin/
+java/depwalk-helper/.gradle/
+
+# Misc
+.DS_Store
+Thumbs.db
+

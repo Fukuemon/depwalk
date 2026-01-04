@@ -49,6 +49,7 @@ Examples:
 
 	cmd.AddCommand(newCalleesCmd())
 	cmd.AddCommand(newCallersCmd())
+	cmd.AddCommand(newBothCmd())
 	return cmd
 }
 

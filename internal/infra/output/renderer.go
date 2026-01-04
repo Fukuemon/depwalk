@@ -23,6 +23,7 @@ type Direction string
 const (
 	DirectionCallees Direction = "callees"
 	DirectionCallers Direction = "callers"
+	DirectionBoth    Direction = "both"
 )
 
 // Renderer renders a call graph to various formats.
@@ -43,6 +44,101 @@ func (r *Renderer) Render(ctx context.Context, root model.MethodID, g *model.Gra
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
+}
+
+// RenderBoth renders both callees and callers graphs in the specified format.
+func (r *Renderer) RenderBoth(ctx context.Context, root model.MethodID, calleesGraph, callersGraph *model.Graph, format Format) (string, error) {
+	switch format {
+	case FormatTree:
+		return r.renderBothTree(root, calleesGraph, callersGraph), nil
+	case FormatMermaid:
+		return r.renderBothMermaid(root, calleesGraph, callersGraph), nil
+	default:
+		return "", fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+func (r *Renderer) renderBothTree(root model.MethodID, calleesGraph, callersGraph *model.Graph) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("both: %s\n\n", root))
+
+	// Render callees section
+	sb.WriteString("=== Callees (outgoing) ===\n")
+	visitedCallees := make(map[model.MethodID]bool)
+	r.renderTreeNode(&sb, root, calleesGraph, DirectionCallees, "", true, visitedCallees)
+
+	sb.WriteString("\n=== Callers (incoming) ===\n")
+	visitedCallers := make(map[model.MethodID]bool)
+	r.renderTreeNode(&sb, root, callersGraph, DirectionCallers, "", true, visitedCallers)
+
+	return sb.String()
+}
+
+func (r *Renderer) renderBothMermaid(root model.MethodID, calleesGraph, callersGraph *model.Graph) string {
+	var sb strings.Builder
+
+	// Use LR (left to right) for combined view
+	sb.WriteString("graph LR\n")
+
+	// Define root node with special styling
+	rootID := mermaidNodeID(string(root))
+	rootLabel := mermaidNodeLabel(string(root))
+	sb.WriteString(fmt.Sprintf("    %s([\"%s\"]):::root\n", rootID, rootLabel))
+
+	definedNodes := map[string]bool{rootID: true}
+
+	// Add callers (point TO root)
+	for from, edges := range callersGraph.Edges {
+		fromID := mermaidNodeID(string(from))
+		fromLabel := mermaidNodeLabel(string(from))
+
+		if !definedNodes[fromID] {
+			sb.WriteString(fmt.Sprintf("    %s[\"%s\"]:::caller\n", fromID, fromLabel))
+			definedNodes[fromID] = true
+		}
+
+		for to := range edges {
+			toID := mermaidNodeID(string(to))
+			toLabel := mermaidNodeLabel(string(to))
+
+			if !definedNodes[toID] {
+				sb.WriteString(fmt.Sprintf("    %s[\"%s\"]:::caller\n", toID, toLabel))
+				definedNodes[toID] = true
+			}
+
+			sb.WriteString(fmt.Sprintf("    %s --> %s\n", fromID, toID))
+		}
+	}
+
+	// Add callees (point FROM root)
+	for from, edges := range calleesGraph.Edges {
+		fromID := mermaidNodeID(string(from))
+		fromLabel := mermaidNodeLabel(string(from))
+
+		if !definedNodes[fromID] {
+			sb.WriteString(fmt.Sprintf("    %s[\"%s\"]:::callee\n", fromID, fromLabel))
+			definedNodes[fromID] = true
+		}
+
+		for to := range edges {
+			toID := mermaidNodeID(string(to))
+			toLabel := mermaidNodeLabel(string(to))
+
+			if !definedNodes[toID] {
+				sb.WriteString(fmt.Sprintf("    %s[\"%s\"]:::callee\n", toID, toLabel))
+				definedNodes[toID] = true
+			}
+
+			sb.WriteString(fmt.Sprintf("    %s --> %s\n", fromID, toID))
+		}
+	}
+
+	// Add style definitions
+	sb.WriteString("\n    classDef root fill:#f96,stroke:#333,stroke-width:3px\n")
+	sb.WriteString("    classDef caller fill:#bbf,stroke:#333,stroke-width:1px\n")
+	sb.WriteString("    classDef callee fill:#bfb,stroke:#333,stroke-width:1px\n")
+
+	return sb.String()
 }
 
 func (r *Renderer) renderTree(root model.MethodID, g *model.Graph, direction Direction) string {

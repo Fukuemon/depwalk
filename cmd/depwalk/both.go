@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCalleesCmd() *cobra.Command {
+func newBothCmd() *cobra.Command {
 	var (
 		depth    int
 		format   string
@@ -21,18 +21,21 @@ func newCalleesCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "callees <selector>",
-		Short: "Explore callees (outgoing calls) recursively",
-		Long: `Explore methods called by the specified method, recursively.
+		Use:   "both <selector>",
+		Short: "Explore both callees and callers from a method",
+		Long: `Explore both outgoing calls (callees) and incoming calls (callers) from the specified method.
+
+This command combines the functionality of 'callees' and 'callers' commands,
+providing a complete view of method dependencies in both directions.
 
 Selector formats:
   file:line[:col]  - Start from the method containing this position
   file#method      - Start from the named method (must be unambiguous)
 
 Examples:
-  depwalk callees src/main/java/com/example/Service.java:42
-  depwalk callees src/main/java/com/example/Service.java#process --depth 5
-  depwalk callees src/Service.java:10 --format mermaid`,
+  depwalk both src/main/java/com/example/Service.java:42
+  depwalk both src/main/java/com/example/Service.java#process --depth 3
+  depwalk both src/Service.java:10 --format mermaid`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := rootContext()
@@ -47,7 +50,6 @@ Examples:
 			// Detect project root
 			projectRoot := rf.projectRoot
 			if projectRoot == "" {
-				// Try to detect from the selector's file path first
 				selectorDir := filepath.Dir(selectorRaw)
 				if idx := strings.Index(selectorRaw, ":"); idx > 0 {
 					selectorDir = filepath.Dir(selectorRaw[:idx])
@@ -58,7 +60,6 @@ Examples:
 
 				detected, err := pathx.FindProjectRoot(selectorDir, "build.gradle", "build.gradle.kts", "pom.xml", ".git")
 				if err != nil {
-					// Fallback to current directory
 					detected, err = pathx.FindProjectRoot(".", "build.gradle", "build.gradle.kts", "pom.xml", ".git")
 					if err != nil {
 						return fmt.Errorf("could not detect project root: %w", err)
@@ -81,11 +82,13 @@ Examples:
 			// Open cache
 			if !rf.noCache {
 				if err := d.OpenCache(); err != nil {
-					// Log warning but continue without cache
 					fmt.Fprintf(os.Stderr, "Warning: failed to open cache: %v\n", err)
 				}
 				defer d.CloseCache()
 			}
+
+			// Create Index for callers lookup (needed for both command)
+			d.CreateIndex(sourceRoots, rf.includeTS)
 
 			// Start the resolver
 			if err := d.StartResolver(ctx, sourceRoots, jarPath); err != nil {
@@ -106,7 +109,8 @@ Examples:
 			}
 
 			// Create and run pipeline
-			p := pipeline.NewCalleesPipeline(d.Dependencies(), cfg)
+			deps := d.Dependencies()
+			p := pipeline.NewBothPipeline(deps, cfg)
 			result, err := p.Run(ctx, selectorRaw)
 			if err != nil {
 				return err
@@ -117,35 +121,10 @@ Examples:
 		},
 	}
 
-	cmd.Flags().IntVar(&depth, "depth", 3, "search depth")
+	cmd.Flags().IntVar(&depth, "depth", 3, "search depth for each direction")
 	cmd.Flags().StringVar(&format, "format", "tree", "output format: tree|mermaid")
-	cmd.Flags().IntVar(&maxNodes, "max-nodes", 0, "max nodes limit (0 = unlimited)")
+	cmd.Flags().IntVar(&maxNodes, "max-nodes", 0, "max nodes limit per direction (0 = unlimited)")
 
 	return cmd
 }
 
-// findHelperJar looks for the depwalk-helper jar in common locations.
-// It first checks the DEPWALK_HELPER_JAR environment variable, then falls back to standard paths.
-func findHelperJar(projectRoot string) string {
-	// Check environment variable first (useful for Docker)
-	if envJar := os.Getenv("DEPWALK_HELPER_JAR"); envJar != "" {
-		if _, err := os.Stat(envJar); err == nil {
-			return envJar
-		}
-	}
-
-	candidates := []string{
-		filepath.Join(projectRoot, "java", "depwalk-helper", "build", "libs", "depwalk-helper-0.1.0-all.jar"),
-		filepath.Join(projectRoot, "build", "libs", "depwalk-helper-0.1.0-all.jar"),
-		"java/depwalk-helper/build/libs/depwalk-helper-0.1.0-all.jar",
-		"/opt/depwalk/depwalk-helper.jar", // Docker default location
-	}
-
-	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
-			return c
-		}
-	}
-
-	return ""
-}

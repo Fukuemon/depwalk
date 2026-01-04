@@ -1,0 +1,16 @@
+services:
+  depwalk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount your project directory
+      - .:/workspace:ro
+      # Optional: Persist cache between runs
+      - depwalk-cache:/workspace/.depwalk
+    working_dir: /workspace
+    # Override entrypoint for interactive use
+    # entrypoint: /bin/sh
+
+volumes:
+  depwalk-cache:
