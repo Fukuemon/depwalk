@@ -1,0 +1,42 @@
+name: 新機能の開発
+description: 新機能の開発に関するIssueを作成するためのテンプレート
+title: '✨ feature: '
+labels: ["enhancement" ]
+body:
+  - type: textarea
+    id: overview
+    attributes:
+      label: 概要
+      description: このIssueの概要を記載してください。
+    validations:
+      required: true
+  - type: input
+    id: goal
+    attributes:
+      label: 完了の定義
+      description: このIssueが完了したときの定義を記載してください
+    validations:
+      required: true
+  - type: textarea
+    id: todo
+    attributes:
+      label: タスク
+      description: このIssueを完了するためのタスクを記載してください
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: module
+    attributes:
+      label: 追加するモジュール
+      description: このIssueを完了するために追加するモジュールを記載してください
+      value: |
+        - 
+        - 
+  - type: textarea
+    id: note
+    attributes:
+      label: 備考
+      description: このIssueに関する備考を記載してください
