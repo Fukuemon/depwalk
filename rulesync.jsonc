@@ -3,14 +3,16 @@
     "copilot",
     "cursor",
     "claudecode",
-    "codexcli"
+    "codexcli",
+    "antigravity"
   ],
   "features": [
     "rules",
     "ignore",
     "mcp",
     "commands",
-    "subagents"
+    "subagents",
+    "skills"
   ],
   "baseDirs": [
     "."
