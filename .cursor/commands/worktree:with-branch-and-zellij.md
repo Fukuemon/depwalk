@@ -1,6 +1,6 @@
 # Worktree with Branch and Zellij (git-wt)
 
-タスク内容からブランチ名とタブ名（3-10文字、日本語可）を生成し、git worktreeを作成して、zellijで新しいタブを開き、Claude Codeを自動起動してタスクを開始する。
+タスク内容からブランチ名とタブ名（3-10文字、日本語可）を生成し、git worktreeを作成して、zellijで新しいタブを開き、AI Agent を自動起動してタスクを開始する。
 
 ## 引数
 
@@ -54,9 +54,36 @@ Readツールでファイル内容を読み込む
 `git-wt`（`git wt`）を使って worktree を作成/切替する。
 
 - `git wt <branch|worktree>` は、対象が無ければ **ブランチとworktreeを作成**して切り替える
-- `--nocd` を付けると **ディレクトリ移動せずに worktree パスを出力**する（このパスを zellij の `--cwd` に使う）:contentReference[oaicite:1]{index=1}
+- `--nocd` を付けると **ディレクトリ移動せずに worktree パスを出力**する（このパスを zellij の `--cwd` に使う）
 
 以下を実行して worktree のパスを取得する:
 
 ```bash
 worktree_path="$(git wt --nocd "<generated-branch-name>" | tail -n 1)"
+```
+
+### Step 5: zellij で新しいタブを開く
+
+取得した worktree パスを使って、zellij で新しいタブを開く:
+
+```bash
+zellij action new-tab --name "<generated-tab-name>" --cwd "$worktree_path"
+```
+
+### Step 6: AI Agent を起動してタスクを開始
+
+新しいタブで AI Agent を起動し、タスク内容を渡す:
+
+
+## 実行例
+
+```bash
+# Issue URL からタスクを開始
+/worktree:with-branch-and-zellij https://github.com/owner/repo/issues/123
+
+# タスク説明から開始
+/worktree:with-branch-and-zellij "ユーザー認証機能を追加"
+
+# ファイルパスから開始
+/worktree:with-branch-and-zellij ./tasks/new-feature.md
+```
