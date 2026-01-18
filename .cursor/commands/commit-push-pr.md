@@ -2,7 +2,8 @@
 
 ## 概要
 
-現在のブランチに対して変更をコミットし、リモートへプッシュしたあと、Pull Request を作成するための一括実行コマンド
+現在のブランチに対して変更をコミットし、リモートへプッシュしたあと、Pull Request を作成するための一括実行コマンドです。
+また、ブランチ名から関連Issueを特定し、Issue の確認・更新、残作業がある場合の新規Issue作成も行います。
 
 ## 前提条件
 
@@ -10,15 +11,19 @@
 - リモート `origin` が設定済みであること
 - GitHub CLI (`gh`) がインストール済みであること（フォールバック用）
 - 作業ブランチ（feature/_, fix/_ など）にいること
+- ブランチ名は `<prefix>/<issue番号>` の形式であること（例: `feature/3`, `fix/42`）
 
 ## 実行手順（対話なし）
 
 1. ブランチ確認（main/develop 直プッシュ防止）
-2. 必要に応じて品質チェック（lint / test / build など）を実行
-3. 変更のステージング（`git add -A`）
-4. コミット（引数または環境変数のメッセージ使用）
-5. プッシュ（`git push -u origin <current-branch>`）
-6. PR作成（MCP や CLI など、環境に応じた方法で作成）
+2. ブランチ名からIssue番号を抽出（例: `feature/3` → `#3`）
+3. 関連Issueの内容を確認・必要に応じて更新
+4. 必要に応じて品質チェック（lint / test / build など）を実行
+5. 変更のステージング（`git add -A`）
+6. コミット（引数または環境変数のメッセージ使用）
+7. プッシュ（`git push -u origin <current-branch>`）
+8. 残作業がある場合、新しいIssueを作成
+9. PR作成（MCP や CLI など、環境に応じた方法で作成）
 
 ## 使い方
 
@@ -32,7 +37,7 @@ MSG="fix: 不要なデバッグログ出力を削除"
 
 # 一括実行
 BRANCH=$(git branch --show-current) && \
-if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "dvelop" ]; then \
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then \
   echo "⚠️ main/develop への直接プッシュは禁止です"; exit 1; \
 fi
 
@@ -122,34 +127,95 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then
   echo "⚠️ main/develop への直接プッシュは禁止です"; exit 1;
 fi
 
-# 2) 変更ファイルの確認
+# 2) Issue番号を抽出
+ISSUE_NUMBER=$(echo "$BRANCH" | sed -E 's/^[^/]+\///')
+echo "関連Issue: #$ISSUE_NUMBER"
+
+# 3) 関連Issueの確認（gh CLIを使用）
+gh issue view "$ISSUE_NUMBER"
+# ここでAIにIssueの内容確認・更新を依頼
+
+# 4) 変更ファイルの確認
 echo "変更されたファイル:"
 git status --short
 
-# 3) 任意のローカル品質チェック（必要に応じて追加）
+# 5) 任意のローカル品質チェック（必要に応じて追加）
 # 例:
 # echo "品質チェック実行中..."
 # ./scripts/lint.sh && ./scripts/test.sh && ./scripts/build.sh || exit 1
 
-# 4) 変更をステージング
+# 6) 変更をステージング
 git add -A
 echo "ステージング完了"
 
-# 5) コミット
+# 7) コミット
 MSG="fix: 不要なデバッグログ出力を削除"
 git commit -m "$MSG"
 echo "コミット完了"
 
-# 6) プッシュ
+# 8) プッシュ
 git push -u origin "$BRANCH"
 echo "プッシュ完了"
 
-# 7) PR作成（AIやCLIに依頼）
+# 9) 残作業Issueの作成（必要な場合）
+# gh issue create --title "✨ feature: 残作業のタイトル" --body "<本文>" --label "enhancement"
+
+# 10) PR作成（AIやCLIに依頼）
 # この後、AI や gh コマンドなどを使って PR を作成：
 # - ブランチ名: $BRANCH
+# - 関連Issue: #$ISSUE_NUMBER
 # - 差分: git diff develop...HEAD --name-status
 # - コミット履歴: git log develop..HEAD --oneline
 ```
+
+## ブランチ名からIssue番号を抽出
+
+```bash
+# ブランチ名からIssue番号を抽出
+BRANCH=$(git branch --show-current)
+ISSUE_NUMBER=$(echo "$BRANCH" | sed -E 's/^[^/]+\///')
+# 例: feature/3 → 3, fix/42 → 42
+```
+
+## 関連Issueの確認・更新フロー
+
+PR作成前に、ブランチに紐づくIssueの内容を確認し、必要に応じて更新します。
+
+### 確認項目
+
+1. Issueのタイトルと概要が実装内容と一致しているか
+2. タスクの完了状況が最新か
+3. 完了の定義を満たしているか
+4. 追加で記載すべき情報がないか
+
+### 更新が必要な場合
+
+- コードベースの変更内容とIssueの記載内容に差異がある場合
+- タスクの完了状況を更新する必要がある場合
+- 実装中に判明した追加情報を記載する必要がある場合
+
+Issue の整理・更新の詳細なフローは、`.cursor/commands/create-issue.md` を参照してください。
+Issue メッセージのフォーマットは、`.cursor/rules/issue-message-format.mdc` に従ってください。
+
+## 残作業用Issue作成フロー
+
+PR作成時に残作業がある場合、または実装内容がブランチの目的と異なる部分がある場合は、新しいIssueを作成します。
+
+### 残作業Issueを作成するケース
+
+1. PR本文の「残作業」セクションに項目がある場合
+2. 元のIssueのタスクで未完了の項目がある場合
+3. 実装中に発見した追加の改善点がある場合
+4. スコープ外だが関連する作業が発生した場合
+
+### 作成するIssueの種類
+
+| 残作業の内容 | Issue種類 | タイトル形式 |
+|---|---|---|
+| 新機能の追加実装 | 機能追加 | `✨ feature: <サマリ>` |
+| バグの発見・修正 | バグ報告 | `🐛 bug: <サマリ>` |
+
+Issue作成時は、`.cursor/rules/issue-message-format.mdc` のフォーマットに従ってください。
 
 ## PR自動生成の情報源
 
@@ -158,6 +224,10 @@ AIがPRを作成する際に使用する情報：
 ```bash
 # ブランチ名を取得（目的の推測に使用）
 git branch --show-current
+
+# ブランチ名からIssue番号を抽出
+BRANCH=$(git branch --show-current)
+ISSUE_NUMBER=$(echo "$BRANCH" | sed -E 's/^[^/]+\///')
 
 # ベースとの差分を取得
 git merge-base origin/develop HEAD
@@ -182,7 +252,9 @@ git log origin/develop..HEAD --oneline
 ## 注意事項
 
 - コミットメッセージのフォーマットやメッセージ生成の原則は、`.cursor/rules/commit-message-format.mdc` の規約に従ってください。
+- Issue メッセージのフォーマットは、`.cursor/rules/issue-message-format.mdc` のルールに従ってください。
 - `git status` や `git diff` で差分を確認してからの実行を推奨します。
+- 残作業がある場合は、必ず対応するIssueを作成してからPRを作成してください。
 
 ## トラブルシューティング
 
@@ -233,5 +305,8 @@ git add -A && git commit -m "$MSG" && git push -u origin "$BRANCH"
 ## 関連ドキュメント
 
 - コミットメッセージルール: `.cursor/rules/commit-message-format.mdc`
-- PR メッセージルール（任意）: `.cursor/rules/pr-message-format.mdc`
+- PR メッセージルール: `.cursor/rules/pr-message-format.mdc`
+- Issue メッセージルール: `.cursor/rules/issue-message-format.mdc`
+- Issue 整理・作成コマンド: `.cursor/commands/create-issue.md`
+- PR 自動生成コマンド: `.cursor/commands/create-pr.md`
 - 開発フロー: プロジェクト固有の README / CONTRIBUTING / 開発ガイド等
