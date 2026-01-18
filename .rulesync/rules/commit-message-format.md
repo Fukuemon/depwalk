@@ -1,8 +1,13 @@
 ---
-alwaysApply: false
+targets:
+  - '*'
+root: false
 description: このルールは、すべてのコミットに対して適用されるコミットメッセージのガイドラインです
+globs: []
+cursor:
+  alwaysApply: false
+  description: このルールは、すべてのコミットに対して適用されるコミットメッセージのガイドラインです
 ---
-
 # Gitコミットメッセージの書式ルール
 
 このルールは、すべてのコミットに対して適用されるコミットメッセージのガイドラインです。

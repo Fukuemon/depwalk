@@ -1,3 +1,8 @@
+---
+targets:
+  - '*'
+description: ''
+---
 # PR 自動生成コマンド
 
 ## 概要

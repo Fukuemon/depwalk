@@ -1,3 +1,8 @@
+---
+targets:
+  - '*'
+description: ''
+---
 # GitHub Issue の整理・作成コマンド
 
 ## 概要
