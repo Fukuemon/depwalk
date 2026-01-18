@@ -1,8 +1,3 @@
----
-alwaysApply: false
-description: PRメッセージの書式ルール（Prefix + サマリ + 構造化本文）
----
-
 # PRメッセージの書式ルール
 
 このルールは、Pull Request（PR）のタイトルおよび本文に適用されるガイドラインです。

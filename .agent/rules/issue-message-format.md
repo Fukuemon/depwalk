@@ -1,8 +1,6 @@
 ---
-alwaysApply: false
-description: Issue作成時のタイトル・本文の書式ルール（種類別フォーマット）
+trigger: always_on
 ---
-
 # GitHub Issue メッセージの書式ルール
 
 このルールは、GitHub Issue のタイトルおよび本文に適用されるガイドラインです。
