@@ -1,4 +1,9 @@
 {
   "version": 1,
-  "permissions": {}
+  "permissions": {
+    "allow": []
+  },
+  "editor": {
+    "vimMode": false
+  }
 }
