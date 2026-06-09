@@ -1,0 +1,43 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/protected-branch/pre_tool_use.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/protected-branch/pre_tool_use.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/markdown/format_markdown.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash hooks/spec/validate_document.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash hooks/spec/validate_prompts.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

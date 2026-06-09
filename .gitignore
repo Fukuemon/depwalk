@@ -1,0 +1,12 @@
+.env
+.DS_Store
+*.log
+*.tmp
+*.swp
+*~
+.ai-out/*
+design/.staging/
+dist/
+build/
+__pycache__/
+*.pyc
