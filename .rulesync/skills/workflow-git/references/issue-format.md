@@ -4,13 +4,13 @@ GitHub Issue のタイトル・本文フォーマット。
 
 ## Issue の種類
 
-| type       | タイトル形式            | 推奨ラベル    | 用途                           |
-| ---------- | ----------------------- | ------------- | ------------------------------ |
-| `feature`  | `✨ feature: <サマリ>`  | `enhancement` | 新機能、利用者価値を増やす改善 |
-| `bug`      | `🐛 bug: <サマリ>`      | `bug`         | 不具合修正                     |
-| `research` | `🔎 research: <サマリ>` | `research`    | 調査、技術検証、スパイク       |
-| `task`     | `🛠 task: <サマリ>`     | `task`        | 実装や運用で実施すべき具体作業 |
-| `chore`    | `🧹 chore: <サマリ>`    | `chore`       | 保守、設定変更、依存更新、雑務 |
+| type       | タイトル形式            | type ラベル     | 用途                           |
+| ---------- | ----------------------- | --------------- | ------------------------------ |
+| `feature`  | `✨ feature: <サマリ>`  | `type:feature`  | 新機能、利用者価値を増やす改善 |
+| `bug`      | `🐛 bug: <サマリ>`      | `type:bug`      | 不具合修正                     |
+| `research` | `🔎 research: <サマリ>` | `type:research` | 調査、技術検証、スパイク       |
+| `task`     | `🛠 task: <サマリ>`     | `type:task`     | 実装や運用で実施すべき具体作業 |
+| `chore`    | `🧹 chore: <サマリ>`    | `type:chore`    | 保守、設定変更、依存更新、雑務 |
 
 ## タイトル
 
@@ -29,6 +29,17 @@ GitHub Issue のタイトル・本文フォーマット。
 - `research`: [../assets/issue-research-template.md](../assets/issue-research-template.md)
 - `task`: [../assets/issue-task-template.md](../assets/issue-task-template.md)
 - `chore`: [../assets/issue-chore-template.md](../assets/issue-chore-template.md)
+
+## ラベル
+
+ラベル体系の正本は **`context/project.md` の `Label Policy`**。本ファイルに固有値を直書きしない。起票時 (`gh issue create --label ...`) に最低限:
+
+- `type:*` を 1 件 (上表の type ラベルと一致)
+- 実装対象が定まるなら該当する `domain:*` (`context/project.md` の「対象ドメイン」に対応)
+- SDD の設計フェーズなら `phase:design`、実装フェーズなら `phase:implementation`
+- 複数 phase / spec にまたがる大きい要件 (親) には `epic`
+
+ラベルが repo に未作成なら `gh label create` で先に作る (定義は Label Policy)。
 
 ## メッセージ生成の原則
 
