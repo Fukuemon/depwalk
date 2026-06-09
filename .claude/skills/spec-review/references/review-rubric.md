@@ -38,24 +38,18 @@
 
 ## 4. template 必須節 (Structure Compliance)
 
-`templates/specs/template.md` の minimal core の必須節がすべて存在するか:
+`templates/specs/template.md` の必須節がすべて存在するか (`hooks/spec/validate_document.sh` の必須セクションと一致):
 
-- メタ情報
-- 設計フェーズ状況
-- 上位文書整合
-- 関連資料
-- 背景
-- スコープ (やること / やらないこと)
-- 要件の解釈
+- メタ情報 / 設計フェーズ状況 / 上位文書整合 / 関連資料 / 背景
+- スコープ (やること / やらないこと) / 要件の解釈
 - 設計時の論点 / 解決済みの論点 / 未確定事項
-- 実装対象
-- 機能仕様 (Performance / Routing / Content / UI Reuse / Testing)
-- フロー / シーケンス
+- 実装対象 / 機能仕様
+- Interface 設計 / Content / Data 設計 / Performance / Security 設計 / Error / Fallback 設計
+- テスト / 評価方針 / フロー / シーケンス / 実装分割
 - 上位資料からの変更点 (PRD / Design Doc / feature doc / context / ADR)
-- レビュー
-- 備考
+- レビュー / 変更履歴 / 備考
 
-→ 欠落があれば `NEEDS_WORK`。
+→ 欠落があれば `NEEDS_WORK`。節名の正本は `templates/specs/template.md` と `hooks/spec/validate_document.sh`。
 
 ## 5. EARS acceptance (受け入れ基準)
 
