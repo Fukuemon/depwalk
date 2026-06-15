@@ -8,7 +8,7 @@
 
 | Feature | 文書 | Phase | 状態 |
 | ------- | ---- | ----- | ---- |
-|         |      |       |      |
+| Analyzer Protocol / SPI | [DesignDoc_analyzer-protocol.md](analyzer-protocol/DesignDoc_analyzer-protocol.md) | Phase1 | 完了 |
 
 各 feature は `design/features/<feature>/` ディレクトリに集約する。design doc は `DesignDoc_<feature>.md`、付随するコンテンツ正本は `<feature>/reference/` に置く。
 
