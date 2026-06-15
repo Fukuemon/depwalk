@@ -131,7 +131,7 @@ EARS 風で振る舞いを記述する。
 
 ## 未確定事項
 
-- D1-D5 は解決済み。次は `spec-diagrams` で flow / sequence を生成し、実装分割と review gate に進める。
+- D1-D5 と flow / sequence は解決済み。次は review gate に進める。
 - Core 実装言語、package manager、test framework は未確定。Protocol 契約は特定実装言語に依存しない形で定義する。
 - 上位資料同期: Design Doc Open Question Q1 と requirements の Q1 は本 spec で解決済み。durable な正本ハンドオフは `spec-sync` で feature doc / ADR / context へ反映するまで保留し、その間は本 spec を作業正本とする。
 
@@ -453,18 +453,83 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 
 ## フロー / シーケンス
 
-(`spec-diagrams` で生成。spec の主要操作を Mermaid 図に落とす)
+この spec では、CLI 実行から `analysisRequest` 送信、Analyzer stdout validation、Graph 受領、diagnostic / error / exit code 分岐までを図示する。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    A["利用者 / CI が depwalk CLI を実行"] --> B["CLI が解析対象 / scope / entrypoints を受け取る"]
+    B --> C["Core が analysisRequest record を生成"]
+    C --> D{"request schema は有効か"}
+    D -- "No" --> E["schema error を表示して終了"]
+    D -- "Yes" --> F["Analyzer SPI が Analyzer process を起動"]
+    F --> G["stdin に analysisRequest を 1 件送信して close"]
+    G --> H["Analyzer が対象ソースを read-only 解析"]
+    H --> I["stdout に JSONL response record を逐次出力"]
+    I --> J{"各 JSONL 行は parse / schema validation 可能か"}
+    J -- "No" --> K["不正行 / schema 不準拠を報告して失敗"]
+    J -- "Yes" --> L{"recordType"}
+    L -- "methodSymbol / callEdge" --> M["Core が Graph Engine 向け Model として受領"]
+    L -- "diagnostic" --> N["Core が警告 / 部分解析を利用者へ伝播"]
+    L -- "error" --> O["Core が fatal failure として扱う"]
+    M --> P{"Analyzer process の exit code"}
+    N --> P
+    O --> Q["error code / message を表示して失敗"]
+    P -- "0" --> R["解析結果を成功または部分解析として確定"]
+    P -- "non-zero" --> S["exit code と stderr 要約を表示して失敗"]
 ```
 
 ### Sequence
 
 ```mermaid
 sequenceDiagram
+    actor User as 利用者 / CI
+    participant CLI as depwalk CLI
+    participant Core as Core
+    participant SPI as Analyzer SPI
+    participant Analyzer as Analyzer Process
+    participant Graph as Graph Engine
+
+    User->>CLI: 解析対象 / scope / entrypoints を指定して実行
+    CLI->>Core: CLI 入力を渡す
+    Core->>Core: analysisRequest を生成
+
+    alt request schema が不正
+        Core-->>CLI: schema error
+        CLI-->>User: 失敗を表示
+    else request schema が有効
+        Core->>SPI: Analyzer 起動を要求
+        SPI->>Analyzer: process 起動
+        SPI->>Analyzer: stdin に analysisRequest を送信
+        SPI->>Analyzer: stdin close
+        Analyzer->>Analyzer: 対象ソースを read-only 解析
+
+        loop stdout JSONL record ごと
+            Analyzer-->>Core: methodSymbol / callEdge / diagnostic / error
+            Core->>Core: parse / schema validation
+            alt 不正 JSONL または schema 不準拠
+                Core-->>CLI: validation error
+                CLI-->>User: 不正行 / schema 不準拠を表示
+            else methodSymbol / callEdge
+                Core->>Graph: graph node / edge として受領
+            else diagnostic
+                Core-->>CLI: diagnostic を伝播
+            else error
+                Core-->>CLI: fatal error を伝播
+            end
+        end
+
+        Analyzer-->>SPI: exit code / stderr
+        SPI-->>Core: exit code / stderr summary
+        alt exit code 0
+            Core-->>CLI: 成功または部分解析結果
+            CLI-->>User: 解析結果と diagnostics を表示
+        else exit code non-zero
+            Core-->>CLI: fatal failure
+            CLI-->>User: exit code と stderr 要約を表示
+        end
+    end
 ```
 
 ## 実装分割
@@ -545,6 +610,7 @@ sequenceDiagram
 
 | 日付       | 変更者 | 変更内容               |
 | ---------- | ------ | ---------------------- |
+| 2026-06-15 | Codex  | flow / sequence diagram を追加 |
 | 2026-06-13 | Codex  | 初版 draft spec を追加 |
 
 ## 備考
