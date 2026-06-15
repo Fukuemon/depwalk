@@ -8,7 +8,7 @@
 - Issue: `#8`
 - ステータス: `Draft`
 - 作成日: 2026-06-13
-- 更新日: 2026-06-13
+- 更新日: 2026-06-15
 - Branch: `feature/8`
 - Owner: Fukuemon
 
@@ -19,15 +19,15 @@
 | #   | フェーズ                    | 状態   | 最終更新   | 備考                                     |
 | --- | --------------------------- | ------ | ---------- | ---------------------------------------- |
 | 1   | 起票                        | 完了   | 2026-06-13 | GitHub issue #8 を確認済み               |
-| 2   | 下書き                      | 進行中 | 2026-06-13 | 本 spec を scaffold                      |
+| 2   | 下書き                      | 完了   | 2026-06-13 | 本 spec を scaffold                      |
 | 3   | 上位文書突合                | 完了   | 2026-06-13 | Design Doc / context / ADR と矛盾なし    |
 | 4   | 論点整理                    | 完了   | 2026-06-13 | D1-D5 を初期論点として列挙               |
-| 5   | 論点解決                    | 未着手 |            | `spec-resolve` で D1 から順に解決する    |
-| 6   | Interface / Routing 設計    | 未着手 |            | Analyzer SPI / process interface を扱う  |
-| 7   | Content / Data 設計         | 未着手 |            | Model schema / JSONL record を扱う       |
-| 8   | Performance / Security 設計 | 未着手 |            | streaming / read-only / no external send |
-| 9   | Test / Metrics 設計         | 未着手 |            | protocol contract test を扱う            |
-| 10  | 実装分割                    | 未着手 |            | prompts 生成前に分割する                 |
+| 5   | 論点解決                    | 完了   | 2026-06-15 | D1-D5 解決済み                           |
+| 6   | Interface / Routing 設計    | 完了   | 2026-06-15 | Analyzer SPI / process interface を定義  |
+| 7   | Content / Data 設計         | 完了   | 2026-06-15 | Model schema / JSONL record を定義       |
+| 8   | Performance / Security 設計 | 完了   | 2026-06-15 | streaming / read-only / no external send |
+| 9   | Test / Metrics 設計         | 完了   | 2026-06-15 | protocol contract test 観点を定義        |
+| 10  | 実装分割                    | 完了   | 2026-06-15 | prompts 生成前の分割案を定義             |
 | 11  | レビュー済                  | 未着手 |            | `spec-review` 未実施                     |
 
 ## 上位文書整合
@@ -35,7 +35,7 @@
 正本 ([PRD](../../PRD.md) / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
 - PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
-- Design Doc 更新要否: 不要 (draft 時点では既存方針の詳細化のみ)
+- Design Doc 更新要否: 一部反映済 (Q1 状態と landscape 表現は更新済み。feature doc / ADR への正本リンクは `spec-sync` で更新する)
 - ADR 起票要否: 要 (Q1 / SPI / versioning 確定後に `spec-sync` で判断を昇格)
 
 | 上位文書    | 節 / 該当箇所                                                                | 整合方針 (継承 / 補足 / 変更提案) |
@@ -119,26 +119,21 @@ EARS 風で振る舞いを記述する。
 
 ## 設計時の論点
 
-設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
-
-| #   | 論点                                                                  | 決定候補                                                                                                                        | 決定 |
-| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| D1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の必須フィールドは何か | `schemaVersion`, `recordType`, stable id, language, signature, source location を最小核にする / Java 固有情報を拡張領域へ逃がす | 未決 |
-| D2  | Core -> Analyzer の解析要求 record はどの粒度を持つか                 | repository root、include / exclude、target language、entry method selector、analysis mode を持つ                                | 未決 |
-| D3  | Analyzer SPI のプロセス契約はどこまで定義するか                       | stdin/stdout JSONL、stderr diagnostics、exit code、timeout、capability handshake を定義する                                     | 未決 |
-| D4  | versioning と互換性の単位をどうするか                                 | protocol version と schema version を同一にする / record 単位に version を持たせる                                              | 未決 |
-| D5  | 不正 record、部分解析、未解決 symbol をどう表現するか                 | error / diagnostic record を定義し、致命的エラーと継続可能な警告を分ける                                                        | 未決 |
+現時点で未解決の設計論点はない。D1-D5 は「解決済みの論点」に移動済み。
 
 ## 解決済みの論点
 
-(`spec-resolve` で確定したものをここに移動する)
-
-- なし
+- D1: `MethodSymbol` / `CallEdge` / `SourceLocation` は最小共通 schema + optional `metadata` で定義する。`MethodSymbol` は graph node、`CallEdge` は graph edge、`SourceLocation` は独立 record ではなく embedded value object として扱う。Core は `methodId` と `callerMethodId` / `calleeMethodId` の参照関係に依存し、Java 固有情報は `metadata` に置く。
+- D2: Core は Analyzer process 起動後、最初に 1 件の `analysisRequest` record を stdin に送る。`analysisRequest` は workspace、対象言語、解析 scope、任意の entrypoint selector、任意の analysis mode を表す。Java 固有の build / classpath / framework hint は共通必須 field にしない。
+- D3: Phase1 の Analyzer SPI は最小 process contract とする。Core は 1 request ごとに Analyzer process を 1 つ起動し、stdin に 1 件の `analysisRequest` を送信して close する。Analyzer は stdout に JSONL response record を逐次出力し、stderr は人間向け diagnostics として扱う。exit code `0` は成功、非ゼロは fatal failure とする。session reuse / interactive mode / capability handshake は初期 protocol に含めない。
+- D4: 全 record の `schemaVersion` は protocol 全体の version を表す。Phase1 は `"1"` とする。Core は対応済み major version の未知 field を無視し、未対応 major version は拒否する。任意 field の追加は互換変更、必須 field の削除・型変更・意味変更は breaking change として major version bump の対象にする。
+- D5: Analyzer は継続可能な問題を `diagnostic` record、致命的な問題を `error` record として stdout に出力する。未解決 symbol や部分解析は `diagnostic` として表現し、valid な `callEdge` には解決済み `methodSymbol` だけを参照させる。不正 JSONL、schema 不準拠、未対応 `schemaVersion` は Analyzer が表現する `error` ではなく Core 側 validation error として扱う。
 
 ## 未確定事項
 
-- D1-D5 が未決のため、下流 phase (diagram / tasks / prompts) には進まない。
+- D1-D5 は解決済み。次は `spec-diagrams` で flow / sequence を生成し、実装分割と review gate に進める。
 - Core 実装言語、package manager、test framework は未確定。Protocol 契約は特定実装言語に依存しない形で定義する。
+- 上位資料同期: Design Doc Open Question Q1 と requirements の Q1 は本 spec で解決済み。durable な正本ハンドオフは `spec-sync` で feature doc / ADR / context へ反映するまで保留し、その間は本 spec を作業正本とする。
 
 ## 実装対象
 
@@ -155,11 +150,12 @@ EARS 風で振る舞いを記述する。
 
 ### User Flow
 
-1. Core は CLI から受け取った解析対象と解析範囲を Analyzer SPI に渡す。
-2. Analyzer SPI は対象 Analyzer を独立プロセスとして起動し、解析要求 record を JSONL で stdin に送る。
+1. Core は CLI から受け取った解析対象と解析範囲を `analysisRequest` record に正規化する。
+2. Analyzer SPI は対象 Analyzer を独立プロセスとして起動し、最初に 1 件の `analysisRequest` record を JSONL で stdin に送って close する。
 3. Analyzer は対象ソースを read-only で解析し、`MethodSymbol` / `CallEdge` / diagnostic record を stdout に JSONL で出力する。
 4. Core は stdout の各行を schema 検証し、Graph Engine が扱える Model として受領する。
 5. Core は Analyzer の終了コードと stderr を確認し、成功 / 失敗 / 部分解析の結果を確定する。
+6. 複数 request が必要な場合、Core は request ごとに Analyzer process を起動する。
 
 ### Reuse Policy
 
@@ -188,7 +184,7 @@ EARS 風で振る舞いを記述する。
 ### Testing
 
 - analyzer-protocol に Protocol contract test を置く。
-- contract test は JSONL record の必須フィールド、未知フィールド、schema version、不正 JSONL、Analyzer error record を検証する。
+- contract test は `analysisRequest` / response record の必須フィールド、未知フィールド、schema version、不正 JSONL、Analyzer error record を検証する。
 - Java Analyzer はこの contract test に準拠する実装として検証する。
 
 ## Interface 設計
@@ -197,10 +193,38 @@ EARS 風で振る舞いを記述する。
 
 - UI: 非該当。
 - Web API endpoint: 非該当。
-- Process interface: Core は Analyzer を独立プロセスとして起動し、stdin / stdout / stderr / exit code を SPI 境界として扱う。
+- Process interface: Core は 1 request ごとに Analyzer を独立プロセスとして起動し、stdin / stdout / stderr / exit code を SPI 境界として扱う。
 - Event interface: JSONL の各行を record event として扱う。
 
+#### Analyzer process contract
+
+| 境界      | 契約                                                                                     |
+| --------- | ---------------------------------------------------------------------------------------- |
+| 起動      | Core は 1 `analysisRequest` ごとに Analyzer process を 1 つ起動する                      |
+| stdin     | Core は最初に 1 件の `analysisRequest` record を JSONL で送信し、その後 stdin を close する |
+| stdout    | Analyzer は `methodSymbol` / `callEdge` / `diagnostic` / `error` record を JSONL で逐次出力する |
+| stderr    | 人間向け diagnostics として扱う。Core は stderr を protocol record として parse しない   |
+| exit code | `0` は成功、非ゼロは fatal failure として扱う                                             |
+
+複数 request は Core が request ごとに Analyzer process を起動して扱う。Analyzer process reuse、session mode、interactive mode、capability handshake は Phase1 の対象外とする。timeout、最大 stderr サイズ、最大 record サイズは Core 実装時の runtime config とし、JSONL protocol field には含めない。
+
 ### Props / Request / Response
+
+#### Versioning / compatibility
+
+`schemaVersion` は record 種別ごとの個別 version ではなく、protocol 全体の version を表す。Phase1 の `schemaVersion` は `"1"` とする。
+
+| 変更種別              | 互換性 | 扱い                                                       |
+| --------------------- | ------ | ---------------------------------------------------------- |
+| 任意 field の追加     | 互換   | Core は未知 field を無視し、既知 field だけで処理を継続する |
+| `metadata` 内の追加   | 互換   | Core の graph 構築は `metadata` に依存しない               |
+| 必須 field の追加     | 非互換 | major version bump の対象                                  |
+| 必須 field の削除     | 非互換 | major version bump の対象                                  |
+| field 型の変更        | 非互換 | major version bump の対象                                  |
+| field 意味論の変更    | 非互換 | major version bump の対象                                  |
+| record type の削除    | 非互換 | major version bump の対象                                  |
+
+Core は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、Core は schema version mismatch として解析を失敗させる。Handshake / capability negotiation は Phase1 では採用しないため、Core は各 JSONL 行の `schemaVersion` と `recordType` で validation 対象を判断する。
 
 #### Core -> Analyzer request
 
@@ -211,26 +235,132 @@ EARS 風で振る舞いを記述する。
 | `requestId`     | 必須      | 解析要求を識別する ID                                |
 | `workspaceRoot` | 必須      | 解析対象 repository root                             |
 | `language`      | 必須      | 対象言語。Phase1 は `java`                           |
-| `include`       | 任意      | 解析対象 path pattern                                |
-| `exclude`       | 任意      | 除外 path pattern                                    |
-| `entrypoint`    | 任意      | 起点 method selector。未指定時は全体 call graph 生成 |
+| `include`       | 任意      | `workspaceRoot` からの相対 path glob 配列。未指定時は Analyzer の既定範囲を解析する |
+| `exclude`       | 任意      | `workspaceRoot` からの相対除外 path glob 配列 |
+| `entrypoints`   | 任意      | 起点 method selector 配列。未指定または空配列の場合は scope 全体の call graph を生成する |
+| `analysisMode`  | 任意      | `fullGraph` または `reachableFromEntrypoints`。未指定時は `fullGraph` |
+| `metadata`      | 任意      | 言語固有または Analyzer 固有の hint。Core / 共通 protocol の必須処理はこの field に依存しない |
+
+Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複数 request / session reuse / incremental analysis は D2-D3 では採用しない。Java 固有の build 設定、classpath、framework hint は共通必須 field にしない。
+
+#### Scope / entrypoint selector contract
+
+`include` / `exclude` は `workspaceRoot` からの相対 path glob とする。path separator は `/` に正規化し、絶対 path、空文字、`..` を含む path は schema 不準拠として扱う。`exclude` は `include` で選択された候補から除外する。
+
+| pattern | 意味                         |
+| ------- | ---------------------------- |
+| `*`     | path segment 内の任意文字列  |
+| `?`     | path segment 内の任意 1 文字 |
+| `**`    | 0 個以上の path segment      |
+
+`entrypoints` の各要素は method selector object とする。
+
+| 項目            | 必須/任意 | 説明                                                                                                   |
+| --------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `qualifiedName` | 必須      | 表示・照合用の完全修飾名。例: `com.example.UserService.findById`                                       |
+| `signature`     | 任意      | overload を一意化する正規化済み signature。省略時に候補が複数あれば Analyzer は `diagnostic` を出力する |
+
+`entrypoints` が未指定または空配列の場合、Analyzer は scope 全体の call graph 生成要求として扱う。`analysisMode = reachableFromEntrypoints` かつ `entrypoints` が空の場合は schema 不準拠ではなく、scope 全体を起点集合として扱う。
 
 #### Analyzer -> Core response
 
-| record           | 必須/任意 | 説明                                                           |
-| ---------------- | --------- | -------------------------------------------------------------- |
-| `MethodSymbol`   | 必須      | メソッド同定情報。D1 で必須フィールドを確定する                |
-| `CallEdge`       | 必須      | caller -> callee の呼び出し関係。D1 で参照形式を確定する       |
-| `SourceLocation` | 任意      | source file / range。MethodSymbol または CallEdge から参照する |
-| `Diagnostic`     | 任意      | 未解決 symbol、部分解析、警告、非致命的エラー                  |
-| `Error`          | 任意      | 致命的エラー。出力後、Analyzer は非ゼロ終了する                |
+| record         | Core 対応 | 出現条件 / 説明                                                            |
+| -------------- | --------- | -------------------------------------------------------------------------- |
+| `methodSymbol` | 必須      | graph node として扱う method / constructor / function が検出された場合に出現する |
+| `callEdge`     | 必須      | 解決済み caller / callee の呼び出し関係が検出された場合に出現する          |
+| `diagnostic`   | 必須      | 未解決 symbol、部分解析、警告、非致命的エラーがある場合に出現する          |
+| `error`        | 必須      | 致命的エラー時に出現する。出力後、Analyzer は非ゼロ終了する                |
+
+`Core 対応 = 必須` は Core parser / validator がその record type を実装するという意味であり、すべての解析結果にその record が 1 件以上出ることを意味しない。対象 scope に検出対象がない場合、Analyzer は `methodSymbol` / `callEdge` を 0 件で終了できる。
+
+#### `methodSymbol` record
+
+`methodSymbol` は呼び出し graph の node を表す。Core が依存する必須 field は graph 構築・識別・表示に必要な最小限に限定する。
+
+| 項目             | 必須/任意 | 説明                                                                                     |
+| ---------------- | --------- | ---------------------------------------------------------------------------------------- |
+| `schemaVersion`  | 必須      | JSONL record の schema version                                                           |
+| `recordType`     | 必須      | `methodSymbol`                                                                           |
+| `methodId`       | 必須      | Analyzer が決定的に生成する stable ID。`callEdge` から参照する                           |
+| `language`       | 必須      | 対象言語。Phase1 は `java`                                                               |
+| `symbolKind`     | 必須      | symbol 種別。例: `method` / `constructor` / `function` / `initializer`                   |
+| `qualifiedName`  | 必須      | 表示・debug 用の完全修飾名。例: `com.example.UserService.findById`                       |
+| `signature`      | 必須      | overload を区別できる正規化済み signature。例: `findById(java.lang.Long):User`           |
+| `sourceLocation` | 任意      | 定義位置。外部 library、生成コード、型解決のみの symbol など位置を持てない場合は省略する |
+| `metadata`       | 任意      | Java 固有情報や Analyzer 固有情報。Core の graph 構築はこの field に依存しない           |
+
+`methodId` の stable は、同一 Analyzer 実装 version、同一 `analysisRequest`、同一 source content、同一 `qualifiedName` / `signature` に対して決定的に再生成できることを指す。global UUID や Analyzer version をまたぐ永続 ID は要求しない。
+
+#### `callEdge` record
+
+`callEdge` は caller から callee への呼び出し関係を表す。valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み `methodSymbol` を参照することを前提にする。未解決 symbol は `diagnostic` として表現する。
+
+| 項目             | 必須/任意 | 説明                                                                 |
+| ---------------- | --------- | -------------------------------------------------------------------- |
+| `schemaVersion`  | 必須      | JSONL record の schema version                                       |
+| `recordType`     | 必須      | `callEdge`                                                           |
+| `edgeId`         | 必須      | Analyzer が決定的に生成する stable ID。重複排除と期待値比較に使う   |
+| `callerMethodId` | 必須      | 呼び出し元の `methodSymbol.methodId`                                 |
+| `calleeMethodId` | 必須      | 呼び出し先の `methodSymbol.methodId`                                 |
+| `callSite`       | 任意      | 呼び出し式の source 位置。正確な位置が取得できない場合は省略する     |
+| `metadata`       | 任意      | dispatch 種別、解析 confidence、言語固有 call kind などの拡張情報    |
+
+`edgeId` の stable は、同一 Analyzer 実装 version、同一 `analysisRequest`、同一 source content、同一 `callerMethodId` / `calleeMethodId` / `callSite` に対して決定的に再生成できることを指す。
+
+#### `SourceLocation` value object
+
+`SourceLocation` は独立 JSONL record ではなく、`methodSymbol.sourceLocation` または `callEdge.callSite` に埋め込む value object とする。
+
+| 項目          | 必須/任意 | 説明                                                                 |
+| ------------- | --------- | -------------------------------------------------------------------- |
+| `path`        | 必須      | `workspaceRoot` からの相対 path。絶対 path は環境差が出るため使わない |
+| `startLine`   | 必須      | 1-based の開始行                                                     |
+| `startColumn` | 任意      | 1-based の開始 column                                                |
+| `endLine`     | 任意      | 1-based の終了行                                                     |
+| `endColumn`   | 任意      | 1-based の終了 column                                                |
+
+#### `diagnostic` record
+
+`diagnostic` は Analyzer が検出した継続可能な問題や部分解析情報を表す。Core は `diagnostic` を利用者へ観測可能な形で伝播するが、`diagnostic` だけを理由に解析全体を fatal failure として扱わない。
+
+| 項目             | 必須/任意 | 説明                                                                 |
+| ---------------- | --------- | -------------------------------------------------------------------- |
+| `schemaVersion`  | 必須      | JSONL record の schema version                                       |
+| `recordType`     | 必須      | `diagnostic`                                                         |
+| `severity`       | 必須      | `info` / `warning` / `partialFailure`                                |
+| `code`           | 必須      | 機械判定可能な診断 code。例: `UNRESOLVED_SYMBOL`                     |
+| `message`        | 必須      | 人間向けの説明                                                       |
+| `sourceLocation` | 任意      | 関連する source 位置                                                 |
+| `relatedMethodId`| 任意      | 関連する `methodSymbol.methodId`                                     |
+| `metadata`       | 任意      | 言語固有または Analyzer 固有の補足情報                               |
+
+未解決 symbol は `diagnostic` として出力する。Analyzer は未解決 callee を参照する `callEdge` を valid edge として出力しない。
+
+#### `error` record
+
+`error` は Analyzer が解析を継続できない致命的な問題を表す。Analyzer が `error` を出力した場合、Analyzer process は非ゼロ exit code で終了する。
+
+| 項目             | 必須/任意 | 説明                                   |
+| ---------------- | --------- | -------------------------------------- |
+| `schemaVersion`  | 必須      | JSONL record の schema version         |
+| `recordType`     | 必須      | `error`                                |
+| `code`           | 必須      | 機械判定可能な error code              |
+| `message`        | 必須      | 人間向けの説明                         |
+| `sourceLocation` | 任意      | 関連する source 位置                   |
+| `metadata`       | 任意      | 言語固有または Analyzer 固有の補足情報 |
+
+不正 JSONL、schema 不準拠、未対応 `schemaVersion` は Analyzer が表現する `error` ではなく、Core が Analyzer stdout を validate した結果として検出する Core 側 validation error とする。
 
 ## Content / Data 設計
 
 ### 保存・管理するデータ
 
 - 永続データは持たない。
-- Core は Analyzer から受け取った `MethodSymbol` / `CallEdge` / `SourceLocation` をプロセス内の Graph Engine へ渡す。
+- Core は Analyzer から受け取った `methodSymbol` / `callEdge` をプロセス内の Graph Engine へ渡す。
+- `SourceLocation` は独立 record ではなく、`methodSymbol.sourceLocation` または `callEdge.callSite` の embedded value object として管理する。
+- Java 固有情報や Analyzer 固有情報は `metadata` に保持できる。ただし Core の graph 構築は `metadata` に依存しない。
+- Core は `diagnostic` を利用者へ伝播するが、`diagnostic` だけを理由に graph 構築を失敗させない。
+- Core は `error` record または Analyzer 非ゼロ終了を fatal failure として扱う。
 - JSONL schema と contract test fixture は repository 内の実装対象として管理する。
 
 ### コンテンツ配置 / package / route
@@ -245,7 +375,7 @@ EARS 風で振る舞いを記述する。
 
 - JSONL は streaming 前提とし、Analyzer は解析結果を逐次出力できる。
 - Core は stdout の各行を逐次 parse / validate する。
-- Analyzer の timeout、最大 stderr サイズ、最大 record サイズは D3 または後続論点で確定する。
+- Analyzer の timeout、最大 stderr サイズ、最大 record サイズは Core 実装時の runtime config とし、JSONL protocol field には含めない。
 
 ### Security / Privacy
 
@@ -265,19 +395,48 @@ EARS 風で振る舞いを記述する。
 | 3   | Analyzer が非ゼロ終了する                   | exit code と stderr 要約を表示して失敗                     | Analyzer stderr をもとに原因を修正する         |
 | 4   | Analyzer が未知フィールドを出力する         | 既知フィールドを採用し、未知フィールドは無視する           | schema version policy に従い後続で採用判断する |
 | 5   | 型解決不能などの部分解析が発生する          | diagnostic record として警告を残し、継続可否を判定する     | Analyzer 側の解析精度を改善する                |
+| 6   | Analyzer が未対応 `schemaVersion` を出力する | schema version mismatch として失敗                         | Core / Analyzer の protocol version を揃える   |
+| 7   | Analyzer が `error` record を出力する       | error code / message / source location を表示して失敗       | Analyzer 実装または解析対象の前提を修正する    |
+| 8   | Analyzer が未解決 symbol を検出する         | `diagnostic` record として警告を表示し、解決済み edge のみ採用する | Analyzer 側の型解決または利用者の解析範囲を見直す |
 
 ### Fallback
 
 - schema 準拠の既知フィールドが揃っている場合、Core は未知フィールドを無視して処理を継続する。
+- 未対応 major version の record は schema version mismatch として失敗する。
 - 致命的な schema 不準拠、不正 JSONL、Analyzer 非ゼロ終了は失敗として扱う。
+- Analyzer が timeout した場合、Core は Analyzer process を終了し、timeout と stderr 要約を利用者へ伝播して失敗として扱う。
 - 部分解析は diagnostic record として表現し、Core が利用者に観測可能な形で伝播する。
+- `error` record は fatal failure として扱い、Analyzer process は非ゼロ exit code で終了する。
+- 未解決 symbol は `diagnostic` として表現し、未解決 callee を参照する `callEdge` は valid edge として出力しない。
 
 ## テスト / 評価方針
 
 ### テスト観点
 
 - valid `analysisRequest` record を Analyzer が受け取れること
-- valid `MethodSymbol` / `CallEdge` / `SourceLocation` record を Core が parse / validate できること
+- `analysisRequest` の `include` / `exclude` が `workspaceRoot` からの相対 path glob 配列として扱われること
+- `include` / `exclude` が `*` / `?` / `**` の glob として扱われ、絶対 path、空文字、`..` を含む path が schema 不準拠として拒否されること
+- `entrypoints` の method selector object が `qualifiedName` 必須、`signature` 任意として検証されること
+- `analysisRequest.entrypoints` 未指定または空配列の場合に、scope 全体の call graph 生成要求として扱われること
+- `analysisRequest.analysisMode` 未指定時に `fullGraph` として扱われること
+- Core が `analysisRequest` 送信後に stdin を close すること
+- Analyzer stdout の JSONL record が逐次 parse / validate されること
+- Analyzer stderr が protocol record として parse されないこと
+- exit code `0` を成功、非ゼロを fatal failure として扱うこと
+- 複数 request が必要な場合、Core が request ごとに Analyzer process を起動すること
+- `methodSymbol` / `callEdge` が 0 件の正常解析を success として扱えること
+- `methodId` / `edgeId` が同一 Analyzer 実装 version、同一 request、同一 source content で決定的に再生成されること
+- `schemaVersion` が protocol 全体 version として全 record に必須であること
+- 対応済み major version の未知 field を Core が無視できること
+- 未対応 major version の record を Core が schema version mismatch として拒否できること
+- 必須 field の削除、型変更、意味変更を非互換変更として contract test で検出できること
+- valid `diagnostic` record を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと
+- valid `error` record を Core が fatal failure として扱うこと
+- Analyzer が `error` record 出力後に非ゼロ exit code で終了すること
+- 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと
+- valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること
+- `SourceLocation.path` が `workspaceRoot` からの相対 path であること
+- Java 固有情報を `metadata` に含む record でも、Core が共通必須 field のみで graph を構築できること
 - 未知フィールドを含む record で既知フィールドを採用できること
 - schema 不準拠 record を拒否できること
 - 不正 JSONL を parse error として報告できること
@@ -340,7 +499,10 @@ sequenceDiagram
 
 | 対象節                 | 変更内容                                                              | 理由                                                                      |
 | ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Communication Protocol | Q1 解決後、具体 schema / SPI 方針への正本リンクを追加する可能性がある | Design Doc には landscape だけを残し、詳細は feature doc / ADR に移すため |
+| Open Questions Q1      | 反映済: Q1 を `解決済み (spec #8 / sync 待ち)` に更新                 | D1-D5 で schema / SPI / versioning / error policy を解決したため          |
+| 詳細の所在             | 反映済: Analyzer Protocol / SPI feature が spec #8 で作業正本であることを追加 | Design Doc には landscape だけを残し、詳細は feature doc / ADR に移すため |
+| Communication Protocol | 反映済: graph model に加えて `diagnostic` / `error` を Protocol diagnostics として受領する表現に更新 | D5 で diagnostics / error record を protocol に含めたため                 |
+| Communication Protocol | feature doc / ADR 作成時に具体 schema / SPI 方針への正本リンクを追加する可能性がある | durable な契約詳細は feature doc / ADR に移すため                         |
 
 ### feature doc への影響
 
@@ -354,12 +516,22 @@ sequenceDiagram
 | ------------------------- | ------------------------------------------------ | ------------------------------------------ |
 | `context/architecture.md` | 現時点では変更なし                               | 既存の Protocol 境界方針と整合しているため |
 | `context/testing.md`      | contract test の詳細確定後に追記する可能性がある | 横断テスト規約として残す場合があるため     |
+| `context/testing.md`      | `methodSymbol` / `callEdge` の共通必須 field、stable ID 決定性、embedded `SourceLocation`、`metadata` 非依存性を contract test 観点に追加する可能性がある | D1 で共通 schema の最小必須 field を確定したため。source: spec-resolve D1 |
+| `context/testing.md`      | `analysisRequest` の必須 field、path glob、entrypoint selector object、entrypoints 未指定時、`analysisMode` default を contract test 観点に追加する可能性がある | D2 で Core -> Analyzer request の最小粒度を確定したため。source: spec-resolve D2 |
+| `context/testing.md`      | stdin close、stdout JSONL streaming、stderr diagnostics、exit code、複数 request 時の process 分離を contract test 観点に追加する可能性がある | D3 で Analyzer SPI の最小 process contract を確定したため。source: spec-resolve D3 |
+| `context/testing.md`      | `schemaVersion`、未知 field、未対応 major version、breaking change の contract test 観点を追加する可能性がある | D4 で versioning / compatibility policy を確定したため。source: spec-resolve D4 |
+| `context/testing.md`      | `diagnostic` / `error` record、未解決 symbol、Core validation error と Analyzer error の境界を contract test 観点に追加する可能性がある | D5 で error / diagnostic policy を確定したため。source: spec-resolve D5 |
 
 ### ADR の新規 / 更新
 
 | ADR ID | 変更内容                                                                                               | 理由                                   |
 | ------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
 | 未採番 | Analyzer 通信を JSONL over STDIN/STDOUT とする判断、SPI 境界、versioning 方針を ADR 化する可能性がある | 長期参照価値のあるアーキ判断になるため |
+| 未採番 | 共通 schema は最小必須 field に限定し、言語固有情報を optional `metadata` に逃がす判断を ADR 化する可能性がある | Analyzer 追加時に Core 変更を不要にする S5 の根拠になるため。source: spec-resolve D1 |
+| 未採番 | Core -> Analyzer request は単一 `analysisRequest` + 最小 scope 指定とし、session reuse / incremental analysis を初期 protocol に含めない判断を ADR 化する可能性がある | Phase1 の protocol contract を単純に保ち、Analyzer 追加時の実装負荷を下げるため。source: spec-resolve D2 |
+| 未採番 | `1 analysisRequest = 1 Analyzer process` を Phase1 の Analyzer SPI とし、複数 request は Core が複数 process として扱う判断を ADR 化する可能性がある | Analyzer 実装から session state 管理を除外し、初期 protocol と contract test を単純に保つため。source: spec-resolve D3 |
+| 未採番 | 全 record の `schemaVersion` を protocol 全体 version として扱い、未知 field を互換、必須 field の削除・型変更・意味変更を breaking change とする判断を ADR 化する可能性がある | Core / Analyzer の version mismatch を検出し、複数 Analyzer の互換性を一貫して扱うため。source: spec-resolve D4 |
+| 未採番 | 継続可能な問題を `diagnostic`、致命的な問題を `error` として分け、Core validation error と Analyzer error を区別する判断を ADR 化する可能性がある | 部分解析と fatal failure の扱いを明確にし、利用者への診断と protocol validation を分離するため。source: spec-resolve D5 |
 
 ## レビュー
 
