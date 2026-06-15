@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-06-10 / Status: Draft
+> 最終更新: 2026-06-15 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -89,7 +89,7 @@ Phase1 では以下を対象外とする。
 - 解析は **静的解析**で行う (実行時情報には依存しない)。
 - 対象は **JVM 言語を先行**し、Phase1 で Java/Spring Boot を扱う。Kotlin / TypeScript / Vue / Go は将来対象。
 - 言語ごとの解析は、その言語のランタイム上で動く **独立した Analyzer プロセス**が担う。Core は特定言語ランタイムに依存しない。
-- Core と Analyzer は、共通データモデル (`MethodSymbol` / `CallEdge`) のみを介して結合する。
+- Core と Analyzer は、共通データモデル (`MethodSymbol` / `CallEdge`) と Protocol diagnostics (`diagnostic` / `error`) のみを介して結合する。
 
 ## アーキテクチャ概観 (Overview)
 
@@ -119,7 +119,7 @@ Core と Analyzer は **別プロセス**であり、STDIN/STDOUT 上の JSONL �
 flowchart TD
     user["ユーザー / CI"] --> cli["CLI<br/>引数解析・実行制御"]
     cli --> core["Core (言語非依存)<br/>Graph Engine / Traversal / Output"]
-    core <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge"| spi["Analyzer SPI<br/>(プラグイン境界)"]
+    core <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge / diagnostics"| spi["Analyzer SPI<br/>(プラグイン境界)"]
     spi --> ja["Java Analyzer (独立プロセス)<br/>JavaParser / SymbolSolver / SootUp"]
     ja -->|"AST 解析・型解決・DI 解決"| src[("Java / Spring ソース")]
     core -->|"Console / JSON / DOT / Mermaid"| out["出力"]
@@ -136,7 +136,7 @@ flowchart TD
 | Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                   | 探索 API           | Graph Engine                       |
 | Output Engine    | Console / JSON / DOT / Mermaid への出力                                                 | 出力 API           | Graph Engine, Model                |
 | Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル) | データ型           | なし                               |
-| Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は `CallEdge` / `MethodSymbol` のみ受領       | Protocol (JSONL)   | Model                              |
+| Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領 | Protocol (JSONL)   | Model                              |
 | Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成                                | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp |
 
 ```mermaid
@@ -161,17 +161,17 @@ flowchart LR
 | --- | --------------------------------------- | -------------------------------------------------------------------------------- | ----------------------- |
 | P1  | Core は言語非依存                       | 呼び出しグラフの構築・探索・出力は言語によらない。言語差は Analyzer へ閉じ込める | マルチ言語化の容易さ    |
 | P2  | Analyzer は独立プロセス                 | Core から各言語ランタイムへの依存を避ける (Java→JVM、TypeScript→Node.js、Go→Go)  | ランタイム混在の回避    |
-| P3  | Analyzer は共通 Protocol を実装         | Core は Analyzer 内部を知らず、受け取るのは `CallEdge` / `MethodSymbol` のみ     | 結合点の最小化          |
+| P3  | Analyzer は共通 Protocol を実装         | Core は Analyzer 内部を知らず、受け取るのは graph model と diagnostics のみ      | 結合点の最小化          |
 | P4  | Core は Analyzer をプラグインとして扱う | Analyzer 追加時に Core 変更を不要とする                                          | 拡張時の変更局所化 (S5) |
 
 ## Communication Protocol
 
 Analyzer との通信は **プロセス間通信**を用いる。
 
-- **形式**: STDIN / STDOUT 上の **JSONL** (1 行 1 レコード)。Core が解析要求を渡し、Analyzer が `MethodSymbol` / `CallEdge` を JSONL で返す。
+- **形式**: STDIN / STDOUT 上の **JSONL** (1 行 1 レコード)。Core が解析要求を渡し、Analyzer が graph model (`MethodSymbol` / `CallEdge`) と diagnostics (`diagnostic` / `error`) を JSONL で返す。
 - **採用理由**: 言語非依存 (どの言語ランタイムからも実装可能) / 実装容易 / デバッグ容易 (テキストで観測可能) / 拡張容易 (新フィールド追加が容易)。
 
-`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマは feature doc / spec で確定する (Open Questions Q1 参照)。
+`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマは spec #8 で解決済み。durable な詳細正本は feature doc / ADR への sync 時に確定する (Open Questions Q1 参照)。
 
 ## Alternatives Considered
 
@@ -197,6 +197,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | ----------------------------------- | -------- | ------ |
 | Caller / Callee 探索                | (未作成) | 未着手 |
 | 出力形式 (Console/JSON/DOT/Mermaid) | (未作成) | 未着手 |
+| Analyzer Protocol / SPI             | (未作成) | spec #8 で作業正本 |
 | Java Analyzer                       | (未作成) | 未着手 |
 
 ### Engineering Context (How: 横断規約)
@@ -237,7 +238,7 @@ Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spe
 
 | #   | 論点                                                                  | 決定者   | 期限          | 状態 |
 | --- | --------------------------------------------------------------------- | -------- | ------------- | ---- |
-| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 未決 |
+| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み (spec #8 / sync 待ち) |
 | Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | Phase3 着手前 | 未決 |
 | Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 未決 |
 | Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 未決 |
