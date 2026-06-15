@@ -37,7 +37,8 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - `methodSymbol` / `callEdge` が 0 件の正常解析を success として扱えること。
 - `methodId` / `edgeId` が同一 Analyzer 実装 version、同一 request、同一 source content で決定的に再生成されること。
 - `schemaVersion` が protocol 全体 version として全 record に必須であること。
-- 対応済み major version の未知 field を Core が無視できること。
+- Analyzer が `analysisRequest` の未知 field を無視できること。
+- Core が Analyzer response record の未知 field を無視できること。
 - 未対応 major version の record を Core が schema version mismatch として拒否できること。
 - 必須 field の削除、型変更、意味変更を非互換変更として検出できること。
 - valid `diagnostic` record を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと。

@@ -224,15 +224,15 @@ Spec8 の下流 phase をブロックする未確定事項はない。Protocol �
 
 | 変更種別              | 互換性 | 扱い                                                       |
 | --------------------- | ------ | ---------------------------------------------------------- |
-| 任意 field の追加     | 互換   | Core は未知 field を無視し、既知 field だけで処理を継続する |
-| `metadata` 内の追加   | 互換   | Core の graph 構築は `metadata` に依存しない               |
+| 任意 field の追加     | 互換   | record の受信者は未知 field を無視し、既知 field だけで処理を継続する |
+| `metadata` 内の追加   | 互換   | record の受信者は必要な既知 field のみを採用し、Core の graph 構築は `metadata` に依存しない |
 | 必須 field の追加     | 非互換 | major version bump の対象                                  |
 | 必須 field の削除     | 非互換 | major version bump の対象                                  |
 | field 型の変更        | 非互換 | major version bump の対象                                  |
 | field 意味論の変更    | 非互換 | major version bump の対象                                  |
 | record type の削除    | 非互換 | major version bump の対象                                  |
 
-Core は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、Core は schema version mismatch として解析を失敗させる。Handshake / capability negotiation は Phase1 では採用しないため、Core は各 JSONL 行の `schemaVersion` と `recordType` で validation 対象を判断する。
+record の受信者は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、受信者は schema version mismatch として解析を失敗させる。Handshake / capability negotiation は Phase1 では採用しないため、受信者は各 JSONL 行の `schemaVersion` と `recordType` で validation 対象を判断する。
 
 #### Core -> Analyzer request
 
@@ -443,7 +443,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 - `methodSymbol` / `callEdge` が 0 件の正常解析を success として扱えること
 - `methodId` / `edgeId` が同一 Analyzer 実装 version、同一 request、同一 source content で決定的に再生成されること
 - `schemaVersion` が protocol 全体 version として全 record に必須であること
-- 対応済み major version の未知 field を Core が無視できること
+- Analyzer が `analysisRequest` の未知 field を無視できること
+- Core が Analyzer response record の未知 field を無視できること
 - 未対応 major version の record を Core が schema version mismatch として拒否できること
 - 必須 field の削除、型変更、意味変更を非互換変更として contract test で検出できること
 - valid `diagnostic` record を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと
@@ -453,7 +454,7 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 - valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること
 - `SourceLocation.path` が `workspaceRoot` からの相対 path であること
 - Java 固有情報を `metadata` に含む record でも、Core が共通必須 field のみで graph を構築できること
-- 未知フィールドを含む record で既知フィールドを採用できること
+- 未知フィールドを含む record で受信者が既知フィールドを採用できること
 - schema 不準拠 record を拒否できること
 - 不正 JSONL を parse error として報告できること
 - Analyzer の非ゼロ終了と stderr を Core が伝播できること

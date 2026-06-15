@@ -24,7 +24,7 @@ Core と Analyzer は別プロセスとし、Analyzer SPI は JSONL over STDIN/S
 - stderr は人間向け diagnostics とし、Core は protocol record として parse しない。
 - exit code `0` は成功、非ゼロは fatal failure とする。
 - 全 record の `schemaVersion` は protocol 全体の major version を表す。Phase1 は `"1"` とする。
-- Core は対応済み major version の未知 field を無視し、未対応 major version を拒否する。
+- record の受信者は対応済み major version の未知 field を無視し、未対応 major version を拒否する。
 - 任意 field の追加は互換変更、必須 field の追加・削除、field 型変更、field 意味論変更、record type 削除は breaking change とする。
 
 Protocol / Model の具体 schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。決定経緯は [spec #8](../specs/8-analyzer-protocol/) に残す。
