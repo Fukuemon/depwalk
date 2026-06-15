@@ -174,12 +174,12 @@ flowchart TD
 
 ### Versioning / compatibility
 
-`schemaVersion` は record 種別ごとの個別 version ではなく、protocol 全体の version を表す。Core は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、Core は schema version mismatch として解析を失敗させる。
+`schemaVersion` は record 種別ごとの個別 version ではなく、protocol 全体の version を表す。record の受信者は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、受信者は schema version mismatch として解析を失敗させる。
 
 | 変更種別 | 互換性 | 扱い |
 | -------- | ------ | ---- |
-| 任意 field の追加 | 互換 | Core は未知 field を無視し、既知 field だけで処理を継続する |
-| `metadata` 内の追加 | 互換 | Core の graph 構築は `metadata` に依存しない |
+| 任意 field の追加 | 互換 | record の受信者は未知 field を無視し、既知 field だけで処理を継続する |
+| `metadata` 内の追加 | 互換 | record の受信者は必要な既知 field のみを採用し、Core の graph 構築は `metadata` に依存しない |
 | 必須 field の追加 | 非互換 | major version bump の対象 |
 | 必須 field の削除 | 非互換 | major version bump の対象 |
 | field 型の変更 | 非互換 | major version bump の対象 |
@@ -194,7 +194,7 @@ Handshake / capability negotiation は Phase1 では採用しない。
 - Analyzer が `methodSymbol` / `callEdge` を stdout JSONL として逐次出力し、Core が逐次 parse / validate する。
 - Analyzer が未解決 symbol や部分解析を `diagnostic` として出力し、Core が利用者へ観測可能に伝播する。
 - Analyzer が継続不能な問題を `error` として出力し、非ゼロ exit code で終了する。
-- Core が未知 field を無視し、対応済み major version の既知 field だけで処理を継続する。
+- record の受信者が未知 field を無視し、対応済み major version の既知 field だけで処理を継続する。
 
 ## テスト観点
 
@@ -209,7 +209,8 @@ Handshake / capability negotiation は Phase1 では採用しない。
 - exit code `0` を成功、非ゼロを fatal failure として扱うこと。
 - `methodSymbol` / `callEdge` が 0 件の正常解析を success として扱えること。
 - `methodId` / `edgeId` が同一条件で決定的に再生成されること。
-- 対応済み major version の未知 field を Core が無視できること。
+- Analyzer が `analysisRequest` の未知 field を無視できること。
+- Core が Analyzer response record の未知 field を無視できること。
 - 未対応 major version の record を Core が schema version mismatch として拒否できること。
 - valid `diagnostic` を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと。
 - valid `error` を Core が fatal failure として扱うこと。
