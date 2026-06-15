@@ -23,7 +23,7 @@
 
 - **Java Analyzer の解析ライブラリは先行固定**: JavaParser (AST) / SymbolSolver (型解決) / SootUp (Interface Dispatch・Override 解決)。確定範囲は `java-analyzer` feature と Open Question Q2 (SootUp 統合範囲) で詰める。
 - **Core 実装言語**は設計フェーズで確定し ADR 化する。判断軸は CLI 配布の軽さとマルチ言語化容易性 (DesignDoc Alternatives A1)。
-- Analyzer との通信は **JSONL over STDIN/STDOUT** に固定 (言語非依存・実装/デバッグ容易)。
+- Analyzer との通信は **JSONL over STDIN/STDOUT** に固定 (言語非依存・実装/デバッグ容易)。判断根拠は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)、Protocol / SPI / Model schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。
 
 ## Scaffold Policy
 
