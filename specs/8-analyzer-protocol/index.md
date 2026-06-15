@@ -1,12 +1,12 @@
 # Analyzer Protocol / SPI feature spec
 
-> Analyzer SPI、JSONL Communication Protocol、Model schema の作業 spec。
-> durable な契約は `spec-sync` 実行後に feature doc / ADR へハンドオフする。
+> Analyzer SPI、JSONL Communication Protocol、Model schema の issue 単位の決定記録。
+> durable な契約は `spec-sync` 済み。正本は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../adr/0001-analyzer-protocol-jsonl-spi.md)。
 
 ## メタ情報
 
 - Issue: `#8`
-- ステータス: `Draft`
+- ステータス: `Review`
 - 作成日: 2026-06-13
 - 更新日: 2026-06-15
 - Branch: `feature/8`
@@ -28,32 +28,34 @@
 | 8   | Performance / Security 設計 | 完了   | 2026-06-15 | streaming / read-only / no external send |
 | 9   | Test / Metrics 設計         | 完了   | 2026-06-15 | protocol contract test 観点を定義        |
 | 10  | 実装分割                    | 完了   | 2026-06-15 | prompts 生成前の分割案を定義             |
-| 11  | レビュー済                  | 未着手 |            | `spec-review` 未実施                     |
+| 11  | レビュー済                  | レビュー済 | 2026-06-15 | spec-review PASS |
 
 ## 上位文書整合
 
 正本 ([PRD](../../PRD.md) / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
 - PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
-- Design Doc 更新要否: 一部反映済 (Q1 状態と landscape 表現は更新済み。feature doc / ADR への正本リンクは `spec-sync` で更新する)
-- ADR 起票要否: 要 (Q1 / SPI / versioning 確定後に `spec-sync` で判断を昇格)
+- Design Doc 更新要否: 反映済 (Q1 状態と feature doc / ADR への正本リンクを更新済み)
+- ADR 起票要否: 反映済 (ADR-0001 に JSONL process SPI / versioning 判断を昇格)
 
 | 上位文書    | 節 / 該当箇所                                                                | 整合方針 (継承 / 補足 / 変更提案) |
 | ----------- | ---------------------------------------------------------------------------- | --------------------------------- |
 | PRD         | 統合モードのため `design/DesignDoc.md` の Why / What を参照                  | 継承                              |
 | Design Doc  | Communication Protocol / モジュール責務 / 設計原則 P1-P4 / Open Questions Q1 | 補足                              |
-| feature doc | `design/features/` は未作成。確定後に analyzer-protocol feature doc へ反映   | 補足                              |
+| feature doc | `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md`           | 反映済                            |
 | context     | `context/architecture.md` Package Boundary / Runtime Boundary                | 補足                              |
-| context     | `context/testing.md` Protocol contract / test runtime contract               | 補足                              |
+| context     | `context/testing.md` Protocol contract / test runtime contract               | 反映済                            |
 | context     | `context/toolchain.md` Analyzer との通信は JSONL over STDIN/STDOUT に固定    | 継承                              |
 | context     | `context/infrastructure.md` CLI / CI 実行、外部送信なし、JSONL 観測可能      | 継承                              |
-| ADR         | 既存 ADR なし。確定した Protocol / SPI 判断は ADR 候補                       | 補足                              |
+| ADR         | `adr/0001-analyzer-protocol-jsonl-spi.md`                                    | 反映済                            |
 
-> 現時点で上位文書との矛盾は検出していない。下流 phase で durable な契約が確定したら `spec-sync` で feature doc / ADR へ反映する。
+> 現時点で上位文書との矛盾は検出していない。durable な契約は `spec-sync` で feature doc / ADR / context へ反映済み。
 
 ## 関連資料
 
 - `design/DesignDoc.md`: Communication Protocol、モジュール責務、設計原則 P1-P4、Open Questions Q1、Future Work Phase1 / Phase5
+- `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md`: Protocol / SPI / Model schema の正本
+- `adr/0001-analyzer-protocol-jsonl-spi.md`: JSONL over STDIN/STDOUT、process SPI、versioning 判断の正本
 - `context/project.md`: 対象ドメイン `analyzer-protocol`、Issue Tracker、Source of Truth、Branch pattern
 - `context/architecture.md`: Core -> Analyzer は Protocol 境界のみ、Core は Analyzer 内部を知らない
 - `context/testing.md`: analyzer-protocol に Protocol contract test を置く
@@ -66,7 +68,7 @@
 
 depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プロセスの Analyzer に閉じ込める。Core と Analyzer の結合点は Analyzer SPI、STDIN / STDOUT 上の JSONL、`MethodSymbol` / `CallEdge` / `SourceLocation` である。
 
-この spec は、全 Analyzer が実装する共通契約を issue #8 の作業正本として定義する。Phase1 では Java Analyzer がこの契約を最初に実装し、将来の Kotlin / TypeScript / Vue / Go Analyzer 追加時にも Core を変更しない状態を目指す。
+この spec は、全 Analyzer が実装する共通契約を issue #8 の決定記録として残す。Phase1 では Java Analyzer がこの契約を最初に実装し、将来の Kotlin / TypeScript / Vue / Go Analyzer 追加時にも Core を変更しない状態を目指す。最新の durable な契約は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とし、本 spec の Interface / Data / Error / Test / Flow は決定時スナップショットとして扱う。
 
 ## スコープ
 
@@ -131,9 +133,13 @@ EARS 風で振る舞いを記述する。
 
 ## 未確定事項
 
-- D1-D5 と flow / sequence は解決済み。次は review gate に進める。
-- Core 実装言語、package manager、test framework は未確定。Protocol 契約は特定実装言語に依存しない形で定義する。
-- 上位資料同期: Design Doc Open Question Q1 と requirements の Q1 は本 spec で解決済み。durable な正本ハンドオフは `spec-sync` で feature doc / ADR / context へ反映するまで保留し、その間は本 spec を作業正本とする。
+Spec8 の下流 phase をブロックする未確定事項はない。Protocol 契約は特定実装言語に依存しない形で定義済み。
+
+| 未確定事項 | 決定者 | 期限 | Spec8 への影響 |
+| ---------- | ------ | ---- | -------------- |
+| Core 実装言語 | Fukuemon | Core 実装 ADR 起票時 / 実装着手前 | なし。Protocol は JSONL process 境界で言語非依存に定義済み |
+| package manager | Fukuemon | Core 実装言語決定時 | なし。Protocol record と process contract には含めない |
+| test framework | Fukuemon | analyzer-protocol 実装着手前 | なし。contract test 観点は `context/testing.md` と feature doc に反映済み |
 
 ## 実装対象
 
@@ -188,6 +194,8 @@ EARS 風で振る舞いを記述する。
 - Java Analyzer はこの contract test に準拠する実装として検証する。
 
 ## Interface 設計
+
+この節は 2026-06-15 時点の決定時スナップショット。Protocol / SPI / Model schema の最新正本は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 
 ### UI / API / Event Interface
 
@@ -353,6 +361,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 
 ## Content / Data 設計
 
+この節は 2026-06-15 時点の決定時スナップショット。Data model の最新正本は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
+
 ### 保存・管理するデータ
 
 - 永続データは持たない。
@@ -371,6 +381,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 
 ## Performance / Security 設計
 
+この節は 2026-06-15 時点の決定時スナップショット。Process SPI と JSONL streaming 判断の正本は [ADR-0001](../../adr/0001-analyzer-protocol-jsonl-spi.md)。
+
 ### Performance
 
 - JSONL は streaming 前提とし、Analyzer は解析結果を逐次出力できる。
@@ -385,6 +397,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 - Analyzer 実行は利用者が指定したローカルまたは CI 環境内で完結する。
 
 ## Error / Fallback 設計
+
+この節は 2026-06-15 時点の決定時スナップショット。`diagnostic` / `error` と Core validation error の境界は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。
 
 ### エラーケース
 
@@ -410,6 +424,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 - 未解決 symbol は `diagnostic` として表現し、未解決 callee を参照する `callEdge` は valid edge として出力しない。
 
 ## テスト / 評価方針
+
+この節は 2026-06-15 時点の決定時スナップショット。Protocol contract test の横断規約は [context/testing.md](../../context/testing.md#protocol-contract-test) を正本とする。
 
 ### テスト観点
 
@@ -452,6 +468,8 @@ Core は 1 Analyzer process につき 1 件の `analysisRequest` を送る。複
 - peak memory while streaming parse (実装後に計測)
 
 ## フロー / シーケンス
+
+この節は 2026-06-15 時点の決定時スナップショット。feature 内部の durable flow は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。
 
 この spec では、CLI 実行から `analysisRequest` 送信、Analyzer stdout validation、Graph 受領、diagnostic / error / exit code 分岐までを図示する。
 
@@ -564,39 +582,37 @@ sequenceDiagram
 
 | 対象節                 | 変更内容                                                              | 理由                                                                      |
 | ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Open Questions Q1      | 反映済: Q1 を `解決済み (spec #8 / sync 待ち)` に更新                 | D1-D5 で schema / SPI / versioning / error policy を解決したため          |
-| 詳細の所在             | 反映済: Analyzer Protocol / SPI feature が spec #8 で作業正本であることを追加 | Design Doc には landscape だけを残し、詳細は feature doc / ADR に移すため |
+| Open Questions Q1      | 反映済: Q1 を feature doc / ADR への正本リンク付きで `解決済み` に更新 | D1-D5 で schema / SPI / versioning / error policy を解決したため          |
+| 詳細の所在             | 反映済: Analyzer Protocol / SPI feature doc を追加                    | Design Doc には landscape だけを残し、詳細は feature doc / ADR に移すため |
 | Communication Protocol | 反映済: graph model に加えて `diagnostic` / `error` を Protocol diagnostics として受領する表現に更新 | D5 で diagnostics / error record を protocol に含めたため                 |
-| Communication Protocol | feature doc / ADR 作成時に具体 schema / SPI 方針への正本リンクを追加する可能性がある | durable な契約詳細は feature doc / ADR に移すため                         |
+| Communication Protocol | 反映済: 具体 schema / SPI 方針への正本リンクを feature doc / ADR へ更新 | durable な契約詳細は feature doc / ADR に移すため                         |
 
 ### feature doc への影響
 
 | 対象 doc / 節                                                      | 変更内容                                             | 理由                                          |
 | ------------------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
-| `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` | Q1 / SPI / versioning 確定後に新規作成または反映する | durable な契約は feature doc を正本にするため |
+| `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` | 反映済: Q1 / SPI / Model schema / versioning / contract test 観点を新規作成 | durable な契約は feature doc を正本にするため |
 
 ### context への影響
 
 | 対象 doc / 節             | 変更内容                                         | 理由                                       |
 | ------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| `context/architecture.md` | 現時点では変更なし                               | 既存の Protocol 境界方針と整合しているため |
-| `context/testing.md`      | contract test の詳細確定後に追記する可能性がある | 横断テスト規約として残す場合があるため     |
-| `context/testing.md`      | `methodSymbol` / `callEdge` の共通必須 field、stable ID 決定性、embedded `SourceLocation`、`metadata` 非依存性を contract test 観点に追加する可能性がある | D1 で共通 schema の最小必須 field を確定したため。source: spec-resolve D1 |
-| `context/testing.md`      | `analysisRequest` の必須 field、path glob、entrypoint selector object、entrypoints 未指定時、`analysisMode` default を contract test 観点に追加する可能性がある | D2 で Core -> Analyzer request の最小粒度を確定したため。source: spec-resolve D2 |
-| `context/testing.md`      | stdin close、stdout JSONL streaming、stderr diagnostics、exit code、複数 request 時の process 分離を contract test 観点に追加する可能性がある | D3 で Analyzer SPI の最小 process contract を確定したため。source: spec-resolve D3 |
-| `context/testing.md`      | `schemaVersion`、未知 field、未対応 major version、breaking change の contract test 観点を追加する可能性がある | D4 で versioning / compatibility policy を確定したため。source: spec-resolve D4 |
-| `context/testing.md`      | `diagnostic` / `error` record、未解決 symbol、Core validation error と Analyzer error の境界を contract test 観点に追加する可能性がある | D5 で error / diagnostic policy を確定したため。source: spec-resolve D5 |
+| `context/architecture.md` | 反映済: Analyzer Protocol / SPI feature doc への正本リンクを追加 | 既存の Protocol 境界方針と整合しているため |
+| `context/toolchain.md`    | 反映済: ADR-0001 と feature doc への正本リンクを追加             | JSONL over STDIN/STDOUT の判断根拠と schema 正本を明示するため |
+| `context/testing.md`      | 反映済: protocol contract test の正本観点を追記                 | 横断テスト規約として残すため |
+| `context/testing.md`      | 反映済: `methodSymbol` / `callEdge` の共通必須 field、stable ID 決定性、embedded `SourceLocation`、`metadata` 非依存性を contract test 観点に追加 | D1 で共通 schema の最小必須 field を確定したため。source: spec-resolve D1 |
+| `context/testing.md`      | 反映済: `analysisRequest` の必須 field、path glob、entrypoint selector object、entrypoints 未指定時、`analysisMode` default を contract test 観点に追加 | D2 で Core -> Analyzer request の最小粒度を確定したため。source: spec-resolve D2 |
+| `context/testing.md`      | 反映済: stdin close、stdout JSONL streaming、stderr diagnostics、exit code、複数 request 時の process 分離を contract test 観点に追加 | D3 で Analyzer SPI の最小 process contract を確定したため。source: spec-resolve D3 |
+| `context/testing.md`      | 反映済: `schemaVersion`、未知 field、未対応 major version、breaking change の contract test 観点を追加 | D4 で versioning / compatibility policy を確定したため。source: spec-resolve D4 |
+| `context/testing.md`      | 反映済: `diagnostic` / `error` record、未解決 symbol、Core validation error と Analyzer error の境界を contract test 観点に追加 | D5 で error / diagnostic policy を確定したため。source: spec-resolve D5 |
 
 ### ADR の新規 / 更新
 
 | ADR ID | 変更内容                                                                                               | 理由                                   |
 | ------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| 未採番 | Analyzer 通信を JSONL over STDIN/STDOUT とする判断、SPI 境界、versioning 方針を ADR 化する可能性がある | 長期参照価値のあるアーキ判断になるため |
-| 未採番 | 共通 schema は最小必須 field に限定し、言語固有情報を optional `metadata` に逃がす判断を ADR 化する可能性がある | Analyzer 追加時に Core 変更を不要にする S5 の根拠になるため。source: spec-resolve D1 |
-| 未採番 | Core -> Analyzer request は単一 `analysisRequest` + 最小 scope 指定とし、session reuse / incremental analysis を初期 protocol に含めない判断を ADR 化する可能性がある | Phase1 の protocol contract を単純に保ち、Analyzer 追加時の実装負荷を下げるため。source: spec-resolve D2 |
-| 未採番 | `1 analysisRequest = 1 Analyzer process` を Phase1 の Analyzer SPI とし、複数 request は Core が複数 process として扱う判断を ADR 化する可能性がある | Analyzer 実装から session state 管理を除外し、初期 protocol と contract test を単純に保つため。source: spec-resolve D3 |
-| 未採番 | 全 record の `schemaVersion` を protocol 全体 version として扱い、未知 field を互換、必須 field の削除・型変更・意味変更を breaking change とする判断を ADR 化する可能性がある | Core / Analyzer の version mismatch を検出し、複数 Analyzer の互換性を一貫して扱うため。source: spec-resolve D4 |
-| 未採番 | 継続可能な問題を `diagnostic`、致命的な問題を `error` として分け、Core validation error と Analyzer error を区別する判断を ADR 化する可能性がある | 部分解析と fatal failure の扱いを明確にし、利用者への診断と protocol validation を分離するため。source: spec-resolve D5 |
+| ADR-0001 | 反映済: Analyzer 通信を JSONL over STDIN/STDOUT とする判断、SPI 境界、versioning 方針を ADR 化 | 長期参照価値のあるアーキ判断になるため |
+| ADR-0001 | 反映済: `1 analysisRequest = 1 Analyzer process` を Phase1 の Analyzer SPI とし、session reuse / incremental analysis を初期 protocol に含めない判断を ADR 化 | Analyzer 実装から session state 管理を除外し、初期 protocol と contract test を単純に保つため。source: spec-resolve D2/D3 |
+| ADR-0001 | 反映済: 全 record の `schemaVersion` を protocol 全体 version として扱い、未知 field を互換、必須 field の削除・型変更・意味変更を breaking change とする判断を ADR 化 | Core / Analyzer の version mismatch を検出し、複数 Analyzer の互換性を一貫して扱うため。source: spec-resolve D4 |
 
 ## レビュー
 
@@ -604,12 +620,14 @@ sequenceDiagram
 
 | 日付 | 結果 (PASS / NEEDS_WORK) | 指摘要点 | 対応 |
 | ---- | ------------------------ | -------- | ---- |
-|      |                          |          |      |
+| 2026-06-15 | NEEDS_WORK | 未確定事項に期限 / 決定者がない。`反映済` 行と feature doc / ADR への正本ハンドオフ未完了が衝突。 | 対応済: 未確定事項を期限 / 決定者付きで管理し、feature doc / ADR / context へ正本ハンドオフ。再 review 待ち |
+| 2026-06-15 | PASS | 指摘なし。上位文書整合、未解決論点、実装対象、必須節、EARS、正本境界を満たす。 | 完了 |
 
 ## 変更履歴
 
 | 日付       | 変更者 | 変更内容               |
 | ---------- | ------ | ---------------------- |
+| 2026-06-15 | Codex  | spec-sync で feature doc / ADR / context へ正本ハンドオフ |
 | 2026-06-15 | Codex  | flow / sequence diagram を追加 |
 | 2026-06-13 | Codex  | 初版 draft spec を追加 |
 

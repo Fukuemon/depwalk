@@ -171,7 +171,7 @@ Analyzer との通信は **プロセス間通信**を用いる。
 - **形式**: STDIN / STDOUT 上の **JSONL** (1 行 1 レコード)。Core が解析要求を渡し、Analyzer が graph model (`MethodSymbol` / `CallEdge`) と diagnostics (`diagnostic` / `error`) を JSONL で返す。
 - **採用理由**: 言語非依存 (どの言語ランタイムからも実装可能) / 実装容易 / デバッグ容易 (テキストで観測可能) / 拡張容易 (新フィールド追加が容易)。
 
-`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマは spec #8 で解決済み。durable な詳細正本は feature doc / ADR への sync 時に確定する (Open Questions Q1 参照)。
+`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマ、Analyzer SPI、versioning 方針は [Analyzer Protocol / SPI feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。JSONL over STDIN/STDOUT を process SPI とする判断は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) を正本とする。
 
 ## Alternatives Considered
 
@@ -197,7 +197,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | ----------------------------------- | -------- | ------ |
 | Caller / Callee 探索                | (未作成) | 未着手 |
 | 出力形式 (Console/JSON/DOT/Mermaid) | (未作成) | 未着手 |
-| Analyzer Protocol / SPI             | (未作成) | spec #8 で作業正本 |
+| Analyzer Protocol / SPI             | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了 |
 | Java Analyzer                       | (未作成) | 未着手 |
 
 ### Engineering Context (How: 横断規約)
@@ -217,8 +217,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 | ADR      | 決定                                             | 関連ドキュメント                   |
 | -------- | ------------------------------------------------ | ---------------------------------- |
-| (未作成) | Core 言語非依存 + Analyzer 独立プロセス (P1〜P4) | 本 doc「設計原則」「Alternatives」 |
-| (未作成) | Analyzer 通信を JSONL (STDIN/STDOUT) とする      | 本 doc「Communication Protocol」   |
+| [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI | 本 doc「設計原則」「Communication Protocol」 |
 
 ## Open Questions / Future Work
 
@@ -238,7 +237,7 @@ Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spe
 
 | #   | 論点                                                                  | 決定者   | 期限          | 状態 |
 | --- | --------------------------------------------------------------------- | -------- | ------------- | ---- |
-| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み (spec #8 / sync 待ち) |
+| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)) |
 | Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | Phase3 着手前 | 未決 |
 | Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 未決 |
 | Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 未決 |
