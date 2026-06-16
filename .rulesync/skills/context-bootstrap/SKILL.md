@@ -17,7 +17,7 @@ targets:
 
 ## 先に読むもの
 
-- `technical-writing` skill
+- `styleguide-documents` skill
 - `design/DesignDoc.md` (Why/What/How の前提)
 - `.rulesync/rules/CLAUDE.md` の `Spec Workflow Contract`
 - `templates/context/*.md` (生成元スケルトン)

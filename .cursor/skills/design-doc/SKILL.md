@@ -14,7 +14,7 @@ description: Creates or updates the product PRD and the top-level Design Doc fro
 
 ## 先に読むもの
 
-- `technical-writing` skill (文書品質の基準)
+- `styleguide-documents` skill (文書の品質基準・分割粒度)
 - `.rulesync/rules/CLAUDE.md` のドキュメント階層と `Spec Workflow Contract`
 - `context/project.md` (存在すれば。なければ本 skill 後に `context-bootstrap` を案内する)
 - `templates/prd/template.md` / `templates/design-doc/template.md`
@@ -54,9 +54,9 @@ description: Creates or updates the product PRD and the top-level Design Doc fro
 
 - `templates/design-doc/template.md` → `design/DesignDoc.md` を生成。`## Related PRD` を削除し、`## Why / What` 節に背景・課題・提供価値・成功条件・スコープを埋める。`PRD.md` は作らない。
 
-いずれも `technical-writing` の 5 原則を満たし、Why / What / How の所在が一意に定まること。未確定点は `Open Questions` / `未決事項` に担当者・期限付きで残す。
+いずれも `styleguide-documents` の 5 原則を満たし、Why / What / How の所在が一意に定まること。未確定点は `Open Questions` / `未決事項` に担当者・期限付きで残す。
 
-`## アーキテクチャ概観` には `technical-writing` の「図のはしご」に従い C4 **L1 (System Context)** と **L2 (Container)** の Mermaid を描く。L3 以下は feature doc / spec へ委譲し、ここでは描かない。確定していない構成は図にしない。
+`## アーキテクチャ概観` には `styleguide-documents` の「図のはしご」に従い C4 **L1 (System Context)** と **L2 (Container)** の Mermaid を描く。L3 以下は feature doc / spec へ委譲し、ここでは描かない。確定していない構成は図にしない。
 
 ### 4. 保存と次の案内
 
