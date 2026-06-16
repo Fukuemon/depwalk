@@ -1,6 +1,6 @@
 # Engineering Context Library
 
-> 最終更新: 2026-06-06
+> 最終更新: 2026-06-16
 
 `context/` は **技術スタック別のコード規約・コードベースアーキテクチャ・運用契約** を集約する永続ナレッジ層である。Feature を問わず横断する "How" を置き、PRD / Design Doc / spec から参照する。
 
@@ -26,6 +26,7 @@
 | [engineering.md](engineering.md)         | root task boundary, shared config boundary, repository quality gate    |
 | [testing.md](testing.md)                 | test 責務分担, test runtime contract                                   |
 | [infrastructure.md](infrastructure.md)   | infra / deployment / environment / operations / security 契約          |
+| [ai-agents.md](ai-agents.md)             | 非対話 CLI エージェントの invocation / routing / timeout 契約          |
 
 ## Producer / Consumer 契約
 
