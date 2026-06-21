@@ -7,7 +7,7 @@
 - Issue: `#11`
 - ステータス: `Draft`
 - 作成日: 2026-06-15
-- 更新日: 2026-06-15
+- 更新日: 2026-06-21
 - Branch: `feature/11`
 - Owner: Fukuemon
 
@@ -21,7 +21,7 @@
 | 2   | 下書き                      | 完了   | 2026-06-15 | 本 spec を scaffold |
 | 3   | 上位文書突合                | 完了   | 2026-06-15 | Design Doc / feature doc / context / ADR を確認 |
 | 4   | 論点整理                    | 完了   | 2026-06-15 | D1-D7 を初期論点として列挙 |
-| 5   | 論点解決                    | 未着手 |            | `spec-resolve` で解決する |
+| 5   | 論点解決                    | 進行中 | 2026-06-21 | D1-D4 を解決済み。D5-D7 は継続 |
 | 6   | Interface / Routing 設計    | 未着手 |            | 非 UI / CLI package boundary として扱う |
 | 7   | Content / Data 設計         | 未着手 |            | 初期 module / package 構成を扱う |
 | 8   | Performance / Security 設計 | 未着手 |            | CLI 配布、外部送信なし、read-only 解析を確認 |
@@ -130,27 +130,94 @@ EARS 風で振る舞いを記述する。
 
 | #   | 論点 | 決定候補 | 決定 |
 | --- | ---- | -------- | ---- |
-| D1  | Core 実装言語を何にするか | Rust / Go / TypeScript(Node.js) / Kotlin 以外の JVM 言語 / その他 | 未決 |
-| D2  | package manager と dependency 管理を何にするか | D1 の言語に従属。例: Cargo / Go modules / npm 系 | 未決 |
-| D3  | task runner と root command をどう定義するか | 言語標準 task / make-like wrapper / package manager scripts | 未決 |
-| D4  | test framework と contract test の配置をどうするか | 言語標準 test / dedicated test runner / golden fixture | 未決 |
+| D1  | Core 実装言語を何にするか | Rust / Go / TypeScript(Node.js) / Kotlin 以外の JVM 言語 / その他 | Go を採用する |
+| D2  | package manager と dependency 管理を何にするか | D1 の言語に従属。例: Cargo / Go modules / npm 系 | Go modules を採用し、初期の runtime dependency は `github.com/spf13/cobra` のみに抑える |
+| D3  | task runner と root command をどう定義するか | 言語標準 task / make-like wrapper / package manager scripts | 初期は Go 標準 command (`go test` / `go vet` / `go fmt` / `go mod tidy`) を root command とし、make-like wrapper は後続で必要になった時に検討する |
+| D4  | test framework と contract test の配置をどうするか | 言語標準 test / dedicated test runner / golden fixture | `testing` を採用し、手書き fake / golden fixture / Protocol contract test で開始する。`testify` / mock generator / `go-cmp` は初期導入しない |
 | D5  | `analyzer-protocol` の実装配置をどうするか | Core 内 package / 独立 package / schema + generated types | 未決 |
 | D6  | 初期 directory / package 構成をどう切るか | CLI / Core / Model / Analyzer SPI / Traversal / Output / fixtures の分割案 | 未決 |
 | D7  | ADR / context へどの順序で handoff するか | ADR 作成後に context 更新 / spec-sync で同時反映 | 未決 |
 
 ## 解決済みの論点
 
-(`spec-resolve` で確定したものをここに移動する)
+- D1: Core 実装言語は Go を採用する。single binary 配布、local / CI での導入容易性、JSONL streaming と外部プロセス制御の標準ライブラリ対応、Core を Analyzer runtime から独立させる設計原則 P1-P4 との相性を重視した。
+- D2: dependency 管理は Go modules を採用する。初期の runtime dependency は CLI framework の `github.com/spf13/cobra` のみに抑え、Analyzer Protocol / JSONL / process 実行 / graph / output / test は標準ライブラリと内部実装で開始する。
+- D3: task runner は初期導入しない。root command は Go 標準 command (`go test ./...`、`go vet ./...`、`go fmt ./...`、`go mod tidy`) とし、repository-level の wrapper は command 数や CI matrix が増えた時に再検討する。
+- D4: test framework は Go 標準の `testing` を採用する。mock は手書き fake / interface stub を標準方針とし、`testify`、`go.uber.org/mock`、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
 
--
+## Go 側ライブラリ選定
+
+### 結論
+
+Core は Go 標準ライブラリを中心に実装する。初期導入する runtime dependency は `github.com/spf13/cobra` のみに抑える。
+
+Cobra は CLI の subcommand、help、completion、POSIX flags を担う。JSONL、外部プロセス実行、graph 表現、text / JSON / Mermaid 出力、unit test / contract test は標準ライブラリと小さな内部実装で開始する。Java Analyzer の AST 解析、型解決、DI 解決に使う library は Go 側 Core に含めない。
+
+### 採用するライブラリ
+
+| 分類 | ライブラリ | 採用度 | 理由 |
+| --- | --- | ---: | --- |
+| CLI フレームワーク | `github.com/spf13/cobra` | 5 | `depwalk analyze ...` のような subcommand、help、completion、POSIX flags を表現しやすい。CLI ツールとして必要な機能に限定して採用する |
+| 設定・flags 管理 | Cobra 内蔵の `pflag` | 4 | 初期要件は CLI flags で足りる。設定ファイル / env binding は要件化されていないため `viper` は採用しない |
+| lint | `golangci-lint` | 4 | CI の品質 gate として利用する。runtime dependency ではなく開発ツールとして扱う |
+| セキュリティ補助 | `golang.org/x/vuln/cmd/govulncheck` | 3 | 依存脆弱性チェック用。CI への追加候補とし、runtime dependency にはしない |
+
+### 標準ライブラリで対応するもの
+
+| 分類 | 標準ライブラリ | 理由 |
+| --- | --- | --- |
+| ロギング | `log/slog` | CLI の verbose / debug logging と構造化 diagnostics には標準で足りる |
+| JSON 入出力 | `encoding/json`, `bufio`, `io` | Analyzer Protocol は JSONL streaming 前提のため、逐次読み込みと struct validation で扱う |
+| 外部プロセス実行 | `os/exec`, `context`, `io`, `bytes` | Analyzer process の起動、stdin close、stdout streaming、stderr summary、exit code、timeout を扱える |
+| グラフ表現 | `map`, `slice`, 内部 struct | `MethodSymbol` / `CallEdge` を node / edge として保持し、caller / callee BFS / DFS を実装する範囲では専用 graph library は不要 |
+| 出力フォーマット | `fmt`, `strings`, `text/template`, `encoding/json` | text / JSON / Mermaid は renderer ではなく文字列 / JSON 出力の責務であり、標準で足りる |
+| テスト | `testing`, `testing/fstest`, `os`, `path/filepath` | unit / golden / fixture / contract test を表現できる |
+| mock | 手書き fake / interface stub | 初期は Analyzer runner や filesystem 境界に小さい interface を切り、手書き fake で検証する |
+| format | `gofmt`, `go fmt` | Go 標準 formatter を正とする |
+| 静的確認 | `go test`, `go vet`, `go mod tidy` | 最小の local / CI quality gate として成立する |
+
+### 検討するもの
+
+| タイミング | 候補 | 理由 |
+| --- | --- | --- |
+| CLI command 数、completion、docs 生成が増えた時 | `cobra-cli` | Cobra scaffold 補助。初期は手書きで足りる |
+| graph / Protocol record の deep diff が読みにくくなった時 | `github.com/google/go-cmp/cmp` | golden / fixture test の失敗差分を読みやすくする。初期 dependency にはしない |
+| 同一 interface の fake が複数 test package に重複した時 | `go.uber.org/mock` | mock generator の導入余地。初期は手書き fake を優先する |
+| Graph algorithm が SCC、最短経路、複雑な到達解析へ広がった時 | `gonum.org/v1/gonum/graph` | 初期の caller / callee traversal には過剰 |
+| 設定ファイル / env / precedence が要件化した時 | `github.com/spf13/viper` | 現時点では CLI flags で足りる |
+| multi-platform binary 配布を自動化する時 | `goreleaser` | release automation 用。初期 scaffold では不要 |
+| dependency license / supply chain gate が必要になった時 | `go-licenses`, `osv-scanner` | 依存が増えてから導入判断する |
+
+### go get が必要なもの
+
+```bash
+go get github.com/spf13/cobra@latest
+```
+
+開発ツールは `go get` ではなく、CI / tools 管理で version を固定する。
+
+```bash
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+```
+
+### 導入しない方針のもの
+
+| 候補 | 方針 | 理由 |
+| --- | --- | --- |
+| `viper` | 初期導入しない | 設定ファイル / env binding が要件化されていない |
+| `zap`, `zerolog` | 導入しない | `log/slog` で足りる |
+| `testify` | 初期導入しない | 標準 `testing` と小さな helper で開始し、assertion DSL への依存を避ける |
+| `go.uber.org/mock` | 初期導入しない | 手書き fake で開始し、fake の重複が実害になった時に検討する |
+| `github.com/google/go-cmp/cmp` | 初期導入しない | deep diff の可読性が問題になった時に検討する |
+| graph 専用 library | 初期導入しない | graph model は Protocol model と密接に結びつくため、内部 struct の方が制御しやすい |
+| JSON schema validator | 初期導入しない | Go struct + `Validate()` で開始し、外部 Analyzer 互換性の問題が増えた時に再検討する |
+| Java 解析 library | Go 側には導入しない | Java 解析は Analyzer 独立プロセス側の責務。Core は JSONL Protocol のみを扱う |
 
 ## 未確定事項
 
 | 未確定事項 | 決定者 | 期限 | 下流への影響 |
 | ---------- | ------ | ---- | ------------ |
-| Core 実装言語 | Fukuemon | Spec8 実装 prompt 生成前 | 実装 scaffold、package manager、test framework が決まらない |
-| package manager / task runner | Fukuemon | Core 実装言語決定時 | Quick Commands と root task が決まらない |
-| test framework | Fukuemon | analyzer-protocol 実装着手前 | Protocol contract test の実装方法が決まらない |
 | `analyzer-protocol` 実装配置 | Fukuemon | Core scaffold 前 | Core / Analyzer の依存境界をコード上に落とせない |
 | 技術選定 ADR の内容 | Fukuemon | `spec-sync` 前 | context の標準スタックを正本化できない |
 
@@ -205,6 +272,8 @@ EARS 風で振る舞いを記述する。
 - Core の unit test は Graph / Traversal / Output / Protocol parser / validator の責務ごとに配置する。
 - Protocol contract test は `analyzer-protocol` 境界に置き、Core と Analyzer 実装が同じ contract を参照できるようにする。
 - E2E はサンプル Java/Spring fixture を使い、既知 caller / callee 集合と CLI 出力を照合する。
+- 初期 test framework は Go 標準の `testing` とし、assertion library / mock generator は導入しない。
+- mock は手書き fake / interface stub を使う。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時に検討する。
 - test command は `context/project.md` の Quick Commands と `context/testing.md` に反映する。
 
 ## Interface 設計
@@ -242,6 +311,7 @@ EARS 風で振る舞いを記述する。
 
 - 技術選定では CLI 配布の軽さ、CI 上の導入時間、JSONL streaming 処理の実装容易性を比較軸に含める。
 - Analyzer process 起動 overhead は ADR-0001 の既知トレードオフとして受け入れる。Core 実装基盤は timeout / stderr 上限 / record size 上限を後続 runtime config で扱える余地を残す。
+- runtime dependency は初期状態で `github.com/spf13/cobra` のみに抑え、dependency restore と supply chain risk を小さく保つ。
 
 ### Security / Privacy
 
@@ -262,8 +332,8 @@ EARS 風で振る舞いを記述する。
 
 ### Fallback
 
-- Core 実装言語が決まらない場合、Spec8 の実装 prompt 生成には進まない。
-- package manager / test framework が決まらない場合、初期 scaffold は行わず、未確定事項として残す。
+- `analyzer-protocol` 実装配置が決まらない場合、Spec8 の実装 prompt 生成には進まない。
+- 初期 directory / package 構成が決まらない場合、Core scaffold は行わず、D6 の未確定事項として残す。
 - context 更新が広がる場合、ADR を先に確定し、context は ADR へのリンクを正本として追従させる。
 
 ## テスト / 評価方針
@@ -273,6 +343,7 @@ EARS 風で振る舞いを記述する。
 - 候補技術が unit test、Protocol contract test、E2E fixture 照合を無理なく表現できること。
 - Core -> Analyzer の JSONL parser / validator を単体で検証できること。
 - Analyzer process 起動、stdin close、stdout streaming、stderr handling、exit code handling を integration / contract test で検証できること。
+- `testing` と手書き fake だけで失敗原因が読めること。graph / Protocol record の deep diff が読みにくい場合は `go-cmp` を追加検討すること。
 - `context/project.md` の Quick Commands に、実装者が迷わず実行できる build / test / quality gate command を記載できること。
 
 ### 計測指標
@@ -305,7 +376,7 @@ sequenceDiagram
 
 | Phase | 対象 | 概要 | 依存 |
 | ----- | ---- | ---- | ---- |
-| P1 | spec | D1-D7 を `spec-resolve` で解決する | 本 draft |
+| P1 | spec | D5-D7 を `spec-resolve` で解決する | D1-D4 |
 | P2 | ADR | Core 実装基盤の技術選定 ADR を作成する | D1-D7 |
 | P3 | context | `toolchain` / `testing` / `engineering` / `project` を更新する | ADR |
 | P4 | prompts | Spec8 の実装 prompt 生成へ進める | ADR / context handoff |
@@ -330,7 +401,7 @@ sequenceDiagram
 
 | 対象節 | 変更内容 | 理由 |
 | ------ | -------- | ---- |
-| Alternatives Considered / Open Questions | Core 実装言語決定後、Kotlin 不採用理由や採用案を反映する可能性がある | Design Doc の A1 / toolchain 未定状態を解消するため |
+| Alternatives Considered / Open Questions | Go 採用判断と Kotlin 不採用理由を反映する可能性がある | Design Doc の A1 / toolchain 未定状態を解消するため |
 
 ### feature doc への影響
 
@@ -344,7 +415,9 @@ sequenceDiagram
 | ------------- | -------- | ---- |
 | `context/project.md` Repository Map / Quick Commands | 初期 directory 構成と build / test / quality gate command を追記する | 実装着手前の未定項目を解消するため |
 | `context/toolchain.md` 標準スタック / 採用方針 | Core 実装言語、package manager、task runner、formatter / linter、test framework を確定する | 技術選定結果を横断正本へ反映するため |
+| `context/toolchain.md` Go 側 dependency 方針 | 初期 runtime dependency は `github.com/spf13/cobra` のみ、開発ツールは `golangci-lint` / `govulncheck` を候補として追記する | 依存最小化と CLI 品質 gate を両立するため。source: spec-resolve D1-D4 |
 | `context/testing.md` テスト runtime contract | 採用 test framework と実行 command、contract test 配置を追記する | Spec8 実装 prompt 生成に必要なため |
+| `context/testing.md` mock / assertion 方針 | 初期は `testing`、手書き fake、golden fixture を採用し、`testify` / mock generator / `go-cmp` は初期導入しない方針を追記する | 依存を増やさずに contract test を開始するため。source: spec-resolve D4 |
 | `context/engineering.md` Shared Config / Root Task / Quality Gate | shared config と root task、依存境界検査の初期方針を追記する | 実装 repo としての quality gate を定義するため |
 
 ### ADR の新規 / 更新
@@ -366,6 +439,7 @@ sequenceDiagram
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-21 | Codex | Go 側 Core ライブラリ選定を追加し、D1-D4 を解決済みに更新 |
 | 2026-06-15 | Codex | Issue #11 の spec draft を作成 |
 
 ## 備考
