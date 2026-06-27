@@ -1,5 +1,3 @@
-default_permissions = "rulesync"
-
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
@@ -15,11 +13,3 @@ url = "https://mcp.deepwiki.com/mcp"
 
 [features]
 hooks = true
-
-[permissions.rulesync.network]
-enabled = true
-
-[permissions.rulesync.network.domains]
-"domain:github.com" = "allow"
-"domain:zenn.dev" = "allow"
-"domain:raw.githubusercontent.com" = "allow"
