@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-06-15 / Status: Draft
+> 最終更新: 2026-06-27 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -175,7 +175,8 @@ Analyzer との通信は **プロセス間通信**を用いる。
 
 ## Alternatives Considered
 
-統合モードのため、却下した代替案を本 doc に保持する。確定した長期判断は将来 [adr/](../adr/) へ切り出す。
+統合モードのため、landscape に影響する代替案を本 doc に保持する。
+確定した長期判断は [adr/](../adr/) を正本とする。
 
 | 案  | 内容                                | メリット                  | デメリット                                 | 判定   |
 | --- | ----------------------------------- | ------------------------- | ------------------------------------------ | ------ |
@@ -184,10 +185,11 @@ Analyzer との通信は **プロセス間通信**を用いる。
 | A3  | Core + Analyzer を同一プロセス化    | 実装が単純                | 将来の TypeScript / Vue 対応が困難         | 不採用 |
 
 いずれも「Core を言語非依存に保ち、Analyzer を独立プロセス + 共通 Protocol で結合する」(P1〜P4) という方針を優先して不採用とした。
+Core 実装基盤は [ADR-0002](../adr/0002-core-implementation-foundation.md) で Go / Go modules / Go 標準 command を採用済み。
 
 ## 詳細の所在 (委譲先)
 
-landscape より下の詳細は以下を正本とする。本 doc には重複させず、抜けと意図的委譲を区別するためリンクのみ置く。Phase1 時点では feature doc / context / ADR は未整備のため「未着手」と明示する。
+landscape より下の詳細は以下を正本とする。本 doc には重複させず、抜けと意図的委譲を区別するためリンクのみ置く。
 
 ### Feature 設計 (How: feature)
 
@@ -202,7 +204,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 ### Engineering Context (How: 横断規約)
 
-技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.md](../context/project.md)。現状は未 bootstrap (`context-bootstrap` skill で生成予定)。
+技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.md](../context/project.md)。
 
 | トピック                     | 文書                                                  |
 | ---------------------------- | ----------------------------------------------------- |
@@ -218,6 +220,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | ADR      | 決定                                             | 関連ドキュメント                   |
 | -------- | ------------------------------------------------ | ---------------------------------- |
 | [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI | 本 doc「設計原則」「Communication Protocol」 |
+| [ADR-0002](../adr/0002-core-implementation-foundation.md) | Core 実装基盤として Go / Go modules / Go 標準 command を採用 | [context/toolchain.md](../context/toolchain.md), [context/architecture.md](../context/architecture.md) |
 
 ## Open Questions / Future Work
 

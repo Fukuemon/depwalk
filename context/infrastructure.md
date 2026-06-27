@@ -1,16 +1,16 @@
 # Infrastructure & Operations
 
-> 最終更新: 2026-06-10
+> 最終更新: 2026-06-27
 
 公開基盤・環境戦略・運用・セキュリティの契約。本書は **app 側が依存する contract** を定義する。infra 実体を別 repo で管理する場合はその境界も記す ([context/project.md](project.md) のリポジトリマップ)。
 
-> depwalk は **CLI ツール**であり、サーバ / Web UI を持たない (Non Goals)。一般的な Web app 向けの環境戦略の多くは非該当。配布形態は設計フェーズで確定する。
+> depwalk は **CLI ツール**であり、サーバ / Web UI を持たない (Non Goals)。一般的な Web app 向けの環境戦略の多くは非該当。Core 実装基盤は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
 
 ## Infrastructure / Deployment
 
 - 配信モデル: **CLI バイナリ / パッケージ配布**。サーバ常駐や hosting は持たない。
 - 主な実行環境: 開発者ローカル、および **CI パイプライン** (プルリク時の影響範囲レポート — DesignDoc System Context)。
-- 具体的な配布チャネル (バイナリ / パッケージレジストリ等) は Core 実装言語確定後に定める。infra repo はなし。
+- 具体的な配布チャネル (バイナリ / パッケージレジストリ等) は release 設計時に定める。infra repo はなし。
 
 ## Infrastructure Contract (app → infra)
 
