@@ -5,7 +5,7 @@
 ## メタ情報
 
 - Issue: `#11`
-- ステータス: `Draft`
+- ステータス: `Review`
 - 作成日: 2026-06-15
 - 更新日: 2026-06-27
 - Branch: `feature/11`
@@ -27,7 +27,7 @@
 | 8   | Performance / Security 設計 | 完了   | 2026-06-27 | CLI 配布、外部送信なし、read-only 解析を ADR-0002 / context へ反映 |
 | 9   | Test / Metrics 設計         | 完了   | 2026-06-27 | test framework と quality gate を context へ反映 |
 | 10  | 実装分割                    | 完了   | 2026-06-27 | ADR / context handoff 済み |
-| 11  | レビュー済                  | 未着手 |            | `spec-review` 未実施 |
+| 11  | レビュー済                  | 進行中 | 2026-06-27 | `spec-review` NEEDS_WORK 指摘へ対応中 |
 
 ## 上位文書整合
 
@@ -72,7 +72,7 @@
 
 Spec8 で Analyzer Protocol / SPI / Model schema の契約設計は完了した。次に Core 実装へ進むには、Core 実装言語、package manager、task runner、test framework、初期 directory / package 構成を確定する必要がある。
 
-この spec は、Core を言語非依存に保つという Design Doc の設計原則 P1-P4 と、Analyzer Protocol を JSONL process SPI とする ADR-0001 を前提に、実装基盤の技術選定を issue #11 の作業正本として整理する。決定後は ADR と context に durable な判断を handoff し、Spec8 の実装 prompt 生成へ進める状態にする。
+この spec は、Core を言語非依存に保つという Design Doc の設計原則 P1-P4 と、Analyzer Protocol を JSONL process SPI とする ADR-0001 を前提に、実装基盤の技術選定を issue #11 の作業正本として整理する。決定後は ADR と context に durable な判断を handoff し、Core 環境構築と空の package 境界を作る最小 scaffold へ進める状態にする。
 
 ## スコープ
 
@@ -84,12 +84,16 @@ Spec8 で Analyzer Protocol / SPI / Model schema の契約設計は完了した�
 - 初期 module / package / directory 構成案を決める。
 - 決定理由と却下案を ADR に昇格する。
 - `context/project.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` の更新方針を決める。
+- Core 実装基盤の最小 scaffold として、`core/go.mod`、Cobra 依存、`core/cmd/depwalk/`、`core/internal/...` の空 package、`analyzers/java/`、`testdata/analyzer-protocol/`、`testdata/fixtures/` を作る。
+- `go test ./...`、`go vet ./...`、`go fmt ./...`、`go mod tidy` が通る最小状態を作る。
 
 ### やらないこと
 
 - Analyzer Protocol / SPI / Model schema を再設計しない。正本は feature doc と ADR-0001。
 - Java Analyzer の AST 解析、型解決、DI 解決方式を決めない。
 - Traversal / Output の feature 詳細仕様を決めない。
+- Protocol parser、Protocol validator、Traversal、Output、Java Analyzer の実装ロジックを作らない。
+- `depwalk analyze ...` の引数、exit code、エラー表示の詳細を決めない。CLI interface spec で扱う。
 - Runtime Trace、APM、Reflection、AspectJ Runtime、実行時 Proxy 解析を扱わない。
 - IDE Plugin / Web UI / サーバ常駐の提供形態を扱わない。
 
@@ -97,7 +101,7 @@ Spec8 で Analyzer Protocol / SPI / Model schema の契約設計は完了した�
 
 ### 実現したいユーザー価値
 
-Core 開発者は、追加質問なしに最初の実装 scaffold、Protocol contract test、Graph / Traversal / Output の実装へ着手できる。Analyzer 実装者は、Core と共有する `analyzer-protocol` の配置と検証コマンドを一意に参照できる。
+Core 開発者は、追加質問なしに最初の実装 scaffold を作成し、後続 spec の実装へ進むための package 境界と検証コマンドを一意に参照できる。Analyzer 実装者は、Core と共有する `analyzer-protocol` の配置と、後続の Protocol 実装で参照する正本を一意に参照できる。
 
 ### 成功条件
 
@@ -107,7 +111,10 @@ Core 開発者は、追加質問なしに最初の実装 scaffold、Protocol con
 - 初期 module / package / directory 構成案が決まっている。
 - 技術選定 ADR が作成されている。
 - `context/project.md` / `context/toolchain.md` / `context/testing.md` / `context/engineering.md` が更新されている。
-- Spec8 の実装 prompt 生成に進める状態になっている。
+- `core/go.mod` と Cobra 依存が追加されている。
+- `core/cmd/depwalk/`、`core/internal/...`、`analyzers/java/`、`testdata/analyzer-protocol/`、`testdata/fixtures/` の最小 directory / package 境界が作成されている。
+- `go test ./...`、`go vet ./...`、`go fmt ./...`、`go mod tidy` が `core/` 配下で成功する。
+- Protocol、Traversal、Output、Java Analyzer、CLI interface の実装を各 Issue / spec に分割して進められる状態になっている。
 
 ### 対象ユーザー / 操作主体
 
@@ -122,8 +129,8 @@ EARS 風で振る舞いを記述する。
 - WHEN Core と Analyzer の境界を実装する時、システムは ADR-0001 と Analyzer Protocol feature doc に定義された JSONL process SPI を変更せずに実装する。
 - WHEN 新しい Analyzer を追加する時、Core は Analyzer の内部 runtime / library に直接依存しない。
 - IF 選定候補が Core に特定 Analyzer runtime への直接依存を要求する時、その候補は Design Doc P1-P4 と矛盾するため採用しない。
-- IF 選定候補の CLI 配布が重い時、採否判断では local / CI での導入負荷を明示的に評価する。
-- THE SYSTEM SHALL keep Core independent from Analyzer implementation language and runtime.
+- IF 選定候補が single binary 配布を阻害する runtime 依存、または local / CI の初期導入に複数 runtime の事前インストールを要求する時、採否判断では導入手順数、dependency restore、CI cold start への影響を記録する。
+- システムは Core を Analyzer 実装言語と Analyzer runtime から独立させる。
 
 ## 設計時の論点
 
@@ -151,85 +158,30 @@ EARS 風で振る舞いを記述する。
 
 ## Go 側ライブラリ選定
 
-### 結論
+本節は spec #11 の決定時スナップショットである。
+Core 実装基盤の正本は [ADR-0002](../../adr/0002-core-implementation-foundation.md)、実装者が参照する標準 stack は [context/toolchain.md](../../context/toolchain.md)、検証観点は [context/testing.md](../../context/testing.md) とする。
 
-Core は Go 標準ライブラリを中心に実装する。初期導入する runtime dependency は `github.com/spf13/cobra` のみに抑える。
-
-Cobra は CLI の subcommand、help、completion、POSIX flags を担う。JSONL、外部プロセス実行、graph 表現、text / JSON / Mermaid 出力、unit test / contract test は標準ライブラリと小さな内部実装で開始する。Java Analyzer の AST 解析、型解決、DI 解決に使う library は Go 側 Core に含めない。
+Core は Go 標準ライブラリを中心に実装し、初期 runtime dependency は `github.com/spf13/cobra` のみに抑える。
+Cobra は CLI の subcommand、help、completion、POSIX flags を担う。
+JSONL、外部プロセス実行、graph 表現、text / JSON / Mermaid 出力、unit test / contract test は標準ライブラリと内部 package で開始する。
 
 JSONL parser / validator は安定版の `encoding/json` で開始する。
-ただし、`encoding/json` v1 の duplicate key 許容、invalid UTF-8 置換、struct field の case-insensitive matching は Protocol contract として採用しない。
-`core/internal/protocol` は duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` を invalid record として拒否する。
-`encoding/json/v2` と `encoding/json/jsontext` は Go 1.25 時点で experimental のため初期採用しない。
-`GOEXPERIMENT=jsonv2` が不要になった時点で、strict JSONL parser の実装候補として再評価する。
+ただし、Protocol の strict validation は `encoding/json` v1 の permissive な挙動をそのまま採用しない。
+duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` の扱いは [ADR-0002](../../adr/0002-core-implementation-foundation.md) と [context/testing.md](../../context/testing.md) を正本とする。
 
-### 採用するライブラリ
-
-| 分類 | ライブラリ | 採用度 | 理由 |
-| --- | --- | ---: | --- |
-| CLI フレームワーク | `github.com/spf13/cobra` | 5 | `depwalk analyze ...` のような subcommand、help、completion、POSIX flags を表現しやすい。CLI ツールとして必要な機能に限定して採用する |
-| 設定・flags 管理 | Cobra 内蔵の `pflag` | 4 | 初期要件は CLI flags で足りる。設定ファイル / env binding は要件化されていないため `viper` は採用しない |
-| lint | `golangci-lint` | 4 | CI の品質 gate として利用する。runtime dependency ではなく開発ツールとして扱う |
-| セキュリティ補助 | `golang.org/x/vuln/cmd/govulncheck` | 3 | 依存脆弱性チェック用。CI への追加候補とし、runtime dependency にはしない |
-
-### 標準ライブラリで対応するもの
-
-| 分類 | 標準ライブラリ | 理由 |
-| --- | --- | --- |
-| ロギング | `log/slog` | CLI の verbose / debug logging と構造化 diagnostics には標準で足りる |
-| JSON 入出力 | `encoding/json`, `bufio`, `io` | Analyzer Protocol は JSONL streaming 前提のため、逐次読み込みと strict validation で扱う。`encoding/json/v2` は experimental が外れた時点で再評価する |
-| 外部プロセス実行 | `os/exec`, `context`, `io`, `bytes` | Analyzer process の起動、stdin close、stdout streaming、stderr summary、exit code、timeout を扱える |
-| グラフ表現 | `map`, `slice`, 内部 struct | `MethodSymbol` / `CallEdge` を node / edge として保持し、caller / callee BFS / DFS を実装する範囲では専用 graph library は不要 |
-| 出力フォーマット | `fmt`, `strings`, `text/template`, `encoding/json` | text / JSON / Mermaid は renderer ではなく文字列 / JSON 出力の責務であり、標準で足りる |
-| テスト | `testing`, `testing/fstest`, `os`, `path/filepath` | unit / golden / fixture / contract test を表現できる |
-| mock | 手書き fake / interface stub | 初期は Analyzer runner や filesystem 境界に小さい interface を切り、手書き fake で検証する |
-| format | `gofmt`, `go fmt` | Go 標準 formatter を正とする |
-| 静的確認 | `go test`, `go vet`, `go mod tidy` | 最小の local / CI quality gate として成立する |
-
-### 検討するもの
-
-| タイミング | 候補 | 理由 |
-| --- | --- | --- |
-| CLI command 数、completion、docs 生成が増えた時 | `cobra-cli` | Cobra scaffold 補助。初期は手書きで足りる |
-| graph / Protocol record の deep diff が読みにくくなった時 | `github.com/google/go-cmp/cmp` | golden / fixture test の失敗差分を読みやすくする。初期 dependency にはしない |
-| 同一 interface の fake が複数 test package に重複した時 | `go.uber.org/mock` | mock generator の導入余地。初期は手書き fake を優先する |
-| Graph algorithm が SCC、最短経路、複雑な到達解析へ広がった時 | `gonum.org/v1/gonum/graph` | 初期の caller / callee traversal には過剰 |
-| 設定ファイル / env / precedence が要件化した時 | `github.com/spf13/viper` | 現時点では CLI flags で足りる |
-| multi-platform binary 配布を自動化する時 | `goreleaser` | release automation 用。初期 scaffold では不要 |
-| dependency license / supply chain gate が必要になった時 | `go-licenses`, `osv-scanner` | 依存が増えてから導入判断する |
-
-### go get が必要なもの
-
-```bash
-go get github.com/spf13/cobra@latest
-```
-
-開発ツールは `go get` ではなく、CI / tools 管理で version を固定する。
-
-```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-go install golang.org/x/vuln/cmd/govulncheck@latest
-```
-
-### 導入しない方針のもの
-
-| 候補 | 方針 | 理由 |
-| --- | --- | --- |
-| `viper` | 初期導入しない | 設定ファイル / env binding が要件化されていない |
-| `zap`, `zerolog` | 導入しない | `log/slog` で足りる |
-| `testify` | 初期導入しない | 標準 `testing` と小さな helper で開始し、assertion DSL への依存を避ける |
-| `go.uber.org/mock` | 初期導入しない | 手書き fake で開始し、fake の重複が実害になった時に検討する |
-| `github.com/google/go-cmp/cmp` | 初期導入しない | deep diff の可読性が問題になった時に検討する |
-| graph 専用 library | 初期導入しない | graph model は Protocol model と密接に結びつくため、内部 struct の方が制御しやすい |
-| JSON schema validator | 初期導入しない | Go struct + `Validate()` で開始し、外部 Analyzer 互換性の問題が増えた時に再検討する |
-| `encoding/json/v2` / `encoding/json/jsontext` | 初期導入しない | Go 1.25 時点では experimental。`GOEXPERIMENT=jsonv2` が不要になった時点で再評価する |
-| Java 解析 library | Go 側には導入しない | Java 解析は Analyzer 独立プロセス側の責務。Core は JSONL Protocol のみを扱う |
+開発ツール (`golangci-lint` / `govulncheck` 等) は runtime dependency ではない。
+CI gate へ追加する時点で version 固定方法を決める。
 
 ## 未確定事項
 
 | 未確定事項 | 決定者 | 期限 | 下流への影響 |
 | ---------- | ------ | ---- | ------------ |
-| なし | - | - | Core 実装基盤の durable な判断は ADR-0002 / context に handoff 済み |
+| Analyzer process の timeout / stderr 上限 / record size 上限 | Fukuemon | CLI interface spec または runtime config spec 着手前 | CLI の exit code、エラー表示、runtime config、E2E の失敗条件に影響する |
+| Runtime budget の具体値 | Fukuemon | Traversal / Output / Java Analyzer の初回 E2E 測定後 | 性能目標、CI 実行時間、large repository 対応方針に影響する |
+| 開発ツール (`golangci-lint` / `govulncheck`) の version 固定方法 | Fukuemon | CI gate 設計時 | 再現性、CI cache、開発者 setup 手順に影響する |
+
+これらは spec #11 の Core 実装基盤選定と最小 scaffold を止める未決事項ではない。
+各 Issue / spec で対象責務に入った時点で決定する。
 
 ## 実装対象
 
@@ -237,10 +189,10 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 | モジュール          | 実装有無 | 主な責務 |
 | ------------------- | :------: | -------- |
-| `traversal`         |    ◯     | Core 実装基盤の対象。探索 engine の配置先と test 方針を決める |
-| `output`            |    ◯     | Core 実装基盤の対象。出力 engine の配置先と test 方針を決める |
-| `analyzer-protocol` |    ◯     | Protocol schema / parser / validator / contract test の配置方針を決める |
-| `java-analyzer`     |    -     | 本 spec では Core 側との境界だけ参照し、Java 固有実装は後続 spec で扱う |
+| `traversal`         |    ◯     | 空 package 境界を作る。探索 engine の実装は Traversal spec で扱う |
+| `output`            |    ◯     | 空 package 境界を作る。Console / JSON / Mermaid 出力の実装は Output spec で扱う |
+| `analyzer-protocol` |    ◯     | 空 package 境界と fixture directory を作る。parser / validator / contract test の実装は spec #8 で扱う |
+| `java-analyzer`     |    -     | `analyzers/java/` directory だけ作る。Java 固有実装は Java Analyzer spec で扱う |
 
 ## 機能仕様
 
@@ -250,20 +202,21 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 2. 設計者は候補技術を CLI 配布、Core 言語非依存性、Analyzer 追加時の Core 無変更、JSONL process SPI との相性、test / build 運用の明確さで比較する。
 3. 設計者は採用案と却下案を決め、ADR に判断理由を記録する。
 4. 設計者は `context/toolchain.md`、`context/testing.md`、`context/engineering.md`、`context/project.md` を更新する。
-5. 実装者は更新後の context を参照して、Spec8 の実装 prompt 生成と初期 scaffold へ進む。
+5. 実装者は更新後の context を参照して、spec #11 の最小 scaffold を作る。
+6. 実装者は Protocol、Traversal、Output、Java Analyzer、CLI interface の実装ロジックを各 Issue / spec に分けて進める。
 
 ### Reuse Policy
 
 - Protocol / SPI / Model schema の正本は `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` とし、本 spec では再定義しない。
 - Core 内 package は `context/architecture.md` の依存方向に従う。
 - Java Analyzer 固有の build / runtime 設定を Core 共通 package に持ち込まない。
-- `analyzer-protocol` に置く共有実装は、Core と Analyzer の双方が使っても Design Doc P1-P4 を破らない範囲に限定する。
+- `analyzer-protocol` の parser / validator / contract test は spec #8 で実装する。本 spec では package 境界と fixture directory だけを作る。
 
 ### Performance
 
 - 採用候補は local / CI での cold start、install size、single binary または package 配布の容易さを評価する。
 - Core ↔ Analyzer は streaming JSONL を扱うため、全 Analyzer stdout の一括読み込みを前提にしない runtime / library を選ぶ。
-- 具体的な runtime budget は実装後の測定で確定し、必要なら context / ADR に追記する。
+- 具体的な runtime budget は Traversal / Output / Java Analyzer の E2E 測定後に、対象 spec または context へ追記する。
 
 ### Routing / URL State
 
@@ -292,14 +245,14 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 - UI: 非該当。
 - Web API endpoint: 非該当。
-- CLI command interface: 初期 scaffold 後に `depwalk` CLI の引数設計 spec で扱う。本 spec では build / test / quality gate の開発者向け command を決める。
+- CLI command interface: 初期 scaffold 後に CLI interface spec で扱う。本 spec では build / test / quality gate の開発者向け command と、Cobra root command を置く package 境界だけを決める。
 - Process interface: ADR-0001 と Analyzer Protocol feature doc の JSONL over STDIN/STDOUT を継承する。
 
 ### Props / Request / Response
 
 - Protocol request / response schema は本 spec では再定義しない。
 - Core 実装基盤の決定は、Protocol schema の必須 field や record type を変更してはならない。
-- `analyzer-protocol` 実装配置を決める際は、Core と Java Analyzer の双方が schema / fixture / contract test を参照できる依存方向にする。
+- `analyzer-protocol` 実装配置は `core/internal/protocol` と `testdata/analyzer-protocol/` の境界だけを決める。parser / validator / contract test の実装は spec #8 で扱う。
 
 ## Content / Data 設計
 
@@ -311,7 +264,10 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ### コンテンツ配置 / package / route
 
-- 初期 directory / package 構成は次の形を採用する。
+本節は spec #11 の決定時スナップショットである。
+初期 directory / package 構成の正本は [ADR-0002](../../adr/0002-core-implementation-foundation.md)、[context/architecture.md](../../context/architecture.md)、[context/project.md](../../context/project.md) とする。
+
+本 spec の実装範囲は、次の directory と空 package 境界を作り、Go 標準 command が通る状態にすることに限定する。
 
 ```text
 depwalk/
@@ -335,13 +291,13 @@ depwalk/
 ```
 
 - `cmd/depwalk` は `main` と Cobra root command の起動に限定する。
-- `internal/cli` は CLI command / flags / 入力 validation を担う。
-- `internal/analyze` は `depwalk analyze` の use case orchestration を担う。
-- `internal/protocol` は JSONL record type、parse、validate を担う。
-- `internal/analyzer` は外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling を担う。
-- `internal/graph`、`internal/traversal`、`internal/output` は graph model、caller / callee traversal、text / JSON / Mermaid formatter を担う。
-- `analyzers/<language>/` は言語別 Analyzer runtime を置く。Java Analyzer 実装は `analyzers/java/` に置き、Core の `internal` package には入れない。
-- `testdata/analyzer-protocol/` は Core と Analyzer が共有する JSONL fixture を置く。
+- `internal/cli` は CLI command / flags / 入力 validation を担う package 境界である。具体的な CLI interface は CLI interface spec で扱う。
+- `internal/analyze` は `depwalk analyze` の use case orchestration を担う package 境界である。実装ロジックは CLI interface spec と各 domain spec で扱う。
+- `internal/protocol` は JSONL record type、parse、validate を担う package 境界である。実装は spec #8 で扱う。
+- `internal/analyzer` は外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling を担う package 境界である。timeout / stderr 上限 / record size 上限は CLI interface spec または runtime config spec で決める。
+- `internal/graph`、`internal/traversal`、`internal/output` は graph model、caller / callee traversal、text / JSON / Mermaid formatter を担う package 境界である。実装ロジックは Traversal spec / Output spec で扱う。
+- `analyzers/<language>/` は言語別 Analyzer runtime を置く境界である。Java Analyzer 実装は Java Analyzer spec で扱う。
+- `testdata/analyzer-protocol/` は Core と Analyzer が共有する JSONL fixture を置く directory である。fixture 内容は spec #8 で扱う。
 - Web route / asset route は非該当。
 
 ## Performance / Security 設計
@@ -349,7 +305,7 @@ depwalk/
 ### Performance
 
 - 技術選定では CLI 配布の軽さ、CI 上の導入時間、JSONL streaming 処理の実装容易性を比較軸に含める。
-- Analyzer process 起動 overhead は ADR-0001 の既知トレードオフとして受け入れる。Core 実装基盤は timeout / stderr 上限 / record size 上限を後続 runtime config で扱える余地を残す。
+- Analyzer process 起動 overhead は ADR-0001 の既知トレードオフとして受け入れる。timeout / stderr 上限 / record size 上限は未確定事項として後続 spec で扱う。
 - runtime dependency は初期状態で `github.com/spf13/cobra` のみに抑え、dependency restore と supply chain risk を小さく保つ。
 
 ### Security / Privacy
@@ -365,9 +321,10 @@ depwalk/
 | #   | ケース | ユーザーへの見せ方 | リカバリ |
 | --- | ------ | ------------------ | -------- |
 | 1   | 選定候補が Core から Analyzer 実装への直接依存を要求する | Design Doc P1-P4 との不整合として却下理由を ADR に記録する | Protocol 境界を保てる候補へ切り替える |
-| 2   | 選定候補の配布方式が local / CI に重すぎる | CLI 配布の軽さの評価で不利として記録する | single binary / 軽量 runtime / package 配布の代替を評価する |
+| 2   | 選定候補が single binary 配布を阻害する runtime 依存、または local / CI の初期導入に複数 runtime の事前インストールを要求する | 導入手順数、dependency restore、CI cold start への影響を ADR に記録する | single binary / 軽量 runtime / package 配布の代替を評価する |
 | 3   | test framework が Protocol contract test を表現しづらい | test 方針の不適合として記録する | fixture / golden test を扱える framework を選ぶ |
 | 4   | context 更新が ADR の決定内容とずれる | `spec-sync` / review で差分を指摘する | ADR を正として context を同期する |
+| 5   | Analyzer 起動失敗、timeout、invalid record、非ゼロ exit の表示仕様が必要になる | 本 spec では未確定事項として扱い、CLI interface spec または runtime config spec の対象にする | CLI interface spec で exit code、stderr 表示、diagnostics 表示、runtime config を決める |
 
 ### Fallback
 
@@ -379,10 +336,8 @@ depwalk/
 ### テスト観点
 
 - 候補技術が unit test、Protocol contract test、E2E fixture 照合を無理なく表現できること。
-- Core -> Analyzer の JSONL parser / validator を単体で検証できること。
-- `encoding/json` v1 の permissive な挙動を Protocol contract に持ち込まないこと。duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` は invalid record として拒否すること。
-- Core が Protocol 上 array / object と定義する field を出力する場合、nil slice / nil map 由来の `null` を出力しないこと。
-- Analyzer process 起動、stdin close、stdout streaming、stderr handling、exit code handling を integration / contract test で検証できること。
+- spec #11 の最小 scaffold 後、`cd core && go test ./...`、`cd core && go vet ./...`、`cd core && go fmt ./...`、`cd core && go mod tidy` が成功すること。
+- Protocol strict validation、nil slice / nil map、Analyzer process contract の詳細検証は [context/testing.md](../../context/testing.md) と spec #8 を正本とする。
 - `testing` と手書き fake だけで失敗原因が読めること。graph / Protocol record の deep diff が読みにくい場合は `go-cmp` を追加検討すること。
 - `context/project.md` の Quick Commands に、実装者が迷わず実行できる build / test / quality gate command を記載できること。
 
@@ -396,19 +351,45 @@ depwalk/
 
 ## フロー / シーケンス
 
-(`spec-diagrams` で生成。spec の主要操作を Mermaid 図に落とす)
+本 spec は技術選定と最小 scaffold の issue であり、runtime の caller / callee 探索フローは扱わない。
+図は、正本 handoff と後続 Issue への分割だけを示す。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    issue["Issue #11<br/>Core 実装基盤を確定"] --> decide["Go / Go modules / Cobra / testing / package 境界を決定"]
+    decide --> adr["ADR-0002 へ handoff"]
+    adr --> context["context/project・architecture・toolchain・testing・engineering を更新"]
+    context --> scaffold["spec #11 実装<br/>最小 scaffold と Go command 成功"]
+    scaffold --> spec8["spec #8<br/>Protocol parser / validator / contract test"]
+    scaffold --> traversal["Traversal spec<br/>graph / caller / callee traversal"]
+    scaffold --> output["Output spec<br/>Console / JSON / Mermaid"]
+    scaffold --> java["Java Analyzer spec<br/>Java 側 Analyzer"]
+    scaffold --> cli["CLI interface spec<br/>depwalk analyze / exit code / エラー表示"]
 ```
+
+spec #11 は `scaffold` までを扱い、各実装ロジックは後続 spec へ分割する。
 
 ### Sequence
 
 ```mermaid
 sequenceDiagram
+    participant Designer as 設計者
+    participant ADR as ADR-0002
+    participant Context as context
+    participant Implementer as 実装者
+    participant Issues as 後続 Issue / spec
+
+    Designer->>ADR: Core 実装基盤の判断を記録
+    Designer->>Context: 実装者向け command / package 境界を同期
+    Implementer->>Context: Quick Commands と package boundary を参照
+    Implementer->>Implementer: core/go.mod と空 package 境界を作成
+    Implementer->>Implementer: go test / go vet / go fmt / go mod tidy を確認
+    Implementer->>Issues: Protocol / Traversal / Output / Java Analyzer / CLI interface を分割して進める
 ```
+
+実装者は spec #11 で実装ロジックを先取りせず、後続 Issue / spec の正本を待って各 package の中身を実装する。
 
 ## 実装分割
 
@@ -416,16 +397,28 @@ sequenceDiagram
 
 | Phase | 対象 | 概要 | 依存 |
 | ----- | ---- | ---- | ---- |
-| P1 | spec | D7 を `spec-resolve` で解決する | D1-D6 |
-| P2 | ADR | Core 実装基盤の技術選定 ADR を作成する | D1-D7 |
-| P3 | context | `toolchain` / `testing` / `engineering` / `project` を更新する | ADR |
-| P4 | prompts | Spec8 の実装 prompt 生成へ進める | ADR / context handoff |
+| P1 | spec | D1-D7 を `spec-resolve` で解決する | 完了 |
+| P2 | ADR | Core 実装基盤の技術選定 ADR-0002 を作成する | 完了 |
+| P3 | context | `project` / `architecture` / `toolchain` / `testing` / `engineering` を ADR 参照として更新する | 完了 |
+| P4 | scaffold | `core/go.mod`、Cobra 依存、`core/cmd/depwalk/`、`core/internal/...`、`analyzers/java/`、`testdata/analyzer-protocol/`、`testdata/fixtures/` を作る | P1-P3 |
+| P5 | scaffold validation | `cd core && go test ./...`、`go vet ./...`、`go fmt ./...`、`go mod tidy` を成功させる | P4 |
+| P6 | downstream | Protocol / Traversal / Output / Java Analyzer / CLI interface の実装を各 Issue / spec に分割する | P5 |
 
 ### prompts 生成方針
 
-- `analyzer-protocol` の prompt は Protocol schema / parser / validator / contract test を中心に切る。
-- `traversal` と `output` の prompt は Core package 構成確定後に別 spec / prompt で切る。
-- `java-analyzer` は本 spec の直接実装対象にしない。Analyzer Protocol に準拠する後続実装として扱う。
+spec #11 では、Core 環境構築と空の package 境界を作る prompt だけを生成する。
+実装ロジックは次の単位に分ける。
+
+| 順序 | spec / Issue | 扱う内容 |
+| ---- | ------------ | -------- |
+| 1 | spec #11 | Core 環境構築と空の package 境界を作る |
+| 2 | spec #8 | Analyzer Protocol の parser / validator / contract test を実装する |
+| 3 | Traversal spec | graph / caller / callee traversal を実装する |
+| 4 | Output spec | Console / JSON / Mermaid などの出力を実装する |
+| 5 | Java Analyzer spec | Java 側 Analyzer 実装を進める |
+| 6 | CLI interface spec | `depwalk analyze ...` の引数、exit code、エラー表示を固めて実装する |
+
+この分割により、Protocol、Traversal、Output、CLI interface、Java Analyzer の判断を spec #11 が先取りしない。
 
 ## 上位資料からの変更点
 
@@ -476,12 +469,13 @@ sequenceDiagram
 
 | 日付 | 結果 (PASS / NEEDS_WORK) | 指摘要点 | 対応 |
 | ---- | ------------------------ | -------- | ---- |
-|      |                          |          |      |
+| 2026-06-27 | NEEDS_WORK | 正本境界の重複、空のフロー / シーケンス、未確定事項の残存、EARS の観測可能性不足、ステータス不整合 | 対応済み。再 review 待ち |
 
 ## 変更履歴
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-27 | Codex | spec-review 指摘に対応し、正本境界、未確定事項、最小 scaffold 範囲、後続 Issue 分割を整理 |
 | 2026-06-27 | Codex | ADR-0002 と context / Design Doc へ Core 実装基盤の durable な判断を handoff |
 | 2026-06-27 | Codex | `encoding/json/v2` を初期採用せず、安定版 `encoding/json` に strict validation を重ねる方針を追記 |
 | 2026-06-27 | Codex | D7 を解決し、ADR 作成後に context を ADR 参照として更新する handoff 順序を追加 |
