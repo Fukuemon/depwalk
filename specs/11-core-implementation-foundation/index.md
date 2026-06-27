@@ -7,7 +7,7 @@
 - Issue: `#11`
 - ステータス: `Draft`
 - 作成日: 2026-06-15
-- 更新日: 2026-06-21
+- 更新日: 2026-06-27
 - Branch: `feature/11`
 - Owner: Fukuemon
 
@@ -22,11 +22,11 @@
 | 3   | 上位文書突合                | 完了   | 2026-06-15 | Design Doc / feature doc / context / ADR を確認 |
 | 4   | 論点整理                    | 完了   | 2026-06-15 | D1-D7 を初期論点として列挙 |
 | 5   | 論点解決                    | 完了   | 2026-06-27 | D1-D7 を解決済み |
-| 6   | Interface / Routing 設計    | 未着手 |            | 非 UI / CLI package boundary として扱う |
-| 7   | Content / Data 設計         | 未着手 |            | 初期 module / package 構成を扱う |
-| 8   | Performance / Security 設計 | 未着手 |            | CLI 配布、外部送信なし、read-only 解析を確認 |
-| 9   | Test / Metrics 設計         | 未着手 |            | test framework と quality gate を決める |
-| 10  | 実装分割                    | 未着手 |            | Spec8 の実装 prompt 生成前に確定する |
+| 6   | Interface / Routing 設計    | 完了   | 2026-06-27 | 非 UI / CLI package boundary として ADR-0002 / context へ反映 |
+| 7   | Content / Data 設計         | 完了   | 2026-06-27 | 初期 module / package 構成を ADR-0002 / context へ反映 |
+| 8   | Performance / Security 設計 | 完了   | 2026-06-27 | CLI 配布、外部送信なし、read-only 解析を ADR-0002 / context へ反映 |
+| 9   | Test / Metrics 設計         | 完了   | 2026-06-27 | test framework と quality gate を context へ反映 |
+| 10  | 実装分割                    | 完了   | 2026-06-27 | ADR / context handoff 済み |
 | 11  | レビュー済                  | 未着手 |            | `spec-review` 未実施 |
 
 ## 上位文書整合
@@ -34,24 +34,24 @@
 正本 ([Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。本プロダクトは統合モードのため独立した `PRD.md` は持たず、Why / What は Design Doc に統合されている。
 
 - PRD 更新要否: 不要 (統合モードのため `design/DesignDoc.md` の Why / What を参照)
-- Design Doc 更新要否: 未定 (Core 実装基盤の決定が Design Doc の Alternatives / Open Questions に影響する場合は要)
-- ADR 起票要否: 要 (Core 実装言語 / toolchain / 初期 module 構成の判断を ADR 化する)
+- Design Doc 更新要否: 反映済 ([design/DesignDoc.md](../../design/DesignDoc.md) の Related ADRs / Alternatives Considered)
+- ADR 起票要否: 反映済 ([ADR-0002](../../adr/0002-core-implementation-foundation.md))
 
 | 上位文書    | 節 / 該当箇所 | 整合方針 (継承 / 補足 / 変更提案) |
 | ----------- | ------------- | --------------------------------- |
 | PRD         | 統合モードのため `design/DesignDoc.md` の Why / What | 継承 |
-| Design Doc  | 設計原則 P1-P4 / Alternatives Considered A1 / Communication Protocol / Future Work | 補足 |
+| Design Doc  | 設計原則 P1-P4 / Alternatives Considered A1 / Related ADRs | 反映済 |
 | feature doc | `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` の「やらないこと」(Core 実装言語、package manager、test framework は定義しない) | 補足 |
 | context     | `context/architecture.md` Package Boundary / Runtime Boundary | 継承 |
-| context     | `context/toolchain.md` 標準スタック / 採用方針 | 変更提案 |
-| context     | `context/testing.md` テスト責務の分担 / テスト runtime contract | 変更提案 |
-| context     | `context/engineering.md` Shared Config Boundary / Root Task Boundary / Repository Quality Gate | 変更提案 |
-| context     | `context/project.md` Repository Map / Quick Commands / 対象ドメイン | 変更提案 |
+| context     | `context/toolchain.md` 標準スタック / 採用方針 | 反映済 |
+| context     | `context/testing.md` テスト責務の分担 / テスト runtime contract | 反映済 |
+| context     | `context/engineering.md` Shared Config Boundary / Root Task Boundary / Repository Quality Gate | 反映済 |
+| context     | `context/project.md` Repository Map / Quick Commands / 対象ドメイン | 反映済 |
 | context     | `context/infrastructure.md` CLI バイナリ / パッケージ配布、外部送信なし | 補足 |
 | ADR         | `adr/0001-analyzer-protocol-jsonl-spi.md` | 継承 |
-| ADR         | Core 実装基盤 ADR (新規) | 変更提案 |
+| ADR         | `adr/0002-core-implementation-foundation.md` | 反映済 |
 
-> `変更提案` は Issue 11 の完了条件そのもの。論点解決後、下流 phase に進む前に `spec-sync` で ADR / context へ handoff する。
+> Issue 11 の durable な判断は ADR-0002 と context へ handoff 済み。本 spec は決定経緯と issue 単位の作業記録を保持する。
 
 ## 関連資料
 
@@ -60,11 +60,12 @@
 - `adr/0001-analyzer-protocol-jsonl-spi.md`: JSONL over STDIN/STDOUT の process SPI 判断
 - `context/project.md`: 対象ドメイン、Issue Tracker、Source of Truth、Branch pattern、Quick Commands
 - `context/architecture.md`: Core -> Analyzer は Protocol 境界のみ、Core は Analyzer 内部を知らない
-- `context/toolchain.md`: Core 実装言語 / package manager / task runner / test framework は未定
+- `context/toolchain.md`: Core 実装言語 / package manager / task runner / test framework の標準スタック
 - `context/testing.md`: Unit / Protocol contract / E2E の責務分担
-- `context/engineering.md`: 実装スタック確定後に shared config / root task / quality gate を定義する
+- `context/engineering.md`: shared config / root task / quality gate の境界規約
 - `context/infrastructure.md`: CLI バイナリ / パッケージ配布、local / CI 実行、外部送信なし
-- `specs/8-analyzer-protocol/`: Protocol / SPI / Model schema は決定済み。Core 実装基盤は未確定事項として残っている
+- `specs/8-analyzer-protocol/`: Protocol / SPI / Model schema は決定済み。Core 実装基盤は ADR-0002 へ handoff 済み
+- `adr/0002-core-implementation-foundation.md`: Go / Go modules / Go 標準 command / 初期 package 構成の正本
 - 関連 issue / ticket: [#11](https://github.com/Fukuemon/depwalk/issues/11)
 
 ## 背景
@@ -221,7 +222,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 | 未確定事項 | 決定者 | 期限 | 下流への影響 |
 | ---------- | ------ | ---- | ------------ |
-| 技術選定 ADR の内容 | Fukuemon | `spec-sync` 前 | context の標準スタックを正本化できない |
+| なし | - | - | Core 実装基盤の durable な判断は ADR-0002 / context に handoff 済み |
 
 ## 実装対象
 
@@ -431,7 +432,7 @@ sequenceDiagram
 
 | 対象節 | 変更内容 | 理由 |
 | ------ | -------- | ---- |
-| Alternatives Considered / Open Questions | Go 採用判断と Kotlin 不採用理由を反映する可能性がある | Design Doc の A1 / toolchain 未定状態を解消するため |
+| Alternatives Considered / Related ADRs | 反映済: ADR-0002 への参照と Go 採用済みの注記を追加 | Design Doc の A1 / toolchain 未確定状態を解消するため |
 
 ### feature doc への影響
 
@@ -443,21 +444,21 @@ sequenceDiagram
 
 | 対象 doc / 節 | 変更内容 | 理由 |
 | ------------- | -------- | ---- |
-| `context/project.md` Repository Map / Quick Commands | 初期 directory 構成と build / test / quality gate command を追記する | 実装着手前の未定項目を解消するため |
-| `context/project.md` Repository Map | `core/` と `analyzers/<language>/` を top-level に分ける構成を追記する | Core と Analyzer の runtime 境界を directory 構成でも明示するため。source: spec-resolve D5-D6 |
-| `context/architecture.md` Package Boundary | Core の Go 実装は `core/internal/...`、Analyzer 実装は `analyzers/<language>/` に分け、共有境界を Protocol doc / fixture / contract test 観点に限定する方針を追記する | Core が Analyzer 内部 runtime / implementation に依存しない境界を実装構成へ落とすため。source: spec-resolve D5-D6 |
-| `context/toolchain.md` 標準スタック / 採用方針 | Core 実装言語、package manager、task runner、formatter / linter、test framework を確定する | 技術選定結果を横断正本へ反映するため |
-| `context/toolchain.md` Go 側 dependency 方針 | 初期 runtime dependency は `github.com/spf13/cobra` のみ、開発ツールは `golangci-lint` / `govulncheck` を候補として追記する | 依存最小化と CLI 品質 gate を両立するため。source: spec-resolve D1-D4 |
-| `context/testing.md` テスト runtime contract | 採用 test framework と実行 command、contract test 配置を追記する | Spec8 実装 prompt 生成に必要なため |
-| `context/testing.md` mock / assertion 方針 | 初期は `testing`、手書き fake、golden fixture を採用し、`testify` / mock generator / `go-cmp` は初期導入しない方針を追記する | 依存を増やさずに contract test を開始するため。source: spec-resolve D4 |
-| `context/engineering.md` Shared Config / Root Task / Quality Gate | shared config と root task、依存境界検査の初期方針を追記する | 実装 repo としての quality gate を定義するため |
-| context 全般 | ADR 作成後に `spec-sync` で更新し、判断理由は ADR 参照へ寄せる | issue 終了後も残る技術選定の正本を ADR に置き、context との二重管理を避けるため。source: spec-resolve D7 |
+| `context/project.md` Repository Map / Quick Commands | 反映済: 初期 directory 構成と build / test / quality gate command を追記 | 実装着手前の未確定項目を解消するため |
+| `context/project.md` Repository Map | 反映済: `core/` と `analyzers/<language>/` を top-level に分ける構成を追記 | Core と Analyzer の runtime 境界を directory 構成でも明示するため。source: spec-resolve D5-D6 |
+| `context/architecture.md` Package Boundary | 反映済: Core の Go 実装は `core/internal/...`、Analyzer 実装は `analyzers/<language>/` に分け、共有境界を Protocol doc / fixture / contract test 観点に限定する方針を追記 | Core が Analyzer 内部 runtime / implementation に依存しない境界を実装構成へ落とすため。source: spec-resolve D5-D6 |
+| `context/toolchain.md` 標準スタック / 採用方針 | 反映済: Core 実装言語、package manager、task runner、formatter / linter、test framework を確定 | 技術選定結果を横断正本へ反映するため |
+| `context/toolchain.md` Go 側 dependency 方針 | 反映済: 初期 runtime dependency は `github.com/spf13/cobra` のみ、開発ツールは `golangci-lint` / `govulncheck` を候補として追記 | 依存最小化と CLI 品質 gate を両立するため。source: spec-resolve D1-D4 |
+| `context/testing.md` テスト runtime contract | 反映済: 採用 test framework と実行 command、contract test 配置を追記 | Spec8 実装 prompt 生成に必要なため |
+| `context/testing.md` mock / assertion 方針 | 反映済: 初期は `testing`、手書き fake、golden fixture を採用し、`testify` / mock generator / `go-cmp` は初期導入しない方針を追記 | 依存を増やさずに contract test を開始するため。source: spec-resolve D4 |
+| `context/engineering.md` Shared Config / Root Task / Quality Gate | 反映済: shared config と root task、依存境界検査の初期方針を追記 | 実装 repo としての quality gate を定義するため |
+| context 全般 | 反映済: ADR-0002 への参照と実行時 contract を追加し、判断理由は ADR 参照へ寄せる | issue 終了後も残る技術選定の正本を ADR に置き、context との二重管理を避けるため。source: spec-resolve D7 |
 
 ### ADR の新規 / 更新
 
 | ADR ID | 変更内容 | 理由 |
 | ------ | -------- | ---- |
-| 新規 | Core 実装言語、package manager、task runner、test framework、初期 module 構成の採用判断を記録する | 長期判断として issue 終了後も残るため |
+| ADR-0002 | 反映済: Core 実装言語、package manager、task runner、test framework、初期 module 構成の採用判断を記録 | 長期判断として issue 終了後も残るため |
 | ADR-0001 | 原則更新なし。必要なら Core 実装基盤から見た影響範囲へのリンクを追加する | JSONL process SPI 判断は既に承認済みであり、再判断しないため |
 
 ## レビュー
@@ -472,6 +473,7 @@ sequenceDiagram
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-27 | Codex | ADR-0002 と context / Design Doc へ Core 実装基盤の durable な判断を handoff |
 | 2026-06-27 | Codex | D7 を解決し、ADR 作成後に context を ADR 参照として更新する handoff 順序を追加 |
 | 2026-06-27 | Codex | D5-D6 を解決し、Core / Analyzer の top-level 分離と Core 内 package 構成を追加 |
 | 2026-06-21 | Codex | Go 側 Core ライブラリ選定を追加し、D1-D4 を解決済みに更新 |
