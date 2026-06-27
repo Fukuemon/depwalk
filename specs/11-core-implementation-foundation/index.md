@@ -21,7 +21,7 @@
 | 2   | 下書き                      | 完了   | 2026-06-15 | 本 spec を scaffold |
 | 3   | 上位文書突合                | 完了   | 2026-06-15 | Design Doc / feature doc / context / ADR を確認 |
 | 4   | 論点整理                    | 完了   | 2026-06-15 | D1-D7 を初期論点として列挙 |
-| 5   | 論点解決                    | 進行中 | 2026-06-21 | D1-D4 を解決済み。D5-D7 は継続 |
+| 5   | 論点解決                    | 進行中 | 2026-06-27 | D1-D6 を解決済み。D7 は継続 |
 | 6   | Interface / Routing 設計    | 未着手 |            | 非 UI / CLI package boundary として扱う |
 | 7   | Content / Data 設計         | 未着手 |            | 初期 module / package 構成を扱う |
 | 8   | Performance / Security 設計 | 未着手 |            | CLI 配布、外部送信なし、read-only 解析を確認 |
@@ -134,8 +134,8 @@ EARS 風で振る舞いを記述する。
 | D2  | package manager と dependency 管理を何にするか | D1 の言語に従属。例: Cargo / Go modules / npm 系 | Go modules を採用し、初期の runtime dependency は `github.com/spf13/cobra` のみに抑える |
 | D3  | task runner と root command をどう定義するか | 言語標準 task / make-like wrapper / package manager scripts | 初期は Go 標準 command (`go test` / `go vet` / `go fmt` / `go mod tidy`) を root command とし、make-like wrapper は後続で必要になった時に検討する |
 | D4  | test framework と contract test の配置をどうするか | 言語標準 test / dedicated test runner / golden fixture | `testing` を採用し、手書き fake / golden fixture / Protocol contract test で開始する。`testify` / mock generator / `go-cmp` は初期導入しない |
-| D5  | `analyzer-protocol` の実装配置をどうするか | Core 内 package / 独立 package / schema + generated types | 未決 |
-| D6  | 初期 directory / package 構成をどう切るか | CLI / Core / Model / Analyzer SPI / Traversal / Output / fixtures の分割案 | 未決 |
+| D5  | `analyzer-protocol` の実装配置をどうするか | Core 内 package / 独立 package / schema + generated types | Go 実装は `core/internal/protocol` に置く。Analyzer 実装は `analyzers/<language>/` に分離し、共有境界は Protocol doc / ADR / JSONL fixture / contract test 観点に限定する |
+| D6  | 初期 directory / package 構成をどう切るか | CLI / Core / Model / Analyzer SPI / Traversal / Output / fixtures の分割案 | `core/` と `analyzers/` を top-level に分ける。Core 内は strict VSA ではなく、`internal/analyze` を use case slice、`protocol` / `analyzer` / `graph` / `traversal` / `output` を capability package とする |
 | D7  | ADR / context へどの順序で handoff するか | ADR 作成後に context 更新 / spec-sync で同時反映 | 未決 |
 
 ## 解決済みの論点
@@ -144,6 +144,8 @@ EARS 風で振る舞いを記述する。
 - D2: dependency 管理は Go modules を採用する。初期の runtime dependency は CLI framework の `github.com/spf13/cobra` のみに抑え、Analyzer Protocol / JSONL / process 実行 / graph / output / test は標準ライブラリと内部実装で開始する。
 - D3: task runner は初期導入しない。root command は Go 標準 command (`go test ./...`、`go vet ./...`、`go fmt ./...`、`go mod tidy`) とし、repository-level の wrapper は command 数や CI matrix が増えた時に再検討する。
 - D4: test framework は Go 標準の `testing` を採用する。mock は手書き fake / interface stub を標準方針とし、`testify`、`go.uber.org/mock`、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
+- D5: `analyzer-protocol` の Go 実装は `core/internal/protocol` に置く。Analyzer process の起動、stdin / stdout / stderr、exit code handling は `core/internal/analyzer` に分ける。Java などの言語別 Analyzer 実装は Core の `internal` 配下に置かず、`analyzers/<language>/` に分離する。Core と Analyzer が共有する正本は Analyzer Protocol feature doc、ADR、JSONL fixture、contract test 観点とし、Go package や Java 実装 code は共有しない。schema generated types / JSON schema validator は初期導入しない。
+- D6: 初期 directory / package 構成は `core/` と `analyzers/` を top-level に分ける。Core 内は strict VSA ではなく、`core/internal/analyze` を use case slice とし、`protocol` / `analyzer` / `graph` / `traversal` / `output` を再利用可能な capability package として分ける折衷案を採用する。`core/internal/core` のような重複名は責務が曖昧なため採用しない。
 
 ## Go 側ライブラリ選定
 
@@ -218,7 +220,6 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 | 未確定事項 | 決定者 | 期限 | 下流への影響 |
 | ---------- | ------ | ---- | ------------ |
-| `analyzer-protocol` 実装配置 | Fukuemon | Core scaffold 前 | Core / Analyzer の依存境界をコード上に落とせない |
 | 技術選定 ADR の内容 | Fukuemon | `spec-sync` 前 | context の標準スタックを正本化できない |
 
 ## 実装対象
@@ -301,8 +302,37 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ### コンテンツ配置 / package / route
 
-- 初期 directory / package 構成は D6 で決める。
-- 現時点の候補分割は `cli`、`core`、`analyzer-protocol`、`traversal`、`output`、`fixtures`。
+- 初期 directory / package 構成は次の形を採用する。
+
+```text
+depwalk/
+├── core/
+│   ├── go.mod
+│   ├── cmd/
+│   │   └── depwalk/
+│   └── internal/
+│       ├── cli/
+│       ├── analyze/
+│       ├── protocol/
+│       ├── analyzer/
+│       ├── graph/
+│       ├── traversal/
+│       └── output/
+├── analyzers/
+│   └── java/
+└── testdata/
+    ├── analyzer-protocol/
+    └── fixtures/
+```
+
+- `cmd/depwalk` は `main` と Cobra root command の起動に限定する。
+- `internal/cli` は CLI command / flags / 入力 validation を担う。
+- `internal/analyze` は `depwalk analyze` の use case orchestration を担う。
+- `internal/protocol` は JSONL record type、parse、validate を担う。
+- `internal/analyzer` は外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling を担う。
+- `internal/graph`、`internal/traversal`、`internal/output` は graph model、caller / callee traversal、text / JSON / Mermaid formatter を担う。
+- `analyzers/<language>/` は言語別 Analyzer runtime を置く。Java Analyzer 実装は `analyzers/java/` に置き、Core の `internal` package には入れない。
+- `testdata/analyzer-protocol/` は Core と Analyzer が共有する JSONL fixture を置く。
 - Web route / asset route は非該当。
 
 ## Performance / Security 設計
@@ -332,8 +362,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ### Fallback
 
-- `analyzer-protocol` 実装配置が決まらない場合、Spec8 の実装 prompt 生成には進まない。
-- 初期 directory / package 構成が決まらない場合、Core scaffold は行わず、D6 の未確定事項として残す。
+- ADR / context handoff 順序が決まらない場合、Spec8 の実装 prompt 生成には進まない。
 - context 更新が広がる場合、ADR を先に確定し、context は ADR へのリンクを正本として追従させる。
 
 ## テスト / 評価方針
@@ -376,7 +405,7 @@ sequenceDiagram
 
 | Phase | 対象 | 概要 | 依存 |
 | ----- | ---- | ---- | ---- |
-| P1 | spec | D5-D7 を `spec-resolve` で解決する | D1-D4 |
+| P1 | spec | D7 を `spec-resolve` で解決する | D1-D6 |
 | P2 | ADR | Core 実装基盤の技術選定 ADR を作成する | D1-D7 |
 | P3 | context | `toolchain` / `testing` / `engineering` / `project` を更新する | ADR |
 | P4 | prompts | Spec8 の実装 prompt 生成へ進める | ADR / context handoff |
@@ -414,6 +443,8 @@ sequenceDiagram
 | 対象 doc / 節 | 変更内容 | 理由 |
 | ------------- | -------- | ---- |
 | `context/project.md` Repository Map / Quick Commands | 初期 directory 構成と build / test / quality gate command を追記する | 実装着手前の未定項目を解消するため |
+| `context/project.md` Repository Map | `core/` と `analyzers/<language>/` を top-level に分ける構成を追記する | Core と Analyzer の runtime 境界を directory 構成でも明示するため。source: spec-resolve D5-D6 |
+| `context/architecture.md` Package Boundary | Core の Go 実装は `core/internal/...`、Analyzer 実装は `analyzers/<language>/` に分け、共有境界を Protocol doc / fixture / contract test 観点に限定する方針を追記する | Core が Analyzer 内部 runtime / implementation に依存しない境界を実装構成へ落とすため。source: spec-resolve D5-D6 |
 | `context/toolchain.md` 標準スタック / 採用方針 | Core 実装言語、package manager、task runner、formatter / linter、test framework を確定する | 技術選定結果を横断正本へ反映するため |
 | `context/toolchain.md` Go 側 dependency 方針 | 初期 runtime dependency は `github.com/spf13/cobra` のみ、開発ツールは `golangci-lint` / `govulncheck` を候補として追記する | 依存最小化と CLI 品質 gate を両立するため。source: spec-resolve D1-D4 |
 | `context/testing.md` テスト runtime contract | 採用 test framework と実行 command、contract test 配置を追記する | Spec8 実装 prompt 生成に必要なため |
@@ -439,6 +470,7 @@ sequenceDiagram
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-27 | Codex | D5-D6 を解決し、Core / Analyzer の top-level 分離と Core 内 package 構成を追加 |
 | 2026-06-21 | Codex | Go 側 Core ライブラリ選定を追加し、D1-D4 を解決済みに更新 |
 | 2026-06-15 | Codex | Issue #11 の spec draft を作成 |
 
