@@ -31,6 +31,15 @@ Test framework は Go 標準の `testing` を採用する。
 Protocol contract test、golden fixture、手書き fake、interface stub で開始する。
 `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。
 
+JSONL parser / validator は安定版の `encoding/json` を使って開始する。
+ただし、`encoding/json` v1 の permissive な挙動を Protocol contract として採用しない。
+`core/internal/protocol` は、duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` を invalid record として拒否する。
+出力側は、Protocol 上 array / object と定義する field を nil slice / nil map から `null` として marshal しない。
+
+`encoding/json/v2` と `encoding/json/jsontext` は初期実装では採用しない。
+Go 1.25 時点では experimental であり、`GOEXPERIMENT=jsonv2` と Go 1 compatibility promise 外の API に依存するためである。
+experimental が外れ、CI / 配布 toolchain で標準利用できる状態になった時点で、strict JSONL parser の実装候補として再評価する。
+
 初期 directory / package 構成は、Core と Analyzer を top-level で分ける。
 Go 側の Analyzer Protocol 実装は `core/internal/protocol` に置く。
 Analyzer process の起動、stdin / stdout / stderr、exit code handling は `core/internal/analyzer` に分ける。
@@ -70,6 +79,8 @@ Go package や Java 実装 code を共有境界にしない。
   - 却下理由: Phase1 の Java Analyzer との統合は容易になる。一方で、Core が JVM 前提になり、Analyzer runtime から独立させる設計原則と CLI 配布の軽さに反する。
 - Protocol schema から各言語の型を生成する。
   - 却下理由: 初期段階では schema generator と generated code の保守が増える。Phase1 は Go struct と `Validate()`、JSONL fixture、contract test で互換性を検証する。
+- `encoding/json/v2` または `encoding/json/jsontext` を初期採用する。
+  - 却下理由: duplicate key や invalid UTF-8 を拒否する default は Protocol 境界に合う。一方で、Go 1.25 時点では experimental であり、Core の実装基盤 ADR が experimental API と `GOEXPERIMENT=jsonv2` に依存することになる。初期実装は安定版 `encoding/json` に strict validation を重ね、v2 は experimental が外れた時点で再評価する。
 - `testify`、mock generator、`go-cmp` を初期導入する。
   - 却下理由: 初期の test 対象は小さい package 境界と fixture 照合で表現できる。Assertion DSL、generated mock、deep diff library は、失敗差分や fake 重複が実害になった時点で追加判断する。
 
@@ -82,11 +93,14 @@ Go package や Java 実装 code を共有境界にしない。
 - Core が Java Analyzer の JVM runtime や Java 解析 library に依存しない。
 - 初期 dependency を Cobra に限定し、restore 時間と supply chain risk を小さく保てる。
 - `go test`、`go vet`、`go fmt`、`go mod tidy` を local / CI の共通 command として使える。
+- `encoding/json/v2` を待たずに実装へ進める。Protocol の厳格性は contract test と `core/internal/protocol` の validation で担保する。
 
 ### 悪い影響 / トレードオフ
 
 - Go と Java Analyzer の間で型定義を code として共有できない。
 - Protocol 互換性は JSONL fixture と contract test で担保する必要がある。
+- `encoding/json` v1 は duplicate key、invalid UTF-8、struct field の大小文字違いなどを permissive に扱う。Protocol parser は `json.Unmarshal` へ直接流すだけでは contract を満たせない。
+- `encoding/json/v2` を初期採用しないため、v2 の strict default を利用できない。v2 が安定化した時点で、strict validation の実装を置き換えるかを再評価する。
 - make-like wrapper を初期導入しないため、複数 module や CI matrix が増えた場合は root task の再設計が必要になる。
 - Assertion library や diff library を初期導入しないため、複雑な graph 差分が読みにくくなった場合は `go-cmp` などの追加判断が必要になる。
 

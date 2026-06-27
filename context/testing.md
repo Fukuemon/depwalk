@@ -36,6 +36,10 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - `analysisRequest.analysisMode` 未指定時に `fullGraph` として扱われること。
 - Core が `analysisRequest` 送信後に stdin を close すること。
 - Analyzer stdout の JSONL record が逐次 parse / validate されること。
+- Analyzer stdout に invalid UTF-8 を含む JSONL record が出た場合、Core が invalid record として拒否すること。
+- Analyzer stdout に duplicate key を含む JSON object が出た場合、Core が invalid record として拒否すること。
+- Protocol field 名の大小文字違いを別 field として扱い、`schemaVersion` の代わりに `schemaversion` が出た場合は必須 field 欠落として拒否すること。
+- Protocol 上 array / object と定義する field を Core が出力する場合、nil slice / nil map 由来の `null` を出力しないこと。
 - Analyzer stderr が protocol record として parse されないこと。
 - exit code `0` を成功、非ゼロを fatal failure として扱うこと。
 - 複数 request が必要な場合、Core が request ごとに Analyzer process を起動すること。
