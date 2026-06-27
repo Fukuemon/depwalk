@@ -157,6 +157,12 @@ Core は Go 標準ライブラリを中心に実装する。初期導入する r
 
 Cobra は CLI の subcommand、help、completion、POSIX flags を担う。JSONL、外部プロセス実行、graph 表現、text / JSON / Mermaid 出力、unit test / contract test は標準ライブラリと小さな内部実装で開始する。Java Analyzer の AST 解析、型解決、DI 解決に使う library は Go 側 Core に含めない。
 
+JSONL parser / validator は安定版の `encoding/json` で開始する。
+ただし、`encoding/json` v1 の duplicate key 許容、invalid UTF-8 置換、struct field の case-insensitive matching は Protocol contract として採用しない。
+`core/internal/protocol` は duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` を invalid record として拒否する。
+`encoding/json/v2` と `encoding/json/jsontext` は Go 1.25 時点で experimental のため初期採用しない。
+`GOEXPERIMENT=jsonv2` が不要になった時点で、strict JSONL parser の実装候補として再評価する。
+
 ### 採用するライブラリ
 
 | 分類 | ライブラリ | 採用度 | 理由 |
@@ -171,7 +177,7 @@ Cobra は CLI の subcommand、help、completion、POSIX flags を担う。JSONL
 | 分類 | 標準ライブラリ | 理由 |
 | --- | --- | --- |
 | ロギング | `log/slog` | CLI の verbose / debug logging と構造化 diagnostics には標準で足りる |
-| JSON 入出力 | `encoding/json`, `bufio`, `io` | Analyzer Protocol は JSONL streaming 前提のため、逐次読み込みと struct validation で扱う |
+| JSON 入出力 | `encoding/json`, `bufio`, `io` | Analyzer Protocol は JSONL streaming 前提のため、逐次読み込みと strict validation で扱う。`encoding/json/v2` は experimental が外れた時点で再評価する |
 | 外部プロセス実行 | `os/exec`, `context`, `io`, `bytes` | Analyzer process の起動、stdin close、stdout streaming、stderr summary、exit code、timeout を扱える |
 | グラフ表現 | `map`, `slice`, 内部 struct | `MethodSymbol` / `CallEdge` を node / edge として保持し、caller / callee BFS / DFS を実装する範囲では専用 graph library は不要 |
 | 出力フォーマット | `fmt`, `strings`, `text/template`, `encoding/json` | text / JSON / Mermaid は renderer ではなく文字列 / JSON 出力の責務であり、標準で足りる |
@@ -216,6 +222,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 | `github.com/google/go-cmp/cmp` | 初期導入しない | deep diff の可読性が問題になった時に検討する |
 | graph 専用 library | 初期導入しない | graph model は Protocol model と密接に結びつくため、内部 struct の方が制御しやすい |
 | JSON schema validator | 初期導入しない | Go struct + `Validate()` で開始し、外部 Analyzer 互換性の問題が増えた時に再検討する |
+| `encoding/json/v2` / `encoding/json/jsontext` | 初期導入しない | Go 1.25 時点では experimental。`GOEXPERIMENT=jsonv2` が不要になった時点で再評価する |
 | Java 解析 library | Go 側には導入しない | Java 解析は Analyzer 独立プロセス側の責務。Core は JSONL Protocol のみを扱う |
 
 ## 未確定事項
@@ -373,6 +380,8 @@ depwalk/
 
 - 候補技術が unit test、Protocol contract test、E2E fixture 照合を無理なく表現できること。
 - Core -> Analyzer の JSONL parser / validator を単体で検証できること。
+- `encoding/json` v1 の permissive な挙動を Protocol contract に持ち込まないこと。duplicate key、invalid UTF-8、Protocol field 名の大小文字違い、必須 field 欠落、未対応 major `schemaVersion` は invalid record として拒否すること。
+- Core が Protocol 上 array / object と定義する field を出力する場合、nil slice / nil map 由来の `null` を出力しないこと。
 - Analyzer process 起動、stdin close、stdout streaming、stderr handling、exit code handling を integration / contract test で検証できること。
 - `testing` と手書き fake だけで失敗原因が読めること。graph / Protocol record の deep diff が読みにくい場合は `go-cmp` を追加検討すること。
 - `context/project.md` の Quick Commands に、実装者が迷わず実行できる build / test / quality gate command を記載できること。
@@ -474,6 +483,7 @@ sequenceDiagram
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
 | 2026-06-27 | Codex | ADR-0002 と context / Design Doc へ Core 実装基盤の durable な判断を handoff |
+| 2026-06-27 | Codex | `encoding/json/v2` を初期採用せず、安定版 `encoding/json` に strict validation を重ねる方針を追記 |
 | 2026-06-27 | Codex | D7 を解決し、ADR 作成後に context を ADR 参照として更新する handoff 順序を追加 |
 | 2026-06-27 | Codex | D5-D6 を解決し、Core / Analyzer の top-level 分離と Core 内 package 構成を追加 |
 | 2026-06-21 | Codex | Go 側 Core ライブラリ選定を追加し、D1-D4 を解決済みに更新 |
