@@ -21,7 +21,7 @@
 | 2   | 下書き                      | 完了   | 2026-06-15 | 本 spec を scaffold |
 | 3   | 上位文書突合                | 完了   | 2026-06-15 | Design Doc / feature doc / context / ADR を確認 |
 | 4   | 論点整理                    | 完了   | 2026-06-15 | D1-D7 を初期論点として列挙 |
-| 5   | 論点解決                    | 進行中 | 2026-06-27 | D1-D6 を解決済み。D7 は継続 |
+| 5   | 論点解決                    | 完了   | 2026-06-27 | D1-D7 を解決済み |
 | 6   | Interface / Routing 設計    | 未着手 |            | 非 UI / CLI package boundary として扱う |
 | 7   | Content / Data 設計         | 未着手 |            | 初期 module / package 構成を扱う |
 | 8   | Performance / Security 設計 | 未着手 |            | CLI 配布、外部送信なし、read-only 解析を確認 |
@@ -136,7 +136,7 @@ EARS 風で振る舞いを記述する。
 | D4  | test framework と contract test の配置をどうするか | 言語標準 test / dedicated test runner / golden fixture | `testing` を採用し、手書き fake / golden fixture / Protocol contract test で開始する。`testify` / mock generator / `go-cmp` は初期導入しない |
 | D5  | `analyzer-protocol` の実装配置をどうするか | Core 内 package / 独立 package / schema + generated types | Go 実装は `core/internal/protocol` に置く。Analyzer 実装は `analyzers/<language>/` に分離し、共有境界は Protocol doc / ADR / JSONL fixture / contract test 観点に限定する |
 | D6  | 初期 directory / package 構成をどう切るか | CLI / Core / Model / Analyzer SPI / Traversal / Output / fixtures の分割案 | `core/` と `analyzers/` を top-level に分ける。Core 内は strict VSA ではなく、`internal/analyze` を use case slice、`protocol` / `analyzer` / `graph` / `traversal` / `output` を capability package とする |
-| D7  | ADR / context へどの順序で handoff するか | ADR 作成後に context 更新 / spec-sync で同時反映 | 未決 |
+| D7  | ADR / context へどの順序で handoff するか | ADR 作成後に context 更新 / spec-sync で同時反映 | ADR を先に作成し、その後 `spec-sync` で context を ADR 参照として更新する |
 
 ## 解決済みの論点
 
@@ -146,6 +146,7 @@ EARS 風で振る舞いを記述する。
 - D4: test framework は Go 標準の `testing` を採用する。mock は手書き fake / interface stub を標準方針とし、`testify`、`go.uber.org/mock`、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
 - D5: `analyzer-protocol` の Go 実装は `core/internal/protocol` に置く。Analyzer process の起動、stdin / stdout / stderr、exit code handling は `core/internal/analyzer` に分ける。Java などの言語別 Analyzer 実装は Core の `internal` 配下に置かず、`analyzers/<language>/` に分離する。Core と Analyzer が共有する正本は Analyzer Protocol feature doc、ADR、JSONL fixture、contract test 観点とし、Go package や Java 実装 code は共有しない。schema generated types / JSON schema validator は初期導入しない。
 - D6: 初期 directory / package 構成は `core/` と `analyzers/` を top-level に分ける。Core 内は strict VSA ではなく、`core/internal/analyze` を use case slice とし、`protocol` / `analyzer` / `graph` / `traversal` / `output` を再利用可能な capability package として分ける折衷案を採用する。`core/internal/core` のような重複名は責務が曖昧なため採用しない。
+- D7: handoff は ADR 作成を先行し、その後 `spec-sync` で context を更新する。Core 実装基盤の技術選定、依存方針、package boundary は issue 終了後も残る durable な設計判断のため ADR を正本にする。`context/project.md`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` は ADR への参照と実行時 contract を持ち、判断理由を二重管理しない。
 
 ## Go 側ライブラリ選定
 
@@ -362,7 +363,7 @@ depwalk/
 
 ### Fallback
 
-- ADR / context handoff 順序が決まらない場合、Spec8 の実装 prompt 生成には進まない。
+- ADR 作成前に context 更新が必要になった場合、context には暫定判断を直接複製せず、本 spec への参照または TODO として残す。
 - context 更新が広がる場合、ADR を先に確定し、context は ADR へのリンクを正本として追従させる。
 
 ## テスト / 評価方針
@@ -450,6 +451,7 @@ sequenceDiagram
 | `context/testing.md` テスト runtime contract | 採用 test framework と実行 command、contract test 配置を追記する | Spec8 実装 prompt 生成に必要なため |
 | `context/testing.md` mock / assertion 方針 | 初期は `testing`、手書き fake、golden fixture を採用し、`testify` / mock generator / `go-cmp` は初期導入しない方針を追記する | 依存を増やさずに contract test を開始するため。source: spec-resolve D4 |
 | `context/engineering.md` Shared Config / Root Task / Quality Gate | shared config と root task、依存境界検査の初期方針を追記する | 実装 repo としての quality gate を定義するため |
+| context 全般 | ADR 作成後に `spec-sync` で更新し、判断理由は ADR 参照へ寄せる | issue 終了後も残る技術選定の正本を ADR に置き、context との二重管理を避けるため。source: spec-resolve D7 |
 
 ### ADR の新規 / 更新
 
@@ -470,6 +472,7 @@ sequenceDiagram
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-27 | Codex | D7 を解決し、ADR 作成後に context を ADR 参照として更新する handoff 順序を追加 |
 | 2026-06-27 | Codex | D5-D6 を解決し、Core / Analyzer の top-level 分離と Core 内 package 構成を追加 |
 | 2026-06-21 | Codex | Go 側 Core ライブラリ選定を追加し、D1-D4 を解決済みに更新 |
 | 2026-06-15 | Codex | Issue #11 の spec draft を作成 |
