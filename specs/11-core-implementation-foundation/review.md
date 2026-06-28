@@ -253,3 +253,22 @@ Reviewer: spec-review (fresh-context, single-agent=claude)
 - contract test: 横断観点の正本を `context/testing.md` とし、Go 側の parser / validator / contract test code / fixture file は issue #12 の対象として整理した。
 - spec #8: 更新日、メタステータス、フェーズ表、変更履歴を ADR-0002 / issue #12 反映に合わせて更新した。
 - build command: `go build ./cmd/depwalk` は spec #11 scaffold 固有の Cobra root command 確認、`go build ./...` は Core 全体 build として関係を明記した。
+
+## Review 2026-06-28 09:08
+
+Verdict: PASS
+Reviewer: spec-review (fresh-context, subagent=default)
+
+### 観点別評価
+
+- 上位文書整合: PASS — `specs/11-core-implementation-foundation/index.md:32-54` で PRD 統合モード、Design Doc、feature doc、context、ADR との整合表が埋まっている。Go / Go modules / Cobra / testing / package 境界は `adr/0002-core-implementation-foundation.md:20-70`、Design Doc の Core 言語非依存・Analyzer 独立プロセス方針は `design/DesignDoc.md:158-188`、feature doc の「Core 実装言語等は定義しない」は `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:35-41` と整合している。
+- 未解決論点: PASS — `specs/11-core-implementation-foundation/index.md:138-154` で D1-D7 は解決済み、`specs/11-core-implementation-foundation/index.md:173-182` の未確定事項は決定者・期限・下流影響付きで管理され、本 spec の scaffold を止めないと明記されている。
+- 実装対象明示: PASS — `context/project.md:64-72` の対象ドメインと、`specs/11-core-implementation-foundation/index.md:184-197` の `core` / `traversal` / `output` / `analyzer-protocol` / `java-analyzer` が一致し、責務境界も明示されている。依存境界は `context/architecture.md:8-36` と整合している。
+- template 必須節: PASS — template の必須節は `templates/specs/template.md:7-287`、対象 spec には `specs/11-core-implementation-foundation/index.md:5-485` に該当節が揃っている。
+- EARS acceptance: PASS — `specs/11-core-implementation-foundation/index.md:129-137` に WHEN / IF 形式の受け入れ基準があり、scaffold validation や dependency graph / import 確認など観測可能な条件を含む。
+- prompts 自己完結性: N/A — 今回は prompts/ が対象外。rubric でも prompts レビュー時のみの観点。
+- 正本境界: PASS — sync 済みの durable 判断は `specs/11-core-implementation-foundation/index.md:54` で ADR-0002 / context へ handoff 済みと明記され、snapshot 節は `specs/11-core-implementation-foundation/index.md:156-159`、`specs/11-core-implementation-foundation/index.md:270-273` で正本リンクを持つ。正本境界 contract は `AGENTS.md:77-85` と整合している。
+
+### 指摘
+
+なし

@@ -5,7 +5,7 @@
 ## メタ情報
 
 - Issue: `#11`
-- ステータス: `Review`
+- ステータス: `レビュー済`
 - 作成日: 2026-06-15
 - 更新日: 2026-06-27
 - Branch: `feature/11`
@@ -27,7 +27,7 @@
 | 8   | Performance / Security 設計 | 完了   | 2026-06-27 | CLI 配布、外部送信なし、read-only 解析を ADR-0002 / context へ反映 |
 | 9   | Test / Metrics 設計         | 完了   | 2026-06-27 | test framework と quality gate を context へ反映 |
 | 10  | 実装分割                    | 完了   | 2026-06-27 | ADR / context handoff 済み |
-| 11  | レビュー                    | 進行中 | 2026-06-27 | 再 review NEEDS_WORK 指摘へ対応済み・再 review 待ち |
+| 11  | レビュー済                  | 完了   | 2026-06-28 | `spec-review` PASS。指摘なし |
 
 ## 上位文書整合
 
@@ -475,6 +475,7 @@ spec #11 では、Core 環境構築と空の package 境界を作る prompt だ�
 
 | 日付 | 結果 (PASS / NEEDS_WORK) | 指摘要点 | 対応 |
 | ---- | ------------------------ | -------- | ---- |
+| 2026-06-28 | PASS | 指摘なし | 完了 |
 | 2026-06-27 | NEEDS_WORK | spec #8 を正本扱いしている正本境界の揺れ、spec #8 の更新日 / 変更履歴、build command 表記揺れ | 対応済み。再 review 待ち |
 | 2026-06-27 | NEEDS_WORK | `cmd/depwalk` stub と Cobra root command 要件の矛盾、`core` target / ADR 影響範囲、Spec8 未確定事項、quality gate cwd、依存境界判定、architecture DOT / Model 境界 | 対応済み。再 review 待ち |
 | 2026-06-27 | NEEDS_WORK | architecture 反映状態、context 更新対象、stub `.go`、Core module path、依存境界 gate、DOT 表記、`core` domain の不足 | 対応済み。再 review 待ち |
@@ -486,6 +487,7 @@ spec #11 では、Core 環境構築と空の package 境界を作る prompt だ�
 
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
+| 2026-06-28 | Codex | fresh-context `spec-review` で PASS を確認し、レビュー状態を完了へ更新 |
 | 2026-06-28 | Codex | 単一 review 指摘に対応し、spec #8 の位置づけ、contract test 正本、build command の関係を整理 |
 | 2026-06-27 | Codex | 再 review 指摘に対応し、Cobra root command と internal stub の境界、ADR / architecture / spec #8 の整合を整理 |
 | 2026-06-27 | Codex | 再 review 指摘に対応し、Core module path、stub `.go`、依存境界 gate、DOT 表記、`core` domain を整理 |
