@@ -38,6 +38,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 ## Naming Conventions
 
 - Go package 名: 小文字、短い単語、責務名を使う。`core/internal/core` のような重複名は使わない。
+- Core module path: `github.com/Fukuemon/depwalk/core`
 - Core package: `core/internal/cli`、`core/internal/analyze`、`core/internal/protocol`、`core/internal/analyzer`、`core/internal/graph`、`core/internal/traversal`、`core/internal/output`
 - Analyzer package / directory: `analyzers/<language>/`
 - ブランチ: `feature/<issue-id>`
@@ -62,8 +63,9 @@ Repository-level の make-like wrapper は初期導入しない。
 
 ## 対象ドメイン (spec「実装対象」テーブル用)
 
-`traversal`, `output`, `analyzer-protocol`, `java-analyzer`
+`core`, `traversal`, `output`, `analyzer-protocol`, `java-analyzer`
 
+- `core` — CLI entrypoint、Analyzer process orchestration、graph / traversal / output / protocol を束ねる Go Core
 - `traversal` — Caller / Callee 探索 (Traversal Engine)
 - `output` — 出力形式 (Console / JSON / DOT / Mermaid; Output Engine)
 - `analyzer-protocol` — Analyzer SPI + Communication Protocol (JSONL) + Model (言語非依存の共通契約)

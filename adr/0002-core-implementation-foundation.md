@@ -106,7 +106,8 @@ Go package や Java 実装 code を共有境界にしない。
 
 ### 影響範囲
 
-- 対象モジュール / package: `traversal`, `output`, `analyzer-protocol`, `java-analyzer`
+- 主対象モジュール / package: `core`
+- scaffold 境界作成の影響先: `traversal`, `output`, `analyzer-protocol`, `java-analyzer`
 
 ## 実装・運用への反映
 

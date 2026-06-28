@@ -22,11 +22,11 @@ Go 側 Core の初期 package 境界は次とする。
 | `core/cmd/depwalk` | `main` と Cobra root command の起動 |
 | `core/internal/cli` | CLI command / flags / 入力 validation |
 | `core/internal/analyze` | `depwalk analyze` の use case orchestration |
-| `core/internal/protocol` | JSONL record type、parse、validate |
+| `core/internal/protocol` | JSONL record type、Protocol DTO / wire model、parse、validate |
 | `core/internal/analyzer` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling |
-| `core/internal/graph` | graph model、node / edge 管理 |
+| `core/internal/graph` | graph 内部 model、node / edge 管理 |
 | `core/internal/traversal` | caller / callee traversal |
-| `core/internal/output` | text / JSON / Mermaid formatter |
+| `core/internal/output` | text / JSON / DOT / Mermaid formatter |
 
 言語別 Analyzer 実装は `analyzers/<language>/` に置く。
 Java Analyzer 実装は `analyzers/java/` に置き、Core の `internal` package には入れない。
