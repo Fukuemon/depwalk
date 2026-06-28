@@ -6,9 +6,9 @@
 ## メタ情報
 
 - Issue: `#8`
-- ステータス: `Review`
+- ステータス: `レビュー済`
 - 作成日: 2026-06-13
-- 更新日: 2026-06-15
+- 更新日: 2026-06-28
 - Branch: `feature/8`
 - Owner: Fukuemon
 
@@ -28,7 +28,7 @@
 | 8   | Performance / Security 設計 | 完了   | 2026-06-15 | streaming / read-only / no external send |
 | 9   | Test / Metrics 設計         | 完了   | 2026-06-15 | protocol contract test 観点を定義        |
 | 10  | 実装分割                    | 完了   | 2026-06-15 | prompts 生成前の分割案を定義             |
-| 11  | レビュー済                  | レビュー済 | 2026-06-15 | spec-review PASS |
+| 11  | レビュー済                  | レビュー済 | 2026-06-28 | spec-review PASS。ADR-0002 / issue #12 参照を追記 |
 
 ## 上位文書整合
 
@@ -59,7 +59,8 @@
 - `context/project.md`: 対象ドメイン `analyzer-protocol`、Issue Tracker、Source of Truth、Branch pattern
 - `context/architecture.md`: Core -> Analyzer は Protocol 境界のみ、Core は Analyzer 内部を知らない
 - `context/testing.md`: analyzer-protocol に Protocol contract test を置く
-- `context/toolchain.md`: JSONL over STDIN/STDOUT 固定、Core 実装言語は未定
+- `context/toolchain.md`: JSONL over STDIN/STDOUT 固定。Core 実装言語 / package manager / test framework は ADR-0002 で解決済み
+- `adr/0002-core-implementation-foundation.md`: Core 実装言語 / package manager / test framework / 初期 package 境界の正本
 - `context/infrastructure.md`: CLI / CI 実行、外部インフラなし、外部送信なし
 - `specs/8-analyzer-protocol/requirements.md`: 要求定義
 - 関連 issue / ticket: [#8](https://github.com/Fukuemon/depwalk/issues/8)
@@ -134,12 +135,11 @@ EARS 風で振る舞いを記述する。
 ## 未確定事項
 
 Spec8 の下流 phase をブロックする未確定事項はない。Protocol 契約は特定実装言語に依存しない形で定義済み。
+Core 実装言語 / package manager / test framework は [ADR-0002](../../adr/0002-core-implementation-foundation.md) で解決済みであり、Protocol 契約の正本には含めない。
 
 | 未確定事項 | 決定者 | 期限 | Spec8 への影響 |
 | ---------- | ------ | ---- | -------------- |
-| Core 実装言語 | Fukuemon | Core 実装 ADR 起票時 / 実装着手前 | なし。Protocol は JSONL process 境界で言語非依存に定義済み |
-| package manager | Fukuemon | Core 実装言語決定時 | なし。Protocol record と process contract には含めない |
-| test framework | Fukuemon | analyzer-protocol 実装着手前 | なし。contract test 観点は `context/testing.md` と feature doc に反映済み |
+| なし | - | - | Core 実装基盤は ADR-0002 で解決済み。Go 側 parser / validator / contract test 実装は issue #12 で扱う |
 
 ## 実装対象
 
@@ -628,6 +628,7 @@ sequenceDiagram
 
 | 日付       | 変更者 | 変更内容               |
 | ---------- | ------ | ---------------------- |
+| 2026-06-28 | Codex  | ADR-0002 / issue #12 への参照を追加し、Core 実装基盤未確定事項を解決済みとして整理 |
 | 2026-06-15 | Codex  | spec-sync で feature doc / ADR / context へ正本ハンドオフ |
 | 2026-06-15 | Codex  | flow / sequence diagram を追加 |
 | 2026-06-13 | Codex  | 初版 draft spec を追加 |
