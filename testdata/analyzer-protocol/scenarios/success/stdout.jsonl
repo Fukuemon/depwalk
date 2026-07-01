@@ -1,0 +1,3 @@
+{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:com.example.App.main","language":"java","symbolKind":"method","qualifiedName":"com.example.App.main","signature":"main(java.lang.String[]):void"}
+{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:com.example.Service.run","language":"java","symbolKind":"method","qualifiedName":"com.example.Service.run","signature":"run():void"}
+{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:main-to-service","callerMethodId":"method:com.example.App.main","calleeMethodId":"method:com.example.Service.run"}
