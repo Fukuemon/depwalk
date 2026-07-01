@@ -8,7 +8,7 @@
 - Issue: `#12`
 - ステータス: `Draft`
 - 作成日: 2026-07-01
-- 更新日: 2026-07-01
+- 更新日: 2026-07-02
 - Branch: `feature/12`
 - Owner: Fukuemon
 
@@ -16,19 +16,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態   | 最終更新   | 備考                                       |
-| --- | --------------------------- | ------ | ---------- | ------------------------------------------ |
-| 1   | 起票                        | 完了   | 2026-07-01 | GitHub issue #12 を確認済み                |
-| 2   | 下書き                      | 進行中 | 2026-07-01 | 本 spec を scaffold                        |
-| 3   | 上位文書突合                | 完了   | 2026-07-01 | #8 feature doc / ADR / context と矛盾なし  |
-| 4   | 論点整理                    | 進行中 | 2026-07-01 | D1-D3 を初期論点として列挙                 |
-| 5   | 論点解決                    | 未着手 |            | `spec-resolve` で実装分割を確定する        |
-| 6   | Interface / Routing 設計    | 未着手 |            | Protocol parser / Analyzer process 境界    |
-| 7   | Content / Data 設計         | 未着手 |            | Go DTO / validation / fixture 配置         |
-| 8   | Performance / Security 設計 | 未着手 |            | streaming parse / read-only / 外部送信なし |
-| 9   | Test / Metrics 設計         | 未着手 |            | unit / contract test                       |
-| 10  | 実装分割                    | 未着手 |            | prompts 生成前に確定                       |
-| 11  | レビュー済                  | 未着手 |            | `spec-review` 後に更新                     |
+| #   | フェーズ                    | 状態   | 最終更新   | 備考                                              |
+| --- | --------------------------- | ------ | ---------- | ------------------------------------------------- |
+| 1   | 起票                        | 完了   | 2026-07-01 | GitHub issue #12 を確認済み                       |
+| 2   | 下書き                      | 進行中 | 2026-07-01 | 本 spec を scaffold                               |
+| 3   | 上位文書突合                | 完了   | 2026-07-01 | #8 feature doc / ADR / context と矛盾なし         |
+| 4   | 論点整理                    | 完了   | 2026-07-02 | D1-D3 を解決済み                                  |
+| 5   | 論点解決                    | 完了   | 2026-07-02 | D1-D3 を解決済み                                  |
+| 6   | Interface / Routing 設計    | 進行中 | 2026-07-02 | Protocol parser / Analyzer process 境界を具体化中 |
+| 7   | Content / Data 設計         | 進行中 | 2026-07-02 | fixture 粒度を決定済み                            |
+| 8   | Performance / Security 設計 | 未着手 |            | streaming parse / read-only / 外部送信なし        |
+| 9   | Test / Metrics 設計         | 未着手 |            | unit / contract test                              |
+| 10  | 実装分割                    | 未着手 |            | prompts 生成前に確定                              |
+| 11  | レビュー済                  | 未着手 |            | `spec-review` 後に更新                            |
 
 ## 上位文書整合
 
@@ -81,7 +81,7 @@ Issue #12 は、#8 の契約を Core 実装へ落とす実装 task である。�
 - JSONL parser / validator を実装し、不正 JSONL、必須 field 欠落、型不一致、未対応 `schemaVersion`、未知 `recordType` を Core validation error として扱う。
 - `encoding/json` v1 の permissive な挙動を Protocol contract として採用しないため、duplicate key、invalid UTF-8、field 名の大小文字違いを拒否する。
 - 未知 field は対応済み major version では無視し、既知 field だけで処理を継続する。
-- `core/internal/analyzer` に `1 analysisRequest = 1 Analyzer process` の境界を実装または実装可能な interface として定義する。
+- `core/internal/analyzer` に `1 analysisRequest = 1 Analyzer process` の最小 runner を実装する。
 - `testdata/analyzer-protocol/` に contract fixture を追加し、Core 側 contract test を `cd core && go test ./...` で実行できるようにする。
 
 ### やらないこと
@@ -104,7 +104,7 @@ Analyzer 実装者は、Go Core が受け付ける Protocol contract を fixture
 - JSONL parser / validator が streaming 前提で 1 行 1 record を処理できる。
 - Core validation error と Analyzer が出力する `error` record の境界が code 上で分離されている。
 - contract fixture により、未知 field、未対応 `schemaVersion`、不正 JSONL、schema 不準拠、duplicate key、invalid UTF-8、field 名の大小文字違いを検証できる。
-- `1 analysisRequest = 1 Analyzer process` の SPI 契約が `core/internal/analyzer` の境界として実装または後続実装可能な interface として定義されている。
+- `1 analysisRequest = 1 Analyzer process` の SPI 契約が `core/internal/analyzer` の最小 runner として実装されている。
 - `cd core && go test ./...`、`cd core && go vet ./...`、`cd core && test -z "$(gofmt -l .)"` が通る。
 
 ### 対象ユーザー / 操作主体
@@ -127,24 +127,27 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                          | 決定候補                                                                                                | 決定 |
-| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---- |
-| D1  | `core/internal/protocol` の実装を model / validation / JSONL parser / fixture test のどの prompt に分割するか | A: model + validation を先に実装して parser を後続にする / B: parser と validation を同一 prompt にする | 未決 |
-| D2  | `core/internal/analyzer` で process 実行を #12 の実装対象に含める範囲                                         | A: interface と fake まで / B: `os/exec` による最小 process runner まで                                 | 未決 |
-| D3  | contract fixture の粒度                                                                                       | A: record type ごとの JSONL fixture / B: scenario ごとの input-output fixture / C: 両方                 | 未決 |
+| #   | 論点                                                                                                          | 決定候補                                                                                                | 決定                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| D1  | `core/internal/protocol` の実装を model / validation / JSONL parser / fixture test のどの prompt に分割するか | A: model + validation を先に実装して parser を後続にする / B: parser と validation を同一 prompt にする | A: model + validation を先に実装し、JSONL parser / fixture test は後続 prompt に分ける       |
+| D2  | `core/internal/analyzer` で process 実行を #12 の実装対象に含める範囲                                         | A: interface と fake まで / B: `os/exec` による最小 process runner まで                                 | B: `os/exec` による最小 process runner まで含める                                            |
+| D3  | contract fixture の粒度                                                                                       | A: record type ごとの JSONL fixture / B: scenario ごとの input-output fixture / C: 両方                 | C: record type ごとの JSONL fixture と scenario ごとの input-output fixture の両方を採用する |
 
 ## 解決済みの論点
 
 - #8 D1-D5: Protocol / SPI / Model schema、`analysisRequest`、process contract、versioning、`diagnostic` / `error` 境界は解決済み。正本は feature doc と ADR-0001。
 - #11 D1-D7: Core 実装基盤、Go package 境界、test framework、strict JSONL validation 方針は解決済み。正本は ADR-0002 と context。
+- #12 D1: `core/internal/protocol` は、最初の prompt で record DTO、enum、embedded object、record 単位 validation を実装する。strict JSONL parser、duplicate key / invalid UTF-8 / field 名大小文字違いの検出、contract fixture は後続 prompt に分ける。初回 prompt を小さくし、Protocol schema と validation API を先にレビュー可能にするため。
+- #12 D2: `core/internal/analyzer` は `os/exec` による最小 process runner まで #12 に含める。runner は 1 `analysisRequest` ごとに Analyzer process を 1 つ起動し、stdin に request JSONL を 1 件送信して close し、stdout を streaming parse へ渡し、stderr を protocol record として parse せず、exit code を結果に含める。timeout、stderr 上限、record size 上限は固定しない。#12 の完了条件である process SPI の実装境界を code で検証可能にするため。
+- #12 D3: contract fixture は record type ごとの JSONL fixture と scenario ごとの input-output fixture の両方を採用する。record type fixture は `core/internal/protocol` の parse / validation / strict JSONL test に使い、scenario fixture は `core/internal/analyzer` の process runner test に使う。fixture 数は増えるが、Protocol record 単位の異常系と process SPI の流れを分離してレビューできるため。
 
 ## 未確定事項
 
 下表は #12 の prompt 生成前に解決する。Protocol 契約そのものの未確定事項ではなく、実装順序と fixture 粒度の未確定事項である。
 
-| 未確定事項       | 決定者   | 期限           | #12 への影響                                            |
-| ---------------- | -------- | -------------- | ------------------------------------------------------- |
-| D1-D3 の実装分割 | Fukuemon | prompts 生成前 | prompts の数、並列可否、最初に実装する package が変わる |
+| 未確定事項 | 決定者 | 期限 | #12 への影響                           |
+| ---------- | ------ | ---- | -------------------------------------- |
+| なし       | -      | -    | D1-D3 は解決済み。prompts 生成へ進める |
 
 ## 実装対象
 
@@ -198,6 +201,8 @@ EARS 風で振る舞いを記述する。
 
 - Unit test は `core/internal/protocol` と `core/internal/analyzer` に置く。
 - Protocol contract fixture は `testdata/analyzer-protocol/` に置く。
+- record type ごとの fixture は `core/internal/protocol` の parser / validator test で使う。
+- scenario ごとの input-output fixture は `core/internal/analyzer` の process runner test で使う。
 - `cd core && go test ./...` で Core 側 unit / contract test を実行できる状態にする。
 - Java Analyzer 側の contract test 実行は後続 issue で扱う。
 
@@ -208,7 +213,7 @@ EARS 風で振る舞いを記述する。
 - UI: 非該当。
 - Web API endpoint: 非該当。
 - Go package interface: `core/internal/protocol` は JSONL record の parse / validate と DTO を提供する。
-- Process interface: `core/internal/analyzer` は 1 request ごとに Analyzer process を起動し、stdin / stdout / stderr / exit code を扱う境界を提供する。
+- Process interface: `core/internal/analyzer` は 1 request ごとに Analyzer process を起動し、stdin / stdout / stderr / exit code を扱う最小 runner を提供する。
 - Event interface: Analyzer stdout の各 JSONL 行を record event として扱う。
 
 ### Props / Request / Response
@@ -237,12 +242,12 @@ EARS 風で振る舞いを記述する。
 
 ### コンテンツ配置 / package / route
 
-| path                         | 用途                                                                 |
-| ---------------------------- | -------------------------------------------------------------------- |
-| `core/internal/protocol`     | Protocol DTO / wire model / JSONL parser / validation / unit test    |
-| `core/internal/analyzer`     | Analyzer process 境界 / stdin / stdout / stderr / exit code handling |
-| `testdata/analyzer-protocol` | Protocol contract fixture                                            |
-| `analyzers/java`             | #12 では参照のみ。Java Analyzer 実装は後続 issue                     |
+| path                         | 用途                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `core/internal/protocol`     | Protocol DTO / wire model / JSONL parser / validation / unit test                           |
+| `core/internal/analyzer`     | `os/exec` による最小 Analyzer process runner / stdin / stdout / stderr / exit code handling |
+| `testdata/analyzer-protocol` | record type fixture と scenario input-output fixture                                        |
+| `analyzers/java`             | #12 では参照のみ。Java Analyzer 実装は後続 issue                                            |
 
 ## Performance / Security 設計
 
@@ -297,6 +302,11 @@ EARS 風で振る舞いを記述する。
 - `include` / `exclude` の絶対 path、空文字、`..` を拒否できること。
 - `entrypoints.qualifiedName` 必須、`signature` 任意を検証できること。
 - Analyzer stderr を protocol record として parse しないこと。
+- `core/internal/analyzer` の最小 runner が stdin に 1 件の `analysisRequest` を送信して close すること。
+- `core/internal/analyzer` の最小 runner が stdout を protocol parser へ streaming で渡すこと。
+- `core/internal/analyzer` の最小 runner が exit code と stderr を protocol record と分離して扱うこと。
+- record type ごとの fixture で valid / invalid record を個別に検証できること。
+- scenario fixture で request、stdout JSONL、stderr、exit code の組み合わせを検証できること。
 - Core が `analyzers/<language>/` や Analyzer runtime library に直接依存していないこと。
 
 ### 計測指標
@@ -371,21 +381,23 @@ sequenceDiagram
 
 ### 実装タスク案
 
-| Phase | 対象                      | 概要                                                                               | 依存         |
-| ----- | ------------------------- | ---------------------------------------------------------------------------------- | ------------ |
-| P1    | protocol model            | record DTO、enum、embedded object、basic validation を実装                         | #11 scaffold |
-| P2    | strict JSONL parser       | 1 行 1 record parse、duplicate key、invalid UTF-8、case-sensitive field validation | P1           |
-| P3    | contract fixtures         | valid / invalid fixture と Core 側 contract test を追加                            | P1, P2       |
-| P4    | analyzer process boundary | `1 analysisRequest = 1 Analyzer process` の interface または最小 runner を実装     | P1, P2       |
-| P5    | quality gate              | go test / go vet / gofmt / import boundary check を通す                            | P1-P4        |
+| Phase | 対象                        | 概要                                                                               | 依存         |
+| ----- | --------------------------- | ---------------------------------------------------------------------------------- | ------------ |
+| P1    | protocol model + validation | record DTO、enum、embedded object、record 単位 validation を実装                   | #11 scaffold |
+| P2    | strict JSONL parser         | 1 行 1 record parse、duplicate key、invalid UTF-8、case-sensitive field validation | P1           |
+| P3    | contract fixtures           | record type fixture と scenario fixture を追加し、Core 側 contract test を実装     | P1, P2       |
+| P4    | analyzer process runner     | `os/exec` で `1 analysisRequest = 1 Analyzer process` の最小 runner を実装         | P1, P2       |
+| P5    | quality gate                | go test / go vet / gofmt / import boundary check を通す                            | P1-P4        |
 
 ### prompts 生成方針
 
 - prompt は `specs/12-analyzer-protocol-implementation/prompts/` に置く。
 - #8 の設計正本は参照先として扱い、prompt 本文には必要最小限の契約だけを抜粋する。
 - 最初の prompt は `core/internal/protocol` の model + validation を対象にする。
-- JSONL parser と contract fixture は、D1-D3 解決後に同一 prompt または分割 prompt として生成する。
-- `core/internal/analyzer` は process 実行範囲を D2 で確定してから prompt 化する。
+- strict JSONL parser は model + validation の後続 prompt に分ける。
+- contract fixture は record type fixture と scenario fixture の両方を生成する。
+- record type fixture は strict JSONL parser prompt と同梱し、scenario fixture は analyzer process runner prompt と同梱する。
+- `core/internal/analyzer` は `os/exec` による最小 runner として prompt 化する。
 
 ## 上位資料からの変更点
 
@@ -411,10 +423,13 @@ sequenceDiagram
 
 ### context への影響
 
-| 対象 doc / 節             | 変更内容 | 理由                                                                     |
-| ------------------------- | -------- | ------------------------------------------------------------------------ |
-| `context/testing.md`      | なし     | contract test 観点は既に正本化済みであり、本 spec は実装計画に留めるため |
-| `context/architecture.md` | なし     | package 境界は ADR-0002 / context を継承するため                         |
+| 対象 doc / 節             | 変更内容 | 理由                                                                                                                       |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `context/testing.md`      | なし     | contract test 観点は既に正本化済みであり、本 spec は実装計画に留めるため                                                   |
+| `context/architecture.md` | なし     | package 境界は ADR-0002 / context を継承するため                                                                           |
+| -                         | なし     | D1 は prompt 分割の決定であり上位文書の正本変更を伴わない。source: spec-resolve D1                                         |
+| -                         | なし     | D2 は ADR-0001 / ADR-0002 の process SPI 実装範囲を具体化するだけで、上位文書の正本変更を伴わない。source: spec-resolve D2 |
+| -                         | なし     | D3 は fixture 配置と粒度の実装計画であり、`context/testing.md` の contract test 観点を変更しない。source: spec-resolve D3  |
 
 ### ADR の新規 / 更新
 
@@ -432,9 +447,12 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                          |
-| ---------- | ------ | --------------------------------- |
-| 2026-07-01 | Codex  | #12 用の実装 spec scaffold を作成 |
+| 日付       | 変更者 | 変更内容                                                                  |
+| ---------- | ------ | ------------------------------------------------------------------------- |
+| 2026-07-01 | Codex  | #12 用の実装 spec scaffold を作成                                         |
+| 2026-07-02 | Codex  | D1 を解決し、protocol model + validation を先行 prompt に分割             |
+| 2026-07-02 | Codex  | D2 を解決し、`os/exec` による最小 Analyzer process runner を #12 に含める |
+| 2026-07-02 | Codex  | D3 を解決し、record type fixture と scenario fixture の両方を採用         |
 
 ## 備考
 
