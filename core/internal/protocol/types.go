@@ -66,6 +66,12 @@ const (
 // Metadata carries language-specific or Analyzer-specific hints.
 type Metadata map[string]any
 
+// Record is an Analyzer Protocol record.
+type Record interface {
+	Validate() error
+	record()
+}
+
 // AnalysisRequest is the Core-to-Analyzer request record.
 type AnalysisRequest struct {
 	SchemaVersion string           `json:"schemaVersion"`
@@ -79,6 +85,8 @@ type AnalysisRequest struct {
 	AnalysisMode  AnalysisMode     `json:"analysisMode,omitempty"`
 	Metadata      Metadata         `json:"metadata,omitempty"`
 }
+
+func (AnalysisRequest) record() {}
 
 // Mode returns the effective analysis mode.
 func (r AnalysisRequest) Mode() AnalysisMode {
@@ -107,6 +115,8 @@ type MethodSymbol struct {
 	Metadata      Metadata        `json:"metadata,omitempty"`
 }
 
+func (MethodSymbol) record() {}
+
 // CallEdge is an Analyzer-to-Core graph edge record.
 type CallEdge struct {
 	SchemaVersion  string          `json:"schemaVersion"`
@@ -117,6 +127,8 @@ type CallEdge struct {
 	CallSite       *SourceLocation `json:"callSite,omitempty"`
 	Metadata       Metadata        `json:"metadata,omitempty"`
 }
+
+func (CallEdge) record() {}
 
 // SourceLocation identifies a source range relative to workspaceRoot.
 type SourceLocation struct {
@@ -139,6 +151,8 @@ type Diagnostic struct {
 	Metadata        Metadata        `json:"metadata,omitempty"`
 }
 
+func (Diagnostic) record() {}
+
 // AnalyzerError is an Analyzer-to-Core fatal error record.
 type AnalyzerError struct {
 	SchemaVersion string          `json:"schemaVersion"`
@@ -148,3 +162,5 @@ type AnalyzerError struct {
 	Source        *SourceLocation `json:"sourceLocation,omitempty"`
 	Metadata      Metadata        `json:"metadata,omitempty"`
 }
+
+func (AnalyzerError) record() {}
