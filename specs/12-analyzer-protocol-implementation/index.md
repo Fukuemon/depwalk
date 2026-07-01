@@ -27,7 +27,7 @@
 | 7   | Content / Data 設計         | 進行中 | 2026-07-02 | fixture 粒度を決定済み                            |
 | 8   | Performance / Security 設計 | 未着手 |            | streaming parse / read-only / 外部送信なし        |
 | 9   | Test / Metrics 設計         | 未着手 |            | unit / contract test                              |
-| 10  | 実装分割                    | 未着手 |            | prompts 生成前に確定                              |
+| 10  | 実装分割                    | 完了   | 2026-07-02 | prompts 4 本を生成済み                            |
 | 11  | レビュー済                  | 未着手 |            | `spec-review` 後に更新                            |
 
 ## 上位文書整合
@@ -386,7 +386,7 @@ sequenceDiagram
 | P1    | protocol model + validation | record DTO、enum、embedded object、record 単位 validation を実装                   | #11 scaffold |
 | P2    | strict JSONL parser         | 1 行 1 record parse、duplicate key、invalid UTF-8、case-sensitive field validation | P1           |
 | P3    | contract fixtures           | record type fixture と scenario fixture を追加し、Core 側 contract test を実装     | P1, P2       |
-| P4    | analyzer process runner     | `os/exec` で `1 analysisRequest = 1 Analyzer process` の最小 runner を実装         | P1, P2       |
+| P4    | analyzer process runner     | `os/exec` で `1 analysisRequest = 1 Analyzer process` の最小 runner を実装         | P1, P2, P3   |
 | P5    | quality gate                | go test / go vet / gofmt / import boundary check を通す                            | P1-P4        |
 
 ### prompts 生成方針
@@ -430,6 +430,7 @@ sequenceDiagram
 | -                         | なし     | D1 は prompt 分割の決定であり上位文書の正本変更を伴わない。source: spec-resolve D1                                         |
 | -                         | なし     | D2 は ADR-0001 / ADR-0002 の process SPI 実装範囲を具体化するだけで、上位文書の正本変更を伴わない。source: spec-resolve D2 |
 | -                         | なし     | D3 は fixture 配置と粒度の実装計画であり、`context/testing.md` の contract test 観点を変更しない。source: spec-resolve D3  |
+| -                         | なし     | prompt review 指摘により phase 依存表を追加し、runner prompt を P4 に揃えた。上位文書の正本変更は伴わない                  |
 
 ### ADR の新規 / 更新
 
@@ -441,9 +442,11 @@ sequenceDiagram
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付 | 結果 (PASS / NEEDS_WORK) | 指摘要点       | 対応                    |
-| ---- | ------------------------ | -------------- | ----------------------- |
-| -    | 未実施                   | draft 作成直後 | `spec-resolve` 後に実施 |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                     | 対応                                                      |
+| ---------- | ------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 2026-07-02 | PASS                     | 指摘なし。上位文書整合、未解決論点、実装対象、必須節、EARS、正本境界を満たす | 完了                                                      |
+| 2026-07-02 | NEEDS_WORK               | prompts 全体の phase 依存表不足、runner prompt の phase 不整合               | 対応済み。README に依存表を追加し、runner prompt を P4 化 |
+| 2026-07-02 | PASS                     | 指摘なし。prompts 自己完結性を含めて PASS                                    | 完了                                                      |
 
 ## 変更履歴
 
@@ -453,6 +456,9 @@ sequenceDiagram
 | 2026-07-02 | Codex  | D1 を解決し、protocol model + validation を先行 prompt に分割             |
 | 2026-07-02 | Codex  | D2 を解決し、`os/exec` による最小 Analyzer process runner を #12 に含める |
 | 2026-07-02 | Codex  | D3 を解決し、record type fixture と scenario fixture の両方を採用         |
+| 2026-07-02 | Codex  | spec-review PASS を記録                                                   |
+| 2026-07-02 | Codex  | 実装 prompt 4 本を生成                                                    |
+| 2026-07-02 | Codex  | prompt review 指摘に対応し、依存表追加と runner prompt の P4 化を実施     |
 
 ## 備考
 
