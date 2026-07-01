@@ -30,15 +30,17 @@
 
 ## Skills (workflow 入口)
 
-| Skill              | 用途                                                          |
-| ------------------ | ------------------------------------------------------------- |
-| `design-doc`       | PRD / Design Doc を作る (Why/What/How、PRD 要否判定)          |
-| `context-bootstrap`| `context/project.md` と context library を初期生成            |
-| `technical-writing`| 文書品質の基準 (doc を書く skill が参照)                      |
-| `dev-commands`     | コマンド / スコープ / E2E env を解決 (`context/project.md` 基準) |
-| `rulesync-sync`    | AI 設定 (`.rulesync/` → 各 provider) の編集と生成             |
-| `workflow-git`     | branch / commit / issue / PR の Git 運用                      |
-| `spec-*`           | Spec Driven Development 一式 (下記 `Spec Workflow Contract`)  |
+| Skill                  | 用途                                                                   |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `design-doc`           | PRD / Design Doc を作る (Why/What/How、PRD 要否判定)                   |
+| `context-bootstrap`    | `context/project.md` と context library を初期生成                     |
+| `styleguide-documents` | 文書の品質基準・分割粒度 (doc を書く skill が参照)                     |
+| `dev-commands`         | コマンド / スコープ / E2E env を解決 (`context/project.md` 基準)       |
+| `rulesync-sync`        | AI 設定 (`.rulesync/` → 各 provider) の編集と生成                      |
+| `workflow-git`         | branch / commit / issue / PR の Git 運用                               |
+| `agent-orchestrate`    | 複数 CLI エージェントを非対話・並列に呼ぶ基盤 (`context/ai-agents.md`) |
+| `multi-agent-review`   | diff / PR / spec を複数エージェントで並列 Rv し指摘を統合              |
+| `spec-*`               | Spec Driven Development 一式 (下記 `Spec Workflow Contract`)           |
 
 skill は `.rulesync/skills/<name>/SKILL.md` が正本。直接呼び出すか slash command で起動する。
 
@@ -96,8 +98,8 @@ spec は **issue 単位** の文書、design (PRD / Design Doc / feature doc / c
 - description は third-person、「何をする + いつ起動」を含める。`いつ使うか` は description の言い換えにせず、追加のトリガー語 / 文脈のみ書く
 - 必須セクション (正規名のみ使用): `いつ使うか` / `先に読むもの` / `実行フロー` / `停止条件`。`実行手順` / `生成手順` / `終了条件` 等の同義異名を使わない
 - 任意セクション: `入力` / `中核原則` / `禁止事項` 等は追加してよい。手順の全体像は ASCII 図でなく `実行フロー` 内の番号付きステップ (複雑なら冒頭にコピー可能なチェックリスト) で示し、`ワークフロー` 節を重複して置かない
-- **例外**: 品質基準のみを提供する reference 型 skill (例: `technical-writing`) は `実行フロー` / `停止条件` を省略してよい
-- 文書を書く skill は `technical-writing` skill を「先に読むもの」で参照する
+- **例外**: 品質基準のみを提供する reference 型 skill (例: `styleguide-documents`) は `実行フロー` / `停止条件` を省略してよい
+- 文書を書く skill は `styleguide-documents` skill を「先に読むもの」で参照する
 
 ### SDD Skill 一覧
 

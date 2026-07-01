@@ -35,9 +35,11 @@ targets:
    - 既存 skill の修正 → 該当 `.rulesync/skills/<skill-name>/` 配下
    - ❌ `AGENTS.md` / `CLAUDE.md` / `.claude/` / `.codex/` / `.cursor/` を直接編集してはいけない
 2. **編集**: `.rulesync/` 配下の対象ファイルだけを編集する
-3. **生成**: 次を実行する
+3. **生成**: 次を実行する (生成後に cursor cli.json / Codex config の正規化を必ず通す。理由は `references/generate-and-verify.md`)
    ```sh
    npx rulesync@latest generate
+   bash scripts/fix-cursor-cli.sh
+   bash scripts/fix-codex-config.sh
    ```
 4. **差分確認** (`references/generate-and-verify.md`):
    - `git status` で生成先 (`AGENTS.md`, `CLAUDE.md`, `.codex/`, `.claude/`, `.cursor/`) に意図どおりの差分が出ているか
