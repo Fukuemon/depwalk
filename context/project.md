@@ -1,6 +1,6 @@
 # Project Profile
 
-> 最終更新: 2026-06-10
+> 最終更新: 2026-06-27
 
 このプロダクト固有の値 (リポジトリ / 命名 / コマンド / 対象ドメイン / トラッカー / 正本パス) を集約する **唯一の正本**。`.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` 等の skill は、固有値をハードコードせず本ファイルを読む。
 
@@ -9,7 +9,6 @@
 - 新規プロダクトでは `<...>` のプレースホルダをすべて埋める。
 - DesignDoc から導ける値は context-bootstrap skill が下書きする。
 - 値を変えたら先頭の「最終更新」を更新し、依存する context/*.md との整合を確認する。
-- 本プロダクトは設計フェーズ。実装スタック (Core 言語 / build) は未確定で、確定タイミングを各項目に明示する。
 -->
 
 ## Repository Map
@@ -26,37 +25,47 @@ depwalk/
 ├── context/       # 技術規約 / codebase architecture / 運用契約 (本ライブラリ)
 ├── specs/         # 機能単位の作業文書 (issue 駆動)
 ├── adr/           # 個別の意思決定
+├── core/          # Go 実装の Core CLI / graph / traversal / output / protocol
+├── analyzers/     # 言語別 Analyzer 実装
+├── testdata/      # JSONL contract fixture / E2E fixture
 ├── templates/     # 各文書のテンプレート
 └── .rulesync/     # AI 設定の正本 (→ AGENTS.md / CLAUDE.md / .codex / .claude / .cursor を生成)
 ```
 
-> 実装コード (Core / Analyzer) のディレクトリ構成は未定。Core 実装言語の確定後 (ADR 化予定) に本マップへ追記する。
+Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
+詳細な package boundary は [context/architecture.md](architecture.md) を参照する。
 
 ## Naming Conventions
 
-- パッケージ名: 未定 (Core 実装言語の確定後に規約を定める)
-- コンポーネント / ファイル: 未定 (同上)
+- Go package 名: 小文字、短い単語、責務名を使う。`core/internal/core` のような重複名は使わない。
+- Core module path: `github.com/Fukuemon/depwalk/core`
+- Core package: `core/internal/cli`、`core/internal/analyze`、`core/internal/protocol`、`core/internal/analyzer`、`core/internal/graph`、`core/internal/traversal`、`core/internal/output`
+- Analyzer package / directory: `analyzers/<language>/`
 - ブランチ: `feature/<issue-id>`
 
 ## Quick Commands
 
-| やりたいこと     | コマンド                                             |
-| ---------------- | ---------------------------------------------------- |
-| 開発起動         | 未定 (実装着手前)                                    |
-| ビルド           | 未定 (実装着手前)                                    |
-| Lint / typecheck | 未定 (実装着手前)                                    |
-| Format (確認)    | 未定 (実装着手前)                                    |
-| Unit test        | 未定 (実装着手前)                                    |
-| E2E              | 未定 (実装着手前)                                    |
-| 健全性検査       | `lefthook run pre-commit` (現状の repo quality gate) |
-| 依存追加         | 未定 (実装着手前)                                    |
+| やりたいこと     | コマンド |
+| ---------------- | -------- |
+| 開発起動         | 後続の CLI interface spec で確定 |
+| ビルド           | `cd core && go build ./...` |
+| Lint / typecheck | `cd core && go vet ./...` |
+| Format (適用)    | `cd core && go fmt ./...` |
+| Format (確認)    | `cd core && test -z "$(gofmt -l .)"` |
+| Unit test        | `cd core && go test ./...` |
+| E2E              | 後続の CLI interface spec で具体引数を確定 |
+| 健全性検査       | `lefthook run pre-commit` |
+| 依存整理         | `cd core && go mod tidy` |
+| 依存追加         | `cd core && go get <module>@<version>` |
 
-> 現状はドキュメント駆動の設計フェーズで、アプリのビルド/テストコマンドは未確定。実装スタック確定時に [toolchain.md](toolchain.md) と本表を同時更新する。
+Core の標準 command は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
+Repository-level の make-like wrapper は初期導入しない。
 
 ## 対象ドメイン (spec「実装対象」テーブル用)
 
-`traversal`, `output`, `analyzer-protocol`, `java-analyzer`
+`core`, `traversal`, `output`, `analyzer-protocol`, `java-analyzer`
 
+- `core` — CLI entrypoint、Analyzer process orchestration、graph / traversal / output / protocol を束ねる Go Core
 - `traversal` — Caller / Callee 探索 (Traversal Engine)
 - `output` — 出力形式 (Console / JSON / DOT / Mermaid; Output Engine)
 - `analyzer-protocol` — Analyzer SPI + Communication Protocol (JSONL) + Model (言語非依存の共通契約)

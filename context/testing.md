@@ -1,24 +1,29 @@
 # Testing Conventions
 
-> 最終更新: 2026-06-10
+> 最終更新: 2026-06-27
 
 テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.md](project.md)。
 
-> 実装着手前のため test framework / コマンドは未定。ここでは **成功条件 (DesignDoc S1〜S5) から導く責務分担**を先に定める。
+Core の test framework は Go 標準の `testing` とする。
+判断根拠は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
 
 ## テスト責務の分担
 
 | 種別              | 配置                         | 主担当範囲                                                                      |
 | ----------------- | ---------------------------- | ------------------------------------------------------------------------------- |
-| Unit test         | Core 各モジュール / Analyzer | Graph/Traversal/Output のロジック、JSONL シリアライズ、探索打ち切り (Q4)        |
-| Protocol contract | analyzer-protocol            | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠 |
-| E2E (照合)        | サンプル Java/Spring repo    | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3) |
+| Unit test         | `core/internal/...` / Analyzer | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4) |
+| Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠 |
+| E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3) |
 
 ## テスト runtime contract
 
 - E2E は **サンプル Java/Spring プロジェクト**を fixture とし、既知の呼び出し関係集合と CLI 出力を照合する (DesignDoc 成功条件の測定方法)。
-- Core ↔ Analyzer は別プロセスのため、JSONL 入出力を境界とした **contract test** を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
-- 具体的な env 変数 / 対象選択 / 実行コマンドは実装スタック確定時に追記する。
+- Core ↔ Analyzer は別プロセスのため、JSONL 入出力を境界とした **contract test** を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)。spec #8 は issue 単位の決定記録であり、横断的な contract test 観点は本書を正本とする。
+- Core の unit test / contract test は `cd core && go test ./...` で実行できる状態を保つ。
+- Mock は手書き fake / interface stub で開始する。
+- Golden fixture は `testdata/` 配下に置く。
+- `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
+- E2E の具体 CLI 引数、env 変数、対象選択は後続の CLI interface spec で確定する。
 
 ## Protocol contract test
 
@@ -31,6 +36,10 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - `analysisRequest.analysisMode` 未指定時に `fullGraph` として扱われること。
 - Core が `analysisRequest` 送信後に stdin を close すること。
 - Analyzer stdout の JSONL record が逐次 parse / validate されること。
+- Analyzer stdout に invalid UTF-8 を含む JSONL record が出た場合、Core が invalid record として拒否すること。
+- Analyzer stdout に duplicate key を含む JSON object が出た場合、Core が invalid record として拒否すること。
+- Protocol field 名の大小文字違いを別 field として扱い、`schemaVersion` の代わりに `schemaversion` が出た場合は必須 field 欠落として拒否すること。
+- Protocol 上 array / object と定義する field を Core が出力する場合、nil slice / nil map 由来の `null` を出力しないこと。
 - Analyzer stderr が protocol record として parse されないこと。
 - exit code `0` を成功、非ゼロを fatal failure として扱うこと。
 - 複数 request が必要な場合、Core が request ごとに Analyzer process を起動すること。
