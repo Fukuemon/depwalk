@@ -1,13 +1,13 @@
 # AI Agents Registry
 
-> 最終更新: 2026-06-16
+> 最終更新: 2026-07-01
 
 非対話で呼び出せる CLI エージェント (Codex / Claude / Cursor 等) の **唯一の正本**。`agent-orchestrate` / `multi-agent-review` skill は、CLI 名・モデル・flag をハードコードせず本ファイルを読む。スキーマの説明は `agent-orchestrate/references/agent-registry-schema.md` を参照する。
 
 <!--
 記入ガイド:
 - 各エージェントは 1 つの `### <id>` ブロックで定義する。
-- `invocation` はプロンプトを `$PROMPT` プレースホルダで受ける **非対話** コマンド。実行前に各 CLI の `--help` で flag を確定し、確認できたら `verified: yes` にする。
+- `invocation` はプロンプトを `$PROMPT` プレースホルダで受ける **非対話** コマンド。user 固有の絶対 path は書かず、PATH 上の command 名または環境ごとの wrapper を使う。実行前に各 CLI の `--help` で flag を確定し、確認できたら `verified: yes` にする。
 - `limit_patterns` は exit code か stdout/stderr に現れる文字列。token/rate 上限を検知するために使う。
 - 値を変えたら先頭の「最終更新」を更新する。
 -->
@@ -27,8 +27,8 @@
 
 - `enabled`: yes
 - `model`: (CLI 既定)
-- `invocation`: `/Users/fuku079/.local/bin/claude -p "$PROMPT" --output-format text`
-- `verified`: yes <!-- 2026-06-16 `/Users/fuku079/.local/bin/claude --help` で flag 確認 -->
+- `invocation`: `claude -p "$PROMPT" --output-format text`
+- `verified`: yes <!-- 2026-07-01 `claude --help` 相当の PATH command 前提。環境差は PATH / wrapper 側で吸収する -->
 - `limit_patterns`: `usage limit`, `rate limit`, `429`
 - `auth_note`: ログイン済み or `ANTHROPIC_API_KEY`
 - `timeout`: 600
@@ -37,8 +37,8 @@
 
 - `enabled`: yes
 - `model`: (CLI 既定)
-- `invocation`: `/Users/fuku079/.local/bin/codex exec "$PROMPT"`
-- `verified`: yes <!-- 2026-06-16 `/Users/fuku079/.local/bin/codex exec --help` で確認。stdin パイプ誤検知でハングするため `</dev/null` 起動必須 -->
+- `invocation`: `codex exec "$PROMPT"`
+- `verified`: yes <!-- 2026-07-01 `codex exec --help` 相当の PATH command 前提。stdin パイプ誤検知でハングするため `</dev/null` 起動必須 -->
 - `limit_patterns`: `rate limit`, `quota`, `usage limit`, `429`
 - `auth_note`: `codex login` 済み or API key
 - `timeout`: 600
@@ -47,8 +47,8 @@
 
 - `enabled`: yes
 - `model`: `composer-2.5`
-- `invocation`: `/Users/fuku079/.local/bin/agent --print -f --model composer-2.5 --output-format text "$PROMPT"`
-- `verified`: yes <!-- 2026-06-16 `/Users/fuku079/.local/bin/agent --help` で flag 確認。`--list-models` は keychain 認証エラーのため実走確認は認証後に行う -->
+- `invocation`: `agent --print -f --model composer-2.5 --output-format text "$PROMPT"`
+- `verified`: yes <!-- 2026-07-01 `agent --help` 相当の PATH command 前提。`--list-models` は keychain 認証エラーのため実走確認は認証後に行う -->
 - `limit_patterns`: `rate limit`, `usage limit`, `quota`, `429`
 - `auth_note`: `cursor agent login` 済み or `CURSOR_API_KEY`
 - `timeout`: 600
