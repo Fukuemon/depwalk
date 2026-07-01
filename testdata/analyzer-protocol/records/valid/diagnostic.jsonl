@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"diagnostic","severity":"warning","code":"UNRESOLVED_SYMBOL","message":"Could not resolve optional dependency","sourceLocation":{"path":"src/main/java/com/example/App.java","startLine":10},"relatedMethodId":"method:com.example.App.main"}

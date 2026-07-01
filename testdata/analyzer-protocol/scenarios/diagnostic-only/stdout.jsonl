@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"diagnostic","severity":"partialFailure","code":"UNRESOLVED_SYMBOL","message":"Some symbols could not be resolved","relatedMethodId":"method:com.example.App.main"}
