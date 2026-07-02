@@ -36,31 +36,31 @@ func ParseRecord(line []byte) (Record, error) {
 	switch recordType {
 	case RecordTypeAnalysisRequest:
 		var r AnalysisRequest
-		if err := decodeExact(raw, analysisRequestFields(), &r); err != nil {
+		if err := decodeExact(raw, acceptedAnalysisRequestJSONFields(), &r); err != nil {
 			return nil, err
 		}
 		record = r
 	case RecordTypeMethodSymbol:
 		var r MethodSymbol
-		if err := decodeExact(raw, methodSymbolFields(), &r); err != nil {
+		if err := decodeExact(raw, acceptedMethodSymbolJSONFields(), &r); err != nil {
 			return nil, err
 		}
 		record = r
 	case RecordTypeCallEdge:
 		var r CallEdge
-		if err := decodeExact(raw, callEdgeFields(), &r); err != nil {
+		if err := decodeExact(raw, acceptedCallEdgeJSONFields(), &r); err != nil {
 			return nil, err
 		}
 		record = r
 	case RecordTypeDiagnostic:
 		var r Diagnostic
-		if err := decodeExact(raw, diagnosticFields(), &r); err != nil {
+		if err := decodeExact(raw, acceptedDiagnosticJSONFields(), &r); err != nil {
 			return nil, err
 		}
 		record = r
 	case RecordTypeError:
 		var r AnalyzerError
-		if err := decodeExact(raw, analyzerErrorFields(), &r); err != nil {
+		if err := decodeExact(raw, acceptedAnalyzerErrorJSONFields(), &r); err != nil {
 			return nil, err
 		}
 		record = r
@@ -173,7 +173,7 @@ func expectDelim(decoder *json.Decoder, want json.Delim) error {
 	return nil
 }
 
-func analysisRequestFields() map[string]struct{} {
+func acceptedAnalysisRequestJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
@@ -188,7 +188,7 @@ func analysisRequestFields() map[string]struct{} {
 	)
 }
 
-func methodSymbolFields() map[string]struct{} {
+func acceptedMethodSymbolJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
@@ -202,7 +202,7 @@ func methodSymbolFields() map[string]struct{} {
 	)
 }
 
-func callEdgeFields() map[string]struct{} {
+func acceptedCallEdgeJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
@@ -214,7 +214,7 @@ func callEdgeFields() map[string]struct{} {
 	)
 }
 
-func diagnosticFields() map[string]struct{} {
+func acceptedDiagnosticJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
@@ -227,7 +227,7 @@ func diagnosticFields() map[string]struct{} {
 	)
 }
 
-func analyzerErrorFields() map[string]struct{} {
+func acceptedAnalyzerErrorJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
