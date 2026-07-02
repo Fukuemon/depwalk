@@ -14,9 +14,12 @@ import (
 
 // Command describes the Analyzer process invocation.
 type Command struct {
+	// Path is the executable path.
 	Path string
+	// Args are command-line arguments passed to Path.
 	Args []string
-	Dir  string
+	// Dir is the optional working directory.
+	Dir string
 }
 
 // Runner starts one Analyzer process for one analysis request.
@@ -31,12 +34,18 @@ func New(command Command) Runner {
 
 // Result contains records and process status returned by an Analyzer process.
 type Result struct {
-	Records         []protocol.Record
-	Diagnostics     []protocol.Diagnostic
-	AnalyzerError   *protocol.AnalyzerError
+	// Records contains valid protocol records parsed from stdout.
+	Records []protocol.Record
+	// Diagnostics contains diagnostic records parsed from stdout.
+	Diagnostics []protocol.Diagnostic
+	// AnalyzerError contains the fatal Analyzer error record, if one was emitted.
+	AnalyzerError *protocol.AnalyzerError
+	// ValidationError contains the first Core-side stdout validation error.
 	ValidationError error
-	ExitCode        int
-	Stderr          string
+	// ExitCode is the Analyzer process exit code.
+	ExitCode int
+	// Stderr is the raw Analyzer stderr output.
+	Stderr string
 }
 
 // Run starts an Analyzer process, sends one analysisRequest JSONL record, and

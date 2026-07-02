@@ -66,7 +66,7 @@ const (
 // Metadata carries language-specific or Analyzer-specific hints.
 type Metadata map[string]any
 
-// Record is an Analyzer Protocol record.
+// Record is an Analyzer Protocol record returned by [ParseRecord].
 type Record interface {
 	Validate() error
 	record()
@@ -88,7 +88,7 @@ type AnalysisRequest struct {
 
 func (AnalysisRequest) record() {}
 
-// Mode returns the effective analysis mode.
+// Mode returns the effective [AnalysisMode].
 func (r AnalysisRequest) Mode() AnalysisMode {
 	if r.AnalysisMode == "" {
 		return AnalysisModeFullGraph

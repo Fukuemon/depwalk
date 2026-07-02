@@ -20,7 +20,7 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Reason)
 }
 
-// Validate validates an analysis request record.
+// Validate validates an [AnalysisRequest] record.
 func (r AnalysisRequest) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeAnalysisRequest); err != nil {
 		return err
@@ -62,7 +62,7 @@ func (s MethodSelector) validate(field string) error {
 	return nil
 }
 
-// Validate validates a method symbol record.
+// Validate validates a [MethodSymbol] record.
 func (r MethodSymbol) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeMethodSymbol); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (r MethodSymbol) Validate() error {
 	return nil
 }
 
-// Validate validates a call edge record.
+// Validate validates a [CallEdge] record.
 func (r CallEdge) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeCallEdge); err != nil {
 		return err
@@ -114,7 +114,7 @@ func (r CallEdge) Validate() error {
 	return nil
 }
 
-// Validate validates a diagnostic record.
+// Validate validates a [Diagnostic] record.
 func (r Diagnostic) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeDiagnostic); err != nil {
 		return err
@@ -138,7 +138,7 @@ func (r Diagnostic) Validate() error {
 	return nil
 }
 
-// Validate validates an Analyzer error record.
+// Validate validates an [AnalyzerError] record.
 func (r AnalyzerError) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeError); err != nil {
 		return err
