@@ -70,9 +70,14 @@ func TestParseRecordRejectsInvalidJSONL(t *testing.T) {
 		{name: "nested duplicate key", line: []byte(`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"q","signature":"s","metadata":{"hint":1,"hint":2}}`)},
 		{name: "invalid UTF-8", line: []byte{'{', '"', 's', 'c', 'h', 'e', 'm', 'a', 'V', 'e', 'r', 's', 'i', 'o', 'n', '"', ':', '"', 0xff, '"', '}'}},
 		{name: "case variant field name", line: []byte(`{"schemaversion":"1","recordType":"diagnostic","severity":"info","code":"A","message":"message"}`)},
+		{name: "case variant source location field name", line: []byte(`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"q","signature":"s","sourceLocation":{"Path":"src/App.java","startLine":1}}`)},
+		{name: "case variant entrypoint field name", line: []byte(`{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","entrypoints":[{"qualifiedname":"example.App.main"}]}`)},
 		{name: "unsupported schema version", line: []byte(`{"schemaVersion":"2","recordType":"diagnostic","severity":"info","code":"A","message":"message"}`)},
 		{name: "unknown record type", line: []byte(`{"schemaVersion":"1","recordType":"unknown"}`)},
 		{name: "type mismatch", line: []byte(`{"schemaVersion":"1","recordType":"diagnostic","severity":"info","code":1,"message":"message"}`)},
+		{name: "windows drive source path", line: []byte(`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"q","signature":"s","sourceLocation":{"path":"C:/repo/src/App.java","startLine":1}}`)},
+		{name: "windows drive source path with backslash", line: []byte(`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"q","signature":"s","sourceLocation":{"path":"C:\\repo\\src\\App.java","startLine":1}}`)},
+		{name: "backslash source path", line: []byte(`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"q","signature":"s","sourceLocation":{"path":"src\\App.java","startLine":1}}`)},
 	}
 
 	for _, tt := range tests {

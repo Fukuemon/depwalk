@@ -80,6 +80,66 @@ func TestRunnerRejectsInvalidRequest(t *testing.T) {
 	}
 }
 
+func TestParseStdoutValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		stdout      string
+		wantRecords int
+	}{
+		{
+			name:   "blank line",
+			stdout: "\n",
+		},
+		{
+			name:   "core request record",
+			stdout: `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java"}` + "\n",
+		},
+		{
+			name:        "unknown caller method id",
+			stdout:      `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:callee","language":"java","symbolKind":"method","qualifiedName":"example.Callee.run","signature":"run():void"}` + "\n" + `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:missing","calleeMethodId":"method:callee"}` + "\n",
+			wantRecords: 2,
+		},
+		{
+			name:        "unknown callee method id",
+			stdout:      `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:caller","language":"java","symbolKind":"method","qualifiedName":"example.Caller.run","signature":"run():void"}` + "\n" + `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:caller","calleeMethodId":"method:missing"}` + "\n",
+			wantRecords: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := parseStdout(strings.NewReader(tt.stdout))
+			if result.ValidationError == nil {
+				t.Fatal("ValidationError = nil, want error")
+			}
+			if len(result.Records) != tt.wantRecords {
+				t.Fatalf("len(Records) = %d, want %d", len(result.Records), tt.wantRecords)
+			}
+		})
+	}
+}
+
+func TestParseStdoutAllowsEdgesAfterSymbols(t *testing.T) {
+	t.Parallel()
+
+	stdout := `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:caller","calleeMethodId":"method:callee"}` + "\n" +
+		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:caller","language":"java","symbolKind":"method","qualifiedName":"example.Caller.run","signature":"run():void"}` + "\n" +
+		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:callee","language":"java","symbolKind":"method","qualifiedName":"example.Callee.run","signature":"run():void"}` + "\n"
+
+	result := parseStdout(strings.NewReader(stdout))
+	if result.ValidationError != nil {
+		t.Fatalf("ValidationError = %v, want nil", result.ValidationError)
+	}
+	if len(result.Records) != 3 {
+		t.Fatalf("len(Records) = %d, want 3", len(result.Records))
+	}
+}
+
 func TestHelperAnalyzerProcess(t *testing.T) {
 	args := os.Args
 	for i, arg := range args {

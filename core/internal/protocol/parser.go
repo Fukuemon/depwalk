@@ -93,12 +93,66 @@ func decodeExact(raw map[string]json.RawMessage, fields map[string]struct{}, out
 			exact[field] = value
 		}
 	}
+	if err := rejectUnknownNestedFields(exact); err != nil {
+		return err
+	}
 	body, err := json.Marshal(exact)
 	if err != nil {
 		return invalid("jsonl", err.Error())
 	}
 	if err := json.Unmarshal(body, out); err != nil {
 		return invalid("jsonl", err.Error())
+	}
+	return nil
+}
+
+func rejectUnknownNestedFields(raw map[string]json.RawMessage) error {
+	if value, ok := raw["sourceLocation"]; ok {
+		if err := rejectUnknownObjectFields("sourceLocation", value, acceptedSourceLocationJSONFields()); err != nil {
+			return err
+		}
+	}
+	if value, ok := raw["callSite"]; ok {
+		if err := rejectUnknownObjectFields("callSite", value, acceptedSourceLocationJSONFields()); err != nil {
+			return err
+		}
+	}
+	if value, ok := raw["entrypoints"]; ok {
+		if err := rejectUnknownArrayObjectFields("entrypoints", value, acceptedMethodSelectorJSONFields()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectUnknownObjectFields(field string, raw json.RawMessage, fields map[string]struct{}) error {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return invalid(field, err.Error())
+	}
+	for key := range object {
+		if _, ok := fields[key]; !ok {
+			return invalid(field, fmt.Sprintf("unknown field %q", key))
+		}
+	}
+	return nil
+}
+
+func rejectUnknownArrayObjectFields(field string, raw json.RawMessage, fields map[string]struct{}) error {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil
+	}
+	var objects []json.RawMessage
+	if err := json.Unmarshal(raw, &objects); err != nil {
+		return invalid(field, err.Error())
+	}
+	for i, object := range objects {
+		if err := rejectUnknownObjectFields(fmt.Sprintf("%s[%d]", field, i), object, fields); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -235,6 +289,23 @@ func acceptedAnalyzerErrorJSONFields() map[string]struct{} {
 		"message",
 		"sourceLocation",
 		"metadata",
+	)
+}
+
+func acceptedMethodSelectorJSONFields() map[string]struct{} {
+	return fieldSet(
+		"qualifiedName",
+		"signature",
+	)
+}
+
+func acceptedSourceLocationJSONFields() map[string]struct{} {
+	return fieldSet(
+		"path",
+		"startLine",
+		"startColumn",
+		"endLine",
+		"endColumn",
 	)
 }
 
