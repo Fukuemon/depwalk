@@ -197,9 +197,12 @@ func validateRelativePath(field, value string) error {
 	if value == "" {
 		return invalid(field, "is required")
 	}
-	path := filepath.ToSlash(value)
-	if strings.HasPrefix(path, "/") || filepath.IsAbs(value) {
+	path := strings.ReplaceAll(value, "\\", "/")
+	if strings.HasPrefix(path, "/") || filepath.IsAbs(value) || isWindowsAbsolutePath(value) {
 		return invalid(field, "must be relative")
+	}
+	if strings.Contains(value, "\\") {
+		return invalid(field, "must use / path separators")
 	}
 	for _, part := range strings.Split(path, "/") {
 		if part == ".." {
@@ -207,6 +210,21 @@ func validateRelativePath(field, value string) error {
 		}
 	}
 	return nil
+}
+
+func isWindowsAbsolutePath(value string) bool {
+	path := strings.ReplaceAll(value, "\\", "/")
+	if strings.HasPrefix(path, "//") {
+		return true
+	}
+	if len(path) < 2 || path[1] != ':' {
+		return false
+	}
+	letter := path[0]
+	if !((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')) {
+		return false
+	}
+	return len(path) == 2 || path[2] == '/'
 }
 
 func invalid(field, reason string) ValidationError {

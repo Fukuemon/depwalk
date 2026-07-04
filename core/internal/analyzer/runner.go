@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -91,20 +90,26 @@ func (r Runner) Run(request protocol.AnalysisRequest) (Result, error) {
 		stderrDone <- content
 	}()
 
+	finish := func(waitErr error) {
+		result.Stderr = string(<-stderrDone)
+		result.ExitCode = exitCode(waitErr)
+	}
+
 	if _, err := stdin.Write(requestLine); err != nil {
 		_ = stdin.Close()
-		_ = cmd.Wait()
+		result = parseStdout(stdout)
+		finish(cmd.Wait())
 		return result, err
 	}
 	if err := stdin.Close(); err != nil {
-		_ = cmd.Wait()
+		result = parseStdout(stdout)
+		finish(cmd.Wait())
 		return result, err
 	}
 
 	result = parseStdout(stdout)
 	waitErr := cmd.Wait()
-	result.Stderr = string(<-stderrDone)
-	result.ExitCode = exitCode(waitErr)
+	finish(waitErr)
 
 	if waitErr != nil && result.ExitCode == 0 {
 		return result, waitErr
@@ -117,7 +122,7 @@ func parseStdout(stdout io.Reader) Result {
 	reader := bufio.NewReader(stdout)
 	for {
 		line, err := reader.ReadBytes('\n')
-		if len(bytes.TrimSpace(line)) > 0 {
+		if len(line) > 0 {
 			record, parseErr := protocol.ParseRecord(line)
 			if parseErr != nil && result.ValidationError == nil {
 				result.ValidationError = parseErr
@@ -137,10 +142,15 @@ func parseStdout(stdout io.Reader) Result {
 		}
 		break
 	}
+	result.validateRecordReferences()
 	return result
 }
 
 func (r *Result) addRecord(record protocol.Record) {
+	if !isAnalyzerRecord(record) {
+		r.setValidationError(fmt.Errorf("analyzer stdout record type %T is not allowed", record))
+		return
+	}
 	r.Records = append(r.Records, record)
 	switch typed := record.(type) {
 	case protocol.Diagnostic:
@@ -148,6 +158,44 @@ func (r *Result) addRecord(record protocol.Record) {
 	case protocol.AnalyzerError:
 		errRecord := typed
 		r.AnalyzerError = &errRecord
+	}
+}
+
+func isAnalyzerRecord(record protocol.Record) bool {
+	switch record.(type) {
+	case protocol.MethodSymbol, protocol.CallEdge, protocol.Diagnostic, protocol.AnalyzerError:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Result) validateRecordReferences() {
+	methodIDs := map[string]struct{}{}
+	var callEdges []protocol.CallEdge
+	for _, record := range r.Records {
+		switch typed := record.(type) {
+		case protocol.MethodSymbol:
+			methodIDs[typed.MethodID] = struct{}{}
+		case protocol.CallEdge:
+			callEdges = append(callEdges, typed)
+		}
+	}
+	for _, edge := range callEdges {
+		if _, ok := methodIDs[edge.CallerMethodID]; !ok {
+			r.setValidationError(fmt.Errorf("callEdge %q references unknown callerMethodId %q", edge.EdgeID, edge.CallerMethodID))
+			return
+		}
+		if _, ok := methodIDs[edge.CalleeMethodID]; !ok {
+			r.setValidationError(fmt.Errorf("callEdge %q references unknown calleeMethodId %q", edge.EdgeID, edge.CalleeMethodID))
+			return
+		}
+	}
+}
+
+func (r *Result) setValidationError(err error) {
+	if r.ValidationError == nil {
+		r.ValidationError = err
 	}
 }
 
