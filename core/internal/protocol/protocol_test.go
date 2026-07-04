@@ -24,7 +24,7 @@ func TestAnalysisRequestValidate(t *testing.T) {
 	}
 }
 
-func TestAnalysisRequestValidateRejectsInvalidFields(t *testing.T) {
+func TestAnalysisRequestValidateRejectsInvalidHeader(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -35,11 +35,6 @@ func TestAnalysisRequestValidateRejectsInvalidFields(t *testing.T) {
 		{name: "unsupported version", req: withAnalysisRequest(func(r *AnalysisRequest) { r.SchemaVersion = "2" })},
 		{name: "invalid record type", req: withAnalysisRequest(func(r *AnalysisRequest) { r.RecordType = RecordTypeMethodSymbol })},
 		{name: "invalid language", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Language = "go" })},
-		{name: "invalid analysis mode", req: withAnalysisRequest(func(r *AnalysisRequest) { r.AnalysisMode = "partial" })},
-		{name: "absolute include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"/src/**/*.java"} })},
-		{name: "empty exclude path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Exclude = []string{""} })},
-		{name: "parent path segment", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"../src/**/*.java"} })},
-		{name: "missing entrypoint name", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Entrypoints = []MethodSelector{{}} })},
 	}
 
 	for _, tt := range tests {
@@ -47,9 +42,162 @@ func TestAnalysisRequestValidateRejectsInvalidFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if err := tt.req.Validate(); err == nil {
-				t.Fatal("Validate() error = nil, want error")
-			}
+			assertValidateError(t, tt.req.Validate)
+		})
+	}
+}
+
+func TestAnalysisRequestValidateRejectsInvalidAnalysisMode(t *testing.T) {
+	t.Parallel()
+
+	req := withAnalysisRequest(func(r *AnalysisRequest) {
+		r.AnalysisMode = "partial"
+	})
+
+	assertValidateError(t, req.Validate)
+}
+
+func TestAnalysisRequestValidateRejectsNonRelativeScopePaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  AnalysisRequest
+	}{
+		{name: "absolute include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"/src/**/*.java"} })},
+		{name: "empty exclude path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Exclude = []string{""} })},
+		{name: "parent path segment", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"../src/**/*.java"} })},
+		{name: "Windows drive include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"C:/repo/src/**/*.java"} })},
+		{name: "backslash include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{`src\**\*.java`} })},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertValidateError(t, tt.req.Validate)
+		})
+	}
+}
+
+func TestAnalysisRequestValidateRejectsEntrypointsWithoutQualifiedName(t *testing.T) {
+	t.Parallel()
+
+	req := withAnalysisRequest(func(r *AnalysisRequest) {
+		r.Entrypoints = []MethodSelector{{}}
+	})
+
+	assertValidateError(t, req.Validate)
+}
+
+func TestModelRecordsValidateRejectsInvalidRecordFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		validate func() error
+	}{
+		{
+			name: "methodSymbol signature is required",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.Signature = ""
+				return r.Validate()
+			},
+		},
+		{
+			name: "methodSymbol kind must be callable",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.SymbolKind = "class"
+				return r.Validate()
+			},
+		},
+		{
+			name: "callEdge calleeMethodId is required",
+			validate: func() error {
+				r := validCallEdge()
+				r.CalleeMethodID = ""
+				return r.Validate()
+			},
+		},
+		{
+			name: "diagnostic severity must be non-fatal",
+			validate: func() error {
+				r := validDiagnostic()
+				r.Severity = "fatal"
+				return r.Validate()
+			},
+		},
+		{
+			name: "error code is required",
+			validate: func() error {
+				r := validAnalyzerError()
+				r.Code = ""
+				return r.Validate()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertValidateError(t, tt.validate)
+		})
+	}
+}
+
+func TestModelRecordsValidateRejectsInvalidSourceLocations(t *testing.T) {
+	t.Parallel()
+
+	zero := 0
+	tests := []struct {
+		name     string
+		validate func() error
+	}{
+		{
+			name: "source path must be workspace-relative",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.Source = &SourceLocation{Path: "/tmp/App.java", StartLine: 1}
+				return r.Validate()
+			},
+		},
+		{
+			name: "source path must use slash separators",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.Source = &SourceLocation{Path: `src\App.java`, StartLine: 1}
+				return r.Validate()
+			},
+		},
+		{
+			name: "source startLine must be positive",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 0}
+				return r.Validate()
+			},
+		},
+		{
+			name: "source startColumn must be positive",
+			validate: func() error {
+				r := validMethodSymbol()
+				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 1, StartColumn: &zero}
+				return r.Validate()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertValidateError(t, tt.validate)
 		})
 	}
 }
@@ -138,90 +286,12 @@ func TestModelRecordsValidate(t *testing.T) {
 	}
 }
 
-func TestModelRecordsValidateRejectsInvalidFields(t *testing.T) {
-	t.Parallel()
+func assertValidateError(t *testing.T, validate func() error) {
+	t.Helper()
 
-	zero := 0
-	tests := []struct {
-		name     string
-		validate func() error
-	}{
-		{
-			name: "method symbol missing signature",
-			validate: func() error {
-				r := validMethodSymbol()
-				r.Signature = ""
-				return r.Validate()
-			},
-		},
-		{
-			name: "method symbol invalid kind",
-			validate: func() error {
-				r := validMethodSymbol()
-				r.SymbolKind = "class"
-				return r.Validate()
-			},
-		},
-		{
-			name: "call edge missing callee",
-			validate: func() error {
-				r := validCallEdge()
-				r.CalleeMethodID = ""
-				return r.Validate()
-			},
-		},
-		{
-			name: "diagnostic invalid severity",
-			validate: func() error {
-				r := validDiagnostic()
-				r.Severity = "fatal"
-				return r.Validate()
-			},
-		},
-		{
-			name: "error missing code",
-			validate: func() error {
-				r := validAnalyzerError()
-				r.Code = ""
-				return r.Validate()
-			},
-		},
-		{
-			name: "invalid source path",
-			validate: func() error {
-				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "/tmp/App.java", StartLine: 1}
-				return r.Validate()
-			},
-		},
-		{
-			name: "invalid source line",
-			validate: func() error {
-				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 0}
-				return r.Validate()
-			},
-		},
-		{
-			name: "invalid source column",
-			validate: func() error {
-				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 1, StartColumn: &zero}
-				return r.Validate()
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			var validationError ValidationError
-			if err := tt.validate(); !errors.As(err, &validationError) {
-				t.Fatalf("Validate() error = %v, want ValidationError", err)
-			}
-		})
+	var validationError ValidationError
+	if err := validate(); !errors.As(err, &validationError) {
+		t.Fatalf("Validate() error = %v, want ValidationError", err)
 	}
 }
 

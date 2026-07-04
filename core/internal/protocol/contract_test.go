@@ -62,32 +62,66 @@ func TestContractScenarioFixturesShape(t *testing.T) {
 			t.Parallel()
 
 			scenarioDir := filepath.Join(dir, name)
-			if _, err := ParseRecord(readFixture(t, filepath.Join(scenarioDir, "request.jsonl"))); err != nil {
-				t.Fatalf("request fixture error = %v", err)
-			}
+			t.Run("request is a valid analysisRequest", func(t *testing.T) {
+				t.Parallel()
 
-			exitCode := strings.TrimSpace(string(readFixture(t, filepath.Join(scenarioDir, "exit-code.txt"))))
-			if _, err := strconv.Atoi(exitCode); err != nil {
-				t.Fatalf("exit-code fixture error = %v", err)
-			}
+				validateScenarioRequestFixture(t, scenarioDir)
+			})
+			t.Run("exit-code is an integer", func(t *testing.T) {
+				t.Parallel()
 
-			_ = readFixture(t, filepath.Join(scenarioDir, "stderr.txt"))
+				validateScenarioExitCodeFixture(t, scenarioDir)
+			})
+			t.Run("stderr fixture is readable", func(t *testing.T) {
+				t.Parallel()
 
-			stdout := filepath.Join(scenarioDir, "stdout.jsonl")
-			for _, line := range fixtureLines(t, stdout) {
-				_, err := ParseRecord(line)
-				if name == "invalid-stdout" {
-					var validationError ValidationError
-					if !errors.As(err, &validationError) {
-						t.Fatalf("stdout fixture error = %v, want ValidationError", err)
-					}
-					continue
-				}
-				if err != nil {
-					t.Fatalf("stdout fixture error = %v", err)
-				}
-			}
+				_ = readFixture(t, filepath.Join(scenarioDir, "stderr.txt"))
+			})
+			t.Run("stdout records match scenario validity", func(t *testing.T) {
+				t.Parallel()
+
+				validateScenarioStdoutFixture(t, scenarioDir, name == "invalid-stdout")
+			})
 		})
+	}
+}
+
+func validateScenarioRequestFixture(t *testing.T, scenarioDir string) {
+	t.Helper()
+
+	record, err := ParseRecord(readFixture(t, filepath.Join(scenarioDir, "request.jsonl")))
+	if err != nil {
+		t.Fatalf("request fixture error = %v", err)
+	}
+	if _, ok := record.(AnalysisRequest); !ok {
+		t.Fatalf("request fixture type = %T, want AnalysisRequest", record)
+	}
+}
+
+func validateScenarioExitCodeFixture(t *testing.T, scenarioDir string) {
+	t.Helper()
+
+	exitCode := strings.TrimSpace(string(readFixture(t, filepath.Join(scenarioDir, "exit-code.txt"))))
+	if _, err := strconv.Atoi(exitCode); err != nil {
+		t.Fatalf("exit-code fixture error = %v", err)
+	}
+}
+
+func validateScenarioStdoutFixture(t *testing.T, scenarioDir string, wantValidationError bool) {
+	t.Helper()
+
+	for _, line := range fixtureLines(t, filepath.Join(scenarioDir, "stdout.jsonl")) {
+		_, err := ParseRecord(line)
+		if wantValidationError {
+			var validationError ValidationError
+			if !errors.As(err, &validationError) {
+				t.Fatalf("stdout fixture error = %v, want ValidationError", err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("stdout fixture error = %v", err)
+		}
 	}
 }
 

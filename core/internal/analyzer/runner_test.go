@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -80,31 +81,49 @@ func TestRunnerRejectsInvalidRequest(t *testing.T) {
 	}
 }
 
-func TestParseStdoutValidation(t *testing.T) {
+func TestParseStdoutRejectsBlankJSONLLines(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		stdout      string
-		wantRecords int
+		name   string
+		stdout string
+	}{
+		{name: "empty JSONL record", stdout: "\n"},
+		{name: "whitespace-only JSONL record", stdout: "  \t\n"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertStdoutValidationError(t, tt.stdout, 0)
+		})
+	}
+}
+
+func TestParseStdoutAcceptsOnlyAnalyzerResponseRecords(t *testing.T) {
+	t.Parallel()
+
+	stdout := `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java"}` + "\n"
+
+	assertStdoutValidationError(t, stdout, 0)
+}
+
+func TestParseStdoutValidatesCallEdgesReferenceMethodSymbols(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		stdout string
 	}{
 		{
-			name:   "blank line",
-			stdout: "\n",
+			name:   "callerMethodId must reference an emitted methodSymbol",
+			stdout: methodSymbolJSONL("method:callee", "example.Callee.run") + callEdgeJSONL("edge:1", "method:missing", "method:callee"),
 		},
 		{
-			name:   "core request record",
-			stdout: `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java"}` + "\n",
-		},
-		{
-			name:        "unknown caller method id",
-			stdout:      `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:callee","language":"java","symbolKind":"method","qualifiedName":"example.Callee.run","signature":"run():void"}` + "\n" + `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:missing","calleeMethodId":"method:callee"}` + "\n",
-			wantRecords: 2,
-		},
-		{
-			name:        "unknown callee method id",
-			stdout:      `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:caller","language":"java","symbolKind":"method","qualifiedName":"example.Caller.run","signature":"run():void"}` + "\n" + `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:caller","calleeMethodId":"method:missing"}` + "\n",
-			wantRecords: 2,
+			name:   "calleeMethodId must reference an emitted methodSymbol",
+			stdout: methodSymbolJSONL("method:caller", "example.Caller.run") + callEdgeJSONL("edge:1", "method:caller", "method:missing"),
 		},
 	}
 
@@ -113,23 +132,17 @@ func TestParseStdoutValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := parseStdout(strings.NewReader(tt.stdout))
-			if result.ValidationError == nil {
-				t.Fatal("ValidationError = nil, want error")
-			}
-			if len(result.Records) != tt.wantRecords {
-				t.Fatalf("len(Records) = %d, want %d", len(result.Records), tt.wantRecords)
-			}
+			assertStdoutValidationError(t, tt.stdout, 2)
 		})
 	}
 }
 
-func TestParseStdoutAllowsEdgesAfterSymbols(t *testing.T) {
+func TestParseStdoutValidatesCallEdgesAfterFullStream(t *testing.T) {
 	t.Parallel()
 
-	stdout := `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:caller","calleeMethodId":"method:callee"}` + "\n" +
-		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:caller","language":"java","symbolKind":"method","qualifiedName":"example.Caller.run","signature":"run():void"}` + "\n" +
-		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:callee","language":"java","symbolKind":"method","qualifiedName":"example.Callee.run","signature":"run():void"}` + "\n"
+	stdout := callEdgeJSONL("edge:1", "method:caller", "method:callee") +
+		methodSymbolJSONL("method:caller", "example.Caller.run") +
+		methodSymbolJSONL("method:callee", "example.Callee.run")
 
 	result := parseStdout(strings.NewReader(stdout))
 	if result.ValidationError != nil {
@@ -138,6 +151,35 @@ func TestParseStdoutAllowsEdgesAfterSymbols(t *testing.T) {
 	if len(result.Records) != 3 {
 		t.Fatalf("len(Records) = %d, want 3", len(result.Records))
 	}
+}
+
+func assertStdoutValidationError(t *testing.T, stdout string, wantRecords int) {
+	t.Helper()
+
+	result := parseStdout(strings.NewReader(stdout))
+	if result.ValidationError == nil {
+		t.Fatal("ValidationError = nil, want error")
+	}
+	if len(result.Records) != wantRecords {
+		t.Fatalf("len(Records) = %d, want %d", len(result.Records), wantRecords)
+	}
+}
+
+func methodSymbolJSONL(methodID, qualifiedName string) string {
+	return fmt.Sprintf(
+		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":%q,"language":"java","symbolKind":"method","qualifiedName":%q,"signature":"run():void"}`+"\n",
+		methodID,
+		qualifiedName,
+	)
+}
+
+func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
+	return fmt.Sprintf(
+		`{"schemaVersion":"1","recordType":"callEdge","edgeId":%q,"callerMethodId":%q,"calleeMethodId":%q}`+"\n",
+		edgeID,
+		callerMethodID,
+		calleeMethodID,
+	)
 }
 
 func TestHelperAnalyzerProcess(t *testing.T) {
