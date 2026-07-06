@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:main-to-service","callerMethodId":"method:com.example.App.main","calleeMethodId":"method:com.example.Service.run","callSite":{"path":"src/main/java/com/example/App.java","startLine":9}}

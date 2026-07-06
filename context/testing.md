@@ -9,11 +9,11 @@ Core の test framework は Go 標準の `testing` とする。
 
 ## テスト責務の分担
 
-| 種別              | 配置                         | 主担当範囲                                                                      |
-| ----------------- | ---------------------------- | ------------------------------------------------------------------------------- |
-| Unit test         | `core/internal/...` / Analyzer | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4) |
+| 種別              | 配置                                                              | 主担当範囲                                                                                                                                    |
+| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)                                                              |
 | Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠 |
-| E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3) |
+| E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3)                                                               |
 
 ## テスト runtime contract
 
@@ -24,6 +24,14 @@ Core の test framework は Go 標準の `testing` とする。
 - Golden fixture は `testdata/` 配下に置く。
 - `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
 - E2E の具体 CLI 引数、env 変数、対象選択は後続の CLI interface spec で確定する。
+
+## テスト構造
+
+- テストは仕様単位の `Test...` 関数に分ける。1 つの巨大な table-driven test に、異なる仕様の invalid case を混在させない。
+- table-driven test は、同じ仕様に対する具体例の列挙に使う。`Test...` 関数名は検証する仕様、`t.Run` の subtest 名は具体的な入力条件や境界値を表す。
+- Protocol / contract test は、失敗時に壊れた契約が test output から分かる構造にする。fixture 検証では `request` / `stdout` / `stderr` / `exit-code` など、契約境界ごとに subtest を分ける。
+- helper は assertion や fixture 生成の重複削減に使う。ただし、helper 名や table の抽象化で仕様名が隠れる場合は分割を優先する。
+- `go test -run '<TestName>/<case>'` で仕様または具体例を絞り込める命名にする。
 
 ## Protocol contract test
 
