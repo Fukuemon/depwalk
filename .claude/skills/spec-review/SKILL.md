@@ -1,26 +1,27 @@
 ---
 name: spec-review
 description: >-
-  Runs an independent reviewer agent with a fresh context over a spec or its
-  generated prompts, returning PASS or NEEDS_WORK with specific findings. Use as
-  a phase gate after spec-draft, spec-resolve, spec-prompts, or when the user
-  asks for spec-review.
+  spec / 生成 prompts を fresh context の評価専用 subagent (spec-reviewer) に委譲し、PASS /
+  NEEDS_WORK と具体指摘を集約して返す。spec-lifecycle の phase gate として、またはユーザーが "spec-review"
+  / "spec のレビュー" / "PASS か見て" を求めたときに起動する。
 ---
+
 # Spec Review
 
 cwc-long-running-agents の "Fresh-Context Evaluator" パターンに沿った skill。
-親 agent の会話履歴を引き継がない別 subagent を立ち上げて spec / prompts を独立評価し、`PASS` または `NEEDS_WORK` を返す。
+親 agent の会話履歴を引き継がない評価専用 subagent `spec-reviewer` に spec / prompts を独立評価させ、`PASS` または `NEEDS_WORK` を集約して返す。
+**レビュー観点の正本は subagent 定義 (`.rulesync/subagents/spec-reviewer.md`)**。本 skill は委譲と集約のみを担い、観点を再記述しない。
 
 ## いつ使うか
 
-- phase gate (`spec-draft` / `spec-resolve` / `spec-prompts` 完了時)
+- phase gate (`spec-lifecycle` の各 phase 完了時)
 - ユーザーが「spec のレビュー」「review」「PASS / NEEDS_WORK」を要求した
 - `spec-lifecycle` からの呼び出し
 
 ## 先に読むもの
 
 - `AGENTS.md` の `Spec Workflow Contract`
-- `references/review-rubric.md`
+- subagent 定義 `spec-reviewer` (観点の正本。fallback 時にのみ本文を Read する)
 
 ## 入力
 
@@ -34,16 +35,15 @@ cwc-long-running-agents の "Fresh-Context Evaluator" パターンに沿った s
 
 - spec path: `<spec dir>/index.md`
 - PRD path / Design Doc path / feature doc dir / context dir / ADR dir: `Spec Workflow Contract` から取得
-- review rubric path: `references/review-rubric.md`
 - (任意) `prompts/` を含めるかを判定
 
-### 2. fresh-context subagent の起動
+### 2. spec-reviewer subagent への委譲
 
-`Agent` tool で別 subagent を起動する。subagent には **チャット履歴を渡さない**。
+`spec-reviewer` subagent を起動する。subagent には **チャット履歴を渡さない**。
 渡す情報は path だけ:
 
 ```text
-subagent_type: Plan (または general-purpose)
+subagent: spec-reviewer
 prompt:
   以下のファイルを読んで spec をレビューしてください。
   - spec: <spec path>
@@ -52,37 +52,14 @@ prompt:
   - feature doc: <feature doc dir / 関連 feature doc>
   - context: <context dir / 関連 topic>
   - ADR dir: <ADR dir>
-  - rubric: <rubric path>
   - (任意) prompts: <prompts dir>
-
-  rubric の各観点を評価し、最終行に `PASS` または `NEEDS_WORK` を出力してください。
-  NEEDS_WORK の場合は、観点ごとに具体的な指摘 (file:line または section 名) を返してください。
 ```
+
+**fallback**: `spec-reviewer` subagent を起動できない環境では、汎用の read-only subagent (Plan / general-purpose 等) を起動し、subagent 定義ファイル (`.rulesync/subagents/spec-reviewer.md`、生成環境では各 provider の agents ディレクトリ) を観点として Read させる。観点をこの skill 内に転記しない。
 
 ### 3. 結果の保存
 
-subagent の出力を `<spec dir>/review.md` に追記する。
-
-```md
-## Review YYYY-MM-DD HH:MM
-
-Verdict: PASS / NEEDS_WORK
-Reviewer: spec-review (fresh-context, subagent=<type>)
-
-### 観点別評価
-
-- 上位文書整合: ...
-- 未解決論点: ...
-- 実装対象明示: ...
-- template 必須節: ...
-- EARS acceptance: ...
-- prompts 自己完結性 (該当時): ...
-- 正本境界 (sync 済時。未 sync は N/A): ...
-
-### 指摘 (NEEDS_WORK の場合のみ)
-
-- <file:line / section> — <内容>
-```
+subagent の出力 (定義の「出力フォーマット」に従う) を `<spec dir>/review.md` に追記する。
 
 ### 4. spec の `## レビュー` テーブル更新
 
@@ -98,7 +75,7 @@ spec の `## レビュー` テーブルに 1 行追加 (`日付 / 結果 / 指�
 
 ## 停止条件
 
-- 対象 spec / PRD / Design Doc / rubric のいずれかが読めない
-- subagent 起動に失敗した
-- rubric の評価観点をすべて評価できなかった (未評価のまま PASS を出さない)
+- 対象 spec / PRD / Design Doc / subagent 定義のいずれかが読めない
+- subagent 起動に失敗し、fallback も起動できなかった
+- 観点をすべて評価できなかった (未評価のまま PASS を出さない)
 - 同一 spec 内容を直前にレビューしており、内容に変化がない (重複レビューを避ける)

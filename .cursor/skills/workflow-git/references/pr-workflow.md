@@ -16,7 +16,7 @@
 - Related Issues: `Closes` / `Refs`
 - Notes: 残課やレビュー観点
 
-## Kufu Monorepo の PR で意識すること
+## 本リポジトリ の PR で意識すること
 
 - PRD / Design Doc / feature doc / context / spec / ADR のどこを更新したかを明示する
 - app / package 側の実装前提が変わる場合は Notes で伝える
