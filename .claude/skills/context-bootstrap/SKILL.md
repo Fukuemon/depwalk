@@ -1,11 +1,11 @@
 ---
 name: context-bootstrap
 description: >-
-  Bootstraps the project profile (context/project.md) and the initial context
-  library (context/*.md) from the Design Doc plus a short interview. Use when
-  setting up this template for a new product, or when context/ is empty or still
-  contains placeholders.
+  Design Doc と短いインタビューからプロジェクトプロファイル (context/project.md) と初期 context ライブラリ
+  (context/*.md) を生成する。新規プロダクトでテンプレートを使い始めるとき、context/
+  が空またはプレースホルダのままのとき、"context-bootstrap" / "context 初期化" で起動する。
 ---
+
 # Context Bootstrap
 
 初期 `design/DesignDoc.md` と短い対話を入力に、**プロジェクト profile (`context/project.md`) と context library (`context/*.md`)** を template から生成する。新規プロダクトで本テンプレートを使い始めるときの初期化 skill。
@@ -25,7 +25,7 @@ description: >-
 
 ## 実行フロー
 
-> 流れ: DesignDoc 読込 → Required Context の対話確定 → project.md 生成 → context/*.md 生成 → 未確定点の確認依頼
+> 流れ: DesignDoc 読込 → Required Context の対話確定 → project.md 生成 → context/\*.md 生成 → 未確定点の確認依頼
 
 ### 1. Design Doc から導出できる値を抽出
 
