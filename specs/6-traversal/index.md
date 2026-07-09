@@ -6,7 +6,7 @@
 ## メタ情報
 
 - Issue: `#6`
-- ステータス: `Done` (phase 11 完了、`spec-sync` 完了。実装分割 (prompts 生成) へ進める)
+- ステータス: `Done` (phase 11 完了、`spec-sync` 完了、prompts 生成済み。実装フェーズへ進める)
 - 作成日: 2026-07-07
 - 更新日: 2026-07-08
 - Branch: `feature/6`
@@ -27,7 +27,7 @@
 | 7   | Content / Data 設計         | 完了 | 2026-07-07 | 探索結果モデルは到達 node 集合 + edge 集合として確定                                                                   |
 | 8   | Performance / Security 設計 | 完了 | 2026-07-08 | 深さ上限未指定時は無制限。大規模 graph budget は後続計測                                                               |
 | 9   | Test / Metrics 設計         | 完了 | 2026-07-08 | unit / E2E fixture 観点を具体化済み                                                                                    |
-| 10  | 実装分割                    | 完了 | 2026-07-08 | Graph / traversal / test の prompts 分割方針を決定済み                                                                 |
+| 10  | 実装分割                    | 完了 | 2026-07-08 | prompts 4 件を生成済み (P1-P4 直列依存)。prompts phase レビュー 2 ラウンドの指摘対応済み                               |
 | 11  | レビュー済                  | 完了 | 2026-07-08 | spec-review 6 回目で spec-reviewer / codex / cursor-composer が 3/3 全会一致 PASS。次 phase は `spec-sync`             |
 
 ## 上位文書整合
@@ -35,7 +35,7 @@
 正本 (PRD ※本プロダクトは統合モードのため未作成、Why/What は [Design Doc](../../design/DesignDoc.md) に統合 / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
 - PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
-- Design Doc 更新要否: 要 (Q4 の循環 / 深さ上限の解決内容と、S1/S2 測定方法への「CLI interface spec 完了後に完成する」補足を `spec-sync` で反映する)
+- Design Doc 更新要否: 反映済み (2026-07-08 `spec-sync` で Q4 の解決内容と S1/S2 測定方法の補足を反映済み)
 - ADR 起票要否: 不要 (現時点では既存の Core package 境界と Protocol 判断の範囲内)
 
 | 上位文書    | 節 / 該当箇所                                                                                                        | 整合方針 (継承 / 補足 / 変更提案) |
@@ -51,8 +51,8 @@
 | ADR         | `adr/0001-analyzer-protocol-jsonl-spi.md`                                                                            | 継承                              |
 | ADR         | `adr/0002-core-implementation-foundation.md`                                                                         | 継承                              |
 
-> Design Doc (`design/DesignDoc.md:41-42`) と `context/testing.md:16,20` は S1 / S2 の測定方法を「既知の caller / callee 集合と CLI 出力の一致」と定義する。本 spec の実装対象は Traversal Engine のみ (CLI 引数 / exit code / エラー表示は対象外、`## スコープ > やらないこと`) のため、#6 の成功条件 (`## 要件の解釈 > 成功条件`) は Traversal Engine が返す到達 node / edge 集合の一致に限定して検証する。S1 / S2 を CLI 出力レベルで満たす最終的な E2E 照合は、CLI interface spec の実装後に本 spec の Traversal 層 E2E と組み合わせて完成する。Design Doc / context/testing.md の測定方法定義そのものは変更しない (`spec-sync` で「CLI interface spec 完了後に完成する」という補足を Design Doc 側へ反映する)。
-> Q4 (循環 / 深さ上限の打ち切り条件) は本 spec の D2 / D3 で解決済みだが、`design/DesignDoc.md:246` は `spec-sync` 実行前のため依然「未決」のままである。矛盾ではなく、`spec-sync` (未実行) での正本ハンドオフ待ちの状態であり、上記以外に上位文書との矛盾は検出していない。
+> Design Doc (`design/DesignDoc.md:41-42`) と `context/testing.md:16,20` は S1 / S2 の測定方法を「既知の caller / callee 集合と CLI 出力の一致」と定義する。本 spec の実装対象は Traversal Engine のみ (CLI 引数 / exit code / エラー表示は対象外、`## スコープ > やらないこと`) のため、#6 の成功条件 (`## 要件の解釈 > 成功条件`) は Traversal Engine が返す到達 node / edge 集合の一致に限定して検証する。S1 / S2 を CLI 出力レベルで満たす最終的な E2E 照合は、CLI interface spec の実装後に本 spec の Traversal 層 E2E と組み合わせて完成する。この分界の補足は 2026-07-08 `spec-sync` で Design Doc / `context/testing.md` 側へ反映済み (測定方法定義そのものは変更していない)。
+> Q4 (循環 / 深さ上限の打ち切り条件) は本 spec の D2 / D3 / D6 で解き、2026-07-08 `spec-sync` で `design/DesignDoc.md` の Open Questions Q4 を「解決済み」へ更新済み (正本は [Traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md))。上位文書との矛盾は検出していない。
 
 ## 関連資料
 
@@ -392,6 +392,17 @@ sequenceDiagram
 - 未確定論点はない。`spec-review` 後に prompts を生成する。
 - Output Engine の実装 prompt は #7 で生成する。
 
+### 生成済み prompts (2026-07-08)
+
+| ファイル                          | phase | target      | 並列可 | 依存先     | 概要                                                                      |
+| --------------------------------- | ----- | ----------- | ------ | ---------- | ------------------------------------------------------------------------- |
+| `P1_01_core_graph-view.md`        | 1     | `core`      | -      | なし (#12) | node / edge graph view と test builder                                    |
+| `P2_01_traversal_search-api.md`   | 2     | `traversal` | -      | P1_01      | request 型 / validation、起点不在、minDepth 計算、到達 node 集合          |
+| `P3_01_traversal_result-model.md` | 3     | `traversal` | -      | P2_01      | 誘導 edge 集合、`cycle` 注釈 (SCC)、`depthLimit` cutoff、Traversal result |
+| `P4_01_core_e2e-fixture.md`       | 4     | `core`      | -      | P1-P3      | S1 / S2 fixture と Traversal 層 E2E 照合テスト                            |
+
+全 prompt は直列依存 (P1 → P2 → P3 → P4) であり、並列実行可能な組はない。
+
 ## 上位資料からの変更点
 
 本 spec で PRD / Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。`spec-track` / `spec-sync` で更新する。
@@ -457,11 +468,16 @@ sequenceDiagram
 | 2026-07-08 | NEEDS_WORK               | spec-review 4 回目 (spec-reviewer subagent NEEDS_WORK、codex / cursor-composer PASS): 探索木 edge 方式では合流 (ダイヤモンド型) graph で BFS/DFS の選択により到達 edge 集合と cutoff の帰属が変わり、「順序は契約に現れない」という修正の前提と矛盾。合流 edge を `cycle` と誤標識する意味論的誤りも指摘                                                                                                        | 対応済み。D6 を新設し、到達集合を minDepth + 誘導部分グラフで定義、`cycle` を SCC 判定の注釈へ精密化 (到達 edge 集合から除外しない)、`depthLimit` cutoff を minDepth 基準に統一。User Flow / Reuse Policy / Performance / Interface / Content / Error / テスト観点 / Flowchart を再整合                  |
 | 2026-07-08 | NEEDS_WORK               | spec-review 5 回目 (spec-reviewer / cursor-composer NEEDS_WORK、codex PASS): **D6 の数学的定義は 4 回目の指摘を解消しており穴はないことを確認**。残指摘は D6 対応時の同期漏れのみ — メタ情報 (L9) と phase 表 (L31) の矛盾、論点テーブル D2 決定欄の旧記述残留、実装分割 P3 の「`cycle` cutoff」旧表記。non-blocking 推奨: Flowchart 段階 1 への minDepth 正確性注記、内部訪問順序の検証手段 (white-box) の明記 | 対応済み。メタ情報 / D2 決定欄 / P3 を D6 後の契約に同期し、non-blocking 推奨 2 件も反映                                                                                                                                                                                                                 |
 | 2026-07-08 | **PASS**                 | spec-review 6 回目 (spec-reviewer subagent / codex / cursor-composer 3/3 全会一致 PASS): ラウンド5の同期指摘の解消を独立に確認。新たな矛盾なし。ラウンド1〜6 を通じて解消した指摘の総括は `review.md` 末尾を参照                                                                                                                                                                                                | 完了。次 phase `spec-sync` へ進める                                                                                                                                                                                                                                                                      |
+| 2026-07-08 | NEEDS_WORK               | prompts phase レビュー 1 回目 (spec-reviewer subagent): [blocking] P4 に探索誘発表現 (「既存の testdata/ 配下の慣行に合わせた」が参照 path 未掲示)、[minor] 上位文書整合の注記に spec-sync 前の残置記述、[non-blocking] 生成後の依存関係表が成果物に無い                                                                                                                                                        | 対応済み。P4 に fixture 慣行をインライン化 + 参照 path 明示、sync 記述を「反映済み」へ同期、生成済み prompts 一覧表を実装分割へ追加                                                                                                                                                                      |
+| 2026-07-08 | NEEDS_WORK               | prompts phase レビュー 2 回目 (spec-reviewer subagent): 前回 3 指摘の解消を確認、prompts 自己完結性 / 正本境界含む主要観点は PASS。残指摘はメタ情報同期のみ — ステータス注記が prompts 生成前の未来形、変更履歴に prompts 生成 / 指摘対応のエントリ欠落 [minor×2]                                                                                                                                               | 対応済み。ステータスを「prompts 生成済み」へ更新し、変更履歴にエントリを追加                                                                                                                                                                                                                             |
+| 2026-07-08 | **PASS**                 | prompts phase レビュー 3 回目 (spec-reviewer subagent、最終確認): 前回のメタ情報同期 2 件の解消を確認。メタ情報 / phase 表 / レビュー表 / 変更履歴 / 本文の間に新たな不整合なし。全 7 観点 PASS (prompts 自己完結性: 必須 10 セクション・antipatterns 注入・探索誘発表現なし・命名規則準拠を再確認)                                                                                                             | 完了。実装フェーズ (P1_01 から直列実行) へ進める                                                                                                                                                                                                                                                         |
 
 ## 変更履歴
 
 | 日付       | 変更者 | 変更内容                                                                                                                                                                                                                                                    |
 | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-08 | Claude | prompts phase レビュー指摘に対応。P4 の fixture 慣行をインライン化し参照 path を明示、上位文書整合の sync 記述を「反映済み」へ同期、生成済み prompts 一覧表を実装分割へ追加                                                                                 |
+| 2026-07-08 | Claude | 実装 prompts を生成 (P1_01 graph view / P2_01 探索 API / P3_01 result モデル / P4_01 E2E fixture の 4 件、直列依存)                                                                                                                                         |
 | 2026-07-08 | Claude | `spec-sync` を実行。Design Doc (Open Questions Q4 解決済み化、S1/S2 測定方法補足) / feature doc (`design/features/traversal/DesignDoc_traversal.md` 新規作成、D1-D6 の durable 判断を反映し正本ハンドオフ) / context (`context/testing.md` E2E 補足) へ反映 |
 | 2026-07-08 | Claude | spec-review 6 回目で 3/3 エージェント全会一致 PASS。ステータスを `Done` に更新し phase 11 を完了。次 phase `spec-sync` へ進める                                                                                                                             |
 | 2026-07-08 | Claude | spec-review 5 回目の同期指摘に対応。メタ情報 / 論点テーブル D2 決定欄 / 実装分割 P3 を D6 後の契約に同期し、Flowchart への minDepth 正確性注記と内部訪問順序の white-box 検証を明記                                                                         |
