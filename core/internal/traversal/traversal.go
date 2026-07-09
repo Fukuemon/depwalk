@@ -50,44 +50,73 @@ type Request struct {
 	Order Order
 }
 
-// Result is the outcome of a traversal. Nodes carries the reached node
-// IDs as a set: no order is guaranteed.
+// Result is the outcome of a traversal. Nodes and Edges carry the
+// reached induced subgraph as sets keyed by ID: no order is guaranteed.
 type Result struct {
 	Status Status
-	Nodes  map[string]bool
+	// Nodes is the reached node ID set (minDepth <= maxDepth), including
+	// the start node.
+	Nodes map[string]bool
+	// Edges is the induced subgraph: every edge in the traversal
+	// direction whose both endpoints are reached, including convergent
+	// and cycle edges.
+	Edges map[string]graph.Edge
+	// Cycles annotates the Edges entries that lie on a cycle of the
+	// reached subgraph (self-loop or same SCC). Annotated edges stay in
+	// Edges because they are real call relations.
+	Cycles map[string]bool
+	// DepthCutoffs records edges from a reached node to a node beyond
+	// the depth limit, keyed by edge ID. These edges are not in Edges.
+	DepthCutoffs map[string]DepthCutoff
 }
 
-// Traverse runs one traversal over g and returns the reached set.
-// Invalid request options fail before any walk; a missing start node
-// yields an empty [Result] with [StatusStartNotFound] instead of an
-// error.
+// DepthCutoff is an edge cut by the depth limit together with the
+// minDepth of the node it leads to.
+type DepthCutoff struct {
+	Edge graph.Edge
+	// TargetMinDepth is the minDepth of the beyond-limit node the edge
+	// leads to in the traversal direction (always > maxDepth).
+	TargetMinDepth int
+}
+
+// Traverse runs one traversal over g and returns the reached induced
+// subgraph. Invalid request options fail before any walk; a missing
+// start node yields an empty [Result] with [StatusStartNotFound]
+// instead of an error.
 func Traverse(g *graph.Graph, req Request) (Result, error) {
 	if err := validate(req); err != nil {
 		return Result{}, err
 	}
 	if _, ok := g.Node(req.StartID); !ok {
-		return Result{Status: StatusStartNotFound, Nodes: map[string]bool{}}, nil
+		return Result{
+			Status:       StatusStartNotFound,
+			Nodes:        map[string]bool{},
+			Edges:        map[string]graph.Edge{},
+			Cycles:       map[string]bool{},
+			DepthCutoffs: map[string]DepthCutoff{},
+		}, nil
 	}
 
 	visited := visitOrder(g, req.StartID, req.Direction, req.Order)
 	nodes := make(map[string]bool, len(visited))
+	var depths map[string]int
 	if req.MaxDepth == nil {
 		for _, id := range visited {
 			nodes[id] = true
 		}
-		return Result{Status: StatusOK, Nodes: nodes}, nil
-	}
-
-	// The depth limit is defined over minDepth (shortest distance), so a
-	// DFS walk that reaches a node the long way around cannot exclude it.
-	depths := minDepths(g, req.StartID, req.Direction)
-	for _, id := range visited {
-		if depths[id] > *req.MaxDepth {
-			continue
+	} else {
+		// The depth limit is defined over minDepth (shortest distance),
+		// so a DFS walk that reaches a node the long way around cannot
+		// exclude it.
+		depths = minDepths(g, req.StartID, req.Direction)
+		for _, id := range visited {
+			if depths[id] > *req.MaxDepth {
+				continue
+			}
+			nodes[id] = true
 		}
-		nodes[id] = true
 	}
-	return Result{Status: StatusOK, Nodes: nodes}, nil
+	return buildResult(g, req.Direction, nodes, depths), nil
 }
 
 func validate(req Request) error {
