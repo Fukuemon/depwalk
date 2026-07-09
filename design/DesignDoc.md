@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-06-27 / Status: Draft
+> 最終更新: 2026-07-08 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -36,13 +36,13 @@ depwalk はこの調査を自動化することを目的とする。
 
 ### 提供価値 / 成功条件 (What)
 
-| #   | 成功条件                                                                         | 測定方法                                                                       |
-| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| S1  | 指定メソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる | サンプル Java/Spring プロジェクトで、既知の呼び出し元集合と CLI 出力が一致する |
-| S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                             |
-| S3  | 呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる                     | 各形式でパース / レンダリング可能な出力が得られる                              |
-| S4  | Spring DI 経由の呼び出し先を実体まで解決できる (Phase2 以降)                     | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる   |
-| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)    |
+| #   | 成功条件                                                                         | 測定方法                                                                                                                                                                                                                                               |
+| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S1  | 指定メソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる | サンプル Java/Spring プロジェクトで、既知の呼び出し元集合と CLI 出力が一致する (Traversal Engine 層の到達集合照合は [feature doc](features/traversal/DesignDoc_traversal.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する) |
+| S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                                                                                                                                                                                                     |
+| S3  | 呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる                     | 各形式でパース / レンダリング可能な出力が得られる                                                                                                                                                                                                      |
+| S4  | Spring DI 経由の呼び出し先を実体まで解決できる (Phase2 以降)                     | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                           |
+| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)                                                                                                                                                                            |
 
 ### スコープ
 
@@ -129,15 +129,15 @@ flowchart TD
 
 各モジュールの責務・境界を示す。Core は呼び出しグラフの構築・探索・出力に責務を限定し、解析処理は一切持たない。言語ごとの差異は Analyzer に閉じ込める。
 
-| モジュール       | 責務                                                                                    | 公開境界           | 依存先                             |
-| ---------------- | --------------------------------------------------------------------------------------- | ------------------ | ---------------------------------- |
-| CLI              | 引数解析、実行制御、Core 呼び出し                                                       | コマンドライン I/F | Core                               |
-| Graph Engine     | Node 管理 / Edge 管理 / Graph 生成                                                      | グラフ構造 API     | Model                              |
-| Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                   | 探索 API           | Graph Engine                       |
-| Output Engine    | Console / JSON / DOT / Mermaid への出力                                                 | 出力 API           | Graph Engine, Model                |
-| Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル) | データ型           | なし                               |
+| モジュール       | 責務                                                                                           | 公開境界           | 依存先                             |
+| ---------------- | ---------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------- |
+| CLI              | 引数解析、実行制御、Core 呼び出し                                                              | コマンドライン I/F | Core                               |
+| Graph Engine     | Node 管理 / Edge 管理 / Graph 生成                                                             | グラフ構造 API     | Model                              |
+| Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                          | 探索 API           | Graph Engine                       |
+| Output Engine    | Console / JSON / DOT / Mermaid への出力                                                        | 出力 API           | Graph Engine, Model                |
+| Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル)        | データ型           | なし                               |
 | Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領 | Protocol (JSONL)   | Model                              |
-| Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成                                | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp |
+| Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成                                       | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp |
 
 ```mermaid
 flowchart LR
@@ -195,12 +195,12 @@ landscape より下の詳細は以下を正本とする。本 doc には重複�
 
 feature 単位の設計 (データ構造・主要シナリオ / フロー) は [design/features/](features/) を正本とする。
 
-| Feature                             | 文書     | 状態   |
-| ----------------------------------- | -------- | ------ |
-| Caller / Callee 探索                | (未作成) | 未着手 |
-| 出力形式 (Console/JSON/DOT/Mermaid) | (未作成) | 未着手 |
-| Analyzer Protocol / SPI             | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了 |
-| Java Analyzer                       | (未作成) | 未着手 |
+| Feature                             | 文書                                                                                        | 状態   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- | ------ |
+| Caller / Callee 探索                | (未作成)                                                                                    | 未着手 |
+| 出力形式 (Console/JSON/DOT/Mermaid) | (未作成)                                                                                    | 未着手 |
+| Analyzer Protocol / SPI             | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了   |
+| Java Analyzer                       | (未作成)                                                                                    | 未着手 |
 
 ### Engineering Context (How: 横断規約)
 
@@ -217,9 +217,9 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 確定した技術判断・却下した代替案は [adr/](../adr/) を正本とする。本 doc では一覧のみ持つ。
 
-| ADR      | 決定                                             | 関連ドキュメント                   |
-| -------- | ------------------------------------------------ | ---------------------------------- |
-| [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI | 本 doc「設計原則」「Communication Protocol」 |
+| ADR                                                       | 決定                                                         | 関連ドキュメント                                                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)    | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI  | 本 doc「設計原則」「Communication Protocol」                                                           |
 | [ADR-0002](../adr/0002-core-implementation-foundation.md) | Core 実装基盤として Go / Go modules / Go 標準 command を採用 | [context/toolchain.md](../context/toolchain.md), [context/architecture.md](../context/architecture.md) |
 
 ## Open Questions / Future Work
@@ -238,9 +238,9 @@ Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spe
 
 ### Open Questions (未決事項)
 
-| #   | 論点                                                                  | 決定者   | 期限          | 状態 |
-| --- | --------------------------------------------------------------------- | -------- | ------------- | ---- |
+| #   | 論点                                                                  | 決定者   | 期限          | 状態                                                                                                                                         |
+| --- | --------------------------------------------------------------------- | -------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)) |
-| Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | Phase3 着手前 | 未決 |
-| Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 未決 |
-| Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 未決 |
+| Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | Phase3 着手前 | 未決                                                                                                                                         |
+| Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 未決                                                                                                                                         |
+| Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/traversal/DesignDoc_traversal.md) / [spec #6](../specs/6-traversal/))                                       |
