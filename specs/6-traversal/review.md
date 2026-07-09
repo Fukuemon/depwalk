@@ -310,3 +310,33 @@ Verdict: PASS — 全観点 PASS。D1-D6 決定済み、Q4/S1-S2 の spec-sync �
 4. multi-agent-review skill による内容レベルの gap 7 件: 順序 vs 集合モデルの矛盾、depth 境界未定義、S1/S2 包含規則未定義、空 graph status 未定義、メタ情報不同期、エラーケース欠落、PRD リンク破損 (別 rubric ラウンド)
 5. **探索木 edge 方式の順序依存性・合流の誤標識という設計バグ (ラウンド4) → D6 で解消 (ラウンド5)**
 6. D6 反映時の同期漏れ (メタ情報/phase表/論点テーブル/実装分割の旧記述残留) (ラウンド5 → ラウンド6 で解消)
+
+---
+
+## Prompts Phase Review 2026-07-08 (spec-review, spec-reviewer subagent, 2 rounds)
+
+実装 prompts 4 件 (`P1_01_core_graph-view.md` / `P2_01_traversal_search-api.md` / `P3_01_traversal_result-model.md` / `P4_01_core_e2e-fixture.md`) の生成後レビュー。
+
+### ラウンド1: NEEDS_WORK
+
+- prompts 自己完結性: 必須 10 セクション完備・antipatterns 逐語一致・命名規則適合・依存関係 (P1→P2→P3→P4) が spec 実装分割と一致・設計仕様抜粋が feature doc の D6 後契約と一致・P1 の protocol フィールド名が `core/internal/protocol/types.go` の実在フィールドと一致、を確認。
+- [blocking] P4 の「形式は既存の `testdata/` 配下の JSONL contract fixture の慣行に合わせた」が探索誘発表現 (実体 `testdata/analyzer-protocol/records/` が参照 path に未掲示で、絶対ルールの「参照 path を外れて探索しない」と矛盾)。
+- [minor] spec の上位文書整合の注記 (旧 L55) と Design Doc 更新要否 (旧 L38) に「spec-sync 未実行」の残置記述。
+- [non-blocking] 生成後の依存関係表 (並列可否列を含む一覧) が成果物として残っていない。
+- 正本境界: PASS (sync 済、feature doc への正本ハンドオフ・spec 側の決定時スナップショット降格・二重正本なしを確認)。
+
+**対応**: P4 に `### fixture 形式の慣行` をインライン化 (JSONL 1 行 1 record / camelCase key / 実例) し `testdata/analyzer-protocol/records/valid/` を参照 path に明示追加。spec の sync 記述を「反映済み (2026-07-08)」へ同期。spec の `## 実装分割 > 生成済み prompts` に一覧表を追加。
+
+### ラウンド2: NEEDS_WORK → 対応済み
+
+- 前回 3 指摘の解消をすべて file:line 根拠付きで確認 (P4 の camelCase key が protocol の json tag と一致することも検証)。
+- prompts 自己完結性 / 正本境界 / 上位文書整合 / 未解決論点 / 実装対象明示 / EARS acceptance: PASS。
+- 残指摘 [minor×2]: メタ情報のステータス注記が prompts 生成前の未来形のまま、変更履歴に prompts 生成 / 指摘対応のエントリ欠落。
+
+**対応**: ステータスを「prompts 生成済み。実装フェーズへ進める」へ更新し、変更履歴に 2 エントリを追加。レビュー表にも prompts phase の 2 ラウンドを記録。
+
+### ラウンド3 (最終確認): PASS
+
+- 前回のメタ情報同期 2 件の解消を file:line 根拠付きで確認。メタ情報 / phase 表 / レビュー表 / 変更履歴 / 本文の相互照合で新たな不整合なし。
+- 全 7 観点 PASS。prompts 自己完結性は必須 10 セクション・antipatterns 逐語注入・探索誘発表現の不在・命名規則準拠・依存表の成果物化を再確認。正本境界は feature doc へのハンドオフ・二重正本なし・用語規約準拠を再確認。
+- **prompts phase 完了。実装フェーズ (P1_01 → P2_01 → P3_01 → P4_01 の直列実行) へ進められる状態。**
