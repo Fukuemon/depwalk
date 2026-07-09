@@ -1,0 +1,54 @@
+{
+  "description": "相互再帰 (2 node の SCC): o -> a <-> b -> c。SCC 内の edge のみ cycle 注釈、出入りする edge は注釈なし",
+  "graph": {
+    "nodes": ["method:o", "method:a", "method:b", "method:c"],
+    "edges": [
+      {
+        "edgeId": "edge:oa",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:a"
+      },
+      {
+        "edgeId": "edge:ab",
+        "callerMethodId": "method:a",
+        "calleeMethodId": "method:b"
+      },
+      {
+        "edgeId": "edge:ba",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:a"
+      },
+      {
+        "edgeId": "edge:bc",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:c"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: callee from o annotates only the SCC edges",
+      "start": "method:o",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o", "method:a", "method:b", "method:c"],
+        "edges": ["edge:oa", "edge:ab", "edge:ba", "edge:bc"],
+        "cycles": ["edge:ab", "edge:ba"],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from c reaches through the recursion",
+      "start": "method:c",
+      "direction": "caller",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:c", "method:b", "method:a", "method:o"],
+        "edges": ["edge:bc", "edge:ab", "edge:ba", "edge:oa"],
+        "cycles": ["edge:ab", "edge:ba"],
+        "depthCutoffs": []
+      }
+    }
+  ]
+}
