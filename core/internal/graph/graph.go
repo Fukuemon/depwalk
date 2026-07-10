@@ -64,7 +64,10 @@ func (g *Graph) AddNode(n Node) {
 }
 
 // AddEdge registers a directed edge. An edge whose ID is already
-// registered is ignored (first registration wins).
+// registered is ignored (first registration wins). Callers must only
+// register edges whose endpoints are (or will be) registered nodes: the
+// Analyzer Protocol guarantees this by rejecting edges to unresolved
+// symbols, and the record-loading layer is responsible for upholding it.
 func (g *Graph) AddEdge(e Edge) {
 	if _, ok := g.edges[e.ID]; ok {
 		return
@@ -84,11 +87,17 @@ func (g *Graph) Node(id string) (Node, bool) {
 
 // Neighbors returns the edges adjacent to the node id in the given
 // direction: for [DirectionCallee] the edges the node calls, for
-// [DirectionCaller] the edges that call the node. Unknown IDs and leaf
-// nodes yield an empty slice.
+// [DirectionCaller] the edges that call the node. Unknown IDs, leaf
+// nodes, and invalid directions yield an empty slice. The returned
+// slice is shared with the graph's internal adjacency and must not be
+// modified by the caller.
 func (g *Graph) Neighbors(id string, dir Direction) []Edge {
-	if dir == DirectionCaller {
+	switch dir {
+	case DirectionCaller:
 		return g.incoming[id]
+	case DirectionCallee:
+		return g.outgoing[id]
+	default:
+		return nil
 	}
-	return g.outgoing[id]
 }

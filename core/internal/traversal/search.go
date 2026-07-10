@@ -9,9 +9,8 @@ import "github.com/Fukuemon/depwalk/core/internal/graph"
 func minDepths(g *graph.Graph, startID string, dir graph.Direction) map[string]int {
 	depths := map[string]int{startID: 0}
 	queue := []string{startID}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
+	for head := 0; head < len(queue); head++ {
+		id := queue[head]
 		for _, e := range g.Neighbors(id, dir) {
 			next := nextNode(e, dir)
 			if _, seen := depths[next]; seen {
@@ -26,9 +25,11 @@ func minDepths(g *graph.Graph, startID string, dir graph.Direction) map[string]i
 
 // visitOrder walks the graph from start and returns the node IDs in the
 // order they were expanded: FIFO for [OrderBFS] (the default) and LIFO
-// matching recursive depth-first order for [OrderDFS]. The order is an
-// internal property only observable by white-box tests; the [Result]
-// contract does not depend on it. Visited nodes are never re-expanded.
+// matching recursive depth-first order for [OrderDFS]. It implements the
+// [Order] semantics of [Request] for consumers that need an ordered
+// expansion (spec D1); [Traverse] itself derives the reached set from
+// [minDepths] because the result contract is order-independent. Visited
+// nodes are never re-expanded.
 func visitOrder(g *graph.Graph, startID string, dir graph.Direction, order Order) []string {
 	visited := map[string]bool{startID: true}
 	frontier := []string{startID}

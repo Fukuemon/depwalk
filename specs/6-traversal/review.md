@@ -340,3 +340,27 @@ Verdict: PASS — 全観点 PASS。D1-D6 決定済み、Q4/S1-S2 の spec-sync �
 - 前回のメタ情報同期 2 件の解消を file:line 根拠付きで確認。メタ情報 / phase 表 / レビュー表 / 変更履歴 / 本文の相互照合で新たな不整合なし。
 - 全 7 観点 PASS。prompts 自己完結性は必須 10 セクション・antipatterns 逐語注入・探索誘発表現の不在・命名規則準拠・依存表の成果物化を再確認。正本境界は feature doc へのハンドオフ・二重正本なし・用語規約準拠を再確認。
 - **prompts phase 完了。実装フェーズ (P1_01 → P2_01 → P3_01 → P4_01 の直列実行) へ進められる状態。**
+
+---
+
+## Implementation Review 2026-07-10 (code-review skill, high effort: 8 angles 並列)
+
+P1-P4 実装 diff (+1696 行) を 8 観点 (line-scan / removed-behavior / cross-file / reuse / simplification / efficiency / altitude / conventions) の並列 finder でレビュー。**コアの正確性 (Tarjan SCC・深さ境界・BFS/DFS 順序非依存性・誘導 edge / cutoff 分類) は line-scan agent が手動トレースで健全と確認**。
+
+### 対応した指摘
+
+- **[3観点合意] Traverse の二重走査と分岐非対称**: 到達 node 集合を常に `minDepths` から単一導出に統一。`visitOrder` は D1 の Order 意味論の実装 + white-box 検証として保持 (Traverse の走査には使わない。結果契約が順序非依存であるため観測上の差はゼロ)。buildResult への depths が常に非 nil になり、nil-map の `TargetMinDepth: 0` 潜在トラップも同時解消。
+- **[3観点合意] `graph.Neighbors` の内部スライス共有**: godoc に「返却スライスは内部 adjacency と共有。変更禁止」を明記。
+- **direction の不正値**: `Neighbors` を明示 switch にし、不正値は nil を返す (silent callee fallback を排除) + テスト追加。
+- **AddEdge の前提条件**: endpoint が登録済み node であることを godoc に明記 (Protocol が未解決 callee edge を拒否し、record 読み込み層が保証する責務)。
+- **validation error 時の Result**: zero value であり使用禁止であることを godoc に明記。
+- **テストギャップ 2 件**: frontier 間 cross edge (両端が maxDepth ちょうどの node を結ぶ非探索木 edge が誘導 edge として残る) の fixture `frontier-cross.json` を追加。`maxDepth=0` + 起点 self-loop (誘導 edge + cycle 注釈として残る) の挙動固定テストを追加し、spec / feature doc の「全隣接 edge が cutoff」という不正確な記述を精密化。
+- **[conventions] `context/testing.md` 違反 2 件**: BFS/DFS 同一性テストの境界値列挙を `t.Run` subtest 化。
+- **効率微修正**: minDepths の queue を head-index 化 (backing array の肥大抑止)、Tarjan の adjacency map 二重 lookup を frame へのスライスキャッシュで解消、result maps に容量ヒント。
+
+### 見送った指摘 (理由付き)
+
+- fixture 構造体を `protocol.CallEdge` で置換 → traversal (test) から protocol への依存を作るため見送り (fixture schema は自己記述が正)。
+- fixture loader の共有 test helper 化 → 新規共有インフラの導入はスコープ外 (将来 3 例目が出たら検討)。
+- E2E loader での Builder 利用 → loader は意図的に raw API を使う (fixture の node 一覧を正とし、auto-registration で誤りを隠さない)。
+- minDepths / visitOrder の walk 骨格共通化 → 過剰抽象のリスクが利得を上回る。

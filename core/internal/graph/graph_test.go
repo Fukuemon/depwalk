@@ -110,6 +110,20 @@ func TestNeighborsReturnsEmptyForUnknownNode(t *testing.T) {
 	}
 }
 
+func TestNeighborsReturnsEmptyForInvalidDirection(t *testing.T) {
+	g := New()
+	g.AddNode(Node{ID: "method:a"})
+	g.AddNode(Node{ID: "method:b"})
+	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+
+	if got := g.Neighbors("method:a", Direction("sideways")); len(got) != 0 {
+		t.Errorf("Neighbors(a, invalid direction) = %v, want empty (no silent callee fallback)", got)
+	}
+	if got := g.Neighbors("method:a", Direction("")); len(got) != 0 {
+		t.Errorf("Neighbors(a, zero direction) = %v, want empty", got)
+	}
+}
+
 func TestAddEdgeIgnoresDuplicateID(t *testing.T) {
 	g := New()
 	g.AddNode(Node{ID: "method:a"})
