@@ -129,7 +129,7 @@
 
 > - **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 node は複数経路のうち最短の距離を採る。
 > - **到達 node 集合**: `minDepth <= maxDepth` を満たす node (maxDepth 未指定時は全到達可能 node)。起点を含む。
-> - **`maxDepth=0`**: 起点 node のみを到達集合に含み、起点の全隣接 edge が `depthLimit` cutoff になる (cutoff の記録自体は P3 の責務)。
+> - **`maxDepth=0`**: 起点 node のみを到達集合に含み、self-loop 以外の隣接 edge が `depthLimit` cutoff になる。起点への self-loop は両端が到達 node のため誘導 edge (+ `cycle` 注釈) として残る (cutoff / 誘導 edge の記録自体は P3 の責務)。
 
 `## Error / Fallback 設計 > エラーケース` より:
 

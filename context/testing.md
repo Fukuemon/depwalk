@@ -17,7 +17,7 @@ Core の test framework は Go 標準の `testing` とする。
 
 ## テスト runtime contract
 
-- E2E は **サンプル Java/Spring プロジェクト**を fixture とし、既知の呼び出し関係集合と CLI 出力を照合する (DesignDoc 成功条件の測定方法)。
+- E2E は 2 層からなる: Traversal 層は `testdata/fixtures/traversal/` の graph 入力 + 期待集合 JSON fixture で到達 node / edge 集合を照合し (#6 実装済み)、CLI 層は **サンプル Java/Spring プロジェクト**を fixture として既知の呼び出し関係集合と CLI 出力を照合する (DesignDoc 成功条件の測定方法。CLI interface spec で完成)。
 - Core ↔ Analyzer は別プロセスのため、JSONL 入出力を境界とした **contract test** を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)。spec #8 は issue 単位の決定記録であり、横断的な contract test 観点は本書を正本とする。
 - Core の unit test / contract test は `cd core && go test ./...` で実行できる状態を保つ。
 - Mock は手書き fake / interface stub で開始する。

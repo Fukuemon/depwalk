@@ -46,7 +46,7 @@
 
 ### ステップ 2: depthLimit cutoff の記録を実装する
 
-1. テストを先に書く (TDD): 「到達 node から `minDepth > maxDepth` の node への edge が `depthLimit` cutoff として記録される」「`maxDepth=0` のとき起点の全隣接 edge が `depthLimit` cutoff になる」「深さ上限未指定時は `depthLimit` cutoff が空になる」の unit test を書く
+1. テストを先に書く (TDD): 「到達 node から `minDepth > maxDepth` の node への edge が `depthLimit` cutoff として記録される」「`maxDepth=0` のとき self-loop 以外の隣接 edge が `depthLimit` cutoff になり、起点への self-loop は誘導 edge + `cycle` 注釈として残る」「深さ上限未指定時は `depthLimit` cutoff が空になる」の unit test を書く
 2. ステップ 1 の edge 走査で、接続先 node の `minDepth > maxDepth` となる edge を `depthLimit` cutoff (対象 edge + 接続先 node の minDepth) として記録する処理を実装する。cutoff の対象は edge のみで、node 自体は cutoff 対象にしない
 3. `## 検証コマンド` を実行する
 4. diff レビューを回し、指摘を対応してから次へ
@@ -127,7 +127,7 @@
 > - **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 node は複数経路のうち最短の距離を採る。
 > - **到達 node 集合**: `minDepth <= maxDepth` を満たす node (maxDepth 未指定時は全到達可能 node)。起点を含む。
 > - **到達 edge 集合**: 両端が到達 node 集合に属する、探索方向に沿った全 edge (誘導部分グラフ)。合流 edge も `cycle` 注釈付き edge も含む。
-> - **`maxDepth=0`**: 起点 node のみを到達集合に含み、起点の全隣接 edge が `depthLimit` cutoff になる。
+> - **`maxDepth=0`**: 起点 node のみを到達集合に含み、self-loop 以外の隣接 edge が `depthLimit` cutoff になる。起点への self-loop は両端が到達 node のため誘導 edge (+ `cycle` 注釈) として残る。
 >
 > この定義により、結果は BFS / DFS の選択・訪問順序に一切依存せず決定的になる。DFS option 指定時も、maxDepth 判定は minDepth 基準で行う。
 
