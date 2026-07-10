@@ -8,7 +8,7 @@
 - Issue: `#6`
 - ステータス: `Done` (phase 11 完了、`spec-sync` 完了、prompts 生成済み。実装フェーズへ進める)
 - 作成日: 2026-07-07
-- 更新日: 2026-07-08
+- 更新日: 2026-07-10
 - Branch: `feature/6`
 - Owner: Fukuemon
 
@@ -16,19 +16,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態 | 最終更新   | 備考                                                                                                                   |
-| --- | --------------------------- | ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了 | 2026-06-10 | GitHub issue #6 を確認済み                                                                                             |
-| 2   | 下書き                      | 完了 | 2026-07-07 | requirements から本 spec を scaffold                                                                                   |
-| 3   | 上位文書突合                | 完了 | 2026-07-08 | Design Doc / context / ADR / analyzer-protocol と矛盾なし。Q4 と S1/S2 測定方法の分界は `spec-sync` 待ちとして注記済み |
-| 4   | 論点整理                    | 完了 | 2026-07-07 | D1-D5 を初期論点として列挙                                                                                             |
-| 5   | 論点解決                    | 完了 | 2026-07-08 | D1-D6 を解決済み (D6 は spec-review 4 回目の指摘を受けて追加)                                                          |
-| 6   | Interface / Routing 設計    | 完了 | 2026-07-07 | Traversal request / result の主要 option を決定                                                                        |
-| 7   | Content / Data 設計         | 完了 | 2026-07-07 | 探索結果モデルは到達 node 集合 + edge 集合として確定                                                                   |
-| 8   | Performance / Security 設計 | 完了 | 2026-07-08 | 深さ上限未指定時は無制限。大規模 graph budget は後続計測                                                               |
-| 9   | Test / Metrics 設計         | 完了 | 2026-07-08 | unit / E2E fixture 観点を具体化済み                                                                                    |
-| 10  | 実装分割                    | 完了 | 2026-07-08 | prompts 4 件を生成済み (P1-P4 直列依存)。prompts phase レビュー 2 ラウンドの指摘対応済み                               |
-| 11  | レビュー済                  | 完了 | 2026-07-08 | spec-review 6 回目で spec-reviewer / codex / cursor-composer が 3/3 全会一致 PASS。次 phase は `spec-sync`             |
+| #   | フェーズ                    | 状態 | 最終更新   | 備考                                                                                                           |
+| --- | --------------------------- | ---- | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了 | 2026-06-10 | GitHub issue #6 を確認済み                                                                                     |
+| 2   | 下書き                      | 完了 | 2026-07-07 | requirements から本 spec を scaffold                                                                           |
+| 3   | 上位文書突合                | 完了 | 2026-07-08 | Design Doc / context / ADR / analyzer-protocol と矛盾なし。Q4 と S1/S2 測定方法の分界は `spec-sync` で反映済み |
+| 4   | 論点整理                    | 完了 | 2026-07-07 | D1-D5 を初期論点として列挙                                                                                     |
+| 5   | 論点解決                    | 完了 | 2026-07-08 | D1-D6 を解決済み (D6 は spec-review 4 回目の指摘を受けて追加)                                                  |
+| 6   | Interface / Routing 設計    | 完了 | 2026-07-07 | Traversal request / result の主要 option を決定                                                                |
+| 7   | Content / Data 設計         | 完了 | 2026-07-07 | 探索結果モデルは到達 node 集合 + edge 集合として確定                                                           |
+| 8   | Performance / Security 設計 | 完了 | 2026-07-08 | 深さ上限未指定時は無制限。大規模 graph budget は後続計測                                                       |
+| 9   | Test / Metrics 設計         | 完了 | 2026-07-08 | unit / E2E fixture 観点を具体化済み                                                                            |
+| 10  | 実装分割                    | 完了 | 2026-07-08 | prompts 4 件を生成済み (P1-P4 直列依存)。prompts phase レビュー 2 ラウンドの指摘対応済み                       |
+| 11  | レビュー済                  | 完了 | 2026-07-08 | spec-review 6 回目で 3/3 全会一致 PASS (`spec-sync` / prompts 生成 / 実装 P1-P4 も完了済み)                    |
 
 ## 上位文書整合
 
@@ -216,7 +216,7 @@ EARS 風で振る舞いを記述する。
 - 探索順序の unit test は、内部の訪問順序 (どの順で node を展開するか) が未指定時に BFS、明示指定時に BFS / DFS option に従って変わることを検証する。結果契約は順序非依存のため公開契約経由では観測できず、内部の展開順を記録する white-box test (package 内 test) で検証する。到達 node / edge 集合・`cycle` 注釈・`depthLimit` cutoff の内容が BFS / DFS どちらでも同一であること (順序非依存性) を検証する。
 - 循環 / 再帰の unit test は、循環 graph で無限ループしないこと、閉路を構成する edge (自己再帰 / 相互再帰) が `cycle` 注釈を持ちつつ到達 edge 集合にも含まれることを検証する。
 - 合流 (ダイヤモンド型) graph の unit test は、複数経路で到達する node への edge がすべて到達 edge 集合に含まれ、`cycle` と誤標識されないことを検証する。
-- 深さ上限の unit test は、未指定時に到達可能 node を深さで打ち切らないこと、指定時に `minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として記録することを検証する (起点の minDepth は 0、`maxDepth=0` の場合は起点のみを含み起点の全隣接 edge が `depthLimit` cutoff になる境界ケース、深い経路と浅い経路の両方を持つ node が浅い経路の minDepth で到達集合に入る合流ケースを含む)。
+- 深さ上限の unit test は、未指定時に到達可能 node を深さで打ち切らないこと、指定時に `minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として記録することを検証する (起点の minDepth は 0、`maxDepth=0` の場合は起点のみを含み self-loop 以外の隣接 edge が `depthLimit` cutoff になり起点への self-loop は誘導 edge + `cycle` 注釈として残る境界ケース、深い経路と浅い経路の両方を持つ node が浅い経路の minDepth で到達集合に入る合流ケースを含む)。
 - 起点不在の unit test は、空の到達 node / edge 集合と `startNotFound` status が返ることを検証する。
 - caller / callee 方向を unit test で検証する。
 - S1 / S2 の既知集合との一致は `testdata/fixtures/` の E2E で検証する。既知集合の定義: 到達 node 集合には起点 node 自身を含む。到達 edge 集合は両端が到達 node 集合に属する探索方向の全 edge (誘導部分グラフ) であり、`cycle` 注釈付き edge も含む。`depthLimit` cutoff の edge は含まない。
@@ -317,7 +317,7 @@ EARS 風で振る舞いを記述する。
 - 合流 (ダイヤモンド型) graph で、同一 node への複数経路の edge がすべて到達 edge 集合に含まれ、`cycle` と誤標識されないこと。
 - BFS / DFS のどちらを指定しても、到達 node / edge 集合・`cycle` 注釈・`depthLimit` cutoff の内容が同一であること (順序非依存性)。
 - 深さ上限未指定時に、到達可能 node を深さで打ち切らないこと。
-- 深さ上限指定時に、`minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として保持できること。境界ケースとして `maxDepth=0` (起点のみを含み、起点の全隣接 edge が `depthLimit` cutoff)、および深い経路と浅い経路の両方を持つ合流 node が浅い経路の minDepth で到達集合に入ることを含む。
+- 深さ上限指定時に、`minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として保持できること。境界ケースとして `maxDepth=0` (起点のみを含み、self-loop 以外の隣接 edge が `depthLimit` cutoff。起点への self-loop は誘導 edge + `cycle` 注釈として残る)、および深い経路と浅い経路の両方を持つ合流 node が浅い経路の minDepth で到達集合に入ることを含む。
 - Traversal 結果が tree ではなく、到達 node 集合 + edge 集合 (誘導部分グラフ) として返ること。到達 node / edge 集合に順序保証がないこと。
 - 起点メソッドが存在しない場合に panic せず、空結果 + `startNotFound` status を返すこと。
 - Graph が空の場合、空結果 + `startNotFound` status を返すこと。
@@ -436,7 +436,7 @@ sequenceDiagram
 | `design/features/traversal/DesignDoc_traversal.md` | 探索結果モデルは到達 node 集合 + edge 集合とし、tree 表現は Output 側で必要に応じて構築する (source: spec-resolve D4)。feature doc 作成時に反映する                                                                                             | Traversal と Output の責務境界になるため                                 |
 | `design/features/traversal/DesignDoc_traversal.md` | 起点不在は空結果 + `startNotFound` status として返す (source: spec-resolve D5)。feature doc 作成時に反映する                                                                                                                                    | Traversal result の status contract になるため                           |
 | `design/features/traversal/DesignDoc_traversal.md` | 到達集合は minDepth (最短距離) と誘導部分グラフで定義し、`cycle` は SCC 判定の注釈、`depthLimit` cutoff は minDepth 超過 node への edge とする。結果は探索順序 (BFS / DFS) に依存しない (source: spec-resolve D6)。feature doc 作成時に反映する | Traversal result の durable な意味論 (順序非依存の決定的契約) になるため |
-| `design/features/traversal/DesignDoc_traversal.md` | 未作成。spec 解決後に作成 / 同期要否を判定                                                                                                                                                                                                      | durable な Traversal 設計の置き場が未作成のため                          |
+| `design/features/traversal/DesignDoc_traversal.md` | 作成済み (2026-07-08 `spec-sync` で新規作成し反映済み)                                                                                                                                                                                          | durable な Traversal 設計の置き場として作成                              |
 
 > **反映済み**: 2026-07-08 `spec-sync` で [design/features/traversal/DesignDoc_traversal.md](../../design/features/traversal/DesignDoc_traversal.md) を新規作成し、D1-D6 の durable 設計判断すべてを反映済み。**以後、Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff、minDepth / 誘導部分グラフの定義) の正本は本 feature doc とする**。本 spec の `## 機能仕様` / `## Interface 設計` / `## Content / Data 設計` / `## Performance / Security 設計` / `## フロー / シーケンス` の該当記述は、以後「決定時スナップショット」であり、feature doc との間で drift が生じた場合は feature doc を正とする。論点 D1-D6 の決定経緯・受け入れ基準・テスト観点・実装分割は本 spec に残る (ハンドオフ対象外)。
 
@@ -471,29 +471,33 @@ sequenceDiagram
 | 2026-07-08 | NEEDS_WORK               | prompts phase レビュー 1 回目 (spec-reviewer subagent): [blocking] P4 に探索誘発表現 (「既存の testdata/ 配下の慣行に合わせた」が参照 path 未掲示)、[minor] 上位文書整合の注記に spec-sync 前の残置記述、[non-blocking] 生成後の依存関係表が成果物に無い                                                                                                                                                        | 対応済み。P4 に fixture 慣行をインライン化 + 参照 path 明示、sync 記述を「反映済み」へ同期、生成済み prompts 一覧表を実装分割へ追加                                                                                                                                                                      |
 | 2026-07-08 | NEEDS_WORK               | prompts phase レビュー 2 回目 (spec-reviewer subagent): 前回 3 指摘の解消を確認、prompts 自己完結性 / 正本境界含む主要観点は PASS。残指摘はメタ情報同期のみ — ステータス注記が prompts 生成前の未来形、変更履歴に prompts 生成 / 指摘対応のエントリ欠落 [minor×2]                                                                                                                                               | 対応済み。ステータスを「prompts 生成済み」へ更新し、変更履歴にエントリを追加                                                                                                                                                                                                                             |
 | 2026-07-08 | **PASS**                 | prompts phase レビュー 3 回目 (spec-reviewer subagent、最終確認): 前回のメタ情報同期 2 件の解消を確認。メタ情報 / phase 表 / レビュー表 / 変更履歴 / 本文の間に新たな不整合なし。全 7 観点 PASS (prompts 自己完結性: 必須 10 セクション・antipatterns 注入・探索誘発表現なし・命名規則準拠を再確認)                                                                                                             | 完了。実装フェーズ (P1_01 から直列実行) へ進める                                                                                                                                                                                                                                                         |
+| 2026-07-10 | 対応済み                 | 実装レビュー (code-review 8 観点並列): コアの正確性は健全。二重走査の統一、Neighbors の契約明文化、テストギャップ 2 件、testing.md 規約違反 2 件等に対応。詳細は `review.md` の Implementation Review                                                                                                                                                                                                           | 対応済み (commit c581250)                                                                                                                                                                                                                                                                                |
+| 2026-07-10 | 対応済み                 | PR #17 multi-agent review (claude/codex/cursor × コード/文書 2 chunk): コードは codex/cursor が NO FINDINGS。文書で [medium×3] `maxDepth=0` self-loop 例外の同期漏れ (spec Testing/テスト観点・prompts P2/P3)、[medium×2] Design Doc feature 一覧の未更新、context/testing.md の 2 層 E2E 未反映、feature doc テスト観点の frontier cross edge 欠落、メタ情報同期 [low×3] を検出                                | 対応済み。全反映先を同期                                                                                                                                                                                                                                                                                 |
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                                                                                                                                                                                                                    |
-| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-08 | Claude | prompts phase レビュー指摘に対応。P4 の fixture 慣行をインライン化し参照 path を明示、上位文書整合の sync 記述を「反映済み」へ同期、生成済み prompts 一覧表を実装分割へ追加                                                                                 |
-| 2026-07-08 | Claude | 実装 prompts を生成 (P1_01 graph view / P2_01 探索 API / P3_01 result モデル / P4_01 E2E fixture の 4 件、直列依存)                                                                                                                                         |
-| 2026-07-08 | Claude | `spec-sync` を実行。Design Doc (Open Questions Q4 解決済み化、S1/S2 測定方法補足) / feature doc (`design/features/traversal/DesignDoc_traversal.md` 新規作成、D1-D6 の durable 判断を反映し正本ハンドオフ) / context (`context/testing.md` E2E 補足) へ反映 |
-| 2026-07-08 | Claude | spec-review 6 回目で 3/3 エージェント全会一致 PASS。ステータスを `Done` に更新し phase 11 を完了。次 phase `spec-sync` へ進める                                                                                                                             |
-| 2026-07-08 | Claude | spec-review 5 回目の同期指摘に対応。メタ情報 / 論点テーブル D2 決定欄 / 実装分割 P3 を D6 後の契約に同期し、Flowchart への minDepth 正確性注記と内部訪問順序の white-box 検証を明記                                                                         |
-| 2026-07-08 | Claude | D6 (合流と循環の区別) を新設し解決。到達集合を minDepth + 誘導部分グラフで定義、`cycle` を SCC 注釈へ精密化し、spec-review 4 回目の指摘 (探索木 edge 方式の順序依存性) に対応                                                                               |
-| 2026-07-08 | Claude | `multi-agent-review` skill の指摘 (BFS/DFS 順序 vs 順序なし集合モデルの矛盾、depth 境界の意味論、S1/S2 到達集合の包含規則、空 graph の status 等) に対応し Reuse Policy / Interface / Performance / Flowchart / Error / テスト観点を修正                    |
-| 2026-07-08 | Claude | multi-agent review 3 回目で PASS。phase 3 / Design Doc 更新要否サマリに S1/S2 分界を明記し phase 11 を完了に更新                                                                                                                                            |
-| 2026-07-08 | Claude | multi-agent review 2 回目の指摘に対応し `## 上位文書整合` / `## 上位資料からの変更点` に S1/S2 測定方法の分界を注記                                                                                                                                         |
-| 2026-07-08 | Claude | multi-agent review 指摘に対応し成功条件 / 実装分割の E2E 検証範囲を Traversal 結果レベルに統一                                                                                                                                                              |
-| 2026-07-08 | Codex  | spec-review 指摘に対応し Design Doc 更新要否と phase 状態を同期                                                                                                                                                                                             |
-| 2026-07-08 | Codex  | spec-review の NEEDS_WORK 結果を記録                                                                                                                                                                                                                        |
-| 2026-07-07 | Codex  | D5 起点メソッド不在を空結果 + status として解決                                                                                                                                                                                                             |
-| 2026-07-07 | Codex  | D4 探索結果モデルを到達 node 集合 + edge 集合として解決                                                                                                                                                                                                     |
-| 2026-07-07 | Codex  | D3 深さ上限を任意 option、未指定時は無制限として解決                                                                                                                                                                                                        |
-| 2026-07-07 | Codex  | D2 循環 / 再帰の打ち切り条件を訪問済み node の再展開抑止と `cycle` cutoff として解決                                                                                                                                                                        |
-| 2026-07-07 | Codex  | D1 探索順序を API option、既定 BFS として解決                                                                                                                                                                                                               |
-| 2026-07-07 | Codex  | requirements から初期 spec を作成                                                                                                                                                                                                                           |
+| 日付       | 変更者 | 変更内容                                                                                                                                                                                                                                                     |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-10 | Claude | PR #17 multi-agent review の指摘に対応。`maxDepth=0` self-loop 例外を Testing / テスト観点 / prompts P2-P3 へ同期、Design Doc feature 一覧を更新、context/testing.md を 2 層 E2E に同期、feature doc テスト観点に frontier cross edge を追加、メタ情報を同期 |
+| 2026-07-10 | Claude | 実装 P1-P4 完了 (graph view / 探索 API / result モデル / E2E fixture)。実装レビュー (8 観点並列) の指摘対応を含む。記録は `review.md` の Implementation Review                                                                                               |
+| 2026-07-08 | Claude | prompts phase レビュー指摘に対応。P4 の fixture 慣行をインライン化し参照 path を明示、上位文書整合の sync 記述を「反映済み」へ同期、生成済み prompts 一覧表を実装分割へ追加                                                                                  |
+| 2026-07-08 | Claude | 実装 prompts を生成 (P1_01 graph view / P2_01 探索 API / P3_01 result モデル / P4_01 E2E fixture の 4 件、直列依存)                                                                                                                                          |
+| 2026-07-08 | Claude | `spec-sync` を実行。Design Doc (Open Questions Q4 解決済み化、S1/S2 測定方法補足) / feature doc (`design/features/traversal/DesignDoc_traversal.md` 新規作成、D1-D6 の durable 判断を反映し正本ハンドオフ) / context (`context/testing.md` E2E 補足) へ反映  |
+| 2026-07-08 | Claude | spec-review 6 回目で 3/3 エージェント全会一致 PASS。ステータスを `Done` に更新し phase 11 を完了。次 phase `spec-sync` へ進める                                                                                                                              |
+| 2026-07-08 | Claude | spec-review 5 回目の同期指摘に対応。メタ情報 / 論点テーブル D2 決定欄 / 実装分割 P3 を D6 後の契約に同期し、Flowchart への minDepth 正確性注記と内部訪問順序の white-box 検証を明記                                                                          |
+| 2026-07-08 | Claude | D6 (合流と循環の区別) を新設し解決。到達集合を minDepth + 誘導部分グラフで定義、`cycle` を SCC 注釈へ精密化し、spec-review 4 回目の指摘 (探索木 edge 方式の順序依存性) に対応                                                                                |
+| 2026-07-08 | Claude | `multi-agent-review` skill の指摘 (BFS/DFS 順序 vs 順序なし集合モデルの矛盾、depth 境界の意味論、S1/S2 到達集合の包含規則、空 graph の status 等) に対応し Reuse Policy / Interface / Performance / Flowchart / Error / テスト観点を修正                     |
+| 2026-07-08 | Claude | multi-agent review 3 回目で PASS。phase 3 / Design Doc 更新要否サマリに S1/S2 分界を明記し phase 11 を完了に更新                                                                                                                                             |
+| 2026-07-08 | Claude | multi-agent review 2 回目の指摘に対応し `## 上位文書整合` / `## 上位資料からの変更点` に S1/S2 測定方法の分界を注記                                                                                                                                          |
+| 2026-07-08 | Claude | multi-agent review 指摘に対応し成功条件 / 実装分割の E2E 検証範囲を Traversal 結果レベルに統一                                                                                                                                                               |
+| 2026-07-08 | Codex  | spec-review 指摘に対応し Design Doc 更新要否と phase 状態を同期                                                                                                                                                                                              |
+| 2026-07-08 | Codex  | spec-review の NEEDS_WORK 結果を記録                                                                                                                                                                                                                         |
+| 2026-07-07 | Codex  | D5 起点メソッド不在を空結果 + status として解決                                                                                                                                                                                                              |
+| 2026-07-07 | Codex  | D4 探索結果モデルを到達 node 集合 + edge 集合として解決                                                                                                                                                                                                      |
+| 2026-07-07 | Codex  | D3 深さ上限を任意 option、未指定時は無制限として解決                                                                                                                                                                                                         |
+| 2026-07-07 | Codex  | D2 循環 / 再帰の打ち切り条件を訪問済み node の再展開抑止と `cycle` cutoff として解決                                                                                                                                                                         |
+| 2026-07-07 | Codex  | D1 探索順序を API option、既定 BFS として解決                                                                                                                                                                                                                |
+| 2026-07-07 | Codex  | requirements から初期 spec を作成                                                                                                                                                                                                                            |
 
 ## 備考
 

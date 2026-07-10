@@ -364,3 +364,29 @@ P1-P4 実装 diff (+1696 行) を 8 観点 (line-scan / removed-behavior / cross
 - fixture loader の共有 test helper 化 → 新規共有インフラの導入はスコープ外 (将来 3 例目が出たら検討)。
 - E2E loader での Builder 利用 → loader は意図的に raw API を使う (fixture の node 一覧を正とし、auto-registration で誤りを隠さない)。
 - minDepths / visitOrder の walk 骨格共通化 → 過剰抽象のリスクが利得を上回る。
+
+---
+
+## PR #17 Multi-agent Review 2026-07-10 (multi-agent-review skill, 3 agents × 2 chunks)
+
+PR 全体差分を実装コード (chunk 1: core/ + testdata/fixtures/) と設計文書 (chunk 2: specs/ + design/ + context/) に分割し、claude / codex / cursor へ並列委譲。生成物 (provider 設定 194 ファイル、正本は sdd-template) はレビュー対象外。出力: `20260710-224947` 配下。
+
+| agent  | chunk 1 (code) | chunk 2 (docs)    |
+| ------ | -------------- | ----------------- |
+| claude | low ×2         | medium ×2, low ×2 |
+| codex  | NO FINDINGS    | medium ×3, low ×1 |
+| cursor | NO FINDINGS    | medium ×4, low ×2 |
+
+### 統合指摘と対応
+
+- [medium ×3] spec の Testing / テスト観点と prompts P2/P3 の `maxDepth=0` 記述に self-loop 例外が未反映 (実装レビュー時に Interface 節と feature doc のみ精密化し、他の記載箇所を見落とし) → **対応済み**: 全 5 箇所を feature doc の例外付き定義に統一。
+- [medium ×2] `design/DesignDoc.md` の feature 一覧で Caller / Callee 探索が「(未作成) / 未着手」のまま → **対応済み**: リンク + 完了に更新。
+- [medium ×1] `context/testing.md` の E2E runtime contract が Java/Spring repo 前提のままで Traversal 層 graph fixture と不整合 → **対応済み**: 2 層 (Traversal 層 fixture / CLI 層) に分けて記述。
+- [medium ×1] feature doc のテスト観点に frontier 間 cross edge が未記載 → **対応済み**: テスト観点に追加 (self-loop 境界ケースも同期)。
+- [low ×3] メタ情報未同期 (phase 3/11 備考の spec-sync 前表現、feature doc 表の「未作成」行、実装レビュー以降の変更履歴 / 更新日) → **対応済み**。
+
+### 見送った指摘 (理由付き)
+
+- [low ×1, by claude] `minDepths` が maxDepth を無視して全到達域を BFS する (cutoff の targetMinDepth は常に maxDepth+1 で確定するため maxDepth+1 で打ち切り可能) → 正当な最適化候補だが未合意 (×1) かつ観測可能な問題が未発生のため、性能計測 (spec の「大規模 graph budget は後続計測」) と併せて後続対応とする。
+- [low ×1, by claude] `visitOrder` が production 経路から未使用 → D1 の決定 (Order 意味論の保持) に基づく設計判断済み。godoc に役割を明記済み。
+- [low ×1, by codex] 変更履歴の D2 旧表記「`cycle` cutoff」 → 履歴は当時の決定の正確な記録であり改変しない (D6 での精密化も履歴に記録済み)。

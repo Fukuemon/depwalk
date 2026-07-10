@@ -1,6 +1,6 @@
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-> 最終更新: 2026-07-08 / Status: 完了
+> 最終更新: 2026-07-10 / Status: 完了
 
 Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯と issue 単位の作業記録は [spec #6](../../../specs/6-traversal/) を参照する。
 
@@ -137,7 +137,8 @@ sequenceDiagram
 - 自己再帰 / 相互再帰 (SCC) を含む graph で、閉路を構成する edge が `cycle` 注釈を持ちつつ到達 edge 集合にも含まれること。
 - 合流 (ダイヤモンド型) graph で、同一 node への複数経路の edge がすべて到達 edge 集合に含まれ、`cycle` と誤標識されないこと。
 - BFS / DFS のどちらを指定しても、到達 node / edge 集合・`cycle` 注釈・`depthLimit` cutoff の内容が同一であること (順序非依存性)。
-- 深さ上限指定時に `minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として記録できること (`maxDepth=0` の境界ケースを含む)。
+- 深さ上限指定時に `minDepth <= maxDepth` の node を到達集合に含め、`minDepth > maxDepth` の node への edge を `depthLimit` cutoff として記録できること (`maxDepth=0` で起点への self-loop が誘導 edge + `cycle` 注釈として残る境界ケースを含む)。
+- 両端が `maxDepth` ちょうどの到達 node を結ぶ frontier 間 cross edge (探索木の edge でないもの) が誘導 edge として到達 edge 集合に含まれること。
 - 起点メソッドが存在しない場合、および Graph が空の場合に panic せず空結果 + `startNotFound` status を返すこと。
 - Traversal が Analyzer 実装や Output format に依存しないこと。
 

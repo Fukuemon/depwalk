@@ -197,7 +197,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 | Feature                             | 文書                                                                                        | 状態   |
 | ----------------------------------- | ------------------------------------------------------------------------------------------- | ------ |
-| Caller / Callee 探索                | (未作成)                                                                                    | 未着手 |
+| Caller / Callee 探索                | [DesignDoc_traversal.md](features/traversal/DesignDoc_traversal.md)                         | 完了   |
 | 出力形式 (Console/JSON/DOT/Mermaid) | (未作成)                                                                                    | 未着手 |
 | Analyzer Protocol / SPI             | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了   |
 | Java Analyzer                       | (未作成)                                                                                    | 未着手 |
