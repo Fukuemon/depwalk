@@ -196,22 +196,31 @@ func TestTraverseNodesIdenticalForBFSAndDFS(t *testing.T) {
 		Edge("edge:bm", "method:b", "method:m").
 		Build()
 
-	for _, maxDepth := range []*int{nil, intPtr(2)} {
-		bfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: maxDepth, Order: OrderBFS})
-		if err != nil {
-			t.Fatalf("Traverse(bfs) returned error: %v", err)
-		}
-		dfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: maxDepth, Order: OrderDFS})
-		if err != nil {
-			t.Fatalf("Traverse(dfs) returned error: %v", err)
-		}
-		if len(bfs.Nodes) != len(dfs.Nodes) {
-			t.Fatalf("node set size differs: bfs=%v dfs=%v", bfs.Nodes, dfs.Nodes)
-		}
-		for id := range bfs.Nodes {
-			if !dfs.Nodes[id] {
-				t.Errorf("dfs result missing %q present in bfs result", id)
+	cases := []struct {
+		name     string
+		maxDepth *int
+	}{
+		{name: "unlimited depth", maxDepth: nil},
+		{name: "maxDepth 2", maxDepth: intPtr(2)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderBFS})
+			if err != nil {
+				t.Fatalf("Traverse(bfs) returned error: %v", err)
 			}
-		}
+			dfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderDFS})
+			if err != nil {
+				t.Fatalf("Traverse(dfs) returned error: %v", err)
+			}
+			if len(bfs.Nodes) != len(dfs.Nodes) {
+				t.Fatalf("node set size differs: bfs=%v dfs=%v", bfs.Nodes, dfs.Nodes)
+			}
+			for id := range bfs.Nodes {
+				if !dfs.Nodes[id] {
+					t.Errorf("dfs result missing %q present in bfs result", id)
+				}
+			}
+		})
 	}
 }

@@ -142,6 +142,28 @@ func TestResultMaxDepthZeroCutsAllAdjacentEdges(t *testing.T) {
 	}
 }
 
+func TestResultMaxDepthZeroKeepsStartSelfLoopAsCycleEdge(t *testing.T) {
+	// A self-loop on the start node has both endpoints reached even at
+	// maxDepth 0, so it stays in the induced edge set with a cycle
+	// annotation instead of becoming a depth cutoff.
+	g := graph.NewBuilder().
+		Edge("edge:aa", "method:a", "method:a").
+		Edge("edge:ab", "method:a", "method:b").
+		Build()
+
+	res := mustTraverse(t, g, Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
+
+	if _, ok := res.Edges["edge:aa"]; !ok {
+		t.Error("self-loop edge:aa excluded from Edges, want included (both endpoints reached)")
+	}
+	if !res.Cycles["edge:aa"] {
+		t.Error("self-loop edge:aa not annotated as cycle")
+	}
+	if _, ok := res.DepthCutoffs["edge:ab"]; !ok {
+		t.Error("edge:ab not recorded as depthLimit cutoff")
+	}
+}
+
 func TestResultNoDepthCutoffsWhenUnlimited(t *testing.T) {
 	res := mustTraverse(t, linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
@@ -188,41 +210,50 @@ func TestResultIdenticalForBFSAndDFS(t *testing.T) {
 		Edge("edge:md", "method:m", "method:d").
 		Build()
 
-	for _, maxDepth := range []*int{nil, intPtr(2)} {
-		bfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: maxDepth, Order: OrderBFS})
-		dfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: maxDepth, Order: OrderDFS})
+	cases := []struct {
+		name     string
+		maxDepth *int
+	}{
+		{name: "unlimited depth", maxDepth: nil},
+		{name: "maxDepth 2", maxDepth: intPtr(2)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderBFS})
+			dfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderDFS})
 
-		if len(bfs.Nodes) != len(dfs.Nodes) {
-			t.Fatalf("node sets differ: bfs=%v dfs=%v", bfs.Nodes, dfs.Nodes)
-		}
-		for id := range bfs.Nodes {
-			if !dfs.Nodes[id] {
-				t.Errorf("dfs Nodes missing %q", id)
+			if len(bfs.Nodes) != len(dfs.Nodes) {
+				t.Fatalf("node sets differ: bfs=%v dfs=%v", bfs.Nodes, dfs.Nodes)
 			}
-		}
-		if len(bfs.Edges) != len(dfs.Edges) {
-			t.Fatalf("edge sets differ: bfs=%v dfs=%v", edgeIDs(bfs), edgeIDs(dfs))
-		}
-		for id := range bfs.Edges {
-			if _, ok := dfs.Edges[id]; !ok {
-				t.Errorf("dfs Edges missing %q", id)
+			for id := range bfs.Nodes {
+				if !dfs.Nodes[id] {
+					t.Errorf("dfs Nodes missing %q", id)
+				}
 			}
-		}
-		if len(bfs.Cycles) != len(dfs.Cycles) {
-			t.Fatalf("cycle sets differ: bfs=%v dfs=%v", bfs.Cycles, dfs.Cycles)
-		}
-		for id := range bfs.Cycles {
-			if !dfs.Cycles[id] {
-				t.Errorf("dfs Cycles missing %q", id)
+			if len(bfs.Edges) != len(dfs.Edges) {
+				t.Fatalf("edge sets differ: bfs=%v dfs=%v", edgeIDs(bfs), edgeIDs(dfs))
 			}
-		}
-		if len(bfs.DepthCutoffs) != len(dfs.DepthCutoffs) {
-			t.Fatalf("cutoff sets differ: bfs=%v dfs=%v", bfs.DepthCutoffs, dfs.DepthCutoffs)
-		}
-		for id, cut := range bfs.DepthCutoffs {
-			if dfs.DepthCutoffs[id] != cut {
-				t.Errorf("dfs DepthCutoffs[%q] = %+v, want %+v", id, dfs.DepthCutoffs[id], cut)
+			for id := range bfs.Edges {
+				if _, ok := dfs.Edges[id]; !ok {
+					t.Errorf("dfs Edges missing %q", id)
+				}
 			}
-		}
+			if len(bfs.Cycles) != len(dfs.Cycles) {
+				t.Fatalf("cycle sets differ: bfs=%v dfs=%v", bfs.Cycles, dfs.Cycles)
+			}
+			for id := range bfs.Cycles {
+				if !dfs.Cycles[id] {
+					t.Errorf("dfs Cycles missing %q", id)
+				}
+			}
+			if len(bfs.DepthCutoffs) != len(dfs.DepthCutoffs) {
+				t.Fatalf("cutoff sets differ: bfs=%v dfs=%v", bfs.DepthCutoffs, dfs.DepthCutoffs)
+			}
+			for id, cut := range bfs.DepthCutoffs {
+				if dfs.DepthCutoffs[id] != cut {
+					t.Errorf("dfs DepthCutoffs[%q] = %+v, want %+v", id, dfs.DepthCutoffs[id], cut)
+				}
+			}
+		})
 	}
 }

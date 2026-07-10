@@ -80,9 +80,17 @@ type DepthCutoff struct {
 }
 
 // Traverse runs one traversal over g and returns the reached induced
-// subgraph. Invalid request options fail before any walk; a missing
-// start node yields an empty [Result] with [StatusStartNotFound]
-// instead of an error.
+// subgraph. Invalid request options fail before any walk with the
+// zero-value [Result], which must not be used; a missing start node
+// yields an empty [Result] with [StatusStartNotFound] instead of an
+// error.
+//
+// The reached set is derived from a single shortest-distance walk
+// ([minDepths]) because the contract defines it order-independently:
+// deriving it from any other walk could only agree or silently diverge.
+// The Order option is therefore validated but does not alter the walk;
+// its BFS / DFS semantics live in [visitOrder] for consumers that need
+// an ordered expansion (kept per spec D1 for future tree-style output).
 func Traverse(g *graph.Graph, req Request) (Result, error) {
 	if err := validate(req); err != nil {
 		return Result{}, err
@@ -97,24 +105,13 @@ func Traverse(g *graph.Graph, req Request) (Result, error) {
 		}, nil
 	}
 
-	visited := visitOrder(g, req.StartID, req.Direction, req.Order)
-	nodes := make(map[string]bool, len(visited))
-	var depths map[string]int
-	if req.MaxDepth == nil {
-		for _, id := range visited {
-			nodes[id] = true
+	depths := minDepths(g, req.StartID, req.Direction)
+	nodes := make(map[string]bool, len(depths))
+	for id, d := range depths {
+		if req.MaxDepth != nil && d > *req.MaxDepth {
+			continue
 		}
-	} else {
-		// The depth limit is defined over minDepth (shortest distance),
-		// so a DFS walk that reaches a node the long way around cannot
-		// exclude it.
-		depths = minDepths(g, req.StartID, req.Direction)
-		for _, id := range visited {
-			if depths[id] > *req.MaxDepth {
-				continue
-			}
-			nodes[id] = true
-		}
+		nodes[id] = true
 	}
 	return buildResult(g, req.Direction, nodes, depths), nil
 }

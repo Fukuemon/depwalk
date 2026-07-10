@@ -15,6 +15,7 @@ func sccComponents(nodes map[string]bool, adjacency map[string][]string) map[str
 
 	type frame struct {
 		node     string
+		edges    []string
 		nextEdge int
 	}
 
@@ -27,14 +28,14 @@ func sccComponents(nodes map[string]bool, adjacency map[string][]string) map[str
 		nextIndex++
 		stack = append(stack, root)
 		onStack[root] = true
-		frames := []frame{{node: root}}
+		frames := []frame{{node: root, edges: adjacency[root]}}
 
 		for len(frames) > 0 {
 			top := len(frames) - 1
 			node := frames[top].node
 
-			if frames[top].nextEdge < len(adjacency[node]) {
-				next := adjacency[node][frames[top].nextEdge]
+			if frames[top].nextEdge < len(frames[top].edges) {
+				next := frames[top].edges[frames[top].nextEdge]
 				frames[top].nextEdge++
 				if _, seen := index[next]; !seen {
 					index[next] = nextIndex
@@ -42,7 +43,7 @@ func sccComponents(nodes map[string]bool, adjacency map[string][]string) map[str
 					nextIndex++
 					stack = append(stack, next)
 					onStack[next] = true
-					frames = append(frames, frame{node: next})
+					frames = append(frames, frame{node: next, edges: adjacency[next]})
 				} else if onStack[next] && index[next] < lowlink[node] {
 					lowlink[node] = index[next]
 				}

@@ -5,12 +5,10 @@ import "github.com/Fukuemon/depwalk/core/internal/graph"
 // buildResult classifies every edge adjacent to a reached node into the
 // induced edge set or a depth cutoff, then annotates cycle edges. The
 // classification depends only on the reached node set and minDepth, so
-// the result is identical for any visit order.
-//
-// depths may be nil when the traversal ran without a depth limit; in
-// that case every adjacent node is reached and no cutoff is recorded.
+// the result is identical for any visit order. depths must cover every
+// reachable node (as returned by [minDepths]).
 func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, depths map[string]int) Result {
-	edges := map[string]graph.Edge{}
+	edges := make(map[string]graph.Edge, len(nodes))
 	cutoffs := map[string]DepthCutoff{}
 	for id := range nodes {
 		for _, e := range g.Neighbors(id, dir) {
@@ -38,7 +36,7 @@ func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, dep
 // does). Convergent (diamond) edges connect distinct components and are
 // never annotated.
 func cycleEdges(nodes map[string]bool, edges map[string]graph.Edge) map[string]bool {
-	adjacency := map[string][]string{}
+	adjacency := make(map[string][]string, len(nodes))
 	for _, e := range edges {
 		adjacency[e.CallerID] = append(adjacency[e.CallerID], e.CalleeID)
 	}
