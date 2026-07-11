@@ -10,7 +10,9 @@ import "github.com/Fukuemon/depwalk/core/internal/graph"
 func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, depths map[string]int) Result {
 	edges := make(map[string]graph.Edge, len(nodes))
 	cutoffs := map[string]DepthCutoff{}
+	reachedDepths := make(map[string]int, len(nodes))
 	for id := range nodes {
+		reachedDepths[id] = depths[id]
 		for _, e := range g.Neighbors(id, dir) {
 			next := nextNode(e, dir)
 			if nodes[next] {
@@ -24,6 +26,7 @@ func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, dep
 	return Result{
 		Status:       StatusOK,
 		Nodes:        nodes,
+		Depths:       reachedDepths,
 		Edges:        edges,
 		Cycles:       cycleEdges(nodes, edges),
 		DepthCutoffs: cutoffs,
