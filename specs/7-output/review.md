@@ -362,3 +362,17 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 44. **[blocking] `traversal.Direction` という型は実在しない** — 正しくは `graph.Direction` (`core/internal/graph/graph.go:13` の `type Direction string`。`traversal.Request.Direction` も `graph.Direction` 型)。前回の修正で 5 箇所 (feature doc / D6 スナップショット / P2_01 / P3_01 / P3_02) すべてに実在しない型名が入っていた → 5 箇所とも `graph.Direction` へ修正。
 45. **[blocking] `NodeView` に `MinDepth int` が無い** — JSON の `nodes[].minDepth` が `Formatter.Format(w, v View)` 境界を通過できず、P3_02 は「traversal.Result から埋める」という Formatter が `View` 以外に依存する誤った記述になっていた (41 と同型の欠陥) → `NodeView` に `MinDepth int` を追加し、`P2_01` の View 構築ステップで `traversal.Result` の minDepth を引き継ぐことを明記。`CutoffView.TargetMinDepth` も同時に確認 (既存で正しく定義済み)。
 46. **[minor] P3_02 の `depthCutoffs[]` の出力元記述が `traversal.DepthCutoff` を指している** — Formatter は `View.Cutoffs[]` を読むだけでよいところ、`traversal` package の型を直接参照する記述が残っていた → 出力元を `View.Cutoffs[]` の各 field に書き換え、`traversal` 型への参照を削除。
+
+## Review 2026-07-11 (phase: tasks gate / 3 回目)
+
+Verdict: **PASS** — tasks gate 通過。
+
+指摘 44-46 の解消を確認 (`graph.Direction` への型名修正、`NodeView.MinDepth` 追加、P3_02 の出力元記述の `View.Cutoffs[]` への統一)。前回作成した View 境界の全数対応表を Console / JSON の全出力項目と再突合し、欠けがないことを確認した。加えて今回は prompts 5 本に登場する全ての型名・関数名・field 名を実装 (`core/internal/graph` / `core/internal/traversal`) と全数突合し、実在しない識別子がないことを確認した。絶対ガード 10 セクション (必須セクション / 命名規約 / antipatterns 注入 / 検証コマンド / 依存表など) の回帰も無い。
+
+### 非ブロッキング指摘と対応
+
+- **[non-blocking] `NodeView.MinDepth` のコメントが `Result.MinDepth` という実在しない field を指していた** (feature doc のみ、他 3 箇所は `Result の minDepth` と表記) → 「`Result の minDepth` を View 構築時に引き継ぐ」に統一し、4 箇所を byte 一致にした。
+- **[non-blocking] P3_01 に 2 箇所、実在しないアクセス経路 `View.EdgeView.Cycle` が残存していた** (正しくは `View.Edges[].Cycle`。`EdgeView` は型名であり `View` の field ではない) → `View.Edges[].Cycle` に修正。
+- **[non-blocking] feature doc の tree 構築規則 2 / 6 が `Result.Edges` / `Result.Cycles` を直接参照し、「Formatter は View 以外に依存しない」という同 doc の記述と表記がねじれていた** → 規則 2 は「誘導 edge 集合 (`View.Edges`)」、規則 6 は「`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない」と、Formatter が View 経由で読む前提が伝わる表記に揃えた (規則の意味は変更していない)。
+
+次アクション: phase 8 (最終レビュー) へ進める。

@@ -88,7 +88,7 @@ type NodeView struct {
     QualifiedName string
     Signature     string
     Source        *protocol.SourceLocation // nil なら位置情報なし
-    MinDepth      int                      // 起点からの最短距離。Result.MinDepth を View 構築時に引き継ぐ
+    MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
 }
 
 // EdgeView は 1 edge の Formatter 向け表現。
@@ -170,11 +170,11 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 #### tree 構築規則
 
 1. **root** = 起点 node。
-2. **子** = 誘導 edge 集合 (`Result.Edges`) を探索方向に辿った先の node。caller 方向なら子は「呼び出し元」、callee 方向なら「呼び出し先」。
+2. **子** = 誘導 edge 集合 (`View.Edges`) を探索方向に辿った先の node。caller 方向なら子は「呼び出し元」、callee 方向なら「呼び出し先」。
 3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力の決定性を担保)。
 4. **展開順序** = 上記順序の pre-order DFS。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む)。これにより self-loop も規則 6 の `(cycle)` になり、root の self-loop で root が再展開されることもない。
 5. **初出のみ展開** = 部分木を展開するのは tree 中で最初に出現したときの 1 回のみ。出力行数は O(到達 edge 数) に収まり、**停止性はこの規則だけで保証される**。
-6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`Result.Cycles` は使わない** (`Result.Cycles` は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られ node が tree から消える):
+6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない** (この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られ node が tree から消える):
    - **`(cycle)`** = 現在の経路上の祖先に戻る edge (back edge) の先。
    - **`(既出)`** = 祖先ではないが、別の枝で展開済みの node (合流)。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の到達側 endpoint の子として、**子の最後に** 1 行出す。N はその node からの cutoff edge 数。cutoff 先 (`targetMethodId`) は到達集合外のため名前を出さない。
