@@ -7,7 +7,7 @@
 ## メタ情報
 
 - Issue: `#7`
-- ステータス: `Draft`
+- ステータス: `In Progress` (phase: clarify 完了。phase: diagram / track / sync / tasks が残る)
 - 作成日: 2026-07-11
 - 更新日: 2026-07-11
 - Branch: `feature/7`
@@ -17,19 +17,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                   |
-| --- | --------------------------- | ---------- | ---------- | ---------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                        |
-| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS       |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし  |
-| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                       |
-| 5   | 論点解決                    | 進行中     | 2026-07-11 | D1 / D2 (= Q3) / D3 解決済み。D4-D7 が未決。D3 が traversal へ変更提案 |
-| 6   | Interface / Routing 設計    | 未着手     |            | Formatter I/F は D1 / D6 の決定に依存                                  |
-| 7   | Content / Data 設計         | 未着手     |            | JSON schema は D3 の決定に依存                                         |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                        |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                        |
-| 10  | 実装分割                    | 未着手     |            |                                                                        |
-| 11  | レビュー済                  | 未着手     |            |                                                                        |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                  |
+| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                       |
+| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS      |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし |
+| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                      |
+| 5   | 論点解決                    | 完了       | 2026-07-11 | D1-D7 をすべて解決 (D2 = Q3)。D3 / D7 が upstream へ変更提案          |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-11 | Formatter interface + 共有 View を確定 (D1 / D5 / D6)                 |
+| 7   | Content / Data 設計         | 完了       | 2026-07-11 | JSON schema / 版管理 / graph の symbol 値型を確定 (D1 / D3)           |
+| 8   | Performance / Security 設計 | 完了       | 2026-07-11 | 逐次書き出し。streaming 機構は導入しない (D6)                         |
+| 9   | Test / Metrics 設計         | 完了       | 2026-07-11 | golden + パース検証を unit 層に (D7)                                  |
+| 10  | 実装分割                    | 未着手     |            |                                                                       |
+| 11  | レビュー済                  | 未着手     |            |                                                                       |
 
 ## 上位文書整合
 
@@ -91,7 +91,7 @@
 - 探索ロジック (→ `traversal` / #6 で確定済み)。
 - 解析・Model schema の定義 (→ `analyzer-protocol` / #8 で確定済み)。
 - CLI の引数名 (`--format` 等)、exit code、エラーメッセージ表示 (→ CLI interface spec。本 spec は Output Engine が返す値までを責務とし、プロセス終了コードには関与しない)。
-- DOT / Mermaid の実装 (Phase4)。本 spec は I/F 方針までを確定する。
+- DOT / Mermaid の実装、および具体構文 (ノード形状 / 色 / 線種) の確定 (Phase4 spec)。本 spec は Formatter interface と表現すべき意味の要件 (G-1〜G-7) までを確定する (D4)。
 - 出力のファイル書き出し / 出力先の決定 (Output Engine は `io.Writer` へ書く。宛先の選択は CLI の責務)。
 
 ## 要件の解釈
@@ -117,11 +117,11 @@
 EARS 風で振る舞いを記述する。
 
 - WHEN 呼び出し側が Traversal result と出力形式を指定して Output Engine を呼ぶ時、システムは指定形式の出力を `io.Writer` へ書き出す。
-- WHEN format が `console` の時、システムは起点メソッドを根とするツリーを、深さ・循環・深さ上限打ち切りが読み取れる形で出力する。
-- WHEN format が `json` の時、システムは schemaVersion を含む機械可読な JSON を、決定的な要素順序で出力する。
-- IF Traversal result の status が `startNotFound` の時、システムは各形式で「該当なし」を明示する (エラーとして扱わない)。
-- IF 到達集合が起点のみで edge が空の時、システムは各形式で空グラフを表現する。
-- IF 未対応の format が指定された時、システムは出力を行わずエラーを返す (対応形式を案内する。プロセス exit code は CLI の責務)。
+- WHEN format が `console` の時、システムは起点メソッドを根とするツリーを出力し、再登場した node には `(既出)`、閉路を構成する edge の先には `(cycle)`、深さ上限で切られた枝には `… (depth limit: N)` を付ける (D2)。
+- WHEN format が `json` の時、システムは `schemaVersion` / `status` / `direction` / `start` / `nodes[]` / `edges[]` / `depthCutoffs[]` を持つ JSON を、id の辞書順で出力する (D3)。
+- IF Traversal result の status が `startNotFound` の時、システムは各形式で「該当なし」を明示し、`error` を返さない (D5)。
+- IF 到達集合が起点のみで edge が空の時、システムは Console で `(呼び出し元なし)` / `(呼び出し先なし)` を、JSON で起点 1 件 + 空の `edges` を出力する (D5)。
+- IF 未対応の format が指定された時、システムは出力を一切書き出さずに `error` を返す (対応形式を案内する。プロセス exit code は CLI の責務) (D5)。
 - THE SYSTEM SHALL 同一の Traversal result に対して常に同一のバイト列を出力する (到達集合が順序非保証であっても、出力は決定的にする)。
 
 ## 設計時の論点
@@ -133,10 +133,10 @@ EARS 風で振る舞いを記述する。
 | D1  | Output が表示する symbol 情報 (`qualifiedName` / `signature` / `sourceLocation` / `callSite`) の受け渡し経路。現行 `graph.Node` は `methodId` のみ持つ | (a) `graph` に固有の値型で保持し Output は Graph から引く / (b) `graph.Node` に `protocol.MethodSymbol` (wire DTO) をそのまま埋める / (c) methodId のみ表示                       | **決定 (a)** |
 | D2  | **Q3**: Console ツリー表現。到達集合 (非 tree) から tree を組む際の、深さ表示・循環参照・`depthLimit` cutoff・合流 (同一 node 複数経路) の見せ方       | 罫線ツリー + **初出のみ展開** (`(既出)` 参照印) / 循環は `(cycle)` で打ち切り / cutoff は `… (depth limit: N)` / 深さラベルなし / 子行は `callSite`、root は宣言位置              | **決定**     |
 | D3  | JSON 出力スキーマと版管理。フィールド構成、`schemaVersion` の採番系 (Analyzer Protocol の `schemaVersion` と同一系統か独立か)、後方互換方針、要素順序  | フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`)。node に `minDepth` を持つ (**traversal 契約の拡張が必要**)。版は Protocol と独立 / additive 互換。順序は id の辞書順 | **決定**     |
-| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                 | (a) 共通 Formatter interface のみ定め、DOT / Mermaid の構文詳細は Phase4 spec へ送る / (b) 構文まで本 spec で確定する                                                             | 未決         |
-| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)                | `startNotFound` と空グラフは**正常系**として各形式で表現、未対応 format は Output API の呼び出し前 validation エラー。exit code は CLI spec                                       | 未決         |
-| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                       | `Format(w io.Writer, r traversal.Result, opts) error` 相当の interface + format ごとの実装。全件メモリ構築か逐次書き出しか                                                        | 未決         |
-| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                               | unit: 各 formatter の出力を golden 比較 / E2E: 生成した JSON を `encoding/json` で、DOT / Mermaid を構文パースで検証。golden の置き場所は `testdata/`                             | 未決         |
+| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                 | 共通 Formatter interface + 「各形式が表現すべき意味」を要件として確定する。具体構文 (ノード形状 / 色 / 線種) は Phase4 spec へ送る                                                | **決定**     |
+| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)                | `startNotFound` と到達なしは**正常系**として各形式で明示。Output が `error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ。exit code / 表示は CLI spec                   | **決定**     |
+| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                       | `Formatter.Format(w io.Writer, v View) error` + 全形式が共有する中間表現 `View` (symbol 解決済み / sort 済み)。入力は Graph + Result + **Request**。streaming 機構は導入しない    | **決定**     |
+| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                               | golden file test + パース検証を **unit 層**に置く。golden は `core/internal/output/testdata/golden/`。S3 は Output 層と CLI 層の 2 層照合 (context/testing.md へ補足)             | **決定**     |
 
 ## 解決済みの論点
 
@@ -267,15 +267,127 @@ UserService.findById(Long)  [UserService.java:42]
 - tree 形式にすると、Console と同じ `(既出)` / `(cycle)` の打ち切りが機械処理側に漏れ出し、利用者が「この node は本当に葉なのか、参照印なのか」を判定する羽目になる。
 - `minDepth` を含めることで、「直接の呼び出し元だけ抽出 (`minDepth == 1`)」のような典型的な後処理が JSON 単体で完結する。
 
-**上位文書への影響 (変更提案)**: `minDepth` を出力するには `traversal.Result` が node ごとの最短距離を公開する必要がある。現行の `Result.Nodes` は `map[string]bool` で深さを公開していない (深さは内部計算のみ)。これは #6 で確定した Traversal result 契約の拡張であり、[traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) への **変更提案** として phase: sync で反映する (`## 上位資料からの変更点 > feature doc への影響`)。追加は additive (既存の到達集合・`cycle`・`depthLimit` の意味論を変えない) であり、#6 の決定を上書きしない。
+**上位文書への影響 (変更提案)**: `minDepth` を出力するには `traversal.Result` が node ごとの最短距離を公開する必要がある。現行の `Result.Nodes` は `map[string]bool` で深さを公開していない (深さは `minDepths()` の内部計算のみ)。これは #6 で確定した Traversal result 契約の拡張であり、[traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) への **変更提案** として phase: sync で反映する (`## 上位資料からの変更点 > feature doc への影響`)。追加は additive (既存の到達集合・`cycle`・`depthLimit` の意味論を変えない) であり、#6 の決定を上書きしない。
+
+### D4: DOT / Mermaid は interface + 意味要件までを本 spec で確定する (2026-07-11 決定)
+
+**決定**: 本 spec では **共通 Formatter interface** と、**各形式が表現できなければならない意味 (以下の要件)** までを確定する。ノード形状 / 色 / 線種といった具体構文は **Phase4 spec** に送る。
+
+#### DOT / Mermaid が表現すべき意味 (Phase4 実装が満たす要件)
+
+| #   | 要件                                                                                                             | 由来                                                   |
+| --- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| G-1 | 到達 node 集合と到達 edge 集合を、グラフとしてそのまま描ける (tree に潰さない)                                   | DOT / Mermaid はグラフ形式。合流も循環もそのまま描ける |
+| G-2 | 起点 node を他と区別できる                                                                                       | 調査の基点が読み取れること                             |
+| G-3 | `cycle` 注釈付き edge を他の edge と区別できる                                                                   | E1 / Traversal の `cycle` 注釈                         |
+| G-4 | `depthLimit` cutoff がある node に「続きがある」ことを示せる (cutoff 先の node は到達集合外のため名前は出せない) | E2 / Traversal の `depthLimit` cutoff                  |
+| G-5 | node ラベルは `qualifiedName` + `signature` (Console と同じ語彙)                                                 | D1 / D2                                                |
+| G-6 | 同一 Result から常に同一のバイト列を出力する (要素順序は id の辞書順)                                            | 決定性 (Console / JSON と同じ規約)                     |
+| G-7 | 外部ツール (Graphviz / Mermaid レンダラ) がパース可能な構文であること                                            | S3 / Non Goals (ビューワは提供しない)                  |
+
+**理由**:
+
+- issue #7 の完了条件は「DOT/Mermaid 出力 I/F の方針が確定 (実装は Phase4)」であり、構文の確定までは求めていない。
+- 本 feature で I/F を設計する目的は「Phase4 で Output Engine の構造を作り直さずに済むこと」にある。そのためには **interface が cycle / cutoff / 起点を表現可能な情報を Formatter に渡せているか**が要点であり、構文そのものは後から決めても構造に影響しない。上表を要件として固定することで、interface の手直しリスクを潰しつつ Phase4 の裁量を残す。
+- Console と違い DOT / Mermaid は**グラフ形式なので tree 化が不要**である (合流も循環も構文上そのまま表現できる)。D2 の tree 構築規則は Console 専用であり、DOT / Mermaid には適用しない。
+
+### D5: 該当なしは全形式で正常系として表現し、Output が返すエラーは 2 種類に限る (2026-07-11 決定)
+
+**決定**: `startNotFound` と「到達なし (起点のみ)」は **正常系**として各形式で明示する。Output Engine が `error` を返すのは **未対応 format** と **書き込み失敗** の 2 つだけとする。
+
+#### 各ケースの扱い
+
+| ケース                            | Console                                                              | JSON                                                   | DOT / Mermaid          | 戻り値  |
+| --------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------- | ------- |
+| 起点不在 (`status=startNotFound`) | `該当なし: 起点メソッドが解析結果に存在しません (<start>)`           | `status: "startNotFound"` + `nodes` / `edges` は空配列 | 空グラフの有効構文     | `nil`   |
+| 到達なし (起点のみ、edge が空)    | root 行 + `└─ (呼び出し元なし)` (callee 方向では `(呼び出し先なし)`) | `nodes` に起点 1 件、`edges` は空配列                  | 起点 node のみのグラフ | `nil`   |
+| 未対応 format 指定                | —                                                                    | —                                                      | —                      | `error` |
+| `io.Writer` への書き込み失敗      | —                                                                    | —                                                      | —                      | `error` |
+
+- **未対応 format** は出力を一切書き出す前に validation で弾く (`requirements.md` V1)。エラーは対応形式を案内する内容とする。
+- **exit code / エラーメッセージの表示先 (stdout / stderr)** は Output Engine の責務ではない。Output は `error` を返すところまでを担い、プロセス終了コードと表示は **CLI interface spec** に委ねる (`## スコープ > やらないこと`)。
+
+**理由**:
+
+- Traversal Engine は `startNotFound` を「エラーではなく正常な no-match の結果」と定義している (`core/internal/traversal/traversal.go` の `StatusStartNotFound`)。Output でこれをエラーに格上げすると、上流の契約と矛盾する。
+- JSON を消費する CI は、該当なしの場合も**パース可能な文書**を受け取れる必要がある。エラーや空出力にすると、CI 側が「該当なし」と「ツールが壊れた」を区別できない。
+- 「到達なし」と「起点不在」は利用者にとって意味が異なる (前者は起点が存在し呼び出し関係がない、後者は起点自体が解析結果にない)。Console でも両者を区別できる文言にする。
+
+### D6: Formatter interface + 全形式が共有する中間表現 (View) (2026-07-11 決定)
+
+**決定**: `Graph` / `traversal.Result` / `traversal.Request` から、**symbol 解決済み・sort 済みの中間表現 (`View`)** を 1 度だけ構築し、各 Formatter は `View` を描画する。streaming 機構は導入せず、`io.Writer` へ逐次書き出す。
+
+```go
+// core/internal/output
+type Input struct {
+    Graph   *graph.Graph
+    Result  traversal.Result
+    Request traversal.Request // direction / start を持つ
+}
+
+// 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
+type View struct {
+    Status  traversal.Status
+    Start   NodeView
+    Nodes   []NodeView   // sorted
+    Edges   []EdgeView   // sorted。Cycle flag を持つ
+    Cutoffs []CutoffView // sorted
+}
+
+type Formatter interface {
+    Format(w io.Writer, v View) error
+}
+```
+
+- **`traversal.Request` を入力に含める**理由: `traversal.Result` は `direction` / `start` を保持しない (`Status` / `Nodes` / `Edges` / `Cycles` / `DepthCutoffs` のみ)。D3 の JSON はこの 2 つを出力するため、Output 側で Request を受け取る必要がある。
+- **sort 規則の所在**: `View` の構築時に、`Nodes` / `Edges` / `Cutoffs` を id (`methodId` / `edgeId`) の辞書順に固定する。これが JSON / DOT / Mermaid の要素順序 (D3 / D4 G-6) をそのまま満たす。Console の兄弟順序だけは `qualifiedName` → `signature` → `methodId` 順 (D2) であり、これは Console formatter が `View` を読み替えて適用する (`View` は決定的な基準順序を与え、Console はその上で表示順を定める)。
+- **tree 化は Console formatter 内に閉じる** (D2)。`View` は tree を持たない。
+- **性能**: graph は既に全体がメモリ上にあり、出力サイズは到達集合に比例する。`View` の構築コストは sort が支配的 (O(n log n)) で、graph 規模に対して支配的にならない。逐次書き出しで足り、専用の streaming API は導入しない。
+
+**理由**:
+
+- symbol 引き (D1) と決定的な sort (D3 / D4 G-6) は 4 つの formatter すべてが必要とする。各 formatter に実装させると同じ規約を 4 箇所で守ることになり、どれか 1 つが sort を忘れるとその形式だけ非決定的になる。`View` に集約すれば決定性の規約が 1 本化される。
+- Phase4 で DOT / Mermaid を追加するとき、実装すべきは `Formatter` 1 つであり、`View` の構築や symbol 解決を再実装しなくてよい (I/F を作り直さない = D4 / issue #7 の完了条件)。
+
+### D7: golden file test + パース検証を unit 層に置く (2026-07-11 決定)
+
+**決定**: 各 formatter の出力を **golden file と比較する unit test** で担保し、S3 の「パース可否」も unit 層で検証する。golden は Go 標準の package-local `testdata/` (`core/internal/output/testdata/golden/`) に置く。CLI 引数レベルの E2E 照合は CLI interface spec 完了後に完成させる。
+
+```text
+core/internal/output/
+  console_test.go
+  json_test.go
+  testdata/
+    golden/
+      console_cycle.txt
+      console_diamond.txt
+      console_depth_limit.txt
+      console_start_not_found.txt
+      json_cycle.json
+      ...
+```
+
+- **golden で担保するもの**: 書式 (D2 の Console 罫線 / 標識、D3 の JSON schema) と **決定性** (同一 Result から常に同一のバイト列 = `## 要件の解釈` の `THE SYSTEM SHALL`)。決定性は golden 比較で自然に検出できる (sort を忘れると golden が不安定になる)。
+- **S3 のパース可否**: JSON は `encoding/json` で unmarshal できることを unit test で検証する。DOT / Mermaid は Phase4 実装時に同層で構文検証を追加する (D4 G-7)。
+- **fixture のケース**: 循環 (self-loop / 相互再帰) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし / `startNotFound` を最低限そろえる (`## 機能仕様 > Testing` の観点に対応)。
+- **既存規約との整合**: [context/testing.md](../../context/testing.md) の「Golden fixture は `testdata/` 配下に置く」に従う。`go-cmp` は初期導入しない方針のため、golden 比較は文字列比較で行う。テストは仕様単位の `Test...` 関数に分ける (巨大な table-driven に異なる仕様を混ぜない)。
+
+**S1/S2 と同じ 2 層構造 (context への補足が必要)**: `context/testing.md` は S3 (各出力形式のパース可否) を「サンプル Java/Spring repo による E2E」に位置づけているが、CLI 層の E2E は CLI interface spec 完了後にしか完成しない。したがって S3 の照合は **Output 層 (本 spec の unit / golden、formatter が Traversal result から各形式を生成できること)** と **CLI 層 (CLI 出力そのものの照合)** の 2 層からなる。これは #6 が S1/S2 で採った分界と同じ構造であり、phase: sync で `context/testing.md` に補足する。
+
+**理由**:
+
+- D2 / D3 / D6 はいずれも「同一 Result から常に同一のバイト列」を受け入れ基準に含む。golden 比較はこの基準を直接検証できる唯一の手段であり、部分一致アサーションでは sort 忘れを検出できない。
+- Output は Traversal result という**純粋な入力から文字列を生成する関数**であり、外部依存を持たない。unit 層で完全に検証でき、E2E に持ち上げる必要がない。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- **D3 が Traversal result 契約への変更提案を含む** (`minDepth` の公開)。spec 単独で閉じないため、phase: sync で [traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) へ反映するまで、この変更提案は未反映のまま残る。
-- D4-D7 が未決 (D1 / D2 / D3 は 2026-07-11 に解決済み)。**決定者: Fukuemon / 期限: Phase1 設計時 (本 spec の phase: clarify)**。phase: clarify で 1 件ずつ確定する (D2 = Design Doc Open Question Q3 の管理を引き継ぐ。`requirements.md` の Q3 と決定者 / 期限を揃える)。
-- CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化する)。
+- **論点 D1-D7 はすべて解決済み** (2026-07-11、決定者: Fukuemon)。Design Doc Open Question Q3 は D2 で解決した。
+- **未反映の変更提案が 2 件残っている** (phase: sync で反映するまで未解決扱い):
+  - `traversal.Result` が node ごとの `minDepth` を公開する ([traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) / D3)。additive な拡張で #6 の決定は上書きしない。
+  - S3 の照合が Output 層と CLI 層の 2 層からなる ([context/testing.md](../../context/testing.md) / D7)。
+- CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化済み)。これは本 spec 内では解決不能な依存であり、下流 phase を止める未決事項ではない。
 
 ## 実装対象
 
@@ -307,8 +419,8 @@ UserService.findById(Long)  [UserService.java:42]
 
 ### Performance
 
-- 大規模グラフでも実用時間で出力できること (`requirements.md` 非機能)。具体的な budget と streaming 要否は D6 で決める。
-- 出力の決定性 (要素順序の固定) のためのソートコストは、グラフ規模に対して支配的にならない範囲に収める。
+- 大規模グラフでも実用時間で出力できること (`requirements.md` 非機能)。graph は既に全体がメモリ上にあり、出力サイズは到達集合に比例するため、`io.Writer` への逐次書き出しで足りる。**専用の streaming 機構は導入しない** (D6)。
+- 出力の決定性 (要素順序の固定) のためのソートは `View` 構築時の 1 回に集約し (O(n log n))、グラフ規模に対して支配的にならない (D6)。
 
 ### Routing / URL State
 
@@ -345,9 +457,12 @@ UserService.findById(Long)  [UserService.java:42]
 ### UI / API / Event Interface
 
 - Output Engine の入力は **Graph と Traversal result の 2 つ**に確定 (D1)。symbol は Graph の読み取り API から引くため、symbol table を第 3 引数として渡さない。
-- Formatter の interface 形状 (シグネチャ / 出力先 / options) は D6 で確定する。format の受け付けと未対応 format の扱いは D5 で確定する。
+- **Formatter interface**: `Formatter.Format(w io.Writer, v View) error`。入力は `Graph` + `traversal.Result` + `traversal.Request` (= `Input`) で、そこから symbol 解決済み・sort 済みの中間表現 `View` を 1 度構築し、各 formatter が描画する (D6 で確定。型は `## 解決済みの論点 > D6`)。
+- Output が `error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ。`startNotFound` / 到達なしは正常系として各形式で表現する (D5)。exit code と表示は CLI の責務。
 - **Console 出力**: 罫線ツリー / 初出のみ展開 / `(既出)` / `(cycle)` / `… (depth limit: N)` / 子行は `callSite`、root は宣言位置 (D2 で確定。tree 構築規則と書式の詳細は `## 解決済みの論点 > D2`)。
 - Console の tree 化は Output Engine 内に閉じる。Traversal は tree を保持しないため、tree 構築を Traversal 側へ押し戻さない。
+- **JSON 出力**: フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`)。node は `minDepth` を持つ (D3 で確定。schema は `## 解決済みの論点 > D3`)。
+- **DOT / Mermaid 出力 (Phase4 実装)**: 本 spec では Formatter interface と「表現すべき意味」の要件 (G-1〜G-7) までを確定し、具体構文は Phase4 spec に送る (D4)。tree 化は行わず、到達 graph をそのまま描く。
 
 ### Props / Request / Response
 
@@ -403,13 +518,13 @@ UserService.findById(Long)  [UserService.java:42]
 
 ### エラーケース
 
-| #   | ケース                               | ユーザーへの見せ方                                                                 | リカバリ                             |
-| --- | ------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ |
-| E1  | 循環参照を含むグラフ                 | Console は閉路の先を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3) | 正常系。無限展開させない (D2 で確定) |
-| E2  | 空グラフ / 起点のみ (edge が空)      | 各形式で空グラフを明示                                                             | 正常系 (D5)                          |
-| E3  | 起点不在 (`status = startNotFound`)  | 各形式で「該当なし」を明示                                                         | 正常系。エラーにしない (D5)          |
-| E4  | 未対応 format 指定                   | 対応形式を案内するエラーを返す                                                     | 出力前に拒否 (V1 / D5)               |
-| E5  | 出力先への書き込み失敗 (`io.Writer`) | 呼び出し側へエラーを返す                                                           | CLI 側で報告 (D5 で境界を明文化)     |
+| #   | ケース                               | ユーザーへの見せ方                                                                               | リカバリ                             |
+| --- | ------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| E1  | 循環参照を含むグラフ                 | Console は閉路の先を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3)               | 正常系。無限展開させない (D2 で確定) |
+| E2  | 到達なし (起点のみ、edge が空)       | Console は root 行 + `(呼び出し元なし)` / `(呼び出し先なし)`、JSON は起点 1 件 + 空 `edges`      | 正常系。`error` を返さない (D5)      |
+| E3  | 起点不在 (`status = startNotFound`)  | Console は `該当なし: 起点メソッドが解析結果に存在しません (<start>)`、JSON は `status` + 空配列 | 正常系。`error` を返さない (D5)      |
+| E4  | 未対応 format 指定                   | 対応形式を案内する `error` を返す (出力は一切書き出さない)                                       | 出力前に validation で拒否 (V1 / D5) |
+| E5  | 出力先への書き込み失敗 (`io.Writer`) | `error` を返す                                                                                   | 表示 / exit code は CLI の責務 (D5)  |
 
 ### Fallback
 
@@ -419,11 +534,15 @@ UserService.findById(Long)  [UserService.java:42]
 
 ### テスト観点
 
-- (D7 決定後に具体化。現時点の候補は「Testing」節を参照)
+- **unit (golden)**: 各 formatter の出力を golden file と比較する (`core/internal/output/testdata/golden/`)。書式 (D2 / D3) と決定性 (同一 Result → 同一バイト列) を同時に担保する。
+- **fixture ケース**: 循環 (self-loop / 相互再帰) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし / `startNotFound`。
+- **パース可否 (S3)**: JSON は `encoding/json` で unmarshal 可能であること。DOT / Mermaid の構文検証は Phase4 で同層に追加する。
+- **エラー境界 (D5)**: 未対応 format が出力を書き出す前に `error` になること。`startNotFound` / 到達なしが `error` にならないこと。
+- 詳細な観点は `## 機能仕様 > Testing` を参照。横断規約は [context/testing.md](../../context/testing.md)。
 
 ### 計測指標
 
-- S3: 各形式でパース / レンダリング可能な出力が得られること。
+- S3: 各形式でパース / レンダリング可能な出力が得られること。**Output 層 (本 spec の unit / golden) と CLI 層 (CLI interface spec 後) の 2 層で照合する** (D7)。
 
 ## フロー / シーケンス
 
@@ -481,10 +600,10 @@ sequenceDiagram
 
 ### context への影響
 
-| 対象 doc / 節                              | 変更内容                                                                                                                                                              | 理由                                                  |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `context/architecture.md` Package Boundary | (予定) Graph Engine が node / edge の表示用属性 (`Symbol` / `CallSite`) を保持し、wire record → 値型の変換を graph 構築時に行う旨を補足 <!-- source: clarify (D1) --> | D1 で確定。依存方向 (Graph Engine → Model) 自体は不変 |
-| `context/testing.md`                       | (D7 次第) golden file test を導入する場合、test 方針へ追記                                                                                                            | D7 の決定に従属                                       |
+| 対象 doc / 節                              | 変更内容                                                                                                                                                                                                   | 理由                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `context/architecture.md` Package Boundary | (予定) Graph Engine が node / edge の表示用属性 (`Symbol` / `CallSite`) を保持し、wire record → 値型の変換を graph 構築時に行う旨を補足 <!-- source: clarify (D1) -->                                      | D1 で確定。依存方向 (Graph Engine → Model) 自体は不変 |
+| `context/testing.md` E2E (照合) 行         | (予定) S3 (各出力形式のパース可否) が **Output 層照合** (本 spec の unit / golden) と **CLI 出力照合** の 2 層からなり、CLI 層は CLI interface spec 完了後に完成する旨を補足 <!-- source: clarify (D7) --> | D7 で確定。#6 が S1/S2 で採った分界と同じ構造         |
 
 ### ADR の新規 / 更新
 
@@ -502,13 +621,14 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                                                                        |
-| ---------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| 2026-07-11 | Fukuemon | phase: scaffold で初版作成 (上位文書突合 + D1-D7 列挙)                                                          |
-| 2026-07-11 | Fukuemon | scaffold gate の spec-review で PASS。未確定事項に決定者 / 期限を追記                                           |
-| 2026-07-11 | Fukuemon | phase: clarify で D1 (symbol 情報の受け渡し経路) を決定                                                         |
-| 2026-07-11 | Fukuemon | phase: clarify で D2 (= Design Doc Q3。Console ツリー表現) を決定                                               |
-| 2026-07-11 | Fukuemon | phase: clarify で D3 (JSON schema / 版管理) を決定。traversal feature doc への変更提案 (`minDepth` 公開) が発生 |
+| 日付       | 変更者   | 変更内容                                                                                                                                     |
+| ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | Fukuemon | phase: scaffold で初版作成 (上位文書突合 + D1-D7 列挙)                                                                                       |
+| 2026-07-11 | Fukuemon | scaffold gate の spec-review で PASS。未確定事項に決定者 / 期限を追記                                                                        |
+| 2026-07-11 | Fukuemon | phase: clarify で D1 (symbol 情報の受け渡し経路) を決定                                                                                      |
+| 2026-07-11 | Fukuemon | phase: clarify で D2 (= Design Doc Q3。Console ツリー表現) を決定                                                                            |
+| 2026-07-11 | Fukuemon | phase: clarify で D3 (JSON schema / 版管理) を決定。traversal feature doc への変更提案 (`minDepth` 公開) が発生                              |
+| 2026-07-11 | Fukuemon | phase: clarify で D4 (DOT/Mermaid I/F) / D5 (エラー境界) / D6 (Formatter interface + View) / D7 (テスト境界) を決定。論点 D1-D7 がすべて解決 |
 
 ## 備考
 
