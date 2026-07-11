@@ -591,7 +591,7 @@ D6 で確定。詳細は `## 機能仕様 > Performance` と `## 解決済みの
 ### テスト観点
 
 - **unit (golden)**: 各 formatter の出力を golden file と比較する (`core/internal/output/testdata/golden/`)。書式 (D2 / D3) と決定性 (同一 Result → 同一バイト列) を同時に担保する。
-- **fixture ケース**: 循環 (self-loop / 相互再帰) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし / `startNotFound`。
+- **fixture ケース**: 正本は `## 解決済みの論点 > D7` の一覧 (二重管理を避けるため本節では再掲しない)。`maxDepth=0` 系と 3 要素 SCC の回帰ケースを含む。
 - **パース可否 (S3)**: JSON は `encoding/json` で unmarshal 可能であること。DOT / Mermaid の構文検証は Phase4 で同層に追加する。
 - **エラー境界 (D5)**: 未対応 format が出力を書き出す前に `error` になること。`startNotFound` / 到達なしが `error` にならないこと。
 - 詳細な観点は `## 機能仕様 > Testing` を参照。横断規約は [context/testing.md](../../context/testing.md)。
@@ -639,7 +639,7 @@ flowchart TD
     S{"View.Status は"} -- "startNotFound" --> S1["該当なし: 起点メソッドが解析結果に存在しません (start)<br/>tree は組まない (D5)"]
     S -- "ok" --> A["root = 起点 node を出力<br/>(位置は宣言位置 Symbol.Source)"]
     A --> A2{"到達 edge があるか"}
-    A2 -- "No" --> A4{"cutoff があるか<br/>(maxDepth=0 では起点の隣接 edge が<br/>すべて cutoff になる)"}
+    A2 -- "No" --> A4{"cutoff があるか<br/>(maxDepth=0 では起点の隣接 edge が cutoff になる。<br/>起点 self-loop は誘導 edge として残るため A2 = Yes)"}
     A4 -- "No" --> A3["(呼び出し元なし) / (呼び出し先なし) を出力<br/>= 到達なし (D5)"]
     A4 -- "Yes" --> B
     A2 -- "Yes" --> B["visit(node = root, 祖先集合 = {}, 展開済み = {})"]
@@ -763,6 +763,7 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 1 回目) | blocking 2 件: ①Flowchart 2 で祖先集合の初期化が抜け self-loop が `(既出)` になり root が二重展開 ②sequence の `Format(w, Input)` が D6 と signature 不一致 (= format 検証 / View 構築 / Formatter 選択を担う entry point が未定義)。他 moderate 1 / minor 2                                     | ①D2 規則 4 に「visit 入口で自分を展開済み / 祖先集合に入れる」を明記し図と回帰テスト観点を追加 ②D6 に公開 entry point `output.Write(w, format, Input)` を追加 (ユーザー承認済み) ③`startNotFound` / 到達なしが Formatter を迂回しない形に修正 ④cutoff 行の位置を明記 ⑤minDepth の変更提案注記を追加 |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 2 回目) | 1 回目の指摘は全件解消を確認。新規 blocking 1 件: `maxDepth=0` で `Edges` は空だが `Cutoffs` が非空になるため、「到達なし」を `Edges` 空だけで判定すると誤って `(呼び出し元なし)` を出力し、規則 7 の cutoff 行も出ない (規則 7 と規則 8 が矛盾)                                                 | 「到達なし」を **`Edges` 空 かつ `Cutoffs` 空** に狭め、EARS / D5 表 / E2・E2' / D2 規則 8 / Flowchart 2 を統一。D7 に `maxDepth=0` と `maxDepth=0 + 起点 self-loop` の fixture を追加                                                                                                              |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 3 回目) | 2 回目の修正自体は実装照合で正しいと確認 (4 境界ケース)。blocking 1 件: **修正の適用漏れ** — Formatter の分岐条件が「`Edges` 空だけ」のまま D6 / Interface 設計 / Flowchart 1 の 4 箇所に残存し、実装者が最初に読む場所で誤出力が再現しうる。minor: 「すべて cutoff」が self-loop 例外と食い違う | 4 箇所を `View.Status` / `Edges` / **`Cutoffs`** の 3 条件に統一 (grep で残存ゼロを確認)。self-loop 例外を上位 feature doc と一致させた                                                                                                                                                             |
+| 2026-07-11 | NEEDS_WORK (phase: diagram / 4 回目) | 述語の統一は解消を確認 (全数突合)。適用漏れ 2 件: ①Flowchart 2 の A4 に「すべて cutoff」が残存 ②`## テスト / 評価方針` の fixture 一覧が D7 より古く、`maxDepth=0` の回帰テストが tasks から落ちる恐れ                                                                                           | ①図の注記を本文と同じ述語に修正 ②fixture の列挙をやめ **D7 への参照 1 行に置き換え**、二重管理を解消 (3 回続いた「片方だけ直す」の根本対処)                                                                                                                                                         |
 
 ## 変更履歴
 
@@ -780,6 +781,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | diagram gate の指摘に対応: D2 規則 4 に visit 入口の初期化を明記 (self-loop / root 二重展開の修正)、D6 に公開 entry point `output.Write` を追加、図を本文と一致させた                      |
 | 2026-07-11 | Fukuemon | diagram gate 2 回目の指摘に対応: 「到達なし」の判定を `Edges` 空 かつ `Cutoffs` 空に狭め、`maxDepth=0` の誤出力 (`(呼び出し元なし)`) を修正 (D2 規則 8 / D5 / D7)                          |
 | 2026-07-11 | Fukuemon | diagram gate 3 回目の指摘に対応: Formatter の分岐条件を `Status` / `Edges` / `Cutoffs` の 3 条件に統一 (適用漏れ 4 箇所)、self-loop 例外を上位 doc と一致                                  |
+| 2026-07-11 | Fukuemon | diagram gate 4 回目の指摘に対応: Flowchart 2 の self-loop 例外を修正し、fixture 一覧を D7 への参照に置き換えて二重管理を解消                                                               |
 
 ## 備考
 
