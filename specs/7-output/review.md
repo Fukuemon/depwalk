@@ -261,3 +261,15 @@ Verdict: **PASS** — track gate 通過。
 ### 次アクション
 
 phase: sync へ進んでよい。
+
+## Review 2026-07-11 (phase: sync gate / 1 回目)
+
+Verdict: **NEEDS_WORK**
+
+**上位文書への反映は全 11 行を実文書と全数突合し、意味の変質なし・反映漏れ / 過剰反映ゼロと確認された** (Design Doc の Q3 / S3 / 依存先 / C4 図 / feature 一覧、graph・output feature doc の型定義〜fixture の述語レベル一致、traversal の `minDepth`、README 索引、context 2 件)。ハンドオフの本体 (spec 冒頭の降格宣言 / snapshot blockquote / feature doc 側の決定経緯逆リンク) も正しい。残ったのは **spec 内の「正本」呼称の残存 3 件** (用語規約違反)。
+
+### 指摘と対応
+
+32. **[blocking] `## スコープ > やること` に「Q3 の正本」が残存** — 降格宣言は「解決済みの論点**以下**」を対象としており、それより前のスコープ節が対象外。output feature doc が「以後本 doc を正本とする」と宣言済みのため二重正本状態だった → 「Q3 の解 (durable 正本は sync で Output feature doc へハンドオフ済み)」へ言い換え。
+33. **[minor] 「fixture ケースの正本は D7」が snapshot 宣言と衝突** (2 箇所) → durable 正本は Output feature doc のテスト観点、spec 内は決定経緯、と言い分け。
+34. **[minor] 「CLI interface spec (…の正本)」** — 用語規約上 spec を「正本」と呼ばない → 「決定先」へ言い換え。
