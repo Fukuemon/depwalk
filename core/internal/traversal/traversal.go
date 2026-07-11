@@ -57,6 +57,9 @@ type Result struct {
 	// Nodes is the reached node ID set (minDepth <= maxDepth), including
 	// the start node.
 	Nodes map[string]bool
+	// Depths maps each reached node ID to its shortest distance from the
+	// start node. It has the same keys as Nodes.
+	Depths map[string]int
 	// Edges is the induced subgraph: every edge in the traversal
 	// direction whose both endpoints are reached, including convergent
 	// and cycle edges.
@@ -99,6 +102,7 @@ func Traverse(g *graph.Graph, req Request) (Result, error) {
 		return Result{
 			Status:       StatusStartNotFound,
 			Nodes:        map[string]bool{},
+			Depths:       map[string]int{},
 			Edges:        map[string]graph.Edge{},
 			Cycles:       map[string]bool{},
 			DepthCutoffs: map[string]DepthCutoff{},
