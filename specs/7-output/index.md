@@ -35,11 +35,10 @@
 
 正本 (PRD ※本プロダクトは統合モードのため未作成、Why/What は [Design Doc](../../design/DesignDoc.md) に統合 / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
-- PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
-- Design Doc 更新要否: 要 (**反映内容の正本は `## 上位資料からの変更点 > Design Doc への影響`**。本節では再掲しない — 二重列挙による片側更新漏れを避けるため)
-
 > **本節の役割**: 下表は「**確認した上位文書と、その整合方針 (継承 / 補足 / 変更提案)**」の記録であり、**phase: sync で実施する作業の網羅リストではない**。sync 作業の唯一の正本は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群とする (同じ規範を 2 箇所に列挙して片方だけ更新される drift を避けるため)。
 
+- PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
+- Design Doc 更新要否: 要 (反映内容の正本は `## 上位資料からの変更点 > Design Doc への影響`)
 - ADR 起票要否: 不要 (D1-D7 はいずれも既存の Core package 境界 (ADR-0002) と Protocol 判断 (ADR-0001) の範囲内。依存先の追加は Core 内の依存方向の明文化であり、ADR-0002 の判断を覆さない)
 
 | 上位文書    | 節 / 該当箇所                                                                                                                 | 整合方針 (継承 / 補足 / 変更提案)                      |
@@ -436,7 +435,7 @@ core/internal/output/
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
 - **論点 D1-D7 はすべて解決済み** (2026-07-11、決定者: Fukuemon)。Design Doc Open Question Q3 は D2 で解決した。
-- **上位文書への反映がすべて未実行** (phase: sync で反映するまで未解決扱い)。**反映対象の唯一の正本は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群**であり、件数や内訳を本節で再掲しない (二重列挙による片側更新漏れを避けるため)。要点だけ記すと、durable 成果の正本は新規 feature doc 2 本 (graph = D1 / output = D2-D7) へハンドオフし、上位文書側は Q3 の解決・Output → Traversal 依存の明文化・`minDepth` の公開・S3 の 2 層照合を反映する。
+- **上位文書への反映がすべて未実行** (phase: sync で反映するまで未解決扱い)。**反映対象の唯一の正本は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群**であり、件数・内訳・要点を本節で再掲しない (二重列挙による片側更新漏れを避けるため)。
 - CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化済み)。これは本 spec 内では解決不能な依存であり、下流 phase を止める未決事項ではない。
 
 ## 実装対象
@@ -778,6 +777,7 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (phase: track / 1 回目)   | blocking 1: Design Doc 成功条件 S3 の 2 層照合の反映行が欠落 (#6 は S1/S2 で Design Doc と testing.md の両方を更新済みで非対称)。moderate 1: D1 (graph の symbol 値型) の正本を output feature doc に置くのは不適切 (graph model は Traversal も読む横断モデル)。minor 1: ラベル不整合                                           | ①Design Doc への S3 行を追加し整合ラベルを変更提案に ②**`design/features/graph/DesignDoc_graph.md` を新設**して D1 の正本を持たせる (ユーザー判断)。output feature doc は D2-D7 の正本に ③変更提案を 4 件に統一                                                                                     |
 | 2026-07-11 | NEEDS_WORK (phase: track / 2 回目)   | 1 回目の指摘は本体対応を確認。正本の振り分けも「二重正本なし」と評価。blocking 1: `## 上位文書整合` の要約行が旧 3 件のままで、S3 と Graph Engine 行の追加が未反映 (**diagram gate で 3 回踏んだ二重列挙パターンの再発**)。minor 2: ステータス語彙の 2 軸混在 / `design/features/README.md` の索引更新が sync 作業として導けない | ①要約行の列挙を廃止し**変更点テーブルへの参照 1 行**に置換 (根本対処) ②節冒頭にステータス規約を明示し `(予定)` を全廃 ③README 索引の行を追加 (stale な traversal も同時に登録)                                                                                                                      |
 | 2026-07-11 | NEEDS_WORK (phase: track / 3 回目)   | 上位文書との矛盾ゼロ / 二重正本なし / ADR 判定妥当 / sync 作業の導出可能性を確認。blocking 1: `## 上位文書整合` **テーブル本体**が変更点テーブルの第 2 列挙として残り 2 行乖離 (**二重列挙パターン 5 回目**)。moderate 1: 未確定事項の「4 件」が第 3 列挙                                                                        | **根本対処**: 各列挙箇所に役割と正本を明記。整合テーブルを「確認記録」に限定し、**sync 作業の網羅リストは変更点テーブル 1 本を唯一の正本**と宣言。未確定事項の件数・内訳の再掲を廃止し参照に降格。欠落 2 行も追加                                                                                   |
+| 2026-07-11 | **PASS** (phase: track / 4 回目)     | 全観点 PASS。整合テーブル 13 行と変更点テーブルを全数マッピングし**片側にしかない行はゼロ**。二重列挙は構造的に解消と判断。sync 作業は変更点テーブルのみから漏れなく導ける。二重正本なし                                                                                                                                         | 非ブロッキング 2 件 (未確定事項の「要点」の残り火 / blockquote の位置) を反映。phase: sync へ進める                                                                                                                                                                                                 |
 
 ## 変更履歴
 
@@ -801,6 +801,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | track gate の指摘に対応: Design Doc S3 の 2 層照合を反映先に追加、D1 の正本を新設 `design/features/graph/DesignDoc_graph.md` に確定 (output feature doc は D2-D7 の正本)、変更提案を 4 件に統一 |
 | 2026-07-11 | Fukuemon | track gate 2 回目の指摘に対応: 上位文書整合の要約行を変更点テーブルへの参照に置換、ステータス規約を明示 (`(予定)` 全廃)、README 索引の更新を sync 作業に追加                                    |
 | 2026-07-11 | Fukuemon | track gate 3 回目の指摘に対応: 整合テーブルを「確認記録」に限定し、sync 作業の正本を変更点テーブル 1 本に確定 (二重列挙の根本対処)                                                              |
+| 2026-07-11 | Fukuemon | track gate 4 回目で **PASS**。未確定事項の「要点」再掲を参照に純化し、二重列挙の残り火を除去                                                                                                    |
 
 ## 備考
 
