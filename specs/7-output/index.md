@@ -7,7 +7,7 @@
 ## メタ情報
 
 - Issue: `#7`
-- ステータス: `In Progress` (phase: clarify / diagram / track / sync 完了。phase: tasks が残る)
+- ステータス: `In Progress` (phase: clarify / diagram / track / sync / tasks 完了。実装 prompts 5 件を生成済み。最終レビュー (phase: review) 待ち)
 - 作成日: 2026-07-11
 - 更新日: 2026-07-11
 - Branch: `feature/7`
@@ -28,7 +28,7 @@
 | 7   | Content / Data 設計         | レビュー済 | 2026-07-11 | JSON schema / 版管理 / graph の symbol 値型を確定 (D1 / D3)                |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-07-11 | 逐次書き出し。streaming 機構は導入しない (D6)                              |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-07-11 | golden + パース検証を unit 層に (D7)                                       |
-| 10  | 実装分割                    | 未着手     |            |                                                                            |
+| 10  | 実装分割                    | 完了       | 2026-07-11 | prompts 5 件を生成 (P1 並列 2 + P2 + P3 並列 2)                            |
 | 11  | レビュー済                  | 未着手     |            |                                                                            |
 
 ## 上位文書整合
@@ -704,15 +704,22 @@ sequenceDiagram
 
 ### 実装タスク案
 
-(phase: tasks で確定)
+| Phase | 対象        | 概要                                                                                                                                                                                 | 依存                   |
+| ----- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| P1    | `core`      | [`P1_01_core_graph-symbol.md`](prompts/P1_01_core_graph-symbol.md): `graph.Symbol` / `Node.Symbol` / `Edge.CallSite` の追加、wire → graph 値型の変換関数、test builder 対応 (D1)     | なし                   |
+| P1    | `traversal` | [`P1_02_traversal_min-depth.md`](prompts/P1_02_traversal_min-depth.md): `traversal.Result` の node ごとの `minDepth` 公開 (additive、D3 の変更提案)                                  | なし (P1_01 と並列可)  |
+| P2    | `output`    | [`P2_01_output_write-view.md`](prompts/P2_01_output_write-view.md): `Format` / `Input` / `View` / `Formatter` と公開 entry point `output.Write` の実装、Formatter registry (D5 / D6) | P1_01、P1_02           |
+| P3    | `output`    | [`P3_01_output_console-formatter.md`](prompts/P3_01_output_console-formatter.md): Console formatter (tree 構築規則 1-9、golden test。D2)                                             | P2_01                  |
+| P3    | `output`    | [`P3_02_output_json-formatter.md`](prompts/P3_02_output_json-formatter.md): JSON formatter (schema・版管理・golden test。D3)                                                         | P2_01 (P3_01 と並列可) |
 
-| Phase | 対象 | 概要 | 依存 |
-| ----- | ---- | ---- | ---- |
-| P1    |      |      |      |
+DOT / Mermaid (Phase4) は prompts を生成しない。I/F 要件 G-1〜G-7 は [Output feature doc](../../design/features/output/DesignDoc_output.md#dot--mermaid-のif-要件-phase4-実装) が正本として保持済みで、Phase4 spec が着手時に参照する。
 
 ### prompts 生成方針
 
-- (phase: tasks で確定)
+- **並列境界**: P1 は `P1_01` (target `core`) と `P1_02` (target `traversal`) が別 package を編集するため並列可。P3 は `P3_01` (Console) と `P3_02` (JSON) が別ファイルを編集し、かつ両者とも `P2_01` の `Formatter` interface を実装するだけなので並列可。P2 は P1 の 2 本完了後に着手する単一 prompt (`Write` entry point と `View` は Console / JSON の共通基盤のため統合しない — 分割を維持すべき境界の「同一画面の全セクション」に対する「共通基盤 → 個別実装」の依存関係)。
+- **fixture の導出元**: golden fixture のケース一覧 (3 要素 SCC / self-loop / root self-loop / ダイヤモンド / cutoff / 到達なし / `maxDepth=0` / `maxDepth=0` + 起点 self-loop / `startNotFound`) は [Output feature doc のテスト観点](../../design/features/output/DesignDoc_output.md#テスト観点) から導出し、prompt 側では再定義せず同じ一覧を転記する (二重管理を避けるため、durable 正本の更新時は prompt 側も追随させる)。
+- **統合の判断**: `graph` の Symbol 追加と wire 変換関数、test builder 対応は同一 entity (`graph.Node` / `graph.Edge`) への拡張のため 1 prompt (`P1_01`) に統合した。Console / JSON は異なる出力形式 (責務が異なる Formatter 実装) のため統合せず分割を維持した。
+- **スコープ外の配線**: Analyze Use Case からの `graph` 変換関数呼び出し、および `output.Write` 呼び出しの配線は CLI interface spec の対象であり、いずれの prompt にも含めない (`## スコープ > やらないこと`)。
 
 ## 上位資料からの変更点
 
@@ -813,6 +820,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | sync gate 3 回目の指摘に対応: レビュー表に 2 回目行を追加、変更履歴を実態化、「反映内容の記録は」へ言い換え                                                                                                                                                                                               |
 | 2026-07-11 | Fukuemon | sync gate 4 回目の指摘に対応: レビュー表 / 変更履歴に 3 回目・4 回目を同時記録 (メタ情報同期の 1 周遅れを解消)                                                                                                                                                                                            |
 | 2026-07-11 | Fukuemon | sync gate 5 回目で **PASS**。phase: sync 完了                                                                                                                                                                                                                                                             |
+| 2026-07-11 | Fukuemon | phase: tasks で実装 prompts 5 件を生成 (P1_01∥P1_02 → P2_01 → P3_01∥P3_02)                                                                                                                                                                                                                                |
 
 ## 備考
 
