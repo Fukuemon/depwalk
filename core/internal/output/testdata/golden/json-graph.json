@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0",
+  "status": "ok",
+  "direction": "caller",
+  "start": "method:a",
+  "nodes": [
+    {
+      "methodId": "method:a",
+      "qualifiedName": "A",
+      "signature": "()",
+      "minDepth": 0
+    },
+    {
+      "methodId": "method:m",
+      "qualifiedName": "M",
+      "signature": "()",
+      "minDepth": 1,
+      "sourceLocation": { "path": "m.go", "startLine": 10 }
+    },
+    {
+      "methodId": "method:z",
+      "qualifiedName": "Z",
+      "signature": "()",
+      "minDepth": 2
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "edge:a",
+      "callerMethodId": "method:m",
+      "calleeMethodId": "method:a",
+      "cycle": false
+    },
+    {
+      "edgeId": "edge:z",
+      "callerMethodId": "method:z",
+      "calleeMethodId": "method:m",
+      "cycle": true,
+      "callSite": { "path": "z.go", "startLine": 20 }
+    }
+  ],
+  "depthCutoffs": [
+    {
+      "edgeId": "cut:a",
+      "callerMethodId": "method:outside-a",
+      "calleeMethodId": "method:z",
+      "targetMethodId": "method:outside-a",
+      "targetMinDepth": 3
+    },
+    {
+      "edgeId": "cut:z",
+      "callerMethodId": "method:outside-z",
+      "calleeMethodId": "method:z",
+      "targetMethodId": "method:outside-z",
+      "targetMinDepth": 3,
+      "callSite": { "path": "z.go", "startLine": 20 }
+    }
+  ]
+}
