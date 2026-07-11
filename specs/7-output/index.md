@@ -74,7 +74,7 @@
 - `context/architecture.md`: Package Boundary、`core/internal/output` の責務
 - `context/testing.md`: S3 の E2E 照合方針
 - `specs/7-output/requirements.md`: 本 spec の要求定義 (S3、R1-R3、I1-I2、O1-O3、E1-E3、V1)
-- 関連 issue: #7 (本 spec)、#6 (Traversal / 入力元、完了)、#8 (Analyzer Protocol / Model、完了)、CLI interface spec (未起票。format 引数 / exit code の正本)
+- 関連 issue: #7 (本 spec)、#6 (Traversal / 入力元、完了)、#8 (Analyzer Protocol / Model、完了)、CLI interface spec (未起票。format 引数 / exit code の決定先)
 
 ## 背景
 
@@ -88,7 +88,7 @@
 ### やること
 
 - Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff、`status`) を各出力形式へ変換する Output API を設計する。
-- Console 出力のツリー表現を確定する (深さ表示、循環参照の見せ方、depthLimit cutoff の見せ方) — Design Doc Open Question **Q3** の正本。
+- Console 出力のツリー表現を確定する (深さ表示、循環参照の見せ方、depthLimit cutoff の見せ方) — Design Doc Open Question **Q3** の解 (durable 正本は sync で [Output feature doc](../../design/features/output/DesignDoc_output.md) へハンドオフ済み)。
 - JSON 出力の契約を確定する (schema、schemaVersion、後方互換方針、要素順序の決定性)。
 - DOT / Mermaid 出力の I/F 方針を確定する (実装は Phase4)。
 - 空グラフ / 起点不在 (`startNotFound`) / 未対応 format の各形式での見せ方を定義する。
@@ -486,7 +486,7 @@ core/internal/output/
 ### Testing
 
 - 横断規約は [context/testing.md](../../context/testing.md)。詳細な検証境界は D7 で確定する。
-- unit: 各 formatter が Traversal result から期待どおりの出力を生成すること (検証する具体ケースの正本は `## 解決済みの論点 > D7` の fixture 一覧)。
+- unit: 各 formatter が Traversal result から期待どおりの出力を生成すること (検証する具体ケースの durable 正本は [Output feature doc のテスト観点](../../design/features/output/DesignDoc_output.md#テスト観点)。決定経緯は `## 解決済みの論点 > D7`)。
 - E2E: 生成物が各形式としてパース可能であること (S3 の測定方法)。
 - Console (D2 で確定した規則の検証観点):
   - 合流 (ダイヤモンド) graph で、共有 node の部分木が展開されるのは 1 回だけで、2 回目以降が `(既出)` の葉になること (出力行数が到達 edge 数に対して線形に収まること)。
@@ -778,6 +778,7 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (phase: track / 2 回目)   | 1 回目の指摘は本体対応を確認。正本の振り分けも「二重正本なし」と評価。blocking 1: `## 上位文書整合` の要約行が旧 3 件のままで、S3 と Graph Engine 行の追加が未反映 (**diagram gate で 3 回踏んだ二重列挙パターンの再発**)。minor 2: ステータス語彙の 2 軸混在 / `design/features/README.md` の索引更新が sync 作業として導けない | ①要約行の列挙を廃止し**変更点テーブルへの参照 1 行**に置換 (根本対処) ②節冒頭にステータス規約を明示し `(予定)` を全廃 ③README 索引の行を追加 (stale な traversal も同時に登録)                                                                                                                      |
 | 2026-07-11 | NEEDS_WORK (phase: track / 3 回目)   | 上位文書との矛盾ゼロ / 二重正本なし / ADR 判定妥当 / sync 作業の導出可能性を確認。blocking 1: `## 上位文書整合` **テーブル本体**が変更点テーブルの第 2 列挙として残り 2 行乖離 (**二重列挙パターン 5 回目**)。moderate 1: 未確定事項の「4 件」が第 3 列挙                                                                        | **根本対処**: 各列挙箇所に役割と正本を明記。整合テーブルを「確認記録」に限定し、**sync 作業の網羅リストは変更点テーブル 1 本を唯一の正本**と宣言。未確定事項の件数・内訳の再掲を廃止し参照に降格。欠落 2 行も追加                                                                                   |
 | 2026-07-11 | **PASS** (phase: track / 4 回目)     | 全観点 PASS。整合テーブル 13 行と変更点テーブルを全数マッピングし**片側にしかない行はゼロ**。二重列挙は構造的に解消と判断。sync 作業は変更点テーブルのみから漏れなく導ける。二重正本なし                                                                                                                                         | 非ブロッキング 2 件 (未確定事項の「要点」の残り火 / blockquote の位置) を反映。phase: sync へ進める                                                                                                                                                                                                 |
+| 2026-07-11 | NEEDS_WORK (phase: sync / 1 回目)    | 上位文書への反映は全 11 行を実文書と全数突合し**意味の変質なし・反映漏れ / 過剰反映ゼロ**。ハンドオフ本体 (降格宣言 / snapshot / 逆リンク) も正しい。blocking 1: スコープ節に「Q3 の正本」が残存し二重正本状態。minor 2: fixture / CLI spec の「正本」呼称                                                                       | 3 件とも用語規約に従い言い換え (「Q3 の解 (durable 正本はハンドオフ済み)」「決定先」等)。上位文書側の再修正は不要                                                                                                                                                                                   |
 
 ## 変更履歴
 
@@ -803,6 +804,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | track gate 3 回目の指摘に対応: 整合テーブルを「確認記録」に限定し、sync 作業の正本を変更点テーブル 1 本に確定 (二重列挙の根本対処)                                                                                                                                                                        |
 | 2026-07-11 | Fukuemon | track gate 4 回目で **PASS**。未確定事項の「要点」再掲を参照に純化し、二重列挙の残り火を除去                                                                                                                                                                                                              |
 | 2026-07-11 | Fukuemon | phase: sync を実行。feature doc 2 本 (graph / output) を新規作成し、Design Doc (Q3 / S3 / 依存先 / feature 一覧 / C4 図)・traversal feature doc (`minDepth`)・features README・context (architecture / testing) へ反映。変更点テーブル全行を `[反映済]` にし、spec の該当節を決定時スナップショットへ降格 |
+| 2026-07-11 | Fukuemon | sync gate の指摘に対応: spec 内に残っていた「正本」呼称 3 件を用語規約に従い言い換え (二重正本の解消)                                                                                                                                                                                                     |
 
 ## 備考
 
