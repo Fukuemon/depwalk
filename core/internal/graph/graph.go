@@ -9,6 +9,8 @@
 // depend only on this read API, not on the internal representation.
 package graph
 
+import "github.com/Fukuemon/depwalk/core/internal/protocol"
+
 // Direction selects which adjacency a graph read follows.
 type Direction string
 
@@ -21,7 +23,15 @@ const (
 
 // Node is a call graph node identified by the Analyzer Protocol methodId.
 type Node struct {
-	ID string
+	ID     string
+	Symbol Symbol
+}
+
+// Symbol describes a method represented by a [Node]. Source is optional.
+type Symbol struct {
+	QualifiedName string
+	Signature     string
+	Source        *protocol.SourceLocation
 }
 
 // Edge is a directed call edge identified by the Analyzer Protocol edgeId.
@@ -30,6 +40,7 @@ type Edge struct {
 	ID       string
 	CallerID string
 	CalleeID string
+	CallSite *protocol.SourceLocation
 }
 
 // Graph is an in-memory call graph. The zero value is not usable; create
