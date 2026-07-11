@@ -1,6 +1,6 @@
 # Engineering Conventions
 
-> 最終更新: 2026-06-27
+> 最終更新: 2026-07-11
 
 shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.md](project.md)。
 
@@ -16,7 +16,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - commit 前検査は `lefthook` (pre-commit hook) が束ねる。設定は repo root の `lefthook.yml`。
 - Core の初期 root task は repository-level wrapper ではなく、`core/` 配下で実行する Go 標準 command とする。
-- make-like wrapper は、複数 module、Analyzer build、CI matrix、release command を 1 command に束ねる必要が出た時点で導入を検討する。
+- make-like wrapper は、複数 module、Analyzer build、CI matrix、release command を 1 command に束ねる必要が出た時点で導入を検討する。Java Analyzer は `analyzers/java/` の `gradlew` で完結し、現時点で repository-level wrapper は導入しない (再評価条件は上記のまま)。
 
 ## Repository Quality Gate
 

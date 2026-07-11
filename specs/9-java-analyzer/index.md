@@ -2,7 +2,7 @@
 
 > issue #9 の spec。Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の設計と実装分割を管理する。
 > 共通契約 (SPI / JSONL Protocol / Model schema) の正本は [Analyzer Protocol / SPI feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../adr/0001-analyzer-protocol-jsonl-spi.md)。本 spec は契約を変更せず、Java 側の実装方式を決める。
-> durable な設計成果は phase: sync で `design/features/java-analyzer/DesignDoc_java-analyzer.md` へ正本ハンドオフする。
+> durable な設計成果の正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)。本 spec は issue 単位の決定経緯・受け入れ基準・実装分割の記録。
 
 ## メタ情報
 
@@ -17,43 +17,46 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                     |
-| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                             |
-| 2   | 下書き                      | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                                 |
-| 3   | 上位文書突合                | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし                        |
-| 4   | 論点整理                    | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                            |
-| 5   | 論点解決                    | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)          |
-| 5.5 | 図 (phase: diagram)         | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目) |
-| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-11 | `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key (`classpath` / `liftExcludePackages`) を確定。実装言語は Java を維持        |
-| 7   | Content / Data 設計         | レビュー済 | 2026-07-11 | 永続データなし / `analyzers/java/` 配置 / fixture 配置を確定                                                                                             |
-| 8   | Performance / Security 設計 | レビュー済 | 2026-07-11 | 方式 (streaming / AST 破棄 / stderr 計測) と Fallback 方針を記載。数値目標は実測 baseline 後                                                             |
-| 9   | Test / Metrics 設計         | レビュー済 | 2026-07-11 | 三層 (Java unit / Go fake / 実 jar E2E) の feature 固有観点と計測指標を記載                                                                              |
-| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                          |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                          |
+| #   | フェーズ                     | 状態       | 最終更新   | 備考                                                                                                                                                     |
+| --- | ---------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                         | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                             |
+| 2   | 下書き                       | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                                 |
+| 3   | 上位文書突合                 | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし                        |
+| 4   | 論点整理                     | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                            |
+| 5   | 論点解決                     | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)          |
+| 5.5 | 図 (phase: diagram)          | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目) |
+| 6   | Interface / Routing 設計     | レビュー済 | 2026-07-11 | `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key (`classpath` / `liftExcludePackages`) を確定。実装言語は Java を維持        |
+| 7   | Content / Data 設計          | レビュー済 | 2026-07-11 | 永続データなし / `analyzers/java/` 配置 / fixture 配置を確定                                                                                             |
+| 8   | Performance / Security 設計  | レビュー済 | 2026-07-11 | 方式 (streaming / AST 破棄 / stderr 計測) と Fallback 方針を記載。数値目標は実測 baseline 後                                                             |
+| 9   | Test / Metrics 設計          | レビュー済 | 2026-07-11 | 三層 (Java unit / Go fake / 実 jar E2E) の feature 固有観点と計測指標を記載                                                                              |
+| 9.5 | 正本ハンドオフ (phase: sync) | レビュー済 | 2026-07-11 | feature doc 新規作成 / DesignDoc S5・P4 / ADR-0003 / context 5 ファイルへ反映。spec-review PASS (3 回目)                                                 |
+| 10  | 実装分割                     | 未着手     |            |                                                                                                                                                          |
+| 11  | レビュー済                   | 未着手     |            |                                                                                                                                                          |
 
 ## 上位文書整合
 
 正本 ([PRD](../../PRD.md) / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
 - PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
-- Design Doc 更新要否: 要 (① 「詳細の所在 → Feature 設計」の Java Analyzer 行を feature doc へリンクする ② 成功条件 S5 / 設計原則 P4 の測定方法を「2 つ目以降の Analyzer 追加時に Core 無変更」と明確化する。いずれも phase: sync で実施)
-- ADR 起票要否: **要** (ADR-0003: Analyzer 起動コマンドを言語非依存な文字列として CLI flag + 環境変数で解決する = D2。phase: sync で起票)。D1 (build tool / JDK / 配布形態) は toolchain の確定値として `context/toolchain.md` に記録し、ADR にはしない
+- Design Doc 更新要否: **反映済** (① 「詳細の所在 → Feature 設計」の Java Analyzer 行を feature doc へリンクした ② 成功条件 S5 / 設計原則 P4 の測定方法を「2 つ目以降の Analyzer 追加時に Core 無変更」と明確化した。phase: sync で反映済み、2026-07-11)
+- ADR 起票要否: **反映済** (ADR-0003: Analyzer 起動コマンドを言語非依存な文字列として CLI flag + 環境変数で解決する = D2。phase: sync で起票済み、2026-07-11)。D1 (build tool / JDK / 配布形態) は toolchain の確定値として `context/toolchain.md` に記録し、ADR にはしない
 
-| 上位文書                       | 節 / 該当箇所                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PRD                            | 統合モードのため非該当                                        | 継承                                                                                                                                                                |
-| Design Doc                     | モジュール責務 (Java Analyzer) / 設計原則 P2・P3 / S4         | 継承 (Analyzer は独立プロセス、Protocol のみで Core と結合)                                                                                                         |
-| Design Doc                     | 成功条件 S5 / 設計原則 P4                                     | 変更提案 (測定方法を「**2 つ目以降**の言語 Analyzer 追加時に Core へ差分が出ないこと」と明確化する。初号機導入時の言語非依存な初回配線は対象外。phase: sync で反映) |
-| Design Doc                     | Future Work Phase1〜3 / Open Questions Q2                     | 補足 (Phase1 の範囲を確定し、Phase2/3 の段階導入境界を宣言する)                                                                                                     |
-| Design Doc                     | 詳細の所在 → Feature 設計 (Java Analyzer = 未作成)            | 変更提案 (phase: sync で feature doc を作成しリンクする)                                                                                                            |
-| feature doc: analyzer-protocol | Model schema / process contract / versioning                  | 継承 (契約は変更しない。Java 側は準拠側として実装する)                                                                                                              |
-| context: architecture          | Package Boundary (`analyzers/<language>/`) / Runtime Boundary | 継承 (Java 実装は `analyzers/java/` に置き、Core の internal に入れない)                                                                                            |
-| context: toolchain             | 標準スタック (Java Analyzer 行) / Scaffold Policy             | 補足 (JavaParser / SymbolSolver / SootUp は確定済。build tool と JDK version を本 spec で確定する)                                                                  |
-| context: testing               | Protocol contract test / テスト責務の分担                     | 補足 (Java Analyzer 側の contract test 実行方式を確定する)                                                                                                          |
-| context: engineering           | quality gate / Analyzer build を束ねる wrapper の要否         | 補足 (D1 / D10 の決定に伴い、Java build を quality gate に含めるかを確定する)                                                                                       |
-| ADR-0001                       | JSONL over STDIN/STDOUT / process SPI                         | 継承                                                                                                                                                                |
-| ADR-0002                       | Core 実装基盤 (Go)                                            | 継承 (Core に JVM 依存を持ち込まない)                                                                                                                               |
+| 上位文書                       | 節 / 該当箇所                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PRD                            | 統合モードのため非該当                                        | 継承                                                                                                                                                               |
+| Design Doc                     | モジュール責務 (Java Analyzer) / 設計原則 P2・P3 / S4         | 継承 (Analyzer は独立プロセス、Protocol のみで Core と結合)                                                                                                        |
+| Design Doc                     | 成功条件 S5 / 設計原則 P4                                     | 変更提案 (測定方法を「**2 つ目以降**の言語 Analyzer 追加時に Core へ差分が出ないこと」と明確化する。初号機導入時の言語非依存な初回配線は対象外。反映済 2026-07-11) |
+| Design Doc                     | Future Work Phase1〜3 / Open Questions Q2                     | 補足 (Phase1 の範囲を確定し、Phase2/3 の段階導入境界を宣言する。反映済 2026-07-11)                                                                                 |
+| Design Doc                     | 詳細の所在 → Feature 設計 (Java Analyzer)                     | 変更提案 (feature doc を作成しリンクした。反映済 2026-07-11)                                                                                                       |
+| feature doc: analyzer-protocol | Model schema / process contract / versioning                  | 継承 (契約は変更しない。Java 側は準拠側として実装する。反映済 2026-07-11)                                                                                          |
+| feature doc: java-analyzer     | Java Analyzer の durable な設計成果 (正本)                    | 新規作成 (本 spec の D1-D11 を feature doc へハンドオフ。反映済 2026-07-11)                                                                                        |
+| context: architecture          | Package Boundary (`analyzers/<language>/`) / Runtime Boundary | 継承 (Java 実装は `analyzers/java/` に置き、Core の internal に入れない。反映済 2026-07-11)                                                                        |
+| context: toolchain             | 標準スタック (Java Analyzer 行) / Scaffold Policy             | 補足 (JavaParser / SymbolSolver / SootUp は確定済。build tool と JDK version を本 spec で確定した。反映済 2026-07-11)                                              |
+| context: testing               | Protocol contract test / テスト責務の分担                     | 補足 (Java Analyzer 側の contract test 実行方式を確定した。反映済 2026-07-11)                                                                                      |
+| context: engineering           | quality gate / Analyzer build を束ねる wrapper の要否         | 補足 (D1 / D10 の決定に伴い、Java build を quality gate に含めるかを確定した。反映済 2026-07-11)                                                                   |
+| ADR-0001                       | JSONL over STDIN/STDOUT / process SPI                         | 継承 (反映済 2026-07-11)                                                                                                                                           |
+| ADR-0002                       | Core 実装基盤 (Go)                                            | 継承 (Core に JVM 依存を持ち込まない。反映済 2026-07-11)                                                                                                           |
+| ADR-0003                       | Analyzer 起動コマンドを言語非依存な文字列として解決する (D2)  | 新規作成 (反映済 2026-07-11)                                                                                                                                       |
 
 > 矛盾を検出した場合は phase: sync で PRD / Design Doc / feature doc / context / ADR への back-propagation を提案する。
 
@@ -149,6 +152,8 @@ EARS 風で振る舞いを記述する。
 
 ## 解決済みの論点
 
+> 以下は決定時スナップショット。durable な設計内容の正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済み (2026-07-11)。論点の決定経緯として保持する。
+
 ### D1: build tool / JDK version / 配布形態 (2026-07-11 決定)
 
 - **build tool: Gradle (Kotlin DSL)**。`gradlew` wrapper を同梱し、CI に Gradle 本体の事前インストールを要求しない。将来 Kotlin Analyzer を追加するときにも同じ build 基盤を使える。
@@ -166,7 +171,7 @@ EARS 風で振る舞いを記述する。
 - 解決順序: ① CLI flag (例: `--analyzer-cmd "java -jar /path/analyzer.jar"`) → ② 環境変数 (例: `DEPWALK_ANALYZER_CMD`) → ③ どちらも無ければ実行前に validation error で拒否する。
 - Core は受け取った文字列を exec するだけで、`java` / jar / JVM の存在を知らない。言語固有の分岐と path 解決規約を Core に持ち込まないことで S5 (2 つ目以降の Analyzer 追加時に Core 無変更) を担保する。
 - 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入せず、後続の CLI interface spec で必要になった時点で ③ の前段として足せる形にしておく。
-- 解決順序 (flag 主 + 環境変数 fallback) は本 spec で確定する。具体名は phase 6 で確定済み: **`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta key=value`** (`## Interface 設計` が正本)。CLI 引数の**完全仕様** (出力形式 / 探索方向 / 深さ上限などの全 flag 体系) は後続の CLI interface spec が正本。
+- 解決順序 (flag 主 + 環境変数 fallback) は本 spec で確定した。具体名は phase 6 で確定済み: **`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta key=value`** (決定時スナップショット。正本は [feature doc の起動契約](../../design/features/java-analyzer/DesignDoc_java-analyzer.md))。CLI 引数の**完全仕様** (出力形式 / 探索方向 / 深さ上限などの全 flag 体系) は後続の CLI interface spec で確定する。
 
 **利点**: E2E / contract test で fake analyzer (任意の実行可能ファイル) に差し替えられるため、JVM を持たない環境でも Core 側のテストが回る (D10 に影響)。
 
@@ -176,7 +181,7 @@ EARS 風で振る舞いを記述する。
 
 **依存 jar の classpath を必須入力とする。** classpath なしでの解析は許可しない。
 
-**必須性の粒度**: `analysisRequest.metadata` の classpath **key は必須**とし、**値としての空配列は許容する** (依存を持たない純 Java プロジェクト / テスト fixture のため)。key 自体が無い場合のみ `JAVA_MISSING_CLASSPATH` の `error` とする。key 名は `classpath` (phase 6 で確定。`## Interface 設計` が正本)。
+**必須性の粒度**: `analysisRequest.metadata` の classpath **key は必須**とし、**値としての空配列は許容する** (依存を持たない純 Java プロジェクト / テスト fixture のため)。key 自体が無い場合のみ `JAVA_MISSING_CLASSPATH` の `error` とする。key 名は `classpath` (phase 6 で確定。決定時スナップショット。正本は [feature doc の metadata 契約](../../design/features/java-analyzer/DesignDoc_java-analyzer.md))。
 
 **検査のタイミング**: classpath の key 検査と、指定された jar の存在 / 読み取り可否の検査は、**解析開始前に一括で** (pre-flight) 行う。型解決の途中で jar 欠落を遅延検出すると、それまでに出力済みの `methodSymbol` / `callEdge` を Core が受け取った状態で fatal になり、部分的な結果が「一見成功した出力」として観測されうるため。いずれも `error` + 非ゼロ exit で即停止する (D8)。
 
@@ -204,23 +209,23 @@ protocol は 2 モードの名前と既定値 (未指定時は `fullGraph`) し�
 | `reachableFromEntrypoints` | `entrypoints` から **呼び出し先 (callee) 方向に推移的に到達する** `methodSymbol` と、それらの間の `callEdge` のみ |
 
 - `entrypoints` が未指定または空配列の場合は、`analysisMode` の値によらず scope 全体の call graph 生成要求として扱う (protocol の既定義に従う)。
-- **node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は D11 を正本とする**。上表の「scope 内の全 `methodSymbol`」は D11 の帰属型規則で読む。
+- **node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は D11 の規則に従う**。上表の「scope 内の全 `methodSymbol`」は D11 の帰属型規則で読む。
 - **caller 探索 (S1) との関係**: `reachableFromEntrypoints` で得たグラフは呼び出し先方向にしか広がらないため、caller 探索の入力としては不完全になる。したがって **caller 方向の問い合わせでは Core が `fullGraph` を選ぶ**責務を持つ。`reachableFromEntrypoints` は callee 方向の調査で大規模リポジトリの出力量を削るための最適化と位置づける。
-- モード選択の CLI 上の露出 (利用者が明示指定できるか、Core が問い合わせ方向から自動選択するか) は後続の CLI interface spec が正本。本 spec では Analyzer が両モードを実装することと、上記の意味論を確定する。
+- モード選択の CLI 上の露出 (利用者が明示指定できるか、Core が問い合わせ方向から自動選択するか) は後続の CLI interface spec で確定する。本 spec では Analyzer が両モードを実装することと、上記の意味論を確定する。
 
 ### D5: `methodId` / `signature` の正規化規則 (2026-07-11 決定)
 
 **型表記は erasure + JVM binary name、`methodId` は可読な文字列そのものとする。**
 
-| 項目            | 規則                                                                                                                   | 例                                                           |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 型名            | JVM binary name (nested class は `$` 区切り)                                                                           | `com.example.Outer$Inner`                                    |
-| generics        | erasure で消去する (型引数を保持しない)                                                                                | `List<String>` → `java.util.List`                            |
-| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                                                              | `String...` → `java.lang.String[]`                           |
-| `signature`     | `<帰属型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` (**帰属型の決定規則は D11 を正本とする**) | `com.example.UserService#findById(java.lang.Long)`           |
-| `qualifiedName` | 表示・debug 用の完全修飾名 (protocol の定義どおり)                                                                     | `com.example.UserService.findById`                           |
-| constructor     | メソッド名 token は JVM 表記の `<init>` を用いる                                                                       | `com.example.UserService#<init>(com.example.UserRepository)` |
-| `methodId`      | `java:` prefix + `signature` (hash しない)                                                                             | `java:com.example.UserService#findById(java.lang.Long)`      |
+| 項目            | 規則                                                                                                             | 例                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 型名            | JVM binary name (nested class は `$` 区切り)                                                                     | `com.example.Outer$Inner`                                    |
+| generics        | erasure で消去する (型引数を保持しない)                                                                          | `List<String>` → `java.util.List`                            |
+| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                                                        | `String...` → `java.lang.String[]`                           |
+| `signature`     | `<帰属型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` (**帰属型の決定規則は D11 に従う**) | `com.example.UserService#findById(java.lang.Long)`           |
+| `qualifiedName` | 表示・debug 用の完全修飾名 (protocol の定義どおり)                                                               | `com.example.UserService.findById`                           |
+| constructor     | メソッド名 token は JVM 表記の `<init>` を用いる                                                                 | `com.example.UserService#<init>(com.example.UserRepository)` |
+| `methodId`      | `java:` prefix + `signature` (hash しない)                                                                       | `java:com.example.UserService#findById(java.lang.Long)`      |
 
 **根拠**:
 
@@ -256,7 +261,7 @@ protocol は 2 モードの名前と既定値 (未指定時は `fullGraph`) し�
 
 **帰属型 (D11 の規則で決まる型。interface / 抽象クラスを含む) のメソッドを callee として `callEdge` を出力し、`callEdge.metadata` に dispatch 種別を標識する。**
 
-- Phase1 は DI 解決を行わないため、`userRepository.findById(id)` の callee は静的に決まる帰属型のメソッド (`com.example.UserRepository#findById(java.lang.Long)`) になる。帰属型の決定規則は D11 を正本とする。実装クラスのメソッドへの辺は Phase2 (Spring Bean / DI 解決) 以降で追加する。
+- Phase1 は DI 解決を行わないため、`userRepository.findById(id)` の callee は静的に決まる帰属型のメソッド (`com.example.UserRepository#findById(java.lang.Long)`) になる。帰属型の決定規則は D11 に従う。実装クラスのメソッドへの辺は Phase2 (Spring Bean / DI 解決) 以降で追加する。
 - `callEdge.metadata.dispatch` に呼び出しの種別を持たせる: `static` (static メソッド呼び出し) / `virtual` (具象クラスの instance メソッド) / `interface` (interface 経由) / `abstract` (抽象クラスの抽象メソッド経由)。利用者は「この辺は宣言型止まりで実体ではない」と判別でき、Phase2/3 で実装候補の辺を足すときの土台にもなる。Core の graph 構築は `metadata` に依存しないため契約上は無害。
 - 未解決 `diagnostic` に倒す案は採らない。Spring プロジェクトでは呼び出しの大半が interface 越しであり、辺を落とすと S1 / S2 (網羅性) が Phase1 で実用にならないため。
 
@@ -337,7 +342,7 @@ Phase1 の必須仕様:
 | **宣言サイトが scope 外**で、宣言型が**引き上げ除外 package**                                         | 出力しない                                            | `userService.toString()` (`java.lang.Object#toString`) / `equals` / `hashCode`                                                                                                            |
 | **宣言サイトが scope 外**で、**レシーバの静的型も scope 外**                                          | 出力しない (`methodSymbol` / `callEdge` とも出さない) | `String#equals` / `List#add`                                                                                                                                                              |
 
-**引き上げ除外 package (B2)**: 既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix。本 spec の他所の `java.*` という表現はこの prefix 一致の言い換え)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする (phase 6 で確定。`## Interface 設計` が正本)。除外しないと `toString` / `equals` / `hashCode` が scope 内の全型ぶん node 化され、D11 自身のノイズ排除根拠と矛盾するため。除外判定は宣言型の binary name に対する **`.` 区切り segment 単位の prefix 一致**で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
+**引き上げ除外 package (B2)**: 既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix。本 spec の他所の `java.*` という表現はこの prefix 一致の言い換え)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする (phase 6 で確定。決定時スナップショット。正本は [feature doc の metadata 契約](../../design/features/java-analyzer/DesignDoc_java-analyzer.md))。除外しないと `toString` / `equals` / `hashCode` が scope 内の全型ぶん node 化され、D11 自身のノイズ排除根拠と矛盾するため。除外判定は宣言型の binary name に対する **`.` 区切り segment 単位の prefix 一致**で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
 
 **その他の呼び出し形**:
 
@@ -394,7 +399,7 @@ depwalk は CLI ツールであり、利用者の操作は `depwalk analyze` の
 5. Core が JSONL を逐次 parse / validate して graph を構築し、traversal / output へ渡す。未解決や部分解析は `diagnostic` として利用者へ伝播する。
 6. Analyzer が非ゼロ exit した場合、Core は fatal failure として扱う。
 
-図示は [`## フロー / シーケンス`](#フロー--シーケンス) を参照 (Flowchart = 本 User Flow の分岐、Sequence = Core ↔ Analyzer の contract、帰属型決定フロー = D11 の可視化)。**仕様の正本は本文の決定 (D1-D11) であり、図はその可視化**とする。
+図示は [`## フロー / シーケンス`](#フロー--シーケンス) を参照 (Flowchart = 本 User Flow の分岐、Sequence = Core ↔ Analyzer の contract、帰属型決定フロー = D11 の可視化)。**durable な仕様の正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) (2026-07-11 ハンドオフ済み)。本文の D1-D11 は決定経緯、図はその可視化**とする。
 
 ### Reuse Policy
 
@@ -423,9 +428,11 @@ depwalk は CLI ツールであり、利用者の操作は `depwalk analyze` の
 
 ## Interface 設計
 
+> 本節は決定時スナップショット (2026-07-11 ハンドオフ済み)。起動契約 / metadata 契約の正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
+
 ### UI / API / Event Interface
 
-Java Analyzer の外部 interface は 3 面ある。protocol record の schema は analyzer-protocol feature doc が正本で、本 spec は Java 固有の具体名だけを定義する。
+Java Analyzer の外部 interface は 3 面ある。protocol record の schema は analyzer-protocol feature doc が正本で、本 spec は Java 固有の具体名だけを定義した。
 
 **(1) CLI (Core 初回配線 / 本 spec で実装する最小 flag)**
 
@@ -442,7 +449,7 @@ Java Analyzer の外部 interface は 3 面ある。protocol record の schema �
 - **値が空文字列の場合、その key を空配列として登録する** (`--analyzer-meta classpath=` → `{"classpath": []}`)。D3 の「key は必須 / 空配列は許容」(依存なし fixture) を CLI から表現する手段はこれ。
 - 分割は**最初の `=`** で行う (value 側に `=` を含んでよい)。`=` を含まない指定は validation error として実行前に拒否する。
 
-`DEPWALK_` prefix は depwalk の環境変数の名前空間とする。CLI 引数の完全仕様 (出力形式 / 探索方向 / 深さ上限等) は後続の CLI interface spec が正本で、上記は拡張可能な最小集合。
+`DEPWALK_` prefix は depwalk の環境変数の名前空間とする。CLI 引数の完全仕様 (出力形式 / 探索方向 / 深さ上限等) は後続の CLI interface spec で確定し、上記は拡張可能な最小集合。
 
 **(2) `analysisRequest.metadata` の Java Analyzer 固有 key**
 
@@ -468,7 +475,7 @@ stdin (`analysisRequest` 1 件 → close) / stdout (JSONL 逐次) / stderr (計�
 
 - **永続データは持たない**。Java Analyzer は 1 request = 1 process で起動され、解析結果は stdout の JSONL としてのみ出力する (`context/architecture.md` State Boundary と整合)。
 - process 内で保持するのは SymbolSolver の型解決キャッシュと、record 出力に必要な最小限の中間状態のみ (D9)。解析済みファイルの AST は逐次破棄する。
-- 出力 record の内容 (`signature` / `methodId` / `metadata.dispatch` / `metadata.declaringType`・`inherited`) は D5 / D7 / D11 が正本。
+- 出力 record の内容 (`signature` / `methodId` / `metadata.dispatch` / `metadata.declaringType`・`inherited`) の正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) の該当節 (正規化規則 / dispatch 標識 / 帰属型の決定規則)。D5 / D7 / D11 は決定経緯。
 
 ### コンテンツ配置 / package / route
 
@@ -511,7 +518,7 @@ stdin (`analysisRequest` 1 件 → close) / stdout (JSONL 逐次) / stderr (計�
 
 ### テスト観点
 
-三層構成は D10 が正本。横断規約と Protocol contract test の観点一覧は [context/testing.md](../../context/testing.md) を継承する。本 feature 固有の観点:
+三層構成の正本は [feature doc のテスト観点](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)。D10 は決定経緯。横断規約と Protocol contract test の観点一覧は [context/testing.md](../../context/testing.md) を継承する。本 feature 固有の観点:
 
 **Java unit test (JUnit / `analyzers/java/`)**
 
@@ -616,7 +623,7 @@ sequenceDiagram
 
 ### 帰属型の決定フロー (D11)
 
-呼び出し 1 件ごとに、callee をどの型のメソッドとして出力するか (あるいは出力しないか) を決める規則。実装 (`analyzers/java/`) と Java unit test (D10) が従う正本は D11 のテキスト、本図はその可視化。
+呼び出し 1 件ごとに、callee をどの型のメソッドとして出力するか (あるいは出力しないか) を決める規則。実装 (`analyzers/java/`) と Java unit test が従う正本は [feature doc の帰属型の決定規則](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)。D11 は決定経緯、本図はその可視化。
 
 **本図が扱うのは「呼び出し 1 件ごとに callee の帰属型を決めること」**であり、node 母集合の列挙そのものではない。両者の関係は次のとおり:
 
@@ -664,32 +671,32 @@ flowchart TD
 
 ### Design Doc への影響
 
-| 対象節                    | 変更内容                                                                                                                                                                         | 理由                                                                                                                                                  |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 詳細の所在 → Feature 設計 | Java Analyzer 行を feature doc へリンクし、状態を `未着手` → `完了` に更新する (phase: sync で反映)                                                                              | phase: sync で feature doc を作成するため                                                                                                             |
-| 成功条件 S5 / 設計原則 P4 | 測定方法を「**2 つ目以降**の言語 Analyzer を追加するとき Core モジュールに差分が発生しないこと」と明確化する。初号機 (Java) 導入時の言語非依存な初回配線は S5 の対象外と明記する | Core に `depwalk analyze` / Analyzer 起動コマンド解決が未実装のため、初号機導入時のみ言語非依存の配線が必要。現行の文言では初回配線が S5 違反に読める |
+| 対象節                    | 変更内容                                                                                                                                                                                             | 理由                                                                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 詳細の所在 → Feature 設計 | Java Analyzer 行を feature doc へリンクし、状態を `未着手` → `完了` に更新する (phase: sync で反映) (反映済 2026-07-11)                                                                              | phase: sync で feature doc を作成するため                                                                                                             |
+| 成功条件 S5 / 設計原則 P4 | 測定方法を「**2 つ目以降**の言語 Analyzer を追加するとき Core モジュールに差分が発生しないこと」と明確化する。初号機 (Java) 導入時の言語非依存な初回配線は S5 の対象外と明記する (反映済 2026-07-11) | Core に `depwalk analyze` / Analyzer 起動コマンド解決が未実装のため、初号機導入時のみ言語非依存の配線が必要。現行の文言では初回配線が S5 違反に読める |
 
 ### feature doc への影響
 
-| 対象 doc / 節                                              | 変更内容               | 理由                     |
-| ---------------------------------------------------------- | ---------------------- | ------------------------ |
-| `design/features/java-analyzer/DesignDoc_java-analyzer.md` | 新規作成 (phase: sync) | durable な設計成果の正本 |
+| 対象 doc / 節                                              | 変更内容                                   | 理由                     |
+| ---------------------------------------------------------- | ------------------------------------------ | ------------------------ |
+| `design/features/java-analyzer/DesignDoc_java-analyzer.md` | 新規作成 (phase: sync) (反映済 2026-07-11) | durable な設計成果の正本 |
 
 ### context への影響
 
-| 対象 doc / 節                       | 変更内容                                                                                                                                                                                                       | 理由                                                                                                                                                        |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `context/project.md` Quick Commands | Java Analyzer の build / test コマンドを追加 (D1 / D10 の決定後)。「開発起動」「E2E」行 (現在「後続の CLI interface spec で確定」) に、本 spec が実装する最小 `depwalk analyze` の起動例を暫定値として記入する | 現状 Go (`cd core && ...`) のみで Java 側のコマンド契約を持たない。最小 analyze を実装するため起動手段が確定する (全 flag 体系は CLI interface spec が正本) |
-| `context/toolchain.md` 標準スタック | Java Analyzer 行を確定値に更新: build tool = Gradle (Kotlin DSL) + Shadow plugin、JDK = 25 LTS (Gradle toolchain で固定)、配布形態 = 単一 fat jar (source: clarify / D1)                                       | 現在「JavaParser / SymbolSolver / SootUp を利用」までしか固定されていない                                                                                   |
-| `context/engineering.md`            | Analyzer build を束ねる wrapper (make-like) 導入要否の判断を反映                                                                                                                                               | 「Analyzer build を束ねる必要が出た時点で検討」と保留されている                                                                                             |
-| `context/testing.md`                | Java Analyzer 側の contract test 実行方式 / CI の JVM 要求を追記 (D10)。S5 の再掲箇所 (「新 Analyzer 追加時は Protocol contract test の通過を必須」) が Design Doc 側の明確化に追随しているか確認する          | Protocol contract test の実行主体が Go 側のみを前提にしている                                                                                               |
-| `context/architecture.md`           | Package Boundary の S5 再掲 (「Analyzer 追加で Core に差分が出ないこと (S5)」) を Design Doc 側の明確化に追随させる                                                                                            | S5 の測定方法を変更提案するため、再掲箇所に drift が残らないようにする                                                                                      |
+| 対象 doc / 節                       | 変更内容                                                                                                                                                                                                                           | 理由                                                                                                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `context/project.md` Quick Commands | Java Analyzer の build / test コマンドを追加 (D1 / D10 の決定後)。「開発起動」「E2E」行 (現在「後続の CLI interface spec で確定」) に、本 spec が実装する最小 `depwalk analyze` の起動例を暫定値として記入する (反映済 2026-07-11) | 現状 Go (`cd core && ...`) のみで Java 側のコマンド契約を持たない。最小 analyze を実装するため起動手段が確定する (全 flag 体系は CLI interface spec で確定) |
+| `context/toolchain.md` 標準スタック | Java Analyzer 行を確定値に更新: build tool = Gradle (Kotlin DSL) + Shadow plugin、JDK = 25 LTS (Gradle toolchain で固定)、配布形態 = 単一 fat jar (source: clarify / D1) (反映済 2026-07-11)                                       | 現在「JavaParser / SymbolSolver / SootUp を利用」までしか固定されていない                                                                                   |
+| `context/engineering.md`            | Analyzer build を束ねる wrapper (make-like) 導入要否の判断を反映 (反映済 2026-07-11)                                                                                                                                               | 「Analyzer build を束ねる必要が出た時点で検討」と保留されている                                                                                             |
+| `context/testing.md`                | Java Analyzer 側の contract test 実行方式 / CI の JVM 要求を追記 (D10)。S5 の再掲箇所 (「新 Analyzer 追加時は Protocol contract test の通過を必須」) が Design Doc 側の明確化に追随しているか確認する (反映済 2026-07-11)          | Protocol contract test の実行主体が Go 側のみを前提にしている                                                                                               |
+| `context/architecture.md`           | Package Boundary の S5 再掲 (「Analyzer 追加で Core に差分が出ないこと (S5)」) を Design Doc 側の明確化に追随させる (反映済 2026-07-11)                                                                                            | S5 の測定方法を変更提案するため、再掲箇所に drift が残らないようにする                                                                                      |
 
 ### ADR の新規 / 更新
 
-| ADR ID          | 変更内容                                                                                                                             | 理由                                                                                                                                      |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| ADR-0003 (新規) | Analyzer 起動コマンドを言語非依存な文字列として解決する (CLI flag 主 + 環境変数 fallback)。Core は起動対象の言語ランタイムを知らない | S5 (2 つ目以降の Analyzer 追加時に Core 無変更) の担保方法であり、将来 Analyzer を追加するたびに参照される長期判断 (source: clarify / D2) |
+| ADR ID          | 変更内容                                                                                                                                                 | 理由                                                                                                                                      |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ADR-0003 (新規) | Analyzer 起動コマンドを言語非依存な文字列として解決する (CLI flag 主 + 環境変数 fallback)。Core は起動対象の言語ランタイムを知らない (反映済 2026-07-11) | S5 (2 つ目以降の Analyzer 追加時に Core 無変更) の担保方法であり、将来 Analyzer を追加するたびに参照される長期判断 (source: clarify / D2) |
 
 ## レビュー
 
@@ -713,6 +720,9 @@ flowchart TD
 | 2026-07-11 | NEEDS_WORK (phase 6-9 ②) | メタ同期の追随漏れ (レビュー表 / 変更履歴) + D11 図ラベルの表記ゆれ + `=` 分割位置の未規定                                                                                                       | 表・履歴を同期。図ラベルを既定 prefix 表記に統一。合成規則に「最初の `=` で分割」を追記                                                                                                      |
 | 2026-07-11 | NEEDS_WORK (phase 6-9 ③) | 2 回目の記録が review.md / レビュー表 / 変更履歴に未追記 (記録同期のみ)                                                                                                                          | 各記録を同期。Go テスト観点に value 内 `=` のケースを追加                                                                                                                                    |
 | 2026-07-11 | **PASS** (phase 6-9 ④)   | 全観点 PASS。記録同期の完了と、確定した interface が protocol 契約と矛盾しないことを確認                                                                                                         | phase 10 (実装分割) へ進む                                                                                                                                                                   |
+| 2026-07-11 | NEEDS_WORK (sync)        | spec と feature doc の二重正本 (5 箇所)                                                                                                                                                          | 降格 + 正本リンクに統一                                                                                                                                                                      |
+| 2026-07-11 | NEEDS_WORK (sync ②)      | Content / Data 設計に「D5 / D7 / D11 が正本」が残存 (+ snapshot 節内の「D11 を正本とする」3 箇所)                                                                                                | feature doc への正本リンクに置換 / 相互参照は「従う」に言い換え                                                                                                                              |
+| 2026-07-11 | **PASS** (sync ③)        | 全観点 PASS。二重正本の完全解消 (spec 内の「正本」語は durable 文書への参照とレビュー履歴引用のみ)、上位文書 8 ファイルとの整合を確認                                                            | phase 10 (実装分割 / prompts 生成) へ進む                                                                                                                                                    |
 
 ## 変更履歴
 
@@ -733,6 +743,9 @@ flowchart TD
 | 2026-07-11 | Fukuemon | phase 6-9 — Interface 設計 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key `classpath`・`liftExcludePackages`)、Content / Data、Performance / Fallback、テスト観点・計測指標を記入。D2 / D3 / D11 / Sequence の先送り箇所を確定名で同期     |
 | 2026-07-11 | Fukuemon | spec-review (phase 6-9) 対応 — `--analyzer-meta` の合成規則を確定 (常に JSON 配列 / 空値は空配列 / `=` なしは拒否)。除外 package の正規値を wildcard なしの prefix に統一。E2E 観点に未解決 symbol 混在 fixture を追加                                                    |
 | 2026-07-11 | Fukuemon | spec-review (phase 6-9 ②③) 対応 — D11 図ラベルを既定 prefix 表記に統一、合成規則に「最初の `=` で分割」を追記、レビュー記録を同期、Go テスト観点に value 内 `=` ケースを追加                                                                                              |
+| 2026-07-11 | Fukuemon | phase: sync — feature doc (java-analyzer) を新規作成し正本をハンドオフ。DesignDoc の S5/P4 明確化、ADR-0003 起票、context 5 ファイル (project / toolchain / testing / architecture / engineering) を反映                                                                  |
+| 2026-07-11 | Fukuemon | spec-review (sync) 対応 — spec 内の「正本」表現を決定時スナップショットに降格し feature doc への正本リンクに統一。feature doc の帰属型表の括弧書きを修正                                                                                                                  |
+| 2026-07-11 | Fukuemon | spec-review (sync ②) 対応 — 残存していた spec 内「正本」表現を掃き出し、feature doc への正本リンクと「従う」表現に統一                                                                                                                                                    |
 
 ## 備考
 

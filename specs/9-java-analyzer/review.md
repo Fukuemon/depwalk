@@ -317,3 +317,44 @@ Verdict: **NEEDS_WORK** (指摘は記録同期のみ: 2 回目の記録が revie
 Verdict: **PASS**
 
 全観点で PASS (prompts / 正本境界は未実施のため N/A)。phase 6-9 (Interface / Content / Performance / Test 設計) の gate を通過。次回 (phase 10) のレビューで、性能 baseline 計測タスクが実装分割に現れることを確認する。
+
+## Review 2026-07-11 (phase: sync, 1 回目)
+
+Verdict: **NEEDS_WORK** (spec と feature doc の二重正本。設計内容の欠陥なし)
+
+### 指摘
+
+- blocking: 正本ハンドオフ後も spec 内に「正本」を名乗る記述が 5 系統残り、feature doc と二重正本になっている — ① D2 節の「`## Interface 設計` が正本」 ② D3 節の classpath key 名 / D11 節の `liftExcludePackages` の同表現 ③ `## Interface 設計` 節に降格の但し書きが無い ④ `## テスト / 評価方針` の「三層構成は D10 が正本」 ⑤ User Flow 節の「仕様の正本は本文の決定 (D1-D11)」と D11 図キャプションの「従う正本は D11 のテキスト」。
+- advisory: feature doc の帰属型表 row1 の括弧書き「(実際に本体が書かれている型)」が直前の定義「本体を持つかどうかは問わない」と矛盾する。
+
+### 対応 (完了)
+
+- blocking: 5 系統すべてを「決定時スナップショット + feature doc への正本リンク」に降格した — D2 / D3 / D11 の「`## Interface 設計` が正本」を feature doc の起動契約 / metadata 契約への正本リンクに置換、`## Interface 設計` 節冒頭に降格の但し書きを追加、テスト観点の正本を feature doc のテスト観点に変更 (D10 は決定経緯)、User Flow 節と D11 図キャプションを「正本は feature doc、D1-D11 は決定経緯、図はその可視化」に統一。
+- advisory: feature doc の帰属型表 row1 の括弧書きを「(宣言の所在型)」に修正した。
+- index のレビュー表と変更履歴に本レビューの対応行を追加。
+
+## Review 2026-07-11 (phase: sync, 2 回目)
+
+Verdict: **NEEDS_WORK** (sync 1 回目対応の掃き出し残渣。設計内容の欠陥なし)
+
+### 指摘
+
+- blocking: `## Content / Data 設計` に「出力 record の内容 ... は D5 / D7 / D11 が正本」が残存し、feature doc と二重正本になっている。
+- advisory: snapshot 節内に「D11 を正本とする」が 3 箇所残存 (D4 の node 母集合 / D5 表の帰属型 / D7 の帰属型)。用語規約では「正本」は durable 文書のみに使うため、spec 内相互参照は言い換える。
+
+### 対応 (完了)
+
+- blocking: Content / Data 設計の該当行を「正本は feature doc の該当節 (正規化規則 / dispatch 標識 / 帰属型の決定規則)。D5 / D7 / D11 は決定経緯」に置換。
+- advisory: D4 / D5 / D7 の「D11 を正本とする」を「D11 (の規則) に従う」に言い換え。あわせて「後続の CLI interface spec が正本」(D2 / D4 / Interface 設計 / 上位資料からの変更点表の 4 箇所) も「後続の CLI interface spec で確定する」に言い換えた (spec を「正本」と呼ばない用語規約に追随)。
+- index のレビュー表と変更履歴に sync ② の対応行を追加。
+
+## Review 2026-07-11 (phase: sync, 3 回目)
+
+Verdict: **PASS**
+
+全観点で PASS (prompts は未実施のため N/A)。二重正本の完全解消 (spec 内の「正本」語は durable 文書への参照とレビュー履歴引用のみ) と、上位文書 8 ファイル (DesignDoc / feature doc: java-analyzer / ADR-0003 / context: project・toolchain・testing・architecture・engineering) との整合を確認。phase: sync の gate を通過。
+
+### 残タスク (phase 10 で確認する)
+
+- 性能 baseline 計測タスクが実装分割に現れること。
+- 「viper を導入しない」制約 (`context/toolchain.md`) を実装 prompt に明示すること。
