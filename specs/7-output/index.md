@@ -17,19 +17,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                  |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                       |
-| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS      |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし |
-| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                      |
-| 5   | 論点解決                    | 進行中     | 2026-07-11 | D1 / D2 (= Q3) 解決済み。D3-D7 が未決                                 |
-| 6   | Interface / Routing 設計    | 未着手     |            | Formatter I/F は D1 / D6 の決定に依存                                 |
-| 7   | Content / Data 設計         | 未着手     |            | JSON schema は D3 の決定に依存                                        |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                       |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                       |
-| 10  | 実装分割                    | 未着手     |            |                                                                       |
-| 11  | レビュー済                  | 未着手     |            |                                                                       |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                   |
+| --- | --------------------------- | ---------- | ---------- | ---------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                        |
+| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS       |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし  |
+| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                       |
+| 5   | 論点解決                    | 進行中     | 2026-07-11 | D1 / D2 (= Q3) / D3 解決済み。D4-D7 が未決。D3 が traversal へ変更提案 |
+| 6   | Interface / Routing 設計    | 未着手     |            | Formatter I/F は D1 / D6 の決定に依存                                  |
+| 7   | Content / Data 設計         | 未着手     |            | JSON schema は D3 の決定に依存                                         |
+| 8   | Performance / Security 設計 | 未着手     |            |                                                                        |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                        |
+| 10  | 実装分割                    | 未着手     |            |                                                                        |
+| 11  | レビュー済                  | 未着手     |            |                                                                        |
 
 ## 上位文書整合
 
@@ -128,15 +128,15 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                                                                   | 決定候補                                                                                                                                                                                                           | 決定         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| D1  | Output が表示する symbol 情報 (`qualifiedName` / `signature` / `sourceLocation` / `callSite`) の受け渡し経路。現行 `graph.Node` は `methodId` のみ持つ | (a) `graph` に固有の値型で保持し Output は Graph から引く / (b) `graph.Node` に `protocol.MethodSymbol` (wire DTO) をそのまま埋める / (c) methodId のみ表示                                                        | **決定 (a)** |
-| D2  | **Q3**: Console ツリー表現。到達集合 (非 tree) から tree を組む際の、深さ表示・循環参照・`depthLimit` cutoff・合流 (同一 node 複数経路) の見せ方       | 罫線ツリー + **初出のみ展開** (`(既出)` 参照印) / 循環は `(cycle)` で打ち切り / cutoff は `… (depth limit: N)` / 深さラベルなし / 子行は `callSite`、root は宣言位置                                               | **決定**     |
-| D3  | JSON 出力スキーマと版管理。フィールド構成、`schemaVersion` の採番系 (Analyzer Protocol の `schemaVersion` と同一系統か独立か)、後方互換方針、要素順序  | フィールド案: `schemaVersion` / `status` / `start` / `direction` / `nodes[]` / `edges[]` (`cycle` flag) / `depthCutoffs[]`。順序は methodId / edgeId の辞書順に固定。版は Protocol と独立の output schema 版とする | 未決         |
-| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                 | (a) 共通 Formatter interface のみ定め、DOT / Mermaid の構文詳細は Phase4 spec へ送る / (b) 構文まで本 spec で確定する                                                                                              | 未決         |
-| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)                | `startNotFound` と空グラフは**正常系**として各形式で表現、未対応 format は Output API の呼び出し前 validation エラー。exit code は CLI spec                                                                        | 未決         |
-| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                       | `Format(w io.Writer, r traversal.Result, opts) error` 相当の interface + format ごとの実装。全件メモリ構築か逐次書き出しか                                                                                         | 未決         |
-| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                               | unit: 各 formatter の出力を golden 比較 / E2E: 生成した JSON を `encoding/json` で、DOT / Mermaid を構文パースで検証。golden の置き場所は `testdata/`                                                              | 未決         |
+| #   | 論点                                                                                                                                                   | 決定候補                                                                                                                                                                          | 決定         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| D1  | Output が表示する symbol 情報 (`qualifiedName` / `signature` / `sourceLocation` / `callSite`) の受け渡し経路。現行 `graph.Node` は `methodId` のみ持つ | (a) `graph` に固有の値型で保持し Output は Graph から引く / (b) `graph.Node` に `protocol.MethodSymbol` (wire DTO) をそのまま埋める / (c) methodId のみ表示                       | **決定 (a)** |
+| D2  | **Q3**: Console ツリー表現。到達集合 (非 tree) から tree を組む際の、深さ表示・循環参照・`depthLimit` cutoff・合流 (同一 node 複数経路) の見せ方       | 罫線ツリー + **初出のみ展開** (`(既出)` 参照印) / 循環は `(cycle)` で打ち切り / cutoff は `… (depth limit: N)` / 深さラベルなし / 子行は `callSite`、root は宣言位置              | **決定**     |
+| D3  | JSON 出力スキーマと版管理。フィールド構成、`schemaVersion` の採番系 (Analyzer Protocol の `schemaVersion` と同一系統か独立か)、後方互換方針、要素順序  | フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`)。node に `minDepth` を持つ (**traversal 契約の拡張が必要**)。版は Protocol と独立 / additive 互換。順序は id の辞書順 | **決定**     |
+| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                 | (a) 共通 Formatter interface のみ定め、DOT / Mermaid の構文詳細は Phase4 spec へ送る / (b) 構文まで本 spec で確定する                                                             | 未決         |
+| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)                | `startNotFound` と空グラフは**正常系**として各形式で表現、未対応 format は Output API の呼び出し前 validation エラー。exit code は CLI spec                                       | 未決         |
+| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                       | `Format(w io.Writer, r traversal.Result, opts) error` 相当の interface + format ごとの実装。全件メモリ構築か逐次書き出しか                                                        | 未決         |
+| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                               | unit: 各 formatter の出力を golden 比較 / E2E: 生成した JSON を `encoding/json` で、DOT / Mermaid を構文パースで検証。golden の置き場所は `testdata/`                             | 未決         |
 
 ## 解決済みの論点
 
@@ -201,24 +201,93 @@ UserService.findById(Long)  [UserService.java:42]
 
 **空グラフ / 起点不在 (`startNotFound`) の Console 表現は D5 で決める。**
 
+### D3: JSON 出力スキーマと版管理 (2026-07-11 決定)
+
+**決定**: JSON は **フラットな graph** (`nodes[]` / `edges[]`) として出力し、Console と同型の tree にはしない。各 node は起点からの最短距離 `minDepth` を持つ。スキーマは Analyzer Protocol とは**独立した output schema 版**を持つ。
+
+#### スキーマ
+
+```json
+{
+  "schemaVersion": "1.0",
+  "status": "ok",
+  "direction": "caller",
+  "start": "<methodId>",
+  "nodes": [
+    {
+      "methodId": "<methodId>",
+      "qualifiedName": "com.example.UserService.findById",
+      "signature": "(java.lang.Long)",
+      "minDepth": 0,
+      "sourceLocation": {
+        "path": "src/main/java/com/example/UserService.java",
+        "startLine": 42
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "<edgeId>",
+      "callerMethodId": "<methodId>",
+      "calleeMethodId": "<methodId>",
+      "cycle": false,
+      "callSite": {
+        "path": "src/main/java/com/example/UserController.java",
+        "startLine": 31
+      }
+    }
+  ],
+  "depthCutoffs": [
+    {
+      "edgeId": "<edgeId>",
+      "callerMethodId": "<methodId>",
+      "calleeMethodId": "<methodId>",
+      "targetMinDepth": 3,
+      "callSite": { "path": "...", "startLine": 12 }
+    }
+  ]
+}
+```
+
+- **field 名は Analyzer Protocol の語彙を踏襲する** (`methodId` / `callerMethodId` / `sourceLocation` / `callSite`)。利用者が Protocol JSONL と同じ語彙で扱えるようにする。
+- `status` は `ok` / `startNotFound` (`traversal.Status` と同値)。`direction` は `caller` / `callee`。
+- `cycle` は `Result.Cycles` の注釈に対応する bool。**false でも省略せず常に出力する** (利用者が field の有無を分岐しなくて済むようにする)。
+- `sourceLocation` / `callSite` は Protocol 上 optional のため、欠落時は field ごと省略する。
+- **`depthCutoffs[]` の `calleeMethodId` は `nodes[]` に存在しない** (深さ上限の外側にある node のため到達集合に含まれない。`traversal.Result` は cutoff 先の symbol を保持しない)。利用者はこの参照が dangling であることを前提にする。この非対称性は Traversal result の契約に由来する。
+- **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。到達集合は順序非保証のため、この固定が出力の決定性を担保する。
+
+#### 版管理
+
+- **Analyzer Protocol の `schemaVersion` とは独立の採番**とする。Protocol は Analyzer ↔ Core の wire 契約、本 schema は Core ↔ 利用者 (CI / 後処理) の契約であり、変更理由が独立しているため。
+- **後方互換方針**: field の追加は後方互換 (additive) とし minor を上げる。field の削除 / 意味変更 / 型変更は破壊的変更とし major を上げる。利用者は未知の field を無視できることを前提にする。
+
+**理由**:
+
+- Traversal result は tree ではなく **graph** (合流・循環を含む) である。フラットな graph はこの構造をそのまま表現でき、合流 node の重複も、循環の打ち切り表現も要らない。tree 化は Console の表示都合であり、機械処理向けの JSON に持ち込む必要がない。
+- tree 形式にすると、Console と同じ `(既出)` / `(cycle)` の打ち切りが機械処理側に漏れ出し、利用者が「この node は本当に葉なのか、参照印なのか」を判定する羽目になる。
+- `minDepth` を含めることで、「直接の呼び出し元だけ抽出 (`minDepth == 1`)」のような典型的な後処理が JSON 単体で完結する。
+
+**上位文書への影響 (変更提案)**: `minDepth` を出力するには `traversal.Result` が node ごとの最短距離を公開する必要がある。現行の `Result.Nodes` は `map[string]bool` で深さを公開していない (深さは内部計算のみ)。これは #6 で確定した Traversal result 契約の拡張であり、[traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) への **変更提案** として phase: sync で反映する (`## 上位資料からの変更点 > feature doc への影響`)。追加は additive (既存の到達集合・`cycle`・`depthLimit` の意味論を変えない) であり、#6 の決定を上書きしない。
+
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D3-D7 が未決 (D1 / D2 は 2026-07-11 に解決済み)。**決定者: Fukuemon / 期限: Phase1 設計時 (本 spec の phase: clarify)**。phase: clarify で 1 件ずつ確定する (D2 = Design Doc Open Question Q3 の管理を引き継ぐ。`requirements.md` の Q3 と決定者 / 期限を揃える)。
+- **D3 が Traversal result 契約への変更提案を含む** (`minDepth` の公開)。spec 単独で閉じないため、phase: sync で [traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md) へ反映するまで、この変更提案は未反映のまま残る。
+- D4-D7 が未決 (D1 / D2 / D3 は 2026-07-11 に解決済み)。**決定者: Fukuemon / 期限: Phase1 設計時 (本 spec の phase: clarify)**。phase: clarify で 1 件ずつ確定する (D2 = Design Doc Open Question Q3 の管理を引き継ぐ。`requirements.md` の Q3 と決定者 / 期限を揃える)。
 - CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化する)。
 
 ## 実装対象
 
 正規 target は `context/project.md` の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                                                                                    |
-| ------------------- | :------: | --------------------------------------------------------------------------------------------------------------------------- |
-| `output`            |    ◯     | Console / JSON / DOT / Mermaid formatter (`core/internal/output`)。本 spec の主対象                                         |
-| `core`              |    ◯     | `core/internal/graph` に symbol 値型を追加 (`Node.Symbol` / `Edge.CallSite`) と、graph 構築時の wire → 値型変換 (D1 で確定) |
-| `traversal`         |    -     | 入力元。#6 で確定済み。本 spec では変更しない                                                                               |
-| `analyzer-protocol` |    -     | Model schema の正本。#8 で確定済み。本 spec では再定義しない                                                                |
-| `java-analyzer`     |    -     | 非該当                                                                                                                      |
+| モジュール          | 実装有無 | 主な責務                                                                                                                                            |
+| ------------------- | :------: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output`            |    ◯     | Console / JSON / DOT / Mermaid formatter (`core/internal/output`)。本 spec の主対象                                                                 |
+| `core`              |    ◯     | `core/internal/graph` に symbol 値型を追加 (`Node.Symbol` / `Edge.CallSite`) と、graph 構築時の wire → 値型変換 (D1 で確定)                         |
+| `traversal`         |    ◯     | **D3 の変更提案**: `Result` が node ごとの `minDepth` を公開するよう拡張 (additive)。到達集合 / `cycle` / `depthLimit` の意味論は #6 のまま変えない |
+| `analyzer-protocol` |    -     | Model schema の正本。#8 で確定済み。本 spec では再定義しない                                                                                        |
+| `java-analyzer`     |    -     | 非該当                                                                                                                                              |
 
 ## 機能仕様
 
@@ -264,6 +333,12 @@ UserService.findById(Long)  [UserService.java:42]
   - `depthLimit` cutoff を持つ node の下に `… (depth limit: N)` が出て、N が当該 node からの cutoff edge 数に一致すること。
   - 兄弟の並び順が `qualifiedName` → `signature` → `methodId` の辞書順で固定され、同一 Result から常に同一のバイト列が得られること (到達集合の map 順序に依存しないこと)。
   - 子行に `callSite`、root に宣言位置が出ること。位置が欠落している場合に位置表記を省略しても破綻しないこと。
+- JSON (D3 で確定した契約の検証観点):
+  - 出力が `encoding/json` でパースでき、`schemaVersion` / `status` / `direction` / `start` / `nodes[]` / `edges[]` / `depthCutoffs[]` を持つこと (S3 の測定方法)。
+  - `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順で、同一 Result から常に同一のバイト列が得られること。
+  - node の `minDepth` が起点 0 からの最短距離に一致すること (合流 graph で最短経路側の値を採ること)。
+  - `cycle` が false の場合も field が出力されること。`sourceLocation` / `callSite` が欠落する場合に field ごと省略されること。
+  - `depthCutoffs[]` の `calleeMethodId` が `nodes[]` に存在しない (dangling) ことを、契約として明示的に検証すること。
 
 ## Interface 設計
 
@@ -306,7 +381,8 @@ UserService.findById(Long)  [UserService.java:42]
 ### 保存・管理するデータ
 
 - Output Engine は状態を持たない (`State Boundary`: 中間状態は Core プロセス内、永続ストアなし)。表示に要する属性は Graph が保持する (D1)。
-- JSON 出力のスキーマと `schemaVersion` は D3 で確定する。
+- JSON 出力はフラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`)。node は `minDepth` を持つ。field 名は Analyzer Protocol の語彙を踏襲し、要素順序は id の辞書順に固定する (D3 で確定。schema 全体は `## 解決済みの論点 > D3`)。
+- `schemaVersion` は Analyzer Protocol とは独立の採番。field 追加は additive (minor)、削除 / 意味変更は破壊的 (major) (D3)。
 
 ### コンテンツ配置 / package / route
 
@@ -398,9 +474,10 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節                                | 変更内容                                                                                           | 理由                           |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `design/features/output/DesignDoc_output.md` | (予定) 新規作成。Output API / Console tree 表現 / JSON schema / DOT・Mermaid I/F の durable な正本 | phase: sync の正本ハンドオフ先 |
+| 対象 doc / 節                                      | 変更内容                                                                                                                                                                | 理由                                                                                                                                               |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design/features/output/DesignDoc_output.md`       | (予定) 新規作成。Output API / Console tree 表現 / JSON schema / DOT・Mermaid I/F の durable な正本 <!-- source: clarify (D1-D3) -->                                     | phase: sync の正本ハンドオフ先                                                                                                                     |
+| `design/features/traversal/DesignDoc_traversal.md` | **変更提案**: Traversal result が node ごとの最短距離 (`minDepth`) を公開する。到達 node 集合を「ID 集合」から「ID → minDepth」へ拡張する <!-- source: clarify (D3) --> | D3 で JSON に `minDepth` を含めると決定したため。additive な拡張で、到達集合 / `cycle` / `depthLimit` の意味論は変えない (#6 の決定を上書きしない) |
 
 ### context への影響
 
@@ -425,12 +502,13 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                              |
-| ---------- | -------- | --------------------------------------------------------------------- |
-| 2026-07-11 | Fukuemon | phase: scaffold で初版作成 (上位文書突合 + D1-D7 列挙)                |
-| 2026-07-11 | Fukuemon | scaffold gate の spec-review で PASS。未確定事項に決定者 / 期限を追記 |
-| 2026-07-11 | Fukuemon | phase: clarify で D1 (symbol 情報の受け渡し経路) を決定               |
-| 2026-07-11 | Fukuemon | phase: clarify で D2 (= Design Doc Q3。Console ツリー表現) を決定     |
+| 日付       | 変更者   | 変更内容                                                                                                        |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | Fukuemon | phase: scaffold で初版作成 (上位文書突合 + D1-D7 列挙)                                                          |
+| 2026-07-11 | Fukuemon | scaffold gate の spec-review で PASS。未確定事項に決定者 / 期限を追記                                           |
+| 2026-07-11 | Fukuemon | phase: clarify で D1 (symbol 情報の受け渡し経路) を決定                                                         |
+| 2026-07-11 | Fukuemon | phase: clarify で D2 (= Design Doc Q3。Console ツリー表現) を決定                                               |
+| 2026-07-11 | Fukuemon | phase: clarify で D3 (JSON schema / 版管理) を決定。traversal feature doc への変更提案 (`minDepth` 公開) が発生 |
 
 ## 備考
 
