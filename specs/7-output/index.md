@@ -17,19 +17,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                  |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                       |
-| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS      |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし |
-| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                      |
-| 5   | 論点解決                    | 完了       | 2026-07-11 | D1-D7 をすべて解決 (D2 = Q3)。D3 / D7 が upstream へ変更提案          |
-| 6   | Interface / Routing 設計    | 完了       | 2026-07-11 | Formatter interface + 共有 View を確定 (D1 / D5 / D6)                 |
-| 7   | Content / Data 設計         | 完了       | 2026-07-11 | JSON schema / 版管理 / graph の symbol 値型を確定 (D1 / D3)           |
-| 8   | Performance / Security 設計 | 完了       | 2026-07-11 | 逐次書き出し。streaming 機構は導入しない (D6)                         |
-| 9   | Test / Metrics 設計         | 完了       | 2026-07-11 | golden + パース検証を unit 層に (D7)                                  |
-| 10  | 実装分割                    | 未着手     |            |                                                                       |
-| 11  | レビュー済                  | 未着手     |            |                                                                       |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                       |
+| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #7 と `requirements.md` を確認済み                            |
+| 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS           |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし      |
+| 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                           |
+| 5   | 論点解決                    | レビュー済 | 2026-07-11 | D1-D7 をすべて解決 (D2 = Q3)。clarify gate は 3 回目の spec-review で PASS |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-11 | Formatter interface + 共有 View を確定 (D1 / D5 / D6)                      |
+| 7   | Content / Data 設計         | レビュー済 | 2026-07-11 | JSON schema / 版管理 / graph の symbol 値型を確定 (D1 / D3)                |
+| 8   | Performance / Security 設計 | レビュー済 | 2026-07-11 | 逐次書き出し。streaming 機構は導入しない (D6)                              |
+| 9   | Test / Metrics 設計         | レビュー済 | 2026-07-11 | golden + パース検証を unit 層に (D7)                                       |
+| 10  | 実装分割                    | 未着手     |            |                                                                            |
+| 11  | レビュー済                  | 未着手     |            |                                                                            |
 
 ## 上位文書整合
 
@@ -178,7 +178,7 @@ Traversal result は tree ではなく集合 (到達 node 集合 + 誘導 edge �
    - **`(cycle)`** = root からの現在の経路上の祖先に戻る edge (back edge) の先。呼び出しグラフに実在する循環を意味する。
    - **`(既出)`** = 祖先ではないが、tree の別の枝で既に展開済みの node。合流 (ダイヤモンド構造) を意味する。
    - 判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` は使わない** — `Result.Cycles` は「両端が同一 SCC に属する誘導 edge すべて」というグラフ全体の性質であり (`core/internal/traversal/result.go` の `cycleEdges`)、SCC 内の最初の edge も注釈対象になる。これを打ち切り条件に使うと、A→B→C→A のような 3 要素 SCC で最初の edge A→B が打ち切られ、**C が tree に一度も現れなくなる**。`Result.Cycles` は JSON の `cycle` フラグ (D3) には正しく使える。
-7. **`… (depth limit: N edges cut)`** = `Result.DepthCutoffs` に記録された edge を持つ node の子として 1 行出す。N はその node からの cutoff edge 数 (深さ上限値ではない)。cutoff 先の node は到達集合外なので名前は出さない。
+7. **`… (depth limit: N edges cut)`** = cutoff edge の **到達側 endpoint** (= `targetMethodId` ではない方。探索方向の手前側で、到達 node 集合に属する) の子として 1 行出す。N はその node からの cutoff edge 数 (深さ上限値ではない)。cutoff の先の node (`targetMethodId`) は到達集合外なので名前は出さない。
 
 #### 行の書式
 
@@ -541,13 +541,13 @@ D6 で確定。詳細は `## 機能仕様 > Performance` と `## 解決済みの
 
 ### エラーケース
 
-| #   | ケース                               | ユーザーへの見せ方                                                                               | リカバリ                             |
-| --- | ------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| E1  | 循環参照を含むグラフ                 | Console は閉路の先を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3)               | 正常系。無限展開させない (D2 で確定) |
-| E2  | 到達なし (起点のみ、edge が空)       | Console は root 行 + `(呼び出し元なし)` / `(呼び出し先なし)`、JSON は起点 1 件 + 空 `edges`      | 正常系。`error` を返さない (D5)      |
-| E3  | 起点不在 (`status = startNotFound`)  | Console は `該当なし: 起点メソッドが解析結果に存在しません (<start>)`、JSON は `status` + 空配列 | 正常系。`error` を返さない (D5)      |
-| E4  | 未対応 format 指定                   | 対応形式を案内する `error` を返す (出力は一切書き出さない)                                       | 出力前に validation で拒否 (V1 / D5) |
-| E5  | 出力先への書き込み失敗 (`io.Writer`) | `error` を返す                                                                                   | 表示 / exit code は CLI の責務 (D5)  |
+| #   | ケース                               | ユーザーへの見せ方                                                                                         | リカバリ                                                      |
+| --- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| E1  | 循環参照を含むグラフ                 | Console は**経路上の祖先に戻る edge の先**を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3) | 正常系。無限展開させない (停止性は「初出のみ展開」が保証。D2) |
+| E2  | 到達なし (起点のみ、edge が空)       | Console は root 行 + `(呼び出し元なし)` / `(呼び出し先なし)`、JSON は起点 1 件 + 空 `edges`                | 正常系。`error` を返さない (D5)                               |
+| E3  | 起点不在 (`status = startNotFound`)  | Console は `該当なし: 起点メソッドが解析結果に存在しません (<start>)`、JSON は `status` + 空配列           | 正常系。`error` を返さない (D5)                               |
+| E4  | 未対応 format 指定                   | 対応形式を案内する `error` を返す (出力は一切書き出さない)                                                 | 出力前に validation で拒否 (V1 / D5)                          |
+| E5  | 出力先への書き込み失敗 (`io.Writer`) | `error` を返す                                                                                             | 表示 / exit code は CLI の責務 (D5)                           |
 
 ### Fallback
 
@@ -624,11 +624,12 @@ sequenceDiagram
 
 ### context への影響
 
-| 対象 doc / 節                              | 変更内容                                                                                                                                                                                                   | 理由                                                                                                                                    |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `context/architecture.md` Package Boundary | (予定) Graph Engine が node / edge の表示用属性 (`Symbol` / `CallSite`) を保持し、wire record → 値型の変換を graph 構築時に行う旨を補足 <!-- source: clarify (D1) -->                                      | D1 で確定。依存方向 (Graph Engine → Model) 自体は不変                                                                                   |
-| `context/architecture.md` Package Boundary | **変更提案**: Core 内の依存方向に `Output Engine` → `Traversal Engine` を追加する (現在は `Output Engine` → `Graph Engine` / `Model` のみ) <!-- source: clarify (D6) -->                                   | D6 で `Input` / `View` が `traversal.Result` / `Request` / `Status` を持つと確定したため。Design Doc のモジュール責務表と同時に更新する |
-| `context/testing.md` E2E (照合) 行         | (予定) S3 (各出力形式のパース可否) が **Output 層照合** (本 spec の unit / golden) と **CLI 出力照合** の 2 層からなり、CLI 層は CLI interface spec 完了後に完成する旨を補足 <!-- source: clarify (D7) --> | D7 で確定。#6 が S1/S2 で採った分界と同じ構造                                                                                           |
+| 対象 doc / 節                                | 変更内容                                                                                                                                                                                                   | 理由                                                                                                                                    |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `context/architecture.md` Package Boundary   | (予定) Graph Engine が node / edge の表示用属性 (`Symbol` / `CallSite`) を保持し、wire record → 値型の変換を graph 構築時に行う旨を補足 <!-- source: clarify (D1) -->                                      | D1 で確定。依存方向 (Graph Engine → Model) 自体は不変                                                                                   |
+| `context/architecture.md` Package Boundary   | **変更提案**: Core 内の依存方向に `Output Engine` → `Traversal Engine` を追加する (現在は `Output Engine` → `Graph Engine` / `Model` のみ) <!-- source: clarify (D6) -->                                   | D6 で `Input` / `View` が `traversal.Result` / `Request` / `Status` を持つと確定したため。Design Doc のモジュール責務表と同時に更新する |
+| `context/testing.md` E2E (照合) 行           | (予定) S3 (各出力形式のパース可否) が **Output 層照合** (本 spec の unit / golden) と **CLI 出力照合** の 2 層からなり、CLI 層は CLI interface spec 完了後に完成する旨を補足 <!-- source: clarify (D7) --> | D7 で確定。#6 が S1/S2 で採った分界と同じ構造                                                                                           |
+| `context/testing.md` テスト runtime contract | (予定) 「Golden fixture は `testdata/` 配下に置く」に、Go の **package-local `testdata/`** (例: `core/internal/output/testdata/golden/`) も含む旨を 1 行補足 <!-- source: clarify (D7) -->                 | 現行の記述は repo root の `testdata/` を指す文脈が多く解釈が揺れる (clarify gate 3 回目の非ブロッキング指摘)                            |
 
 ### ADR の新規 / 更新
 
@@ -644,7 +645,8 @@ sequenceDiagram
 | ---------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-07-11 | PASS (phase: scaffold)               | 全観点 PASS。非ブロッキング提案 3 件: ①Console の EARS 述語は D2 確定時に具体化 ②未確定事項に決定者 / 期限 ③D1(b) の供給元                                                                                                                                                                       | ② は本 spec に反映済み。① / ③ は phase: clarify で D2 / D1 を解くときに対応する                                                                                                                                                                   |
 | 2026-07-11 | NEEDS_WORK (phase: clarify / 1 回目) | blocking 3 件: ①D2 の `(cycle)` 判定が `Result.Cycles` の意味論と矛盾し 3 要素 SCC で node が tree から欠落 ②`output → traversal` の package 依存が上位文書に未宣言 ③Performance 節が placeholder のまま phase 表は「完了」。minor 2 件: `depth limit: N` の曖昧さ / `View.Start` の symbol 欠落 | ①経路上の祖先への back edge で判定する規則へ修正 (ユーザー承認済み。回帰テスト観点を追加) ②Design Doc / architecture.md への変更提案として記録 ③D6 の結論を反映 ④`… (depth limit: N edges cut)` に変更 ⑤`NodeView` の symbol 欠落許容を D6 に明記 |
-| 2026-07-11 | NEEDS_WORK (phase: clarify / 2 回目) | 1 回目の blocking 3 件は解消確認。新規 blocking 1 件: `depthCutoffs[]` の dangling 参照が探索方向で逆 (caller 方向では `callerMethodId` 側が dangling)。minor: cutoff ラベルの表記ゆれ                                                                                                           | schema に `targetMethodId` (探索方向の接続先) を追加し、D7 の検証観点を両方向で書き分け (ユーザー承認済み)。表記を統一 → 再レビューへ                                                                                                             |
+| 2026-07-11 | NEEDS_WORK (phase: clarify / 2 回目) | 1 回目の blocking 3 件は解消確認。新規 blocking 1 件: `depthCutoffs[]` の dangling 参照が探索方向で逆 (caller 方向では `callerMethodId` 側が dangling)。minor: cutoff ラベルの表記ゆれ                                                                                                           | schema に `targetMethodId` (探索方向の接続先) を追加し、D7 の検証観点を両方向で書き分け (ユーザー承認済み)。表記を統一                                                                                                                            |
+| 2026-07-11 | **PASS** (phase: clarify / 3 回目)   | 全観点 PASS。blocking なし。`targetMethodId` の定義が `nextNode(e, dir)` / cutoff 記録ロジックと厳密に一致することを実装照合で確認。非ブロッキング 3 件: ①golden の置き場所 (package-local testdata) の解釈揺れ ②D2 規則 7 の endpoint が暗黙 ③E1 行の表現が D2 より緩い                         | ② / ③ は本 spec に反映済み。① は `context/testing.md` への変更提案として phase: sync で反映する                                                                                                                                                   |
 
 ## 変更履歴
 
