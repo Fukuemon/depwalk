@@ -116,3 +116,19 @@ Verdict: **NEEDS_WORK**
 
 14. D2 規則 8 の「tree を組まず」が D5 表・図と食い違う → 到達なしは root 行のみを出す形に文言を統一 (規則 8 / 規則 9 に分割)。
 15. メタ情報のステータス行が「phase: clarify 完了」のままだった → 「phase: clarify / diagram 完了」に更新。
+
+## Review 2026-07-11 (phase: diagram gate / 3 回目)
+
+Verdict: **NEEDS_WORK**
+
+2 回目の `maxDepth=0` 修正そのものは**正しい**と実装照合で確認された (4 つの境界ケース: `maxDepth=0` / `maxDepth=0` + 起点 self-loop / 起点孤立 / `startNotFound` をすべてトレースし、規則 7 と規則 8 が同一入力で衝突しないことも確認)。ただし **修正の適用漏れ**が 4 箇所あった。
+
+### blocking 指摘と対応
+
+16. **Formatter の分岐条件が「`Edges` 空だけ」のまま 4 箇所に残存** — D6 (`## 解決済みの論点 > D6`) / Interface 設計 / Flowchart 1 のノード K / Flowchart 1 直下の本文。規則 8・D5 表・E2'・EARS は「`Edges` 空 **かつ** `Cutoffs` 空」に修正済みだったが、**実装者が Formatter の契約を読むときに最初に当たる場所**に旧述語が残っており、同一入力に対して spec が二通りの出力を規定する状態だった。放置すると 2 回目で修正したはずの `maxDepth=0` → `(呼び出し元なし)` 誤出力がそのまま再現しうる。
+
+- **対応**: 4 箇所すべてを `View.Status` / `View.Edges` / **`View.Cutoffs`** の 3 つを見る形に統一。grep で旧述語の残存ゼロを確認。
+
+### minor 指摘と対応
+
+17. D2 規則 8 の根拠文「`maxDepth=0` は起点の隣接 edge が**すべて** cutoff になる」が上位 feature doc と食い違う (feature doc と実装は「**起点自身への self-loop は誘導 edge + `cycle` 注釈として残る**」を明記) → 例外を補って上位 doc と一致させた。

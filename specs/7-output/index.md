@@ -181,7 +181,7 @@ Traversal result は tree ではなく集合 (到達 node 集合 + 誘導 edge �
    - 判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` は使わない** — `Result.Cycles` は「両端が同一 SCC に属する誘導 edge すべて」というグラフ全体の性質であり (`core/internal/traversal/result.go` の `cycleEdges`)、SCC 内の最初の edge も注釈対象になる。これを打ち切り条件に使うと、A→B→C→A のような 3 要素 SCC で最初の edge A→B が打ち切られ、**C が tree に一度も現れなくなる**。`Result.Cycles` は JSON の `cycle` フラグ (D3) には正しく使える。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の **到達側 endpoint** (= `targetMethodId` ではない方。探索方向の手前側で、到達 node 集合に属する) の子として 1 行出す。**位置はその node の子の最後** (通常の子 edge をすべて出した後)。N はその node からの cutoff edge 数 (深さ上限値ではない)。cutoff の先の node (`targetMethodId`) は到達集合外なので名前は出さない。
 8. **到達なし** = `Edges` が空 **かつ** `Cutoffs` も空のとき。root 行のみを出し、その子として `(呼び出し元なし)` / `(呼び出し先なし)` を出す (子の展開は行わない)。
-   - **`Edges` が空でも `Cutoffs` が非空なら「到達なし」ではない**。root 行 + 規則 7 の `… (depth limit: N edges cut)` を出す。これは `maxDepth=0` で必ず起きる (traversal の契約上、`maxDepth=0` は起点のみを到達集合に含め、**起点の隣接 edge はすべて cutoff になる** — [traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md))。呼び出し元は存在するが深さ上限で切られただけなので、`(呼び出し元なし)` と出してはならない。
+   - **`Edges` が空でも `Cutoffs` が非空なら「到達なし」ではない**。root 行 + 規則 7 の `… (depth limit: N edges cut)` を出す。これは `maxDepth=0` で起きる (traversal の契約上、`maxDepth=0` は起点のみを到達集合に含め、**起点の隣接 edge は cutoff になる。ただし起点自身への self-loop は両端が到達 node のため、誘導 edge (+ `cycle` 注釈) として到達 edge 集合に残る** — [traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md))。呼び出し元は存在するが深さ上限で切られただけなので、`(呼び出し元なし)` と出してはならない。
 9. **`startNotFound`** は tree を組まず、D5 の表に従った文言を出す (Console formatter 内の分岐)。
 
 #### 行の書式
@@ -379,7 +379,7 @@ type Formatter interface {
 ```
 
 - **未対応 format の検証・`View` の構築・Formatter の選択は `Write` が担う**。`Formatter` は「`View` を描く」ことだけに責務を絞る。D5 の「未対応 format は出力を書き出す前に `error`」は Formatter 選択より前の段階であり、`Formatter.Format` では表現できないため、この entry point が必要になる。
-- **`startNotFound` / 到達なしの表現は各 Formatter の内部分岐**とする (`View.Status` と `View.Edges` の空を見て分岐する)。`Write` は status で分岐せず、常に Formatter に委譲する — 「該当なし」の見せ方は形式ごとに異なる (D5 の表) ため。
+- **`startNotFound` / 到達なしの表現は各 Formatter の内部分岐**とする。分岐は `View.Status` / `View.Edges` / **`View.Cutoffs`** の 3 つを見る (「到達なし」= `Edges` 空 **かつ** `Cutoffs` 空。`Edges` が空でも `Cutoffs` が非空なら `maxDepth=0` 等の cutoff ケースであり到達なしではない — D2 規則 8)。`Write` は status で分岐せず、常に Formatter に委譲する — 「該当なし」の見せ方は形式ごとに異なる (D5 の表) ため。
 
 - **`traversal.Request` を入力に含める**理由: `traversal.Result` は `direction` / `start` を保持しない (`Status` / `Nodes` / `Edges` / `Cycles` / `DepthCutoffs` のみ)。D3 の JSON はこの 2 つを出力するため、Output 側で Request を受け取る必要がある。
 - **sort 規則の所在**: `View` の構築時に、`Nodes` / `Edges` / `Cutoffs` を id (`methodId` / `edgeId`) の辞書順に固定する。これが JSON / DOT / Mermaid の要素順序 (D3 / D4 G-6) をそのまま満たす。Console の兄弟順序だけは `qualifiedName` → `signature` → `methodId` 順 (D2) であり、これは Console formatter が `View` を読み替えて適用する (`View` は決定的な基準順序を与え、Console はその上で表示順を定める)。
@@ -508,7 +508,7 @@ core/internal/output/
 - Output Engine の入力は **Graph と Traversal result の 2 つ**に確定 (D1)。symbol は Graph の読み取り API から引くため、symbol table を第 3 引数として渡さない。
 - **公開 entry point**: `output.Write(w io.Writer, f Format, in Input) error`。未対応 format の検証 → `View` 構築 → Formatter 選択 → 描画、を担う唯一の公開 API。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らず、format 名を渡すだけでよい (D6 で確定)。
 - **Formatter interface (package 内部の拡張点)**: `Formatter.Format(w io.Writer, v View) error`。入力は `Graph` + `traversal.Result` + `traversal.Request` (= `Input`) で、そこから symbol 解決済み・sort 済みの中間表現 `View` を 1 度構築し、各 formatter が描画する (型は `## 解決済みの論点 > D6`)。
-- `startNotFound` / 到達なしは `Write` では分岐せず、各 Formatter が `View.Status` / 空の `Edges` を見て形式ごとに表現する (D5)。
+- `startNotFound` / 到達なしは `Write` では分岐せず、各 Formatter が `View.Status` / `View.Edges` / `View.Cutoffs` の 3 つを見て形式ごとに表現する (D5。「到達なし」= `Edges` 空 かつ `Cutoffs` 空 — D2 規則 8)。
 - Output が `error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ。`startNotFound` / 到達なしは正常系として各形式で表現する (D5)。exit code と表示は CLI の責務。
 - **Console 出力**: 罫線ツリー / 初出のみ展開 / `(cycle)` (経路上の祖先) / `(既出)` (別枝で展開済み) / `… (depth limit: N edges cut)` / 子行は `callSite`、root は宣言位置 (D2 で確定。tree 構築規則と書式の詳細は `## 解決済みの論点 > D2`)。
 - Console の tree 化は Output Engine 内に閉じる。Traversal は tree を保持しないため、tree 構築を Traversal 側へ押し戻さない。
@@ -619,7 +619,7 @@ flowchart TD
     G --> H["Console: View から tree を構築して描画<br/>(D2。下図)"]
     G --> I["JSON: フラットな graph を描画<br/>(nodes/edges/depthCutoffs。D3)"]
     G --> J["DOT / Mermaid: 到達 graph を描画<br/>(Phase4。tree 化しない。D4)"]
-    H --> K["各 Formatter は View.Status / 空の Edges を見て<br/>startNotFound (該当なし) と<br/>到達なしを形式ごとに表現する (D5)"]
+    H --> K["各 Formatter は View.Status / Edges / Cutoffs を見て<br/>startNotFound (該当なし) と 到達なし を形式ごとに表現する<br/>(到達なし = Edges 空 かつ Cutoffs 空。<br/>Edges 空でも Cutoffs 非空なら cutoff ケース。D5 / D2 規則 8)"]
     I --> K
     J --> K
     K --> L["io.Writer へ逐次書き出し"]
@@ -628,7 +628,7 @@ flowchart TD
     M -- "Yes" --> O["正常終了 (nil)"]
 ```
 
-`startNotFound` / 到達なしは **Formatter を迂回しない**。「該当なし」の見せ方は形式ごとに異なる (D5 の表) ため、各 Formatter が `View.Status` と空の `Edges` を見て分岐する。
+`startNotFound` / 到達なしは **Formatter を迂回しない**。「該当なし」の見せ方は形式ごとに異なる (D5 の表) ため、各 Formatter が `View.Status` / `View.Edges` / `View.Cutoffs` を見て分岐する。**「到達なし」は `Edges` 空 かつ `Cutoffs` 空**であり、`Edges` が空でも `Cutoffs` が非空なら (`maxDepth=0` 等) 到達なしではない (D2 規則 8)。
 
 ### Flowchart (Console の tree 構築 — D2)
 
@@ -762,6 +762,7 @@ sequenceDiagram
 | 2026-07-11 | **PASS** (phase: clarify / 3 回目)   | 全観点 PASS。blocking なし。`targetMethodId` の定義が `nextNode(e, dir)` / cutoff 記録ロジックと厳密に一致することを実装照合で確認。非ブロッキング 3 件: ①golden の置き場所 (package-local testdata) の解釈揺れ ②D2 規則 7 の endpoint が暗黙 ③E1 行の表現が D2 より緩い                         | ② / ③ は本 spec に反映済み。① は `context/testing.md` への変更提案として phase: sync で反映する                                                                                                                                                                                                     |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 1 回目) | blocking 2 件: ①Flowchart 2 で祖先集合の初期化が抜け self-loop が `(既出)` になり root が二重展開 ②sequence の `Format(w, Input)` が D6 と signature 不一致 (= format 検証 / View 構築 / Formatter 選択を担う entry point が未定義)。他 moderate 1 / minor 2                                     | ①D2 規則 4 に「visit 入口で自分を展開済み / 祖先集合に入れる」を明記し図と回帰テスト観点を追加 ②D6 に公開 entry point `output.Write(w, format, Input)` を追加 (ユーザー承認済み) ③`startNotFound` / 到達なしが Formatter を迂回しない形に修正 ④cutoff 行の位置を明記 ⑤minDepth の変更提案注記を追加 |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 2 回目) | 1 回目の指摘は全件解消を確認。新規 blocking 1 件: `maxDepth=0` で `Edges` は空だが `Cutoffs` が非空になるため、「到達なし」を `Edges` 空だけで判定すると誤って `(呼び出し元なし)` を出力し、規則 7 の cutoff 行も出ない (規則 7 と規則 8 が矛盾)                                                 | 「到達なし」を **`Edges` 空 かつ `Cutoffs` 空** に狭め、EARS / D5 表 / E2・E2' / D2 規則 8 / Flowchart 2 を統一。D7 に `maxDepth=0` と `maxDepth=0 + 起点 self-loop` の fixture を追加                                                                                                              |
+| 2026-07-11 | NEEDS_WORK (phase: diagram / 3 回目) | 2 回目の修正自体は実装照合で正しいと確認 (4 境界ケース)。blocking 1 件: **修正の適用漏れ** — Formatter の分岐条件が「`Edges` 空だけ」のまま D6 / Interface 設計 / Flowchart 1 の 4 箇所に残存し、実装者が最初に読む場所で誤出力が再現しうる。minor: 「すべて cutoff」が self-loop 例外と食い違う | 4 箇所を `View.Status` / `Edges` / **`Cutoffs`** の 3 条件に統一 (grep で残存ゼロを確認)。self-loop 例外を上位 feature doc と一致させた                                                                                                                                                             |
 
 ## 変更履歴
 
@@ -778,6 +779,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | clarify gate 3 回目で PASS。phase: diagram で `## フロー / シーケンス` に 3 図を生成 (出力フロー / Console tree 構築 / sequence)。mermaid-cli でレンダリング検証済み                       |
 | 2026-07-11 | Fukuemon | diagram gate の指摘に対応: D2 規則 4 に visit 入口の初期化を明記 (self-loop / root 二重展開の修正)、D6 に公開 entry point `output.Write` を追加、図を本文と一致させた                      |
 | 2026-07-11 | Fukuemon | diagram gate 2 回目の指摘に対応: 「到達なし」の判定を `Edges` 空 かつ `Cutoffs` 空に狭め、`maxDepth=0` の誤出力 (`(呼び出し元なし)`) を修正 (D2 規則 8 / D5 / D7)                          |
+| 2026-07-11 | Fukuemon | diagram gate 3 回目の指摘に対応: Formatter の分岐条件を `Status` / `Edges` / `Cutoffs` の 3 条件に統一 (適用漏れ 4 箇所)、self-loop 例外を上位 doc と一致                                  |
 
 ## 備考
 
