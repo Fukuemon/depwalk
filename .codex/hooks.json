@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 hooks/protected-branch/pre_tool_use.py"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && python3 hooks/protected-branch/pre_tool_use.py"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 hooks/protected-branch/pre_tool_use.py"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && python3 hooks/protected-branch/pre_tool_use.py"
           }
         ]
       }
@@ -26,15 +26,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash hooks/markdown/format_markdown.sh"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/markdown/format_markdown.sh"
           },
           {
             "type": "command",
-            "command": "bash hooks/spec/validate_document.sh"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/spec/validate_document.sh"
           },
           {
             "type": "command",
-            "command": "bash hooks/spec/validate_prompts.sh"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/spec/validate_prompts.sh"
           }
         ]
       }

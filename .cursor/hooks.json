@@ -4,29 +4,29 @@
     "preToolUse": [
       {
         "type": "command",
-        "command": "python3 hooks/protected-branch/pre_tool_use.py",
+        "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && python3 hooks/protected-branch/pre_tool_use.py",
         "matcher": "Edit|Write|MultiEdit"
       },
       {
         "type": "command",
-        "command": "python3 hooks/protected-branch/pre_tool_use.py",
+        "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && python3 hooks/protected-branch/pre_tool_use.py",
         "matcher": "Bash"
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "command": "bash hooks/markdown/format_markdown.sh",
+        "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/markdown/format_markdown.sh",
         "matcher": "Edit|Write"
       },
       {
         "type": "command",
-        "command": "bash hooks/spec/validate_document.sh",
+        "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/spec/validate_document.sh",
         "matcher": "Edit|Write"
       },
       {
         "type": "command",
-        "command": "bash hooks/spec/validate_prompts.sh",
+        "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" && bash hooks/spec/validate_prompts.sh",
         "matcher": "Edit|Write"
       }
     ]

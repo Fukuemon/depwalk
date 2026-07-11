@@ -7,14 +7,12 @@
 ```sh
 npx rulesync@latest generate
 bash scripts/fix-cursor-cli.sh   # cursor cli.json を cursor-agent 互換へ正規化
-bash scripts/fix-codex-config.sh # Codex config の legacy permissions profile を除去
 ```
 
 - 引数なしで全 provider に展開する
 - `@latest` を明示するのは旧キャッシュ版を踏まないため
 - 生成先は `AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/`
 - **生成後に必ず `scripts/fix-cursor-cli.sh` を実行する** (理由は下記)
-- **生成後に必ず `scripts/fix-codex-config.sh` を実行する** (理由は下記)
 
 ### cursor cli.json の正規化が必要な理由
 
@@ -22,19 +20,9 @@ bash scripts/fix-codex-config.sh # Codex config の legacy permissions profile �
 **常時出力**し、`permissions.deny` は deny エントリが 1 件以上ある時だけ出力する。一方
 現行 cursor-agent CLI は `version` / `editor` を未知キーとして拒否し、`permissions.deny`
 を必須配列として要求する。rulesync 側にこれらを抑止する設定が無いため、生成直後に
-`scripts/fix-cursor-cli.sh` (`jq`、未導入時は Python 3 で `version`/`editor` を除去し `deny` 配列を保証) を通す。
+`scripts/fix-cursor-cli.sh` (jq で `version`/`editor` を除去し `deny` 配列を保証) を通す。
 冪等なので何度実行してもよい。`.rulesync/permissions.json` に deny エントリを持たせると
 deny 配列は rulesync 側でも出力される (スクリプトは欠落時の保険)。
-
-### Codex config の正規化が必要な理由
-
-`rulesync generate` は `.codex/config.toml` に `default_permissions = "rulesync"` と
-`[permissions.rulesync.*]` を出力する。rulesync 9.x では project profile に
-`:minimal = "read"` のような filesystem permission が出ることがあり、ユーザーの global
-config で `sandbox_mode = "workspace-write"` を指定していても project profile が優先されて
-read-only 相当になる。repo 側で広い write permission を永続化せず、ユーザーの global sandbox
-policy に委ねるため、生成後に `scripts/fix-codex-config.sh` で project permissions profile を除去する。
-冪等なので何度実行してもよい。
 
 ## 2. 差分確認チェックリスト
 

@@ -21,19 +21,12 @@ PROMPT="$(cat "$OUT/prompt.txt")"   # step2 で固定済みのプロンプト本
 
 run_agent() {           # $1=id  $2=timeout秒  $3...=invocation（registry から $PROMPT 展開済み）
   local id="$1" tmo="$2"; shift 2
-  local rc
   if [ -n "$TIMEOUT" ]; then          # timeout runner があるとき
-    if "$TIMEOUT" "$tmo" "$@" </dev/null >"$OUT/$id.out" 2>&1; then
-      rc=0
-    else
-      rc=$?
-    fi
-  else                                # runner 不在: raw 実行は禁止。無制限起動せず timeout 相当で失敗させる
-    echo "timeout runner is required for $id; install timeout/gtimeout or use a harness background runner" >"$OUT/$id.out"
-    rc=124
+    "$TIMEOUT" "$tmo" "$@" </dev/null >"$OUT/$id.out" 2>&1
+  else                                # runner 不在: 素の起動はハングを打ち切れない。下記「timeout runner の解決」に従い background runner 方式へ切り替える前提
+    "$@" </dev/null >"$OUT/$id.out" 2>&1
   fi
-  echo "$rc" >"$OUT/$id.exit"
-  return "$rc"
+  echo $? >"$OUT/$id.exit"
 }
 
 # レジストリの各 enabled エージェントについて、invocation を argv に展開して起動する。
@@ -56,12 +49,12 @@ GNU `timeout` は macOS に標準搭載されず (`command not found` で全エ�
 ```bash
 if command -v timeout >/dev/null 2>&1; then TIMEOUT=timeout
 elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT=gtimeout   # coreutils (brew)
-else TIMEOUT=""; fi   # どれも無ければ raw 実行せず 124 として扱うか、background runner 方式に切り替える
+else TIMEOUT=""; fi   # どれも無ければ background runner 方式に切り替える
 ```
 
 - `$TIMEOUT` が空だと `run_agent` の素の起動は **ハングを打ち切れず `wait` が無限に止まりうる** (中核原則「timeout を各エージェントに適用」を満たせない)。macOS は GNU `timeout` 非搭載が既定のためこの分岐は頻繁に通る。したがって runner 不在時は次のいずれかを **必須** とする:
   - (推奨) 下記「background runner を使う場合」の方式に切り替え、harness 側の timeout に各エージェントの打ち切りを委ねる。打ち切られた場合は `<id>.exit` に timeout 相当 (124) を書き、失敗分類を成立させる。
-  - background runner も無い実行環境では、上記の `run_agent` が `<id>.out` に理由を書き、`<id>.exit` に timeout 相当 (124) を残す。timeout runner (coreutils の `gtimeout` 等) の導入を `停止条件` として促し、無制限起動のまま続行しない。
+  - background runner も無い実行環境では、timeout runner (coreutils の `gtimeout` 等) の導入を `停止条件` として促す (無制限起動のまま続行しない)。
 - coreutils が multi-call binary (`coreutils timeout ...`) の環境では、その呼び出しを `$TIMEOUT` に読み替える。
 
 ## background runner を使う場合

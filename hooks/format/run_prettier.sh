@@ -21,4 +21,4 @@ if [ "${#STAGED_FILES[@]}" -eq 0 ]; then
 fi
 
 npx prettier --write "${STAGED_FILES[@]}"
-git add -f -- "${STAGED_FILES[@]}"
+git add -- "${STAGED_FILES[@]}"

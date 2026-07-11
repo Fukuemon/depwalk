@@ -1,7 +1,8 @@
 ---
 name: design-doc
-description: Creates or updates the product PRD and the top-level Design Doc from templates. Decides whether a standalone PRD is needed, or whether Why/What should be merged into the Design Doc. Use when the user asks to draft a PRD, a Design Doc, or to define a product's Why/What/How.
+description: テンプレートからプロダクトの PRD とトップレベル Design Doc を作成・更新し、独立 PRD の要否 (Why/What を Design Doc に統合するか) を判定する。"PRD 書いて" / "Design Doc 作って" / "Why/What/How を整理" で起動する。
 ---
+
 # Design Doc
 
 プロダクトの **Why / What / How** を確定し、PRD と Design Doc を template から生成・更新する。要件規模に応じて、独立 PRD を作るか、Design Doc に Why/What を統合するかを判定する。
@@ -62,7 +63,7 @@ description: Creates or updates the product PRD and the top-level Design Doc fro
 
 - 承認後に `PRD.md` / `design/DesignDoc.md` を保存する。既存がある場合は上書きせず差分案を提示する。
 - `context/` が未整備なら `context-bootstrap` skill を案内する。
-- 統合モードを選んだ場合、下流 (CLAUDE.md / spec-*) の「PRD」参照は「統合 Design Doc の Why/What 節」を指す旨を `Spec Workflow Contract` 側で確認する。
+- 統合モードを選んだ場合、下流 (CLAUDE.md / spec-\*) の「PRD」参照は「統合 Design Doc の Why/What 節」を指す旨を `Spec Workflow Contract` 側で確認する。
 
 ## 停止条件
 

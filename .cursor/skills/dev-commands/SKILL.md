@@ -1,7 +1,8 @@
 ---
 name: dev-commands
-description: Resolves the correct project command for a task (dev, build, lint, format, typecheck, test, e2e, analysis) from the project's command contract, and decides whether to scope it to a single module. Use when the user asks how to run, build, test, or analyze something in this repo, or asks for a command cheat sheet.
+description: タスクに対応するプロジェクトコマンド (dev / build / lint / format / typecheck / test / e2e / 分析) を context/project.md のコマンド契約から解決し、単一 module へのスコープ要否を判定する。"どう動かす" / "テストの回し方" / "コマンド一覧" で起動する。
 ---
+
 # Dev Commands
 
 本リポジトリで **タスクを正しいコマンドで実行する** ための入口。新しいコマンドを発明せず、[context/project.md](../../../context/project.md) の Quick Commands 契約に沿って実行する。

@@ -1,6 +1,6 @@
 # Git Workflow Order
 
-Kufu Monorepo で Git / GitHub 操作を進めるときの標準順序。
+本リポジトリ で Git / GitHub 操作を進めるときの標準順序。
 
 ## 標準順序
 
