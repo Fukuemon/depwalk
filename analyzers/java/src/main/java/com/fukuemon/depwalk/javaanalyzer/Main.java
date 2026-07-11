@@ -1,0 +1,77 @@
+package com.fukuemon.depwalk.javaanalyzer;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fukuemon.depwalk.javaanalyzer.io.MetricsReporter;
+import com.fukuemon.depwalk.javaanalyzer.io.MetricsSummary;
+import com.fukuemon.depwalk.javaanalyzer.io.ProtocolObjectMapper;
+import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
+import com.fukuemon.depwalk.javaanalyzer.io.RequestReader;
+import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
+import com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator;
+import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
+import com.fukuemon.depwalk.javaanalyzer.protocol.ErrorRecord;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+
+/**
+ * Java Analyzer process の entry point。
+ * process contract (analyzer-protocol 正本): stdin から {@code analysisRequest} を 1 件受け取り、
+ * stdout へ JSONL record を逐次出力し、stderr へ計測ログを出す。exit code 0 = 成功、非ゼロ = fatal。
+ *
+ * <p>AST 解析 / 型解決 / {@code methodSymbol} ・ {@code callEdge} の生成は P2_01 の責務。
+ * 本 prompt の範囲では pre-flight を通過した場合、record 0 件で exit code 0 とする
+ * (0 件の正常解析は protocol 上 success)。
+ */
+public final class Main {
+
+    private Main() {
+    }
+
+    public static void main(String[] args) {
+        int exitCode = run(System.in, System.out, System.err);
+        System.exit(exitCode);
+    }
+
+    /**
+     * テスト容易性のため exit code を返す形にし、{@link System#exit(int)} を呼ばない実行本体。
+     */
+    public static int run(InputStream in, OutputStream out, OutputStream err) {
+        Instant start = Instant.now();
+        ObjectMapper mapper = ProtocolObjectMapper.create();
+
+        try (RecordWriter writer = new RecordWriter(out, mapper)) {
+            AnalysisRequest request;
+            try {
+                request = new RequestReader(mapper).read(in);
+            } catch (IOException e) {
+                writer.write(ErrorRecord.of(
+                        JavaErrorCode.JAVA_INVALID_REQUEST.code(),
+                        "failed to read analysisRequest: " + e.getMessage()));
+                return 1;
+            }
+
+            try {
+                PreflightValidator.validate(request);
+            } catch (AnalyzerFatalException e) {
+                writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
+                return 1;
+            }
+
+            // AST 解析 / 型解決 / methodSymbol・callEdge 生成は P2_01 の責務。
+            // 本 prompt では pre-flight 通過後、record 0 件で success とする。
+            Duration elapsed = Duration.between(start, Instant.now());
+            MetricsSummary summary = new MetricsSummary(0, elapsed.toMillis(), 0);
+            PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
+            MetricsReporter.report(errStream, summary);
+            return 0;
+        } catch (IOException e) {
+            return 1;
+        }
+    }
+}
