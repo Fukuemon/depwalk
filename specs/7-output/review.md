@@ -80,3 +80,22 @@ Verdict: **PASS** — clarify gate 通過。
 ### 次アクション
 
 phase: diagram / track / sync / tasks へ進んでよい。sync では 3 件の変更提案の反映、Design Doc Q3 の「解決済み」更新、`design/features/output/DesignDoc_output.md` への正本ハンドオフを行う。
+
+## Review 2026-07-11 (phase: diagram gate / 1 回目)
+
+Verdict: **NEEDS_WORK**
+
+図 3 点 (出力フロー / Console tree 構築 / sequence) を追加した状態のレビュー。blocking 2 件 + moderate 1 件 + minor 2 件。
+
+### blocking 指摘と対応
+
+8. **Flowchart 2 で祖先集合 / 展開済みの初期化が抜けており、self-loop が D2 規則 6 と食い違う** — 図では現 node が祖先集合に加わるのが再帰時のみのため、(a) 非 root の self-loop `B→B` が `(cycle)` ではなく `(既出)` になり、(b) root の self-loop で root が再展開され、規則 5 の「各 node は高々 1 回しか展開されない」(= 停止性と O(到達 edge 数) の根拠) が破れる。
+   - **対応**: D2 規則 4 に「**visit 入口で現 node を展開済みに記録し、祖先集合に加える** (root を含む)」を明記し、図にも入口ステップを追加。self-loop と root self-loop の回帰テスト観点を D7 に追加。
+9. **sequence の `Format(w, Input{...})` が D6 の `Formatter.Format(w, View)` と signature 不一致** — 根本原因は、**format 検証・`View` 構築・Formatter 選択を担う package entry point が spec に定義されていなかった**こと。D5 の「未対応 format は出力前に error」は Formatter 選択より前の段階であり、`Formatter.Format(w, View)` では表現できない。
+   - **対応**: D6 に公開 entry point **`output.Write(w io.Writer, f Format, in Input) error`** を追加 (ユーザー承認済み)。`Formatter` / `View` は package 内部の拡張点に降格。Interface 設計 / E4 / sequence を同期。
+
+### moderate / minor 指摘と対応
+
+10. Flowchart 1 で `startNotFound` / 到達なしが Formatter 選択を迂回していた → **Formatter を迂回しない**形に修正 (「該当なし」の見せ方は形式ごとに異なるため、各 Formatter が `View.Status` / 空 `Edges` を見て分岐する)。Flowchart 2 にも status 分岐と到達なしの枝を追加。
+11. cutoff 行の位置を図が先取りしていた → D2 規則 7 に「**位置はその node の子の最後**」を明記し、本文と図を一致させた。
+12. sequence の `minDepth` が未反映の変更提案である旨の注記が無かった → `Note over Trv` に「D3 の変更提案。sync で traversal feature doc へ反映」を追加。
