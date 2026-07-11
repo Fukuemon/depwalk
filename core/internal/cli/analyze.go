@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ func newAnalyzeCommand() *cobra.Command {
 				return err
 			}
 			if flags.language == "" {
-				return fmt.Errorf("--language is required")
+				return errors.New("--language is required")
 			}
 
 			result, err := analyze.Run(analyze.Options{

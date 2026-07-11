@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -12,7 +13,7 @@ const analyzerCmdEnv = "DEPWALK_ANALYZER_CMD"
 // ResolveCommand resolves the Analyzer launch command string.
 //
 // Resolution order (ADR-0003): the flag value takes precedence, then the
-// DEPWALD_ANALYZER_CMD environment variable (read through getenv), and if
+// DEPWALK_ANALYZER_CMD environment variable (read through getenv), and if
 // neither is set, resolution fails so the caller can reject the request
 // before starting an Analyzer process.
 func ResolveCommand(flagValue string, getenv func(string) string) (string, error) {
@@ -76,7 +77,7 @@ func SplitCommand(command string) ([]string, error) {
 	}
 
 	if inEscape {
-		return nil, fmt.Errorf("analyzer command has a trailing unescaped backslash")
+		return nil, errors.New("analyzer command has a trailing unescaped backslash")
 	}
 	if quote != 0 {
 		return nil, fmt.Errorf("analyzer command has an unterminated %c quote", quote)
@@ -84,7 +85,7 @@ func SplitCommand(command string) ([]string, error) {
 	flush()
 
 	if len(words) == 0 {
-		return nil, fmt.Errorf("analyzer command must not be empty")
+		return nil, errors.New("analyzer command must not be empty")
 	}
 	return words, nil
 }
