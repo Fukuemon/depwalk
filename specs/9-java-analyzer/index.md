@@ -7,9 +7,9 @@
 ## メタ情報
 
 - Issue: `#9`
-- ステータス: `In Progress`
+- ステータス: `Done`
 - 作成日: 2026-07-11
-- 更新日: 2026-07-11
+- 更新日: 2026-07-12
 - Branch: `feature/9`
 - Owner: Fukuemon
 
@@ -17,21 +17,21 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                     | 状態       | 最終更新   | 備考                                                                                                                                                     |
-| --- | ---------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                         | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                             |
-| 2   | 下書き                       | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                                 |
-| 3   | 上位文書突合                 | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし                        |
-| 4   | 論点整理                     | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                            |
-| 5   | 論点解決                     | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)          |
-| 5.5 | 図 (phase: diagram)          | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目) |
-| 6   | Interface / Routing 設計     | レビュー済 | 2026-07-11 | `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key (`classpath` / `liftExcludePackages`) を確定。実装言語は Java を維持        |
-| 7   | Content / Data 設計          | レビュー済 | 2026-07-11 | 永続データなし / `analyzers/java/` 配置 / fixture 配置を確定                                                                                             |
-| 8   | Performance / Security 設計  | レビュー済 | 2026-07-11 | 方式 (streaming / AST 破棄 / stderr 計測) と Fallback 方針を記載。数値目標は実測 baseline 後                                                             |
-| 9   | Test / Metrics 設計          | レビュー済 | 2026-07-11 | 三層 (Java unit / Go fake / 実 jar E2E) の feature 固有観点と計測指標を記載                                                                              |
-| 9.5 | 正本ハンドオフ (phase: sync) | レビュー済 | 2026-07-11 | feature doc 新規作成 / DesignDoc S5・P4 / ADR-0003 / context 5 ファイルへ反映。spec-review PASS (3 回目)                                                 |
-| 10  | 実装分割                     | 未着手     |            |                                                                                                                                                          |
-| 11  | レビュー済                   | 未着手     |            |                                                                                                                                                          |
+| #   | フェーズ                     | 状態       | 最終更新   | 備考                                                                                                                                                           |
+| --- | ---------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                         | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                                   |
+| 2   | 下書き                       | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                                       |
+| 3   | 上位文書突合                 | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし                              |
+| 4   | 論点整理                     | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                                  |
+| 5   | 論点解決                     | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)                |
+| 5.5 | 図 (phase: diagram)          | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目)       |
+| 6   | Interface / Routing 設計     | レビュー済 | 2026-07-11 | `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key (`classpath` / `liftExcludePackages`) を確定。実装言語は Java を維持              |
+| 7   | Content / Data 設計          | レビュー済 | 2026-07-11 | 永続データなし / `analyzers/java/` 配置 / fixture 配置を確定                                                                                                   |
+| 8   | Performance / Security 設計  | レビュー済 | 2026-07-11 | 方式 (streaming / AST 破棄 / stderr 計測) と Fallback 方針を記載。数値目標は実測 baseline 後                                                                   |
+| 9   | Test / Metrics 設計          | レビュー済 | 2026-07-11 | 三層 (Java unit / Go fake / 実 jar E2E) の feature 固有観点と計測指標を記載                                                                                    |
+| 9.5 | 正本ハンドオフ (phase: sync) | レビュー済 | 2026-07-11 | feature doc 新規作成 / DesignDoc S5・P4 / ADR-0003 / context 5 ファイルへ反映。spec-review PASS (3 回目)                                                       |
+| 10  | 実装分割                     | レビュー済 | 2026-07-12 | prompts 4 件を生成 (P1 並列 2 + P2 直列 2)。#7 (output) merge 済みの codebase と突合し P1_01 の traversal / output 境界表現を明確化。spec-review PASS (2 回目) |
+| 11  | レビュー済                   | レビュー済 | 2026-07-12 | prompts gate の fresh-context review (2 回目) が全観点 PASS — 最終レビューを兼ねる。非ブロッキング補足 1 件 (E2E 配置先) は実装時に確定                        |
 
 ## 上位文書整合
 
@@ -41,22 +41,24 @@
 - Design Doc 更新要否: **反映済** (① 「詳細の所在 → Feature 設計」の Java Analyzer 行を feature doc へリンクした ② 成功条件 S5 / 設計原則 P4 の測定方法を「2 つ目以降の Analyzer 追加時に Core 無変更」と明確化した。phase: sync で反映済み、2026-07-11)
 - ADR 起票要否: **反映済** (ADR-0003: Analyzer 起動コマンドを言語非依存な文字列として CLI flag + 環境変数で解決する = D2。phase: sync で起票済み、2026-07-11)。D1 (build tool / JDK / 配布形態) は toolchain の確定値として `context/toolchain.md` に記録し、ADR にはしない
 
-| 上位文書                       | 節 / 該当箇所                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PRD                            | 統合モードのため非該当                                        | 継承                                                                                                                                                               |
-| Design Doc                     | モジュール責務 (Java Analyzer) / 設計原則 P2・P3 / S4         | 継承 (Analyzer は独立プロセス、Protocol のみで Core と結合)                                                                                                        |
-| Design Doc                     | 成功条件 S5 / 設計原則 P4                                     | 変更提案 (測定方法を「**2 つ目以降**の言語 Analyzer 追加時に Core へ差分が出ないこと」と明確化する。初号機導入時の言語非依存な初回配線は対象外。反映済 2026-07-11) |
-| Design Doc                     | Future Work Phase1〜3 / Open Questions Q2                     | 補足 (Phase1 の範囲を確定し、Phase2/3 の段階導入境界を宣言する。反映済 2026-07-11)                                                                                 |
-| Design Doc                     | 詳細の所在 → Feature 設計 (Java Analyzer)                     | 変更提案 (feature doc を作成しリンクした。反映済 2026-07-11)                                                                                                       |
-| feature doc: analyzer-protocol | Model schema / process contract / versioning                  | 継承 (契約は変更しない。Java 側は準拠側として実装する。反映済 2026-07-11)                                                                                          |
-| feature doc: java-analyzer     | Java Analyzer の durable な設計成果 (正本)                    | 新規作成 (本 spec の D1-D11 を feature doc へハンドオフ。反映済 2026-07-11)                                                                                        |
-| context: architecture          | Package Boundary (`analyzers/<language>/`) / Runtime Boundary | 継承 (Java 実装は `analyzers/java/` に置き、Core の internal に入れない。反映済 2026-07-11)                                                                        |
-| context: toolchain             | 標準スタック (Java Analyzer 行) / Scaffold Policy             | 補足 (JavaParser / SymbolSolver / SootUp は確定済。build tool と JDK version を本 spec で確定した。反映済 2026-07-11)                                              |
-| context: testing               | Protocol contract test / テスト責務の分担                     | 補足 (Java Analyzer 側の contract test 実行方式を確定した。反映済 2026-07-11)                                                                                      |
-| context: engineering           | quality gate / Analyzer build を束ねる wrapper の要否         | 補足 (D1 / D10 の決定に伴い、Java build を quality gate に含めるかを確定した。反映済 2026-07-11)                                                                   |
-| ADR-0001                       | JSONL over STDIN/STDOUT / process SPI                         | 継承 (反映済 2026-07-11)                                                                                                                                           |
-| ADR-0002                       | Core 実装基盤 (Go)                                            | 継承 (Core に JVM 依存を持ち込まない。反映済 2026-07-11)                                                                                                           |
-| ADR-0003                       | Analyzer 起動コマンドを言語非依存な文字列として解決する (D2)  | 新規作成 (反映済 2026-07-11)                                                                                                                                       |
+| 上位文書                       | 節 / 該当箇所                                                         | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                     |
+| ------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD                            | 統合モードのため非該当                                                | 継承                                                                                                                                                                  |
+| Design Doc                     | モジュール責務 (Java Analyzer) / 設計原則 P2・P3 / S4                 | 継承 (Analyzer は独立プロセス、Protocol のみで Core と結合)                                                                                                           |
+| Design Doc                     | 成功条件 S5 / 設計原則 P4                                             | 変更提案 (測定方法を「**2 つ目以降**の言語 Analyzer 追加時に Core へ差分が出ないこと」と明確化する。初号機導入時の言語非依存な初回配線は対象外。反映済 2026-07-11)    |
+| Design Doc                     | Future Work Phase1〜3 / Open Questions Q2                             | 補足 (Phase1 の範囲を確定し、Phase2/3 の段階導入境界を宣言する。反映済 2026-07-11)                                                                                    |
+| Design Doc                     | 詳細の所在 → Feature 設計 (Java Analyzer)                             | 変更提案 (feature doc を作成しリンクした。反映済 2026-07-11)                                                                                                          |
+| feature doc: analyzer-protocol | Model schema / process contract / versioning                          | 継承 (契約は変更しない。Java 側は準拠側として実装する。反映済 2026-07-11)                                                                                             |
+| feature doc: java-analyzer     | Java Analyzer の durable な設計成果 (正本)                            | 新規作成 (本 spec の D1-D11 を feature doc へハンドオフ。反映済 2026-07-11)                                                                                           |
+| context: architecture          | Package Boundary (`analyzers/<language>/`) / Runtime Boundary         | 継承 (Java 実装は `analyzers/java/` に置き、Core の internal に入れない。反映済 2026-07-11)                                                                           |
+| context: toolchain             | 標準スタック (Java Analyzer 行) / Scaffold Policy                     | 補足 (JavaParser / SymbolSolver / SootUp は確定済。build tool と JDK version を本 spec で確定した。反映済 2026-07-11)                                                 |
+| context: testing               | Protocol contract test / テスト責務の分担                             | 補足 (Java Analyzer 側の contract test 実行方式を確定した。反映済 2026-07-11)                                                                                         |
+| context: engineering           | quality gate / Analyzer build を束ねる wrapper の要否                 | 補足 (D1 / D10 の決定に伴い、Java build を quality gate に含めるかを確定した。反映済 2026-07-11)                                                                      |
+| ADR-0001                       | JSONL over STDIN/STDOUT / process SPI                                 | 継承 (反映済 2026-07-11)                                                                                                                                              |
+| ADR-0002                       | Core 実装基盤 (Go)                                                    | 継承 (Core に JVM 依存を持ち込まない。反映済 2026-07-11)                                                                                                              |
+| ADR-0003                       | Analyzer 起動コマンドを言語非依存な文字列として解決する (D2)          | 新規作成 (反映済 2026-07-11)                                                                                                                                          |
+| ADR-0004                       | 動的呼び出しの完全追跡を初期スコープに含めない                        | 継承 (Design Doc Non Goals と整合。Phase1 は動的解析を実装せず、候補・未解決の観測可能性の境界も後続 feature が継承する。2026-07-12 突合)                             |
+| ADR-0005                       | SootUp と Spring DI 解決を単一の後続 feature (#21) として段階導入する | 継承 (本 spec の Phase2 / Phase3 という 2 段階呼称は決定時の区分。後続範囲が本 spec のスコープ外である事実は変わらず、統合設計は #21 の spec が担う。2026-07-12 突合) |
 
 > 矛盾を検出した場合は phase: sync で PRD / Design Doc / feature doc / context / ADR への back-propagation を提案する。
 
@@ -66,17 +68,18 @@
 - `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md`: Model schema / process contract / versioning (本 spec が準拠する契約の正本)
 - `adr/0001-analyzer-protocol-jsonl-spi.md`: JSONL process SPI の判断
 - `adr/0002-core-implementation-foundation.md`: Core 実装基盤 (Go)
+- `adr/0004-defer-runtime-call-tracing.md` / `adr/0005-adopt-sootup-and-spring-di-resolution.md`: 後続 feature (#21) の境界決定 (Phase2 / Phase3 の呼称を統合)
 - `context/architecture.md` / `context/toolchain.md` / `context/testing.md`
 - `specs/9-java-analyzer/requirements.md`: 要求定義 (本 issue の起点)
 - `specs/8-analyzer-protocol/`: 契約決定の経緯 (issue 単位の作業記録)
 - `specs/12-analyzer-protocol-implementation/`: Core 側 Protocol / Analyzer process 実装の作業記録
-- 関連 issue: #8 (Protocol 設計, closed) / #12 (Protocol 実装, closed) / #7 (出力形式, open)
+- 関連 issue: #8 (Protocol 設計, closed) / #12 (Protocol 実装, closed) / #7 (出力形式, closed — PR #20 で merge 済み。graph の Symbol 拡張 / traversal の MinDepth / output の Console・JSON formatter は本 branch に取り込み済み) / #21 (Interface Dispatch / Spring DI, open — ADR-0004 / ADR-0005 で境界決定済み)
 
 ## 背景
 
 Phase1 の対象は Java/Spring Boot であり、Java Analyzer は `analyzer-protocol` の SPI / JSONL スキーマを実装する **最初の言語別 Analyzer** である。Core 側は #12 で Protocol parser / validator (`core/internal/protocol`) と Analyzer process 起動 (`core/internal/analyzer`) を実装済みで、契約の受け側は揃っている。本 spec は、その契約に対して JSONL を出力する Java 側の実装方式を確定する。
 
-本 spec が関わる成功条件は Design Doc の S1 / S2 (caller / callee 探索の網羅性 — graph の入力を供給する)、S4 (Spring DI 経由の呼び出し先解決、Phase2 以降)、S5 (Analyzer 追加時に Core を変更しない) である。Phase1 では JavaParser ベースの静的呼び出し抽出を達成し、DI 解決 (Phase2) と Interface Dispatch / Override 解決 (Phase3, SootUp) は段階導入とする。
+本 spec が関わる成功条件は Design Doc の S1 / S2 (caller / callee 探索の網羅性 — graph の入力を供給する)、S4 (Spring DI 経由の呼び出し先解決、Phase2 以降)、S5 (Analyzer 追加時に Core を変更しない) である。Phase1 では JavaParser ベースの静的呼び出し抽出を達成し、DI 解決 (Phase2) と Interface Dispatch / Override 解決 (Phase3, SootUp) は段階導入とする。なお、その後 ADR-0005 (2026-07-11 承認) により Phase2 / Phase3 は単一の後続 feature (#21) として統合設計し、型階層補完 (SootUp) を先行させることが決定した。本 spec 内の Phase2 / Phase3 という呼称は決定時の区分として残す。
 
 解析ロジックの影響範囲は `analyzers/java/` に閉じる。ただし Core 側には「どの Analyzer をどう起動するか」を決める配線 (analyze command / Analyzer 起動コマンド解決) がまだ無く (`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけ)、Java Analyzer を初号機として Core から実行するにはこの初回配線が必要になる。S5 が求めるのは **2 つ目以降**の言語 Analyzer 追加時に Core へ差分を出さないことなので、初回配線は S5 に反しない。本 spec はこの配線を「言語非依存」に作ることで S5 を担保する。
 
@@ -97,7 +100,7 @@ Phase1 の対象は Java/Spring Boot であり、Java Analyzer は `analyzer-pro
 
 - 共通契約 (SPI / Protocol / Model schema) の定義・変更 (→ `analyzer-protocol` feature doc が正本)
 - グラフ探索 (→ `traversal`)、出力整形 (→ `output`)
-- Phase2 / Phase3 の実装 (本 spec では段階導入の境界宣言のみ)
+- Phase2 / Phase3 の実装 (本 spec では段階導入の境界宣言のみ。後続範囲は ADR-0005 により #21 の単一 feature として設計する)
 - SootUp 統合範囲 (Q2) の決定 (DesignDoc Open Question として Phase3 着手前まで保留)
 - Reflection / AspectJ Runtime / 実行時 Proxy の動的解析 (Design Doc Non Goals)
 - CLI 引数の完全仕様の確定 (出力形式指定 / 探索方向 / 深さ上限などの全 flag 体系 → 後続の CLI interface spec)。本 spec は Analyzer を起動して graph を得るために必要な最小 flag のみ扱い、後から拡張できる形に留める
@@ -649,15 +652,21 @@ flowchart TD
 
 ### 実装タスク案
 
-(phase 10 で確定する)
+生成済み prompts (`prompts/`) と 1:1 対応する。
 
-| Phase | 対象 | 概要 | 依存 |
-| ----- | ---- | ---- | ---- |
-| P1    |      |      |      |
+| Phase | 対象            | 概要                                                                                                                                          | 依存               | prompt                                        |
+| ----- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------- |
+| P1    | `core`          | `depwalk analyze` command と Analyzer 起動コマンド解決 (D2)、`--analyzer-meta` 合成、既存 runner / protocol / graph との結合 (graph 構築まで) | なし (P1 内並列可) | `P1_01_core_analyze-command.md`               |
+| P1    | `java-analyzer` | Gradle (Kotlin DSL) scaffold、`analysisRequest` 受領、pre-flight 検査、JSONL 書出基盤、stderr 計測の枠                                        | なし (P1 内並列可) | `P1_02_java-analyzer_scaffold-protocol-io.md` |
+| P2    | `java-analyzer` | AST 解析・型解決 (3 TypeSolver)、正規化 (D5) / symbolKind (D6) / 帰属型 (D11) / dispatch 標識 (D7) / diagnostic (D8) / analysisMode (D4)      | P1_02              | `P2_01_java-analyzer_extraction.md`           |
+| P2    | `core`          | サンプル Java/Spring fixture、実 jar E2E 照合 (S1 / S2)、性能 baseline 計測と feature doc への記録 (D9)                                       | P1_01 + P2_01      | `P2_02_core_e2e-fixture-baseline.md`          |
 
 ### prompts 生成方針
 
-(phase 10 で確定する)
+- 分割軸は「変更ファイルが衝突しない境界」: Core 初回配線 (P1_01) と Analyzer scaffold (P1_02) は互いのファイルに触れないため並列可。解析本体 (P2_01) は P1_02 の成果に積み、E2E (P2_02) は P1_01 / P2_01 双方の成果物を要求する。
+- 各 prompt は `spec-lifecycle` の phase-prompts 絶対ガード 10 セクション (絶対ルール / 作業ステップ / 実装コンテキスト / 前提条件 / 不明点ハンドリング / タスク境界 / 設計仕様 / テスト観点 / 検証コマンド / 完了条件) を備え、自己完結で実行できる。
+- 設計仕様は feature doc (`design/features/java-analyzer/DesignDoc_java-analyzer.md`) からの抜粋で構成し、spec の D1-D11 は決定経緯として参照する (正本の二重化をしない)。
+- traversal (#6) / output (#7) は実装済みのため結合対象に含めず、`depwalk analyze` からの探索・出力整形の配線は後続の CLI interface spec に委ねる。
 
 ## 上位資料からの変更点
 
@@ -697,32 +706,36 @@ flowchart TD
 | ADR ID          | 変更内容                                                                                                                                                 | 理由                                                                                                                                      |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | ADR-0003 (新規) | Analyzer 起動コマンドを言語非依存な文字列として解決する (CLI flag 主 + 環境変数 fallback)。Core は起動対象の言語ランタイムを知らない (反映済 2026-07-11) | S5 (2 つ目以降の Analyzer 追加時に Core 無変更) の担保方法であり、将来 Analyzer を追加するたびに参照される長期判断 (source: clarify / D2) |
+| ADR-0004 (新規) | 動的呼び出しの完全追跡を初期スコープに含めない (2026-07-11 承認。#21 起票に伴い作成)                                                                     | Phase1 の Non Goals (Reflection / AOP / Proxy) と後続 feature の境界を長期判断として固定する                                              |
+| ADR-0005 (新規) | SootUp と Spring DI 解決を単一の後続 feature として段階導入する (2026-07-11 承認。#21 起票に伴い作成)                                                    | 本 spec が宣言した Phase2 / Phase3 の 2 段階区分を統合し、型階層補完 → Spring 絞り込みの順に再定義する後続決定                            |
 
 ## レビュー
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                                                                         | 対応                                                                                                                                                                                         |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-11 | NEEDS_WORK               | `core` の責務境界が矛盾 (D2 で起動方法を決めるのに実装対象は `-` / S5 解釈が上位より強い)                                                                                                        | `core` を実装対象 ◯ (初回配線のみ) に変更、S5 の表現を DesignDoc 定義に合わせた。advisory (D6 の protocol 影響 / context 波及) も反映                                                        |
-| 2026-07-11 | NEEDS_WORK (2 回目)      | S5 の再定義が「継承」扱いのままで Design Doc へ back-propagation 登録されていない                                                                                                                | 上位文書整合表の Design Doc 行を分割し S5 / P4 を `変更提案` として登録。「Design Doc への影響」表に明確化行を追加 (phase: sync で反映)                                                      |
-| 2026-07-11 | NEEDS_WORK (3 回目)      | メタ情報の追随漏れ (phase 3 備考 / phase 2 状態 / review 記録)。設計内容の変更は不要                                                                                                             | phase 3 備考を齟齬検出に更新、phase 2 を `進行中` に戻し、`review.md` と本表に 2・3 回目の記録を追記                                                                                         |
-| 2026-07-11 | **PASS** (4 回目)        | 全観点 PASS (prompts / 正本境界は N/A)。phase: scaffold の gate 通過                                                                                                                             | phase: clarify (D1-D10 の決定) へ進む                                                                                                                                                        |
-| 2026-07-11 | NEEDS_WORK (clarify)     | D4 (scope 内 node) と D7 (宣言型に辺) の間に未決 — scope 外に宣言されたメソッド (継承した library メソッド) の node 化基準が無く、protocol の「valid edge は解決済み symbol を参照」に違反しうる | D11 を追加起票して決定。advisory 4 件 (classpath の key/空配列、metadata key 名の確定先、constructor signature、性能目標の追跡) も反映                                                       |
-| 2026-07-11 | NEEDS_WORK (clarify 2)   | D11 を「常にレシーバ型に帰属」としたため scope 内継承で node が分裂し S1 の網羅性が壊れる。D5 の signature 定義と EARS が D11 反映前のまま                                                       | D11 を「宣言型優先、scope 外のときだけ引き上げ」に修正。D5 / EARS / D7 本文を帰属型基準に同期。性能目標の正本を feature doc に一本化                                                         |
-| 2026-07-11 | NEEDS_WORK (clarify 3)   | D11 の「宣言型」が override 時に一意でない (dead node か取りこぼしか)。引き上げが `Object#toString` 等を巻き込みノイズ排除根拠と衝突。`fullGraph` の node 母集合の列挙方法が未定義               | 宣言型を「実際の宣言サイト」と定義。引き上げ除外 package (既定 JDK / metadata で上書き可) を導入。node 母集合を「宣言列挙 ∪ call site 由来の引き上げ node」と定義。D7 / D10 / エラー表も同期 |
-| 2026-07-11 | NEEDS_WORK (clarify 4)   | EARS が D11 の第 3 分岐 (引き上げ除外 package) に追随しておらず、`myCollection.iterator()` で EARS と D11 が逆の結論を出す (決定内容の欠陥ではなく同期漏れ)                                      | EARS の WHERE 条を D11 参照に改め、除外 package の IF 条を追加。D5 の括弧書きも D11 参照に統一。advisory (D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲) も反映                |
-| 2026-07-11 | **PASS** (clarify 5)     | 全観点 PASS。D1-D11 が protocol 契約を変更せずに成立し、EARS / D4-D10 / エラー表が D11 を正本として一貫。未決ゼロ                                                                                | advisory 2 件 (宣言サイトの定義を abstract / interface に適用可能な表現へ、`iterator()` の例に前提を明記) を反映。phase: diagram へ進む                                                      |
-| 2026-07-11 | NEEDS_WORK (diagram)     | User Flow 節が placeholder のままで本文と drift。図が本文より先に規定していた 3 点 (flag 名 / classpath 検査の順序 / node 母集合)                                                                | User Flow を記入し設計フェーズ状況に図の行を追加。Sequence の flag を例示表記へ、D3 に pre-flight 検査を明記、D11 図に node 母集合の但し書きを追加                                           |
-| 2026-07-11 | NEEDS_WORK (diagram 2)   | D11 図のキャプションが過剰補正で図自身 (declared 枝) と矛盾。変更履歴が D3 への決定追加に追随していない                                                                                          | キャプションを書き分け、図の emit を declared / lifted の 2 枝に分割して node 母集合 ①/② と対応づけ。変更履歴に対応行を追加。「正本」の向きも統一                                            |
-| 2026-07-11 | **PASS** (diagram 3)     | 全観点 PASS。3 図が本文 (D1-D11 / EARS / エラーケース表 / node 母集合) と一致し、図が本文に根拠を持たない仕様を新設していないことを確認                                                          | phase 6 (Interface 設計) へ進む                                                                                                                                                              |
-| 2026-07-11 | NEEDS_WORK (phase 6-9)   | `--analyzer-meta` の合成規則が未定義 (1 回指定の型 / 空配列の表現)。レビュー表が diagram 3 回目 PASS に未追随                                                                                    | 合成規則を確定 (常に配列 / 空値 `key=` → 空配列 / `=` なし → 拒否) し Go テスト観点に同期。除外 package の正規値を統一。PASS 行を追加                                                        |
-| 2026-07-11 | NEEDS_WORK (phase 6-9 ②) | メタ同期の追随漏れ (レビュー表 / 変更履歴) + D11 図ラベルの表記ゆれ + `=` 分割位置の未規定                                                                                                       | 表・履歴を同期。図ラベルを既定 prefix 表記に統一。合成規則に「最初の `=` で分割」を追記                                                                                                      |
-| 2026-07-11 | NEEDS_WORK (phase 6-9 ③) | 2 回目の記録が review.md / レビュー表 / 変更履歴に未追記 (記録同期のみ)                                                                                                                          | 各記録を同期。Go テスト観点に value 内 `=` のケースを追加                                                                                                                                    |
-| 2026-07-11 | **PASS** (phase 6-9 ④)   | 全観点 PASS。記録同期の完了と、確定した interface が protocol 契約と矛盾しないことを確認                                                                                                         | phase 10 (実装分割) へ進む                                                                                                                                                                   |
-| 2026-07-11 | NEEDS_WORK (sync)        | spec と feature doc の二重正本 (5 箇所)                                                                                                                                                          | 降格 + 正本リンクに統一                                                                                                                                                                      |
-| 2026-07-11 | NEEDS_WORK (sync ②)      | Content / Data 設計に「D5 / D7 / D11 が正本」が残存 (+ snapshot 節内の「D11 を正本とする」3 箇所)                                                                                                | feature doc への正本リンクに置換 / 相互参照は「従う」に言い換え                                                                                                                              |
-| 2026-07-11 | **PASS** (sync ③)        | 全観点 PASS。二重正本の完全解消 (spec 内の「正本」語は durable 文書への参照とレビュー履歴引用のみ)、上位文書 8 ファイルとの整合を確認                                                            | phase 10 (実装分割 / prompts 生成) へ進む                                                                                                                                                    |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                                                                                           | 対応                                                                                                                                                                                         |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | NEEDS_WORK               | `core` の責務境界が矛盾 (D2 で起動方法を決めるのに実装対象は `-` / S5 解釈が上位より強い)                                                                                                                          | `core` を実装対象 ◯ (初回配線のみ) に変更、S5 の表現を DesignDoc 定義に合わせた。advisory (D6 の protocol 影響 / context 波及) も反映                                                        |
+| 2026-07-11 | NEEDS_WORK (2 回目)      | S5 の再定義が「継承」扱いのままで Design Doc へ back-propagation 登録されていない                                                                                                                                  | 上位文書整合表の Design Doc 行を分割し S5 / P4 を `変更提案` として登録。「Design Doc への影響」表に明確化行を追加 (phase: sync で反映)                                                      |
+| 2026-07-11 | NEEDS_WORK (3 回目)      | メタ情報の追随漏れ (phase 3 備考 / phase 2 状態 / review 記録)。設計内容の変更は不要                                                                                                                               | phase 3 備考を齟齬検出に更新、phase 2 を `進行中` に戻し、`review.md` と本表に 2・3 回目の記録を追記                                                                                         |
+| 2026-07-11 | **PASS** (4 回目)        | 全観点 PASS (prompts / 正本境界は N/A)。phase: scaffold の gate 通過                                                                                                                                               | phase: clarify (D1-D10 の決定) へ進む                                                                                                                                                        |
+| 2026-07-11 | NEEDS_WORK (clarify)     | D4 (scope 内 node) と D7 (宣言型に辺) の間に未決 — scope 外に宣言されたメソッド (継承した library メソッド) の node 化基準が無く、protocol の「valid edge は解決済み symbol を参照」に違反しうる                   | D11 を追加起票して決定。advisory 4 件 (classpath の key/空配列、metadata key 名の確定先、constructor signature、性能目標の追跡) も反映                                                       |
+| 2026-07-11 | NEEDS_WORK (clarify 2)   | D11 を「常にレシーバ型に帰属」としたため scope 内継承で node が分裂し S1 の網羅性が壊れる。D5 の signature 定義と EARS が D11 反映前のまま                                                                         | D11 を「宣言型優先、scope 外のときだけ引き上げ」に修正。D5 / EARS / D7 本文を帰属型基準に同期。性能目標の正本を feature doc に一本化                                                         |
+| 2026-07-11 | NEEDS_WORK (clarify 3)   | D11 の「宣言型」が override 時に一意でない (dead node か取りこぼしか)。引き上げが `Object#toString` 等を巻き込みノイズ排除根拠と衝突。`fullGraph` の node 母集合の列挙方法が未定義                                 | 宣言型を「実際の宣言サイト」と定義。引き上げ除外 package (既定 JDK / metadata で上書き可) を導入。node 母集合を「宣言列挙 ∪ call site 由来の引き上げ node」と定義。D7 / D10 / エラー表も同期 |
+| 2026-07-11 | NEEDS_WORK (clarify 4)   | EARS が D11 の第 3 分岐 (引き上げ除外 package) に追随しておらず、`myCollection.iterator()` で EARS と D11 が逆の結論を出す (決定内容の欠陥ではなく同期漏れ)                                                        | EARS の WHERE 条を D11 参照に改め、除外 package の IF 条を追加。D5 の括弧書きも D11 参照に統一。advisory (D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲) も反映                |
+| 2026-07-11 | **PASS** (clarify 5)     | 全観点 PASS。D1-D11 が protocol 契約を変更せずに成立し、EARS / D4-D10 / エラー表が D11 を正本として一貫。未決ゼロ                                                                                                  | advisory 2 件 (宣言サイトの定義を abstract / interface に適用可能な表現へ、`iterator()` の例に前提を明記) を反映。phase: diagram へ進む                                                      |
+| 2026-07-11 | NEEDS_WORK (diagram)     | User Flow 節が placeholder のままで本文と drift。図が本文より先に規定していた 3 点 (flag 名 / classpath 検査の順序 / node 母集合)                                                                                  | User Flow を記入し設計フェーズ状況に図の行を追加。Sequence の flag を例示表記へ、D3 に pre-flight 検査を明記、D11 図に node 母集合の但し書きを追加                                           |
+| 2026-07-11 | NEEDS_WORK (diagram 2)   | D11 図のキャプションが過剰補正で図自身 (declared 枝) と矛盾。変更履歴が D3 への決定追加に追随していない                                                                                                            | キャプションを書き分け、図の emit を declared / lifted の 2 枝に分割して node 母集合 ①/② と対応づけ。変更履歴に対応行を追加。「正本」の向きも統一                                            |
+| 2026-07-11 | **PASS** (diagram 3)     | 全観点 PASS。3 図が本文 (D1-D11 / EARS / エラーケース表 / node 母集合) と一致し、図が本文に根拠を持たない仕様を新設していないことを確認                                                                            | phase 6 (Interface 設計) へ進む                                                                                                                                                              |
+| 2026-07-11 | NEEDS_WORK (phase 6-9)   | `--analyzer-meta` の合成規則が未定義 (1 回指定の型 / 空配列の表現)。レビュー表が diagram 3 回目 PASS に未追随                                                                                                      | 合成規則を確定 (常に配列 / 空値 `key=` → 空配列 / `=` なし → 拒否) し Go テスト観点に同期。除外 package の正規値を統一。PASS 行を追加                                                        |
+| 2026-07-11 | NEEDS_WORK (phase 6-9 ②) | メタ同期の追随漏れ (レビュー表 / 変更履歴) + D11 図ラベルの表記ゆれ + `=` 分割位置の未規定                                                                                                                         | 表・履歴を同期。図ラベルを既定 prefix 表記に統一。合成規則に「最初の `=` で分割」を追記                                                                                                      |
+| 2026-07-11 | NEEDS_WORK (phase 6-9 ③) | 2 回目の記録が review.md / レビュー表 / 変更履歴に未追記 (記録同期のみ)                                                                                                                                            | 各記録を同期。Go テスト観点に value 内 `=` のケースを追加                                                                                                                                    |
+| 2026-07-11 | **PASS** (phase 6-9 ④)   | 全観点 PASS。記録同期の完了と、確定した interface が protocol 契約と矛盾しないことを確認                                                                                                                           | phase 10 (実装分割) へ進む                                                                                                                                                                   |
+| 2026-07-11 | NEEDS_WORK (sync)        | spec と feature doc の二重正本 (5 箇所)                                                                                                                                                                            | 降格 + 正本リンクに統一                                                                                                                                                                      |
+| 2026-07-11 | NEEDS_WORK (sync ②)      | Content / Data 設計に「D5 / D7 / D11 が正本」が残存 (+ snapshot 節内の「D11 を正本とする」3 箇所)                                                                                                                  | feature doc への正本リンクに置換 / 相互参照は「従う」に言い換え                                                                                                                              |
+| 2026-07-11 | **PASS** (sync ③)        | 全観点 PASS。二重正本の完全解消 (spec 内の「正本」語は durable 文書への参照とレビュー履歴引用のみ)、上位文書 8 ファイルとの整合を確認                                                                              | phase 10 (実装分割 / prompts 生成) へ進む                                                                                                                                                    |
+| 2026-07-12 | NEEDS_WORK (prompts)     | P2_02 の target `e2e` が対象ドメイン一覧に無い (命名規則違反)。承認済み ADR-0004 / ADR-0005 が整合表・関連資料に未登録で、段階導入境界 (Phase2 / Phase3) の宣言と矛盾                                              | P2_02 を `P2_02_core_e2e-fixture-baseline.md` に改名し参照を同期。ADR-0004 / 0005 を整合表・ADR 表・関連資料に登録し、背景 / スコープ / feature doc の段階導入節を ADR-0005 に追随           |
+| 2026-07-12 | **PASS** (prompts ②)     | 全観点 PASS。指摘 2 件 (P2_02 改名 / ADR-0004・0005 追随) の解消と、prompts 4 件の自己完結性 (必須 10 セクション / antipatterns 注入 / 命名規則 / 依存表整合) を確認。非ブロッキング補足: E2E 配置先は実装時に確定 | phase 10 をレビュー済に更新。実装セッション (P1_01 / P1_02 並列) の起動が可能                                                                                                                |
 
 ## 変更履歴
 
@@ -746,6 +759,9 @@ flowchart TD
 | 2026-07-11 | Fukuemon | phase: sync — feature doc (java-analyzer) を新規作成し正本をハンドオフ。DesignDoc の S5/P4 明確化、ADR-0003 起票、context 5 ファイル (project / toolchain / testing / architecture / engineering) を反映                                                                  |
 | 2026-07-11 | Fukuemon | spec-review (sync) 対応 — spec 内の「正本」表現を決定時スナップショットに降格し feature doc への正本リンクに統一。feature doc の帰属型表の括弧書きを修正                                                                                                                  |
 | 2026-07-11 | Fukuemon | spec-review (sync ②) 対応 — 残存していた spec 内「正本」表現を掃き出し、feature doc への正本リンクと「従う」表現に統一                                                                                                                                                    |
+| 2026-07-12 | Fukuemon | phase: prompts — 実装 prompts 4 件を生成 (P1 並列 2 + P2 直列 2)。#7 (output, PR #20) merge 済みの codebase と突合し、P1_01 の traversal / output 境界表現を明確化。関連資料の #7 状態を closed に更新                                                                    |
+| 2026-07-12 | Fukuemon | spec-review (prompts) 対応 — P2_02 の target を core に改名 (命名規則準拠)。ADR-0004 / ADR-0005 (#21 の境界決定) を整合表・関連資料に登録し、段階導入境界の記述を ADR-0005 (単一後続 feature / 型階層補完先行) に追随                                                     |
+| 2026-07-12 | Fukuemon | spec-review (prompts ②) PASS — phase 10 / 11 をレビュー済に更新し spec を Done へ。#9 Phase1 の実装 prompts 4 件が確定                                                                                                                                                    |
 
 ## 備考
 
