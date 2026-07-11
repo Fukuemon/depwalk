@@ -376,3 +376,25 @@ Verdict: **PASS** — tasks gate 通過。
 - **[non-blocking] feature doc の tree 構築規則 2 / 6 が `Result.Edges` / `Result.Cycles` を直接参照し、「Formatter は View 以外に依存しない」という同 doc の記述と表記がねじれていた** → 規則 2 は「誘導 edge 集合 (`View.Edges`)」、規則 6 は「`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない」と、Formatter が View 経由で読む前提が伝わる表記に揃えた (規則の意味は変更していない)。
 
 次アクション: phase 8 (最終レビュー) へ進める。
+
+## Review 2026-07-11 (phase 8 最終レビュー)
+
+Verdict: **PASS**
+
+lifecycle 全 phase (scaffold 〜 tasks) を通過した spec の、実装フェーズへの handoff 可否を判定する最終レビュー。
+
+### 観点別評価
+
+- **上位文書整合: PASS** — `## 上位資料からの変更点` の全行 (Design Doc 4 件 / feature doc 4 件 / context 4 件 / ADR なし) を実文書 (`design/DesignDoc.md`、`design/features/output/DesignDoc_output.md`、`design/features/graph/DesignDoc_graph.md`、`design/features/traversal/DesignDoc_traversal.md`、`design/features/README.md`、`context/architecture.md`、`context/testing.md`) と spot-check し、`[反映済]` の宣言どおり反映済みであることを確認した。意味の変質・反映漏れ・過剰反映は検出されなかった。
+- **prompts 自己完結性: PASS** — 生成済み prompts 5 件 (`P1_01_core_graph-symbol.md` / `P1_02_traversal_min-depth.md` / `P2_01_output_write-view.md` / `P3_01_output_console-formatter.md` / `P3_02_output_json-formatter.md`) に登場する型・関数・field 名を実装 (`core/internal/graph`、`core/internal/traversal`) と再照合し、tasks gate 3 回目で確認済みの「実在しない識別子ゼロ」の状態が本レビュー時点でも維持されていることを確認した。並列境界 (P1_01∥P1_02 → P2_01 → P3_01∥P3_02) の依存表も一貫。
+- **正本境界: PASS** — 正本境界の最終状態を確認した。durable な設計成果の正本は feature doc 2 本 (`design/features/output/DesignDoc_output.md` = D2-D7、`design/features/graph/DesignDoc_graph.md` = D1) にあり、本 spec の `## 解決済みの論点` 以下は決定時スナップショットへ正しく降格している。spec 自身やその節を「正本」と呼ぶ箇所は sync gate 4 回目の全数 grep で解消済みであり、本レビューでも再発なし。
+- **未解決論点: PASS** — D1-D7 はすべて解決済み。未確定事項は「CLI interface spec 未起票」の 1 件のみで、これは本 spec の責務境界外 (D5 で明文化済み) として扱われており、下流 phase を止める要因ではない。
+- **メタ情報同期: PASS** — 設計フェーズ状況表 (11 行)・レビュー表・変更履歴の 3 系統が本レビュー時点の実態と同期していることを確認した (sync gate で問題になった「メタ情報同期の 1 周遅れ」の再発なし)。
+
+### 総評
+
+lifecycle 全体を通じて指摘された論点 (D2 の `(cycle)` 判定、`output → traversal` 依存の明文化、`depthCutoffs[]` の方向依存性、Formatter 分岐条件の統一、View 境界の欠落、二重列挙の根絶等) はすべて実装照合を伴って解消されており、本 spec と 2 本の feature doc の間に矛盾は残っていない。
+
+### 次アクション
+
+lifecycle 完了。実装フェーズへ進んでよい。実装セッションは `specs/7-output/prompts/` の 5 件のプロンプトを P1 (並列 2) → P2 → P3 (並列 2) の順に実行する。
