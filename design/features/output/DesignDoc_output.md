@@ -74,11 +74,40 @@ func Write(w io.Writer, f Format, in Input) error
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
     Status    traversal.Status
-    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Direction graph.Direction // 探索方向 (Request から引き継ぐ)
     Start     NodeView
     Nodes     []NodeView   // methodId の辞書順
     Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
     Cutoffs   []CutoffView // edgeId の辞書順
+}
+
+// NodeView は 1 node の Formatter 向け表現。symbol 欠落時は QualifiedName /
+// Signature / Source がゼロ値 (ID のみ有効)。
+type NodeView struct {
+    ID            string
+    QualifiedName string
+    Signature     string
+    Source        *protocol.SourceLocation // nil なら位置情報なし
+    MinDepth      int                      // 起点からの最短距離。Result.MinDepth を View 構築時に引き継ぐ
+}
+
+// EdgeView は 1 edge の Formatter 向け表現。
+type EdgeView struct {
+    ID       string
+    CallerID string
+    CalleeID string
+    Cycle    bool
+    CallSite *protocol.SourceLocation // nil なら位置情報なし
+}
+
+// CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
+type CutoffView struct {
+    EdgeID         string
+    CallerID       string
+    CalleeID       string
+    TargetMethodID string                   // 探索方向の接続先 (dangling する側)
+    TargetMinDepth int                      // TargetMethodID の minDepth
+    CallSite       *protocol.SourceLocation // nil なら位置情報なし
 }
 
 type Formatter interface {
@@ -86,11 +115,37 @@ type Formatter interface {
 }
 ```
 
+- **Formatter は `View` 以外に依存しない**: Console / JSON いずれの出力項目も `View` / `NodeView` / `EdgeView` / `CutoffView` の field からのみ得られる (`traversal.Result` や `graph.Graph` へ直接アクセスしない)。全出力項目と対応 field の一覧は「View 境界の全数対応」節を正本とする。
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 Result から常に同一のバイト列を出力する。
 - symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する ([graph feature doc](../graph/DesignDoc_graph.md) が属性の正本)。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
 - `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
 - **`View` は `Request` の `direction` / `start` を保持して Formatter へ運ぶ** (JSON の `direction` field と Console の子方向判定・文言分岐が必要とするため)。
+- **`NodeView.MinDepth` / `CutoffView.TargetMinDepth` は `traversal.Result` の `minDepth` 公開を View 構築時に引き継ぐ** (JSON の `nodes[].minDepth` / `depthCutoffs[].targetMinDepth` が Formatter 内で `traversal.Result` に触れずに済むようにするため)。
 - 出力は `io.Writer` への逐次書き出しで足り、専用の streaming 機構は導入しない (graph は全体がメモリ上にあり、出力サイズは到達集合に比例する)。
+
+### View 境界の全数対応
+
+Console / JSON 両 Formatter が出力する全項目と、対応する `View` field の一覧。Formatter はこの一覧に載る field 以外から情報を得ない。
+
+| 出力項目                                                                   | View field                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| status                                                                     | `View.Status`                                                 |
+| direction (Console の子方向判定 / JSON の `direction`)                     | `View.Direction`                                              |
+| 起点の methodId / qualifiedName / signature / 宣言位置                     | `View.Start.ID` / `.QualifiedName` / `.Signature` / `.Source` |
+| start (JSON)                                                               | `View.Start.ID`                                               |
+| nodes[] の methodId / qualifiedName / signature                            | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`           |
+| nodes[].minDepth                                                           | `View.Nodes[].MinDepth`                                       |
+| nodes[].sourceLocation                                                     | `View.Nodes[].Source`                                         |
+| edge 両端 methodId (Console) / callerMethodId・calleeMethodId (JSON)       | `View.Edges[].CallerID` / `.CalleeID`                         |
+| edges[].edgeId                                                             | `View.Edges[].ID`                                             |
+| edge の callSite (Console 子行の位置 / JSON `callSite`)                    | `View.Edges[].CallSite`                                       |
+| cycle flag                                                                 | `View.Edges[].Cycle`                                          |
+| cutoff の到達側 endpoint (Console) / callerMethodId・calleeMethodId (JSON) | `View.Cutoffs[].CallerID` / `.CalleeID`                       |
+| cutoff 件数 (Console の `N edges cut`)                                     | `len(View.Cutoffs)` を対象 node 単位に集計                    |
+| depthCutoffs[].edgeId                                                      | `View.Cutoffs[].EdgeID`                                       |
+| depthCutoffs[].targetMethodId                                              | `View.Cutoffs[].TargetMethodID`                               |
+| depthCutoffs[].targetMinDepth                                              | `View.Cutoffs[].TargetMinDepth`                               |
+| depthCutoffs[].callSite                                                    | `View.Cutoffs[].CallSite`                                     |
 
 ### エラー境界
 

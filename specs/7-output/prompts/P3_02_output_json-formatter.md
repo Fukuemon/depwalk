@@ -56,7 +56,7 @@
 ### ステップ 3: `minDepth` と `depthCutoffs[].targetMethodId` の dangling 参照を実装する
 
 1. テストを先に書く (TDD): 「node の `minDepth` が起点からの最短距離に一致する (合流 graph で最短経路側の値を採ること)」「`depthCutoffs[]` の `targetMethodId` が `nodes[]` に存在しない (dangling) ことを **caller / callee 両方向で**検証する (caller 方向では `targetMethodId == callerMethodId`、callee 方向では `targetMethodId == calleeMethodId` になり、もう一方の endpoint は `nodes[]` に存在する)」の golden test / assertion test を追加する
-2. `nodes[].minDepth` を `traversal.Result` の node ごとの minDepth (`P1_02` で公開済み) から埋め、`depthCutoffs[].targetMethodId` / `targetMinDepth` を `traversal.DepthCutoff` (探索方向の接続先 endpoint + `TargetMinDepth`) から埋める実装を行う
+2. `nodes[].minDepth` を `View.Nodes[].MinDepth` からそのまま埋め、`depthCutoffs[].targetMethodId` / `targetMinDepth` / `edgeId` / `callerMethodId` / `calleeMethodId` / `callSite` を `View.Cutoffs[]` の対応 field (`TargetMethodID` / `TargetMinDepth` / `EdgeID` / `CallerID` / `CalleeID` / `CallSite`) からそのまま埋める実装を行う。JSON formatter は `View` にのみ依存し、`traversal.Result` / `traversal.DepthCutoff` へ直接アクセスしない (`minDepth` / `targetMethodId` の導出は `P2_01` の `View` 構築時に完了している)
 3. `## 検証コマンド` を実行する
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す
 5. 指摘を対応してから次へ
@@ -125,15 +125,44 @@
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
     Status    traversal.Status
-    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Direction graph.Direction // 探索方向 (Request から引き継ぐ)
     Start     NodeView
     Nodes     []NodeView   // methodId の辞書順
     Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
     Cutoffs   []CutoffView // edgeId の辞書順
 }
+
+// NodeView は 1 node の Formatter 向け表現。symbol 欠落時は QualifiedName /
+// Signature / Source がゼロ値 (ID のみ有効)。
+type NodeView struct {
+    ID            string
+    QualifiedName string
+    Signature     string
+    Source        *protocol.SourceLocation // nil なら位置情報なし
+    MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
+}
+
+// EdgeView は 1 edge の Formatter 向け表現。
+type EdgeView struct {
+    ID       string
+    CallerID string
+    CalleeID string
+    Cycle    bool
+    CallSite *protocol.SourceLocation // nil なら位置情報なし
+}
+
+// CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
+type CutoffView struct {
+    EdgeID         string
+    CallerID       string
+    CalleeID       string
+    TargetMethodID string                   // 探索方向の接続先 (dangling する側)
+    TargetMinDepth int                      // TargetMethodID の minDepth
+    CallSite       *protocol.SourceLocation // nil なら位置情報なし
+}
 ```
 
-- **`"direction"` の出力元は `View.Direction`** (`caller` / `callee` をそのまま文字列化する)。`targetMethodId` の検証観点は従来どおり (下記 `## テスト観点`)。
+- **`"direction"` の出力元は `View.Direction`** (`caller` / `callee` をそのまま文字列化する)。`nodes[].minDepth` の出力元は `View.Nodes[].MinDepth`、`depthCutoffs[]` の各 field の出力元は `View.Cutoffs[]` の対応 field である (下記の schema 節参照)。`targetMethodId` の検証観点は従来どおり (下記 `## テスト観点`)。
 
 フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`) として出力し、tree にはしない。field 名は Analyzer Protocol の語彙を踏襲する。
 
@@ -180,11 +209,12 @@ type View struct {
 }
 ```
 
-- `status` = `ok` / `startNotFound`。`direction` = `caller` / `callee`。
-- `edges[].cycle` は `View.EdgeView.Cycle` に対応し、**false でも省略しない**。
-- `nodes[].minDepth` は起点からの最短距離。
-- `sourceLocation` / `callSite` は欠落時 field ごと省略する。
-- **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
+- `status` = `View.Status` を `ok` / `startNotFound` に文字列化する。`direction` = `View.Direction` (`caller` / `callee`)。
+- `nodes[]` の `methodId` / `qualifiedName` / `signature` / `sourceLocation` は `View.Nodes[]` の `ID` / `QualifiedName` / `Signature` / `Source` から埋める。
+- `edges[]` の `edgeId` / `callerMethodId` / `calleeMethodId` / `callSite` は `View.Edges[]` の `ID` / `CallerID` / `CalleeID` / `CallSite` から埋める。`edges[].cycle` は `View.Edges[].Cycle` に対応し、**false でも省略しない**。
+- `nodes[].minDepth` は `View.Nodes[].MinDepth` から埋める (起点からの最短距離)。
+- `sourceLocation` / `callSite` は `View` 側で `nil` (欠落) のとき field ごと省略する。
+- `depthCutoffs[]` の `edgeId` / `callerMethodId` / `calleeMethodId` / `targetMethodId` / `targetMinDepth` / `callSite` は `View.Cutoffs[]` の `EdgeID` / `CallerID` / `CalleeID` / `TargetMethodID` / `TargetMinDepth` / `CallSite` から埋める。**`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値 (`View` 構築時に `P2_01` が導出済み)。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する (`View` が既に sort 済みのため、順に marshal すれば満たされる)。
 
 #### 版管理

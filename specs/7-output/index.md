@@ -374,11 +374,40 @@ func Write(w io.Writer, f Format, in Input) error
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
     Status    traversal.Status
-    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Direction graph.Direction // 探索方向 (Request から引き継ぐ)
     Start     NodeView
     Nodes     []NodeView   // sorted
     Edges     []EdgeView   // sorted。Cycle flag を持つ
     Cutoffs   []CutoffView // sorted
+}
+
+// NodeView は 1 node の Formatter 向け表現。symbol 欠落時は QualifiedName /
+// Signature / Source がゼロ値 (ID のみ有効)。
+type NodeView struct {
+    ID            string
+    QualifiedName string
+    Signature     string
+    Source        *protocol.SourceLocation // nil なら位置情報なし
+    MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
+}
+
+// EdgeView は 1 edge の Formatter 向け表現。
+type EdgeView struct {
+    ID       string
+    CallerID string
+    CalleeID string
+    Cycle    bool
+    CallSite *protocol.SourceLocation // nil なら位置情報なし
+}
+
+// CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
+type CutoffView struct {
+    EdgeID         string
+    CallerID       string
+    CalleeID       string
+    TargetMethodID string                   // 探索方向の接続先 (dangling する側)
+    TargetMinDepth int                      // TargetMethodID の minDepth
+    CallSite       *protocol.SourceLocation // nil なら位置情報なし
 }
 
 type Formatter interface {
@@ -386,10 +415,12 @@ type Formatter interface {
 }
 ```
 
+- **Formatter は `View` 以外に依存しない**: Console / JSON いずれの出力項目も `View` / `NodeView` / `EdgeView` / `CutoffView` の field からのみ得られる (`traversal.Result` や `graph.Graph` へ直接アクセスしない)。全出力項目と対応 field の一覧は feature doc の「View 境界の全数対応」節が正本 (本節はハンドオフ後のスナップショット)。
 - **未対応 format の検証・`View` の構築・Formatter の選択は `Write` が担う**。`Formatter` は「`View` を描く」ことだけに責務を絞る。D5 の「未対応 format は出力を書き出す前に `error`」は Formatter 選択より前の段階であり、`Formatter.Format` では表現できないため、この entry point が必要になる。
 - **`startNotFound` / 到達なしの表現は各 Formatter の内部分岐**とする。分岐は `View.Status` / `View.Edges` / **`View.Cutoffs`** の 3 つを見る (「到達なし」= `Edges` 空 **かつ** `Cutoffs` 空。`Edges` が空でも `Cutoffs` が非空なら `maxDepth=0` 等の cutoff ケースであり到達なしではない — D2 規則 8)。`Write` は status で分岐せず、常に Formatter に委譲する — 「該当なし」の見せ方は形式ごとに異なる (D5 の表) ため。
 
 - **`traversal.Request` を入力に含める**理由: `traversal.Result` は `direction` / `start` を保持しない (`Status` / `Nodes` / `Edges` / `Cycles` / `DepthCutoffs` のみ)。D3 の JSON はこの 2 つを出力するため、Output 側で Request を受け取る必要がある。**`View` はこれを `Direction` field として保持し、Formatter へ運ぶ** (JSON の `direction` 出力、Console の子方向判定・`(呼び出し元なし)` / `(呼び出し先なし)` の文言分岐が Formatter 単独では成立しないため)。
+- **`NodeView.MinDepth` / `CutoffView.TargetMinDepth` は `traversal.Result` の `minDepth` 公開を View 構築時に引き継ぐ** (JSON の `nodes[].minDepth` / `depthCutoffs[].targetMinDepth` が Formatter 内で `traversal.Result` に触れずに済むようにするため)。
 - **sort 規則の所在**: `View` の構築時に、`Nodes` / `Edges` / `Cutoffs` を id (`methodId` / `edgeId`) の辞書順に固定する。これが JSON / DOT / Mermaid の要素順序 (D3 / D4 G-6) をそのまま満たす。Console の兄弟順序だけは `qualifiedName` → `signature` → `methodId` 順 (D2) であり、これは Console formatter が `View` を読み替えて適用する (`View` は決定的な基準順序を与え、Console はその上で表示順を定める)。
 - **tree 化は Console formatter 内に閉じる** (D2)。`View` は tree を持たない。Console は `View.Edges` を隣接情報として DFS し、`(cycle)` / `(既出)` の判定は **自身の DFS 経路 (祖先集合)** から行う。`EdgeView.Cycle` (= `Result.Cycles` 由来) は **JSON / DOT / Mermaid 用**であり、Console の打ち切り判定には使わない (D2 規則 6)。
 - **`View.Start` の symbol 欠落**: `status = startNotFound` のとき起点 node は graph に存在せず symbol を解決できない (`traversal.Traverse` が空 Result を返す)。`NodeView` は symbol 欠落 (ID のみ) を許容する。D5 の Console 文言と D3 の `start` はいずれも methodId のみで足りる。
@@ -792,6 +823,7 @@ DOT / Mermaid (Phase4) は prompts を生成しない。I/F 要件 G-1〜G-7 は
 | 2026-07-11 | NEEDS_WORK (phase: sync / 4 回目)    | 用語規約は全数確認で適合 (handoff 済み spec 自身を「正本」と呼ぶ箇所ゼロ)。blocking: メタ情報同期が 1 レビュー分遅れる再発 (3 回目の行が未記録)                                                                                                                                                                                  | 3 回目 / 4 回目の行を同時に記録し、遅延の連鎖を断つ                                                                                                                                                                                                                                                 |
 | 2026-07-11 | **PASS** (phase: sync / 5 回目)      | 全観点 PASS。反映の残存を実文書で再確認、用語規約適合 (spec 自身を「正本」と呼ぶ箇所ゼロ)、レビュー表 / 変更履歴 / review.md の 3 系統が同期                                                                                                                                                                                     | phase: tasks へ進める。fixture は output feature doc のテスト観点から導出する                                                                                                                                                                                                                       |
 | 2026-07-11 | NEEDS_WORK (phase: tasks / 1 回目)   | blocking: View に direction が無く JSON の direction 出力と Console の子方向判定が Formatter で不可能 (P3 が完遂不能)。moderate: P2_01 の registry 実装が自由選択で P3 の並列前提が壊れうる。minor: CutoffView.TargetMethodID の導出規則が P2_01 に未転記                                                                        | View に Direction を追加 (feature doc → spec → prompts を同時修正)。P2_01 の完了条件に「P3 が output.go を編集せず登録できる構造」を明記。TargetMethodID の導出規則を P2_01 に転記                                                                                                                  |
+| 2026-07-11 | NEEDS_WORK (phase: tasks / 2 回目)   | 指摘 41-43 の解消を確認。新規 blocking 2: ①型名 traversal.Direction が実在しない (正: graph.Direction) ②NodeView に MinDepth が無く JSON の minDepth が View 境界を通過不能 (41 と同型)。minor: P3_02 が traversal 型を参照                                                                                                      | View 境界の全数チェック表を作成し、graph.Direction へ修正 + NodeView.MinDepth 追加 + View 型の field を 5 箇所で確定。P3_02 の出力元を View に統一                                                                                                                                                  |
 
 ## 変更履歴
 
@@ -824,6 +856,7 @@ DOT / Mermaid (Phase4) は prompts を生成しない。I/F 要件 G-1〜G-7 は
 | 2026-07-11 | Fukuemon | sync gate 5 回目で **PASS**。phase: sync 完了                                                                                                                                                                                                                                                             |
 | 2026-07-11 | Fukuemon | phase: tasks で実装 prompts 5 件を生成 (P1_01∥P1_02 → P2_01 → P3_01∥P3_02)                                                                                                                                                                                                                                |
 | 2026-07-11 | Fukuemon | tasks gate の指摘に対応: View に Direction を追加 (feature doc / D6 スナップショット / prompts P2_01・P3_01・P3_02 を同時修正)                                                                                                                                                                            |
+| 2026-07-11 | Fukuemon | tasks gate 2 回目の指摘に対応: graph.Direction へ型名修正、NodeView.MinDepth 追加、View 境界の全数対応表で欠落ゼロを確認                                                                                                                                                                                  |
 
 ## 備考
 

@@ -131,7 +131,7 @@
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
     Status    traversal.Status
-    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Direction graph.Direction // 探索方向 (Request から引き継ぐ)
     Start     NodeView
     Nodes     []NodeView   // methodId の辞書順
     Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
