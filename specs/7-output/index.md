@@ -569,18 +569,92 @@ D6 で確定。詳細は `## 機能仕様 > Performance` と `## 解決済みの
 
 ## フロー / シーケンス
 
-(phase: diagram で生成)
+depwalk は CLI ツールであり画面操作を持たないため、flowchart の起点は「ユーザーが出力形式を指定して実行する」時点とし、以降は Output Engine 内部の処理として描く。participants は Core 内の層 (Analyze Use Case / Graph / Traversal / Output) を採る。
 
-### Flowchart (ユーザー操作起点)
+### Flowchart (出力形式の指定 → 出力)
+
+D5 のエラー境界 (`error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ) と、D6 の `View` 構築を経由する流れを示す。
 
 ```mermaid
 flowchart TD
+    A["ユーザー / CI が出力形式を指定して実行"] --> B["Analyze Use Case が Traversal result を取得"]
+    B --> C{"format は対応形式か<br/>console / json / dot / mermaid"}
+    C -- "No" --> D["出力を書き出さず error を返す<br/>(対応形式を案内。V1 / D5)"]
+    C -- "Yes" --> E["View を構築<br/>(Graph から symbol を解決し<br/>node/edge/cutoff を id 辞書順に sort。D1 / D6)"]
+    E --> F{"Result.Status は"}
+    F -- "startNotFound" --> G["該当なしを各形式で表現<br/>(Console: 該当なしメッセージ<br/>JSON: status + 空配列)"]
+    F -- "ok" --> H{"到達 edge があるか"}
+    H -- "No (起点のみ)" --> I["到達なしを各形式で表現<br/>(Console: 呼び出し元/先なし<br/>JSON: 起点 1 件 + 空 edges)"]
+    H -- "Yes" --> J["format に対応する Formatter を選ぶ"]
+    J --> K["Console: View から tree を構築して描画<br/>(D2。下図)"]
+    J --> L["JSON: フラットな graph を描画<br/>(nodes/edges/depthCutoffs。D3)"]
+    J --> M["DOT / Mermaid: 到達 graph を描画<br/>(Phase4。tree 化しない。D4)"]
+    G --> N["io.Writer へ逐次書き出し"]
+    I --> N
+    K --> N
+    L --> N
+    M --> N
+    N --> O{"書き込みは成功したか"}
+    O -- "No" --> P["error を返す<br/>(表示 / exit code は CLI の責務。D5)"]
+    O -- "Yes" --> Q["正常終了 (nil)"]
+```
+
+### Flowchart (Console の tree 構築 — D2)
+
+Traversal result は tree ではなく集合であるため、tree 化の規則を Output 側で定義する (D2)。**停止性は「初出のみ展開」が単独で保証**し、`(cycle)` / `(既出)` は「なぜこの枝が展開されていないか」を説明する情報表示にすぎない。
+
+```mermaid
+flowchart TD
+    A["root = 起点 node を出力<br/>(位置は宣言位置 Symbol.Source)"] --> B["visit(node, 祖先集合)"]
+    B --> C["View.Edges から探索方向の子 edge を列挙し<br/>qualifiedName → signature → methodId 順に sort"]
+    C --> D{"未処理の子 edge があるか"}
+    D -- "Yes" --> E["子 node を出力<br/>(位置は edge.CallSite)"]
+    E --> F{"子 node は祖先集合に含まれるか"}
+    F -- "Yes" --> G["(cycle) を付けて葉にする<br/>= 経路上の祖先に戻る back edge"]
+    F -- "No" --> H{"子 node は既に展開済みか"}
+    H -- "Yes" --> I["(既出) を付けて葉にする<br/>= 別の枝で展開済み (合流)"]
+    H -- "No" --> J["展開済みに記録し<br/>visit(子 node, 祖先集合 + 自分) を再帰<br/>(初出のみ展開 → 停止性を保証)"]
+    G --> D
+    I --> D
+    J --> D
+    D -- "No" --> K{"この node に cutoff edge があるか<br/>(View.Cutoffs)"}
+    K -- "Yes" --> L["… (depth limit: N edges cut) を 1 行出力<br/>N = この node からの cutoff edge 数<br/>cutoff 先 (targetMethodId) は到達集合外のため名前を出さない"]
+    K -- "No" --> M["この node の処理を終える"]
+    L --> M
 ```
 
 ### Sequence
 
+`Output` は `Graph` から symbol を引き (D1)、`traversal.Result` / `Request` を入力に取る (D6)。`Request` を渡すのは、`Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
+
 ```mermaid
 sequenceDiagram
+    actor User as ユーザー / CI
+    participant CLI as CLI
+    participant UC as Analyze Use Case
+    participant Graph as Graph Engine
+    participant Trv as Traversal Engine
+    participant Out as Output Engine
+    participant W as io.Writer
+
+    User->>CLI: メソッド / 方向 / 深さ / 出力形式を指定
+    CLI->>UC: analyze 実行
+    UC->>Graph: methodSymbol / callEdge を登録<br/>(wire record → graph の値型に変換。D1)
+    UC->>Trv: Traverse(graph, request)
+    Trv->>Graph: 読み取り API で node / edge を取得
+    Graph-->>Trv: node / edge
+    Trv-->>UC: Result (到達集合 / cycle / depthCutoffs / minDepth)
+
+    UC->>Out: Format(w, Input{Graph, Result, Request})
+    Note over Out: 未対応 format はここで error (D5)
+    Out->>Graph: 到達 node / edge の symbol を解決 (D1)
+    Graph-->>Out: Symbol / CallSite
+    Note over Out: View を構築 (id 辞書順に sort。決定性の規約はここに集約。D6)
+    Out->>W: 選んだ Formatter が逐次書き出し
+    W-->>Out: 書き込み結果
+    Out-->>UC: nil または error (書き込み失敗時)
+    UC-->>CLI: 結果
+    CLI-->>User: 出力 (exit code は CLI が決める)
 ```
 
 ## 実装分割
@@ -660,6 +734,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | phase: clarify で D4 (DOT/Mermaid I/F) / D5 (エラー境界) / D6 (Formatter interface + View) / D7 (テスト境界) を決定。論点 D1-D7 がすべて解決                                               |
 | 2026-07-11 | Fukuemon | clarify gate の spec-review (NEEDS_WORK) を受けて修正: D2 の `(cycle)` 判定を back edge 方式へ、`output → traversal` 依存を変更提案として宣言、Performance 節を確定、cutoff ラベルを明確化 |
 | 2026-07-11 | Fukuemon | clarify gate 2 回目の指摘に対応: `depthCutoffs[]` に `targetMethodId` を追加し dangling 参照を方向非依存に (D3 / D7)                                                                       |
+| 2026-07-11 | Fukuemon | clarify gate 3 回目で PASS。phase: diagram で `## フロー / シーケンス` に 3 図を生成 (出力フロー / Console tree 構築 / sequence)。mermaid-cli でレンダリング検証済み                       |
 
 ## 備考
 
