@@ -312,3 +312,15 @@ Verdict: **PASS** — sync gate 通過。
 全観点 PASS。上位文書への反映の残存を実文書で再確認 (Design Doc の依存先 / C4 図 / Q3 / S3、feature doc 2 本の実在)。用語規約は全数 grep で適合。レビュー表・変更履歴・review.md の 3 系統が同期し、メタ情報同期の 1 周遅れ連鎖は断たれた。
 
 次アクション: phase: tasks へ。`## 実装分割` を確定し、fixture ケースは output feature doc のテスト観点 (durable 正本) から導出する。
+
+## Review 2026-07-11 (phase: tasks gate / 1 回目)
+
+Verdict: **NEEDS_WORK**
+
+必須 10 セクション / 命名 / antipatterns 注入 / 検証コマンド / 依存表は全 prompt で適合。P1_01 / P1_02 は現行実装との突合を含め単体で実行可能な品質と評価された。blocking 1 件は durable 正本由来の契約欠陥。
+
+### 指摘と対応
+
+41. **[blocking] `View` に探索方向が無く、P3 の両 formatter が完遂不能** — JSON は `direction` を出力し、Console は「子 = 探索方向に辿った先」の判定と `(呼び出し元なし)` / `(呼び出し先なし)` の文言分岐に direction が必須だが、`Formatter.Format(w, v View)` に direction が届かない。D6 は「Result が direction / start を保持しないから Request を Input に含める」と正しく認識していたのに、View 構築でその情報が落ちていた。→ **View に `Direction traversal.Direction` を追加** (durable 正本の修正のため、feature doc → D6 スナップショット → P2_01 / P3_01 / P3_02 の転記を同時更新)。
+42. **[moderate] P2_01 の registry 実装が自由選択で、P3_01∥P3_02 の並列前提が壊れうる** — 「Write 内で明示分岐」案が選ばれると P3 両 prompt が `output.go` を編集することになり衝突する。→ P2_01 の完了条件に「P3 が `output.go` を編集せず登録できる構造」を明記し、選択肢を絞った。
+43. **[minor] `CutoffView.TargetMethodID` の導出規則が P2_01 に未転記** (P3_02 にしかない) → direction からの導出規則を P2_01 の設計仕様に転記。

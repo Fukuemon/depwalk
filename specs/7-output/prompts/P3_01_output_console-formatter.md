@@ -123,7 +123,23 @@
 
 ## 設計仕様
 
-以下は `design/features/output/DesignDoc_output.md` (`### Console ツリー表現 (Q3 の正本)`) からの抜粋。
+以下は `design/features/output/DesignDoc_output.md` (`### Console ツリー表現 (Q3 の正本)` と `### 公開 entry point と Formatter / View`) からの抜粋。
+
+#### View (`P2_01` で確定。抜粋)
+
+```go
+// 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
+type View struct {
+    Status    traversal.Status
+    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Start     NodeView
+    Nodes     []NodeView   // methodId の辞書順
+    Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
+    Cutoffs   []CutoffView // edgeId の辞書順
+}
+```
+
+- **「子」の判定と `(呼び出し元なし)` / `(呼び出し先なし)` の文言分岐は `View.Direction` を使う**: `Direction = caller` なら子は「呼び出し元」で到達なし時は `(呼び出し元なし)`、`Direction = callee` なら子は「呼び出し先」で `(呼び出し先なし)`。
 
 #### tree 構築規則
 

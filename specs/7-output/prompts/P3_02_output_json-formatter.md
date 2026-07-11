@@ -117,7 +117,23 @@
 
 ## 設計仕様
 
-以下は `design/features/output/DesignDoc_output.md` (`### JSON 出力 (schema と版管理)`) からの抜粋。
+以下は `design/features/output/DesignDoc_output.md` (`### JSON 出力 (schema と版管理)` と `### 公開 entry point と Formatter / View`) からの抜粋。
+
+#### View (`P2_01` で確定。抜粋)
+
+```go
+// 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
+type View struct {
+    Status    traversal.Status
+    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Start     NodeView
+    Nodes     []NodeView   // methodId の辞書順
+    Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
+    Cutoffs   []CutoffView // edgeId の辞書順
+}
+```
+
+- **`"direction"` の出力元は `View.Direction`** (`caller` / `callee` をそのまま文字列化する)。`targetMethodId` の検証観点は従来どおり (下記 `## テスト観点`)。
 
 フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`) として出力し、tree にはしない。field 名は Analyzer Protocol の語彙を踏襲する。
 

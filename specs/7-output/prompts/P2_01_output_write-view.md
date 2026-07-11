@@ -43,7 +43,7 @@
 2. `core/internal/output/output.go` (現在は `package output` のみの stub) に次を実装する:
    - `Format` 定数: `FormatConsole` (`"console"`) / `FormatJSON` (`"json"`) / `FormatDOT` (`"dot"`) / `FormatMermaid` (`"mermaid"`)
    - `Input` 型 (`Graph *graph.Graph` / `Result traversal.Result` / `Request traversal.Request`)
-   - `View` 型 (`Status traversal.Status` / `Start NodeView` / `Nodes []NodeView` / `Edges []EdgeView` / `Cutoffs []CutoffView`)
+   - `View` 型 (`Status traversal.Status` / `Direction traversal.Direction` / `Start NodeView` / `Nodes []NodeView` / `Edges []EdgeView` / `Cutoffs []CutoffView`)
    - `NodeView` (methodId + symbol 情報。symbol 欠落 = ID のみを許容する構造にする)
    - `EdgeView` (edgeId + 両端 methodId + `Cycle bool` + `CallSite` 相当の位置情報)
    - `CutoffView` (edgeId + 両端 methodId + `TargetMethodID` + `TargetMinDepth` + 位置情報)
@@ -54,8 +54,9 @@
 
 ### ステップ 2: `View` 構築 (symbol 解決 + sort) を実装する
 
-1. テストを先に書く (TDD): 「`Input` から `View` を構築すると、到達 node すべてが `Nodes` に symbol 解決済みで含まれる」「`Nodes` が `methodId` の辞書順に sort される」「`Edges` / `Cutoffs` が `edgeId` の辞書順に sort される」「`status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容する」「同一 `Input` から構築した `View` が常に同じ内容になる (決定性)」の unit test を書く
-2. `Input` から `View` を構築する内部関数を実装する。Graph の読み取り API (`graph.Graph.Node`) で `Result.Nodes` の各 methodId から `Symbol` / `CallSite` を解決し、`Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定する
+1. テストを先に書く (TDD): 「`Input` から `View` を構築すると、到達 node すべてが `Nodes` に symbol 解決済みで含まれる」「`Nodes` が `methodId` の辞書順に sort される」「`Edges` / `Cutoffs` が `edgeId` の辞書順に sort される」「`status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容する」「同一 `Input` から構築した `View` が常に同じ内容になる (決定性)」「`View.Direction` が `Input.Request.Direction` から引き継がれる」の unit test を書く
+2. `Input` から `View` を構築する内部関数を実装する。Graph の読み取り API (`graph.Graph.Node`) で `Result.Nodes` の各 methodId から `Symbol` / `CallSite` を解決し、`Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定する。`Input.Request.Direction` / `Input.Request.StartID` (探索方向 / 起点 ID) を `View.Direction` / `View.Start` に引き継ぐ
+   - `CutoffView.TargetMethodID` は `traversal.DepthCutoff` が endpoint field を持たないため、`View` 構築時に **direction から導出する**: `direction=caller` なら `DepthCutoff.Edge.CallerID`、`direction=callee` なら `DepthCutoff.Edge.CalleeID` と同値。`TargetMinDepth` は `DepthCutoff.TargetMinDepth` をそのまま使う
 3. `## 検証コマンド` を実行する
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す
 5. 指摘を対応してから次へ
@@ -63,7 +64,7 @@
 ### ステップ 3: `Write` entry point と Formatter registry を実装する
 
 1. テストを先に書く (TDD): 「未対応 format (未登録 format) を指定すると、何も書き出さずに `error` を返す」「対応 format を指定すると `View` が構築され、対応する Formatter が呼ばれる」「`Write` は format 検証 → `View` 構築 → Formatter 選択の順で処理する」の unit test を書く。Formatter 呼び出しの検証には、テスト専用の仮 Formatter (呼ばれたことを記録するだけの実装、または固定文字列を書き出す実装) を用いてよい
-2. `func Write(w io.Writer, f Format, in Input) error` を実装する: ① `f` が未対応 format なら何も書き出さず `error` を返す ② `Input` から `View` を構築する ③ `f` に対応する `Formatter` を選ぶ ④ `formatter.Format(w, view)` を呼ぶ。Console / JSON の実 Formatter は P3 で実装されるため、本 prompt では registry (format → Formatter のマッピング) を用意し、**P3 が差し替えやすい構造**にする (例: package 内の `map[Format]Formatter` にコンストラクタ時 or `init` で登録する、あるいは `Write` 内で明示的に分岐しつつ Console / JSON 分岐は「未登録」を返す仮実装にする、のいずれか。unexported な形で構わない)
+2. `func Write(w io.Writer, f Format, in Input) error` を実装する: ① `f` が未対応 format なら何も書き出さず `error` を返す ② `Input` から `View` を構築する ③ `f` に対応する `Formatter` を選ぶ ④ `formatter.Format(w, view)` を呼ぶ。Console / JSON の実 Formatter は P3 で実装されるため、本 prompt では registry (format → Formatter のマッピング) を用意し、**P3 が `output.go` (Write 本体) を編集せず、各自の formatter 実装ファイルの追加・変更だけで Formatter を登録できる構造**にする。実装は package 内の unexported `map[Format]Formatter` に、各 formatter 実装ファイル側の `init()` (または package 変数初期化) で自身を登録する形に限定する (`Write` 内で `switch`/`if` により Console / JSON を明示分岐する実装は、P3_01 と P3_02 の両方が `output.go` を編集することになり並列実装が衝突するため選ばない)
 3. `## 検証コマンド` を実行する
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す
 5. 指摘を対応してから次へ
@@ -145,11 +146,12 @@ func Write(w io.Writer, f Format, in Input) error
 
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
-    Status  traversal.Status
-    Start   NodeView
-    Nodes   []NodeView   // methodId の辞書順
-    Edges   []EdgeView   // edgeId の辞書順。Cycle flag を持つ
-    Cutoffs []CutoffView // edgeId の辞書順
+    Status    traversal.Status
+    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Start     NodeView
+    Nodes     []NodeView   // methodId の辞書順
+    Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
+    Cutoffs   []CutoffView // edgeId の辞書順
 }
 
 type Formatter interface {
@@ -159,7 +161,8 @@ type Formatter interface {
 
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 `Input` から常に同一内容の `View` を構築する。
 - symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
-- `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため。
+- `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため。`View` はこれを `Direction` field として保持し Formatter へ運ぶ (JSON の `direction` 出力、Console の子方向判定・文言分岐に必須)。
+- `CutoffView.TargetMethodID` の導出規則: `traversal.DepthCutoff` は endpoint field を持たないため、`View` 構築時に direction から導出する。`direction=caller` なら `DepthCutoff.Edge.CallerID`、`direction=callee` なら `DepthCutoff.Edge.CalleeID` と同値。`TargetMinDepth` は `DepthCutoff.TargetMinDepth` をそのまま使う。
 - **未対応 format の検証・`View` の構築・Formatter の選択は `Write` が担う**。`Formatter` は「`View` を描く」ことだけに責務を絞る。
 
 `## エラー境界` より (該当部分のみ抜粋):
@@ -178,6 +181,7 @@ type Formatter interface {
 - `View.Nodes` が `methodId` の辞書順、`View.Edges` / `View.Cutoffs` が `edgeId` の辞書順に sort されること
 - 同一 `Input` から構築した `View` が常に同一内容になること (決定性)
 - `status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容すること
+- `View.Direction` が `Input.Request.Direction` から引き継がれること
 
 ## 検証コマンド
 
@@ -197,6 +201,8 @@ type Formatter interface {
 - [ ] `Input` から `View` を構築する処理が symbol 解決 + id 辞書順 sort を行う
 - [ ] `Write(w io.Writer, f Format, in Input) error` が未対応 format を出力前に弾く
 - [ ] Formatter registry が P3 (Console / JSON) から差し替え可能な構造になっている
+- [ ] P3 (Console / JSON formatter) が `output.go` (`Write` 本体) を編集せず、自ファイル (formatter 実装ファイル) の追加・変更だけで Formatter を登録できる構造になっている (`map[Format]Formatter` registry への自己登録)
+- [ ] `View.Direction` が `Input.Request.Direction` から引き継がれる
 - [ ] spec の `## 上位資料からの変更点` に必要な追記を行った (本 prompt では追記不要なことを確認した)
 - [ ] PR / MR を Ready に変更しレビュアーを指名した
 - [ ] 未解決の仕様質問が残っていない
