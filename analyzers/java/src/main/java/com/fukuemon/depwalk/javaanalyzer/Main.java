@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsReporter;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsSummary;
 import com.fukuemon.depwalk.javaanalyzer.io.ProtocolObjectMapper;
@@ -24,9 +25,7 @@ import java.time.Instant;
  * process contract (analyzer-protocol 正本): stdin から {@code analysisRequest} を 1 件受け取り、
  * stdout へ JSONL record を逐次出力し、stderr へ計測ログを出す。exit code 0 = 成功、非ゼロ = fatal。
  *
- * <p>AST 解析 / 型解決 / {@code methodSymbol} ・ {@code callEdge} の生成は P2_01 の責務。
- * 本 prompt の範囲では pre-flight を通過した場合、record 0 件で exit code 0 とする
- * (0 件の正常解析は protocol 上 success)。
+ * <p>AST 解析 / 型解決 / {@code methodSymbol} ・ {@code callEdge} の生成は {@link AnalysisRunner} が担う。
  */
 public final class Main {
 
@@ -63,10 +62,9 @@ public final class Main {
                 return 1;
             }
 
-            // AST 解析 / 型解決 / methodSymbol・callEdge 生成は P2_01 の責務。
-            // 本 prompt では pre-flight 通過後、record 0 件で success とする。
+            AnalysisRunner.RunStats stats = AnalysisRunner.run(request, writer);
             Duration elapsed = Duration.between(start, Instant.now());
-            MetricsSummary summary = new MetricsSummary(0, elapsed.toMillis(), 0);
+            MetricsSummary summary = new MetricsSummary(stats.analyzedFileCount(), elapsed.toMillis(), stats.unresolvedCount());
             PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
             MetricsReporter.report(errStream, summary);
             return 0;

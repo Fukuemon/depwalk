@@ -1,10 +1,12 @@
 package com.fukuemon.depwalk.javaanalyzer;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MainTest {
 
     @Test
-    void preflightPassWithEmptyClasspathProducesZeroRecordsAndExitZero() {
+    void preflightPassWithEmptyClasspathProducesZeroRecordsAndExitZero(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
-                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
+                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
                 + "\"language\":\"java\",\"metadata\":{\"classpath\":[]}}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -24,7 +26,7 @@ class MainTest {
         int exitCode = Main.run(inputStream(request), stdout, stderr);
 
         assertEquals(0, exitCode);
-        assertTrue(stdout.toString(StandardCharsets.UTF_8).isEmpty(), "no protocol records expected yet (P2_01 responsibility)");
+        assertTrue(stdout.toString(StandardCharsets.UTF_8).isEmpty(), "empty workspace has no scope files to analyze");
         assertFalse(stderr.toString(StandardCharsets.UTF_8).isBlank(), "stderr should contain the metrics summary");
     }
 
@@ -76,9 +78,9 @@ class MainTest {
     }
 
     @Test
-    void unknownFieldsInRequestAreIgnored() {
+    void unknownFieldsInRequestAreIgnored(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
-                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
+                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
                 + "\"language\":\"java\",\"metadata\":{\"classpath\":[]},\"unknownField\":true}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -105,5 +107,9 @@ class MainTest {
 
     private static ByteArrayInputStream inputStream(String content) {
         return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String jsonPath(Path path) {
+        return path.toAbsolutePath().toString().replace("\\", "\\\\");
     }
 }
