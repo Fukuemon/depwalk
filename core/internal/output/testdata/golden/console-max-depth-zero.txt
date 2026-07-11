@@ -1,0 +1,2 @@
+A()
+└─ … (depth limit: 2 edges cut)

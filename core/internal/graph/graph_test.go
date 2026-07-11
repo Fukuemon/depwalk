@@ -1,6 +1,10 @@
 package graph
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/protocol"
+)
 
 func TestNodeReturnsRegisteredNode(t *testing.T) {
 	g := New()
@@ -12,6 +16,34 @@ func TestNodeReturnsRegisteredNode(t *testing.T) {
 	}
 	if got.ID != "method:a" {
 		t.Errorf("Node(%q).ID = %q, want %q", "method:a", got.ID, "method:a")
+	}
+}
+
+func TestNodeReturnsRegisteredSymbol(t *testing.T) {
+	source := &protocol.SourceLocation{Path: "service.go", StartLine: 12}
+	want := Symbol{QualifiedName: "example.Service.Run", Signature: "()", Source: source}
+	g := New()
+	g.AddNode(Node{ID: "method:a", Symbol: want})
+
+	got, ok := g.Node("method:a")
+	if !ok {
+		t.Fatal("Node(method:a) not found")
+	}
+	if got.Symbol != want {
+		t.Errorf("Node(method:a).Symbol = %#v, want %#v", got.Symbol, want)
+	}
+}
+
+func TestNodeAllowsNilSymbolSource(t *testing.T) {
+	g := New()
+	g.AddNode(Node{ID: "method:a", Symbol: Symbol{QualifiedName: "example.Service.Run"}})
+
+	got, ok := g.Node("method:a")
+	if !ok {
+		t.Fatal("Node(method:a) not found")
+	}
+	if got.Symbol.Source != nil {
+		t.Errorf("Node(method:a).Symbol.Source = %#v, want nil", got.Symbol.Source)
 	}
 }
 
@@ -133,6 +165,33 @@ func TestAddEdgeIgnoresDuplicateID(t *testing.T) {
 
 	if got := g.Neighbors("method:a", DirectionCallee); len(got) != 1 {
 		t.Errorf("Neighbors(a, callee) returned %d edges after duplicate AddEdge, want 1", len(got))
+	}
+}
+
+func TestNeighborsReturnsRegisteredCallSite(t *testing.T) {
+	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 24}
+	g := New()
+	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite})
+
+	got := g.Neighbors("method:a", DirectionCallee)
+	if len(got) != 1 {
+		t.Fatalf("Neighbors(method:a, callee) = %d edges, want 1", len(got))
+	}
+	if got[0].CallSite != callSite {
+		t.Errorf("Neighbors(method:a, callee)[0].CallSite = %#v, want %#v", got[0].CallSite, callSite)
+	}
+}
+
+func TestEdgeAllowsNilCallSite(t *testing.T) {
+	g := New()
+	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+
+	got := g.Neighbors("method:a", DirectionCallee)
+	if len(got) != 1 {
+		t.Fatalf("Neighbors(method:a, callee) = %d edges, want 1", len(got))
+	}
+	if got[0].CallSite != nil {
+		t.Errorf("Neighbors(method:a, callee)[0].CallSite = %#v, want nil", got[0].CallSite)
 	}
 }
 

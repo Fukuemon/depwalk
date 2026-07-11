@@ -38,6 +38,52 @@ func TestResultEdgesFormInducedSubgraph(t *testing.T) {
 	}
 }
 
+func TestResultPublishesReachedNodeDepths(t *testing.T) {
+	res := mustTraverse(t, linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+
+	want := map[string]int{"method:a": 0, "method:b": 1, "method:c": 2}
+	if len(res.Depths) != len(want) {
+		t.Fatalf("Depths = %v, want %v", res.Depths, want)
+	}
+	for id, depth := range want {
+		if res.Depths[id] != depth {
+			t.Errorf("Depths[%q] = %d, want %d", id, res.Depths[id], depth)
+		}
+	}
+}
+
+func TestResultDepthsExcludeNodesBeyondMaxDepth(t *testing.T) {
+	res := mustTraverse(t, linearGraph(), Request{
+		StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(1),
+	})
+
+	for id, depth := range res.Depths {
+		if depth > 1 {
+			t.Errorf("Depths[%q] = %d, want <= 1", id, depth)
+		}
+	}
+	if _, ok := res.Depths["method:c"]; ok {
+		t.Error("Depths contains method:c beyond maxDepth 1")
+	}
+}
+
+func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
+	// o -> a -> a2 -> m and o -> b -> m: the second route is shorter.
+	g := graph.NewBuilder().
+		Edge("edge:oa", "method:o", "method:a").
+		Edge("edge:aa2", "method:a", "method:a2").
+		Edge("edge:a2m", "method:a2", "method:m").
+		Edge("edge:ob", "method:o", "method:b").
+		Edge("edge:bm", "method:b", "method:m").
+		Build()
+
+	res := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee})
+
+	if got := res.Depths["method:m"]; got != 2 {
+		t.Errorf("Depths[method:m] = %d, want shortest depth 2", got)
+	}
+}
+
 func TestResultDiamondKeepsAllConvergentEdges(t *testing.T) {
 	// o -> a -> m and o -> b -> m: all four edges are call relations and
 	// must survive regardless of which arm a walk expands first.
@@ -192,7 +238,7 @@ func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
 	if res.Status != StatusStartNotFound {
 		t.Fatalf("Status = %q, want %q", res.Status, StatusStartNotFound)
 	}
-	if len(res.Nodes) != 0 || len(res.Edges) != 0 || len(res.Cycles) != 0 || len(res.DepthCutoffs) != 0 {
+	if len(res.Nodes) != 0 || len(res.Depths) != 0 || len(res.Edges) != 0 || len(res.Cycles) != 0 || len(res.DepthCutoffs) != 0 {
 		t.Errorf("Result = %+v, want all collections empty", res)
 	}
 }
@@ -228,6 +274,9 @@ func TestResultIdenticalForBFSAndDFS(t *testing.T) {
 			for id := range bfs.Nodes {
 				if !dfs.Nodes[id] {
 					t.Errorf("dfs Nodes missing %q", id)
+				}
+				if dfs.Depths[id] != bfs.Depths[id] {
+					t.Errorf("dfs Depths[%q] = %d, want %d", id, dfs.Depths[id], bfs.Depths[id])
 				}
 			}
 			if len(bfs.Edges) != len(dfs.Edges) {

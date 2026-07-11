@@ -1,6 +1,10 @@
 package graph
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/protocol"
+)
 
 func TestBuilderBuildsNodesAndEdges(t *testing.T) {
 	g := NewBuilder().
@@ -30,6 +34,52 @@ func TestBuilderEdgeRegistersEndpointNodes(t *testing.T) {
 	}
 	if _, ok := g.Node("method:b"); !ok {
 		t.Error("callee endpoint method:b not auto-registered")
+	}
+}
+
+func TestBuilderBuildsNodeWithSymbolAndEdgeWithCallSite(t *testing.T) {
+	source := &protocol.SourceLocation{Path: "callee.go", StartLine: 8}
+	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 13}
+	symbol := Symbol{QualifiedName: "example.Callee.Run", Signature: "()", Source: source}
+
+	g := NewBuilder().
+		NodeWithSymbol("method:a", Symbol{QualifiedName: "example.Caller.Run", Signature: "()"}).
+		NodeWithSymbol("method:b", symbol).
+		EdgeWithCallSite("edge:ab", "method:a", "method:b", callSite).
+		Build()
+
+	gotNode, ok := g.Node("method:b")
+	if !ok {
+		t.Fatal("Node(method:b) not found")
+	}
+	if gotNode.Symbol != symbol {
+		t.Errorf("Node(method:b).Symbol = %#v, want %#v", gotNode.Symbol, symbol)
+	}
+	edges := g.Neighbors("method:a", DirectionCallee)
+	if len(edges) != 1 {
+		t.Fatalf("Neighbors(method:a, callee) = %d edges, want 1", len(edges))
+	}
+	if edges[0].CallSite != callSite {
+		t.Errorf("edge CallSite = %#v, want %#v", edges[0].CallSite, callSite)
+	}
+}
+
+func TestBuilderExistingMethodsUseZeroValueMetadata(t *testing.T) {
+	g := NewBuilder().
+		Node("method:a").
+		Edge("edge:ab", "method:a", "method:b").
+		Build()
+
+	node, ok := g.Node("method:a")
+	if !ok {
+		t.Fatal("Node(method:a) not found")
+	}
+	if node.Symbol != (Symbol{}) {
+		t.Errorf("Node(method:a).Symbol = %#v, want zero value", node.Symbol)
+	}
+	edges := g.Neighbors("method:a", DirectionCallee)
+	if len(edges) != 1 || edges[0].CallSite != nil {
+		t.Errorf("Neighbors(method:a, callee) = %#v, want one edge with nil CallSite", edges)
 	}
 }
 

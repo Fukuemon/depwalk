@@ -1,0 +1,3 @@
+A()
+├─ A()  (cycle)
+└─ … (depth limit: 1 edges cut)
