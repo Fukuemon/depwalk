@@ -9,4 +9,7 @@ design/.staging/
 dist/
 build/
 __pycache__/
-*.pyc
+*.pyc# 共有プロセス層の正本は sdd-template repo (消費 repo では local symlink のみ。commit しない)
+.rulesync/
+rulesync.jsonc
+scripts/link.sh
