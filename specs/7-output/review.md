@@ -39,3 +39,18 @@ Verdict: **NEEDS_WORK**
 
 4. `… (depth limit: N)` の `N` が「深さ上限値」とも「省略された edge 数」とも読める → `… (depth limit: N edges cut)` に変更。
 5. `View.Start` は `status = startNotFound` のとき symbol を解決できない → `NodeView` が symbol 欠落 (ID のみ) を許容する旨を D6 に明記。
+
+## Review 2026-07-11 (phase: clarify gate / 2 回目)
+
+Verdict: **NEEDS_WORK**
+
+1 回目の blocking 3 件はいずれも**解消を確認**。D1-D7 の相互整合も良好と評価された (D1 の symbol 保持 → D2/D3/D4 の表示語彙 → D6 の `View` 集約 → D7 の golden 検証が一貫)。新規 blocking が 1 件。
+
+### blocking 指摘と対応
+
+6. **`depthCutoffs[]` の dangling 参照が探索方向で逆になる** — spec は「`calleeMethodId` が `nodes[]` に存在しない」と方向非依存に断定していたが、`nextNode(e, dir)` は `DirectionCaller` で `e.CallerID` を返す (`core/internal/traversal/search.go`)。caller 方向 (depwalk の主用途 S1) では深さ上限の外側にあるのは **`callerMethodId` 側**であり、`calleeMethodId` は `nodes[]` に存在する。従来の記述は callee 方向でしか成立せず、JSON 利用者に誤った契約を与えていた。
+   - **対応**: schema に **`targetMethodId`** (探索方向の接続先 = dangling する側) を追加。既存の `targetMinDepth` と対になり、利用者は `direction` を見て分岐せずに dangling 参照を特定できる。D7 の検証観点も caller / callee の両方向で書き分けた。
+
+### minor 指摘と対応
+
+7. cutoff ラベルの表記ゆれ (`… (depth limit: N)` が D2 決定文と Interface 設計に残存) → `… (depth limit: N edges cut)` に統一。
