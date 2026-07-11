@@ -324,3 +324,41 @@ Verdict: **NEEDS_WORK**
 41. **[blocking] `View` に探索方向が無く、P3 の両 formatter が完遂不能** — JSON は `direction` を出力し、Console は「子 = 探索方向に辿った先」の判定と `(呼び出し元なし)` / `(呼び出し先なし)` の文言分岐に direction が必須だが、`Formatter.Format(w, v View)` に direction が届かない。D6 は「Result が direction / start を保持しないから Request を Input に含める」と正しく認識していたのに、View 構築でその情報が落ちていた。→ **View に `Direction traversal.Direction` を追加** (durable 正本の修正のため、feature doc → D6 スナップショット → P2_01 / P3_01 / P3_02 の転記を同時更新)。
 42. **[moderate] P2_01 の registry 実装が自由選択で、P3_01∥P3_02 の並列前提が壊れうる** — 「Write 内で明示分岐」案が選ばれると P3 両 prompt が `output.go` を編集することになり衝突する。→ P2_01 の完了条件に「P3 が `output.go` を編集せず登録できる構造」を明記し、選択肢を絞った。
 43. **[minor] `CutoffView.TargetMethodID` の導出規則が P2_01 に未転記** (P3_02 にしかない) → direction からの導出規則を P2_01 の設計仕様に転記。
+
+## Review 2026-07-11 (phase: tasks gate / 2 回目)
+
+Verdict: **NEEDS_WORK**
+
+指摘 41-43 の解消を確認 (View に Direction が追加され、P2_01 の完了条件と `CutoffView.TargetMethodID` 導出規則の転記も反映済み)。修正の適用時に **同型の欠陥が 2 度目**発生: View 境界 (Formatter が `View` 以外に依存しない契約) を修正するたびに一部の情報が運ばれないまま残る。今回は① 1 回目の修正で入れた型名が実在しない ② JSON が新たに要求する `minDepth` が `NodeView` に無い、の 2 件。
+
+### View 境界の全数チェック表 (再発防止のため今回作成)
+
+Console / JSON 両 Formatter が出力する全項目と、対応する `View` field を突合した (feature doc に正本として追記)。
+
+| 出力項目                                                  | View field                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| status                                                    | `View.Status`                                                 |
+| direction (Console 子方向判定 / JSON `direction`)         | `View.Direction`                                              |
+| root の methodId / qualifiedName / signature / 宣言位置   | `View.Start.ID` / `.QualifiedName` / `.Signature` / `.Source` |
+| start (JSON)                                              | `View.Start.ID`                                               |
+| nodes[] の methodId / qualifiedName / signature           | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`           |
+| nodes[].minDepth                                          | `View.Nodes[].MinDepth` (**修正前は欠落**)                    |
+| nodes[].sourceLocation                                    | `View.Nodes[].Source`                                         |
+| 子 edge 両端 methodId / callerMethodId・calleeMethodId    | `View.Edges[].CallerID` / `.CalleeID`                         |
+| edges[].edgeId                                            | `View.Edges[].ID`                                             |
+| edge の callSite                                          | `View.Edges[].CallSite`                                       |
+| cycle flag                                                | `View.Edges[].Cycle`                                          |
+| cutoff の到達側 endpoint / callerMethodId・calleeMethodId | `View.Cutoffs[].CallerID` / `.CalleeID`                       |
+| cutoff 件数 (Console `N edges cut`)                       | `len(View.Cutoffs)` を対象 node 単位に集計                    |
+| depthCutoffs[].edgeId                                     | `View.Cutoffs[].EdgeID`                                       |
+| depthCutoffs[].targetMethodId                             | `View.Cutoffs[].TargetMethodID`                               |
+| depthCutoffs[].targetMinDepth                             | `View.Cutoffs[].TargetMinDepth`                               |
+| depthCutoffs[].callSite                                   | `View.Cutoffs[].CallSite`                                     |
+
+この表により、`NodeView.MinDepth` の欠落以外に運ばれていない出力項目がないことを確認した。
+
+### 指摘と対応
+
+44. **[blocking] `traversal.Direction` という型は実在しない** — 正しくは `graph.Direction` (`core/internal/graph/graph.go:13` の `type Direction string`。`traversal.Request.Direction` も `graph.Direction` 型)。前回の修正で 5 箇所 (feature doc / D6 スナップショット / P2_01 / P3_01 / P3_02) すべてに実在しない型名が入っていた → 5 箇所とも `graph.Direction` へ修正。
+45. **[blocking] `NodeView` に `MinDepth int` が無い** — JSON の `nodes[].minDepth` が `Formatter.Format(w, v View)` 境界を通過できず、P3_02 は「traversal.Result から埋める」という Formatter が `View` 以外に依存する誤った記述になっていた (41 と同型の欠陥) → `NodeView` に `MinDepth int` を追加し、`P2_01` の View 構築ステップで `traversal.Result` の minDepth を引き継ぐことを明記。`CutoffView.TargetMinDepth` も同時に確認 (既存で正しく定義済み)。
+46. **[minor] P3_02 の `depthCutoffs[]` の出力元記述が `traversal.DepthCutoff` を指している** — Formatter は `View.Cutoffs[]` を読むだけでよいところ、`traversal` package の型を直接参照する記述が残っていた → 出力元を `View.Cutoffs[]` の各 field に書き換え、`traversal` 型への参照を削除。

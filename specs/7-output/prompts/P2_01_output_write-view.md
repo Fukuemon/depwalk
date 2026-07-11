@@ -43,8 +43,8 @@
 2. `core/internal/output/output.go` (現在は `package output` のみの stub) に次を実装する:
    - `Format` 定数: `FormatConsole` (`"console"`) / `FormatJSON` (`"json"`) / `FormatDOT` (`"dot"`) / `FormatMermaid` (`"mermaid"`)
    - `Input` 型 (`Graph *graph.Graph` / `Result traversal.Result` / `Request traversal.Request`)
-   - `View` 型 (`Status traversal.Status` / `Direction traversal.Direction` / `Start NodeView` / `Nodes []NodeView` / `Edges []EdgeView` / `Cutoffs []CutoffView`)
-   - `NodeView` (methodId + symbol 情報。symbol 欠落 = ID のみを許容する構造にする)
+   - `View` 型 (`Status traversal.Status` / `Direction graph.Direction` / `Start NodeView` / `Nodes []NodeView` / `Edges []EdgeView` / `Cutoffs []CutoffView`)
+   - `NodeView` (methodId + symbol 情報 + `MinDepth int`。symbol 欠落 = ID のみを許容する構造にする)
    - `EdgeView` (edgeId + 両端 methodId + `Cycle bool` + `CallSite` 相当の位置情報)
    - `CutoffView` (edgeId + 両端 methodId + `TargetMethodID` + `TargetMinDepth` + 位置情報)
    - `Formatter` interface (`Format(w io.Writer, v View) error`)
@@ -54,9 +54,10 @@
 
 ### ステップ 2: `View` 構築 (symbol 解決 + sort) を実装する
 
-1. テストを先に書く (TDD): 「`Input` から `View` を構築すると、到達 node すべてが `Nodes` に symbol 解決済みで含まれる」「`Nodes` が `methodId` の辞書順に sort される」「`Edges` / `Cutoffs` が `edgeId` の辞書順に sort される」「`status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容する」「同一 `Input` から構築した `View` が常に同じ内容になる (決定性)」「`View.Direction` が `Input.Request.Direction` から引き継がれる」の unit test を書く
+1. テストを先に書く (TDD): 「`Input` から `View` を構築すると、到達 node すべてが `Nodes` に symbol 解決済みで含まれる」「`Nodes` が `methodId` の辞書順に sort される」「`Edges` / `Cutoffs` が `edgeId` の辞書順に sort される」「`status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容する」「同一 `Input` から構築した `View` が常に同じ内容になる (決定性)」「`View.Direction` が `Input.Request.Direction` から引き継がれる」「`NodeView.MinDepth` / `CutoffView.TargetMinDepth` が `traversal.Result` の node ごとの minDepth から引き継がれる」の unit test を書く
 2. `Input` から `View` を構築する内部関数を実装する。Graph の読み取り API (`graph.Graph.Node`) で `Result.Nodes` の各 methodId から `Symbol` / `CallSite` を解決し、`Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定する。`Input.Request.Direction` / `Input.Request.StartID` (探索方向 / 起点 ID) を `View.Direction` / `View.Start` に引き継ぐ
-   - `CutoffView.TargetMethodID` は `traversal.DepthCutoff` が endpoint field を持たないため、`View` 構築時に **direction から導出する**: `direction=caller` なら `DepthCutoff.Edge.CallerID`、`direction=callee` なら `DepthCutoff.Edge.CalleeID` と同値。`TargetMinDepth` は `DepthCutoff.TargetMinDepth` をそのまま使う
+   - `NodeView.MinDepth` は `traversal.Result` が公開する node ごとの `minDepth` (`P1_02_traversal_min-depth.md` で実装済み) を、`View` 構築時に対応する `NodeView` へそのまま引き継ぐ (Formatter は `traversal.Result` に触れない)
+   - `CutoffView.TargetMethodID` は `traversal.DepthCutoff` が endpoint field を持たないため、`View` 構築時に **direction から導出する**: `direction=caller` なら `DepthCutoff.Edge.CallerID`、`direction=callee` なら `DepthCutoff.Edge.CalleeID` と同値。`TargetMinDepth` は `DepthCutoff.TargetMinDepth` をそのまま `View` 構築時に `CutoffView.TargetMinDepth` へ引き継ぐ
 3. `## 検証コマンド` を実行する
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す
 5. 指摘を対応してから次へ
@@ -147,11 +148,40 @@ func Write(w io.Writer, f Format, in Input) error
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
     Status    traversal.Status
-    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Direction graph.Direction // 探索方向 (Request から引き継ぐ)
     Start     NodeView
     Nodes     []NodeView   // methodId の辞書順
     Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
     Cutoffs   []CutoffView // edgeId の辞書順
+}
+
+// NodeView は 1 node の Formatter 向け表現。symbol 欠落時は QualifiedName /
+// Signature / Source がゼロ値 (ID のみ有効)。
+type NodeView struct {
+    ID            string
+    QualifiedName string
+    Signature     string
+    Source        *protocol.SourceLocation // nil なら位置情報なし
+    MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
+}
+
+// EdgeView は 1 edge の Formatter 向け表現。
+type EdgeView struct {
+    ID       string
+    CallerID string
+    CalleeID string
+    Cycle    bool
+    CallSite *protocol.SourceLocation // nil なら位置情報なし
+}
+
+// CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
+type CutoffView struct {
+    EdgeID         string
+    CallerID       string
+    CalleeID       string
+    TargetMethodID string                   // 探索方向の接続先 (dangling する側)
+    TargetMinDepth int                      // TargetMethodID の minDepth
+    CallSite       *protocol.SourceLocation // nil なら位置情報なし
 }
 
 type Formatter interface {
@@ -162,6 +192,7 @@ type Formatter interface {
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 `Input` から常に同一内容の `View` を構築する。
 - symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
 - `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため。`View` はこれを `Direction` field として保持し Formatter へ運ぶ (JSON の `direction` 出力、Console の子方向判定・文言分岐に必須)。
+- `NodeView.MinDepth` / `CutoffView.TargetMinDepth` は `traversal.Result` の `minDepth` 公開を `View` 構築時に引き継ぐ (Formatter は `traversal.Result` に触れずに `nodes[].minDepth` / `depthCutoffs[].targetMinDepth` を出力できる)。
 - `CutoffView.TargetMethodID` の導出規則: `traversal.DepthCutoff` は endpoint field を持たないため、`View` 構築時に direction から導出する。`direction=caller` なら `DepthCutoff.Edge.CallerID`、`direction=callee` なら `DepthCutoff.Edge.CalleeID` と同値。`TargetMinDepth` は `DepthCutoff.TargetMinDepth` をそのまま使う。
 - **未対応 format の検証・`View` の構築・Formatter の選択は `Write` が担う**。`Formatter` は「`View` を描く」ことだけに責務を絞る。
 
@@ -182,6 +213,7 @@ type Formatter interface {
 - 同一 `Input` から構築した `View` が常に同一内容になること (決定性)
 - `status = startNotFound` のとき `View.Start` が symbol 欠落 (ID のみ) を許容すること
 - `View.Direction` が `Input.Request.Direction` から引き継がれること
+- `NodeView.MinDepth` / `CutoffView.TargetMinDepth` が `traversal.Result` の node ごとの minDepth から引き継がれること
 
 ## 検証コマンド
 
@@ -203,6 +235,7 @@ type Formatter interface {
 - [ ] Formatter registry が P3 (Console / JSON) から差し替え可能な構造になっている
 - [ ] P3 (Console / JSON formatter) が `output.go` (`Write` 本体) を編集せず、自ファイル (formatter 実装ファイル) の追加・変更だけで Formatter を登録できる構造になっている (`map[Format]Formatter` registry への自己登録)
 - [ ] `View.Direction` が `Input.Request.Direction` から引き継がれる
+- [ ] `NodeView.MinDepth` / `CutoffView.TargetMinDepth` が `traversal.Result` の minDepth から引き継がれる
 - [ ] spec の `## 上位資料からの変更点` に必要な追記を行った (本 prompt では追記不要なことを確認した)
 - [ ] PR / MR を Ready に変更しレビュアーを指名した
 - [ ] 未解決の仕様質問が残っていない
