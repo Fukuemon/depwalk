@@ -1,0 +1,98 @@
+{
+  "description": "深さ上限打ち切り: o -> n1 -> n2 -> n3 の chain と o -> x -> n2 の近道 (合流 node n2 は minDepth 2)",
+  "graph": {
+    "nodes": ["method:o", "method:n1", "method:n2", "method:n3", "method:x"],
+    "edges": [
+      {
+        "edgeId": "edge:on1",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:n1"
+      },
+      {
+        "edgeId": "edge:n1n2",
+        "callerMethodId": "method:n1",
+        "calleeMethodId": "method:n2"
+      },
+      {
+        "edgeId": "edge:n2n3",
+        "callerMethodId": "method:n2",
+        "calleeMethodId": "method:n3"
+      },
+      {
+        "edgeId": "edge:ox",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:x"
+      },
+      {
+        "edgeId": "edge:xn2",
+        "callerMethodId": "method:x",
+        "calleeMethodId": "method:n2"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: maxDepth 2 keeps convergent n2 (shortest path) and cuts n2 -> n3",
+      "start": "method:o",
+      "direction": "callee",
+      "maxDepth": 2,
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o", "method:n1", "method:x", "method:n2"],
+        "edges": ["edge:on1", "edge:ox", "edge:n1n2", "edge:xn2"],
+        "cycles": [],
+        "depthCutoffs": [{ "edgeId": "edge:n2n3", "targetMinDepth": 3 }]
+      }
+    },
+    {
+      "name": "S2: maxDepth 0 keeps only the start and cuts all adjacent edges",
+      "start": "method:o",
+      "direction": "callee",
+      "maxDepth": 0,
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o"],
+        "edges": [],
+        "cycles": [],
+        "depthCutoffs": [
+          { "edgeId": "edge:on1", "targetMinDepth": 1 },
+          { "edgeId": "edge:ox", "targetMinDepth": 1 }
+        ]
+      }
+    },
+    {
+      "name": "S2: unlimited depth reaches everything without cutoffs",
+      "start": "method:o",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": [
+          "method:o",
+          "method:n1",
+          "method:n2",
+          "method:n3",
+          "method:x"
+        ],
+        "edges": ["edge:on1", "edge:n1n2", "edge:n2n3", "edge:ox", "edge:xn2"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from n3 with maxDepth 1 cuts upstream edges",
+      "start": "method:n3",
+      "direction": "caller",
+      "maxDepth": 1,
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:n3", "method:n2"],
+        "edges": ["edge:n2n3"],
+        "cycles": [],
+        "depthCutoffs": [
+          { "edgeId": "edge:n1n2", "targetMinDepth": 2 },
+          { "edgeId": "edge:xn2", "targetMinDepth": 2 }
+        ]
+      }
+    }
+  ]
+}

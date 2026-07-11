@@ -1,0 +1,60 @@
+{
+  "description": "frontier 間の cross edge: o -> a -> c, o -> b -> d, c -> d。maxDepth 2 で c と d はともに深さ上限ちょうどの node であり、両者を結ぶ edge c -> d は探索木の edge でなくても誘導部分グラフとして到達 edge 集合に含まれる",
+  "graph": {
+    "nodes": ["method:o", "method:a", "method:b", "method:c", "method:d"],
+    "edges": [
+      {
+        "edgeId": "edge:oa",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:a"
+      },
+      {
+        "edgeId": "edge:ob",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:b"
+      },
+      {
+        "edgeId": "edge:ac",
+        "callerMethodId": "method:a",
+        "calleeMethodId": "method:c"
+      },
+      {
+        "edgeId": "edge:bd",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:d"
+      },
+      {
+        "edgeId": "edge:cd",
+        "callerMethodId": "method:c",
+        "calleeMethodId": "method:d"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: maxDepth 2 keeps the cross edge between two frontier nodes",
+      "start": "method:o",
+      "direction": "callee",
+      "maxDepth": 2,
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o", "method:a", "method:b", "method:c", "method:d"],
+        "edges": ["edge:oa", "edge:ob", "edge:ac", "edge:bd", "edge:cd"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S2: unlimited depth keeps the same induced set",
+      "start": "method:o",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o", "method:a", "method:b", "method:c", "method:d"],
+        "edges": ["edge:oa", "edge:ob", "edge:ac", "edge:bd", "edge:cd"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    }
+  ]
+}

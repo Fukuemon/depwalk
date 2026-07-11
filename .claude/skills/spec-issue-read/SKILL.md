@@ -1,10 +1,10 @@
 ---
 name: spec-issue-read
 description: >-
-  Fetches an issue from the repository's tracker and returns a structured
-  summary. Use when the user references an issue by number, URL, or asks to
-  "read issue" / "issue 確認".
+  リポジトリのトラッカーから issue を取得し、構造化された要約を返す。issue 番号 / URL の言及、"issue 確認" / "issue
+  読んで" / "read issue" で起動する。
 ---
+
 # Spec Issue Read
 
 Issue tracker から指定 issue を取得し、要約と推奨次アクションを返す。
@@ -55,7 +55,7 @@ Issue tracker から指定 issue を取得し、要約と推奨次アクショ�
 
    ### 推奨次アクション
 
-   - 新規 spec を起こす → `spec-draft`
+   - 新規 spec を起こす → `spec-lifecycle` の scaffold phase
    - 既存 spec を更新する → 既存 spec dir を提示
    ```
 

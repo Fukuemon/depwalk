@@ -1,7 +1,8 @@
 ---
 name: spec-requirement
-description: Captures user requests through dialog, drafts a requirements doc from the requirements template, and optionally opens a tracker issue. Use when the user asks to turn a request into a requirements doc or an issue.
+description: 対話でユーザー要求を整理し、requirements テンプレートから要求文書を起案、必要ならトラッカー issue を起票する。"要求を整理して" / "issue にして" / "requirements 作って" で起動する。
 ---
+
 # Spec Requirement
 
 要求を対話で構造化し、requirements template に沿った draft を作成し、必要に応じて issue を起票する。

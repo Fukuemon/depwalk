@@ -1,10 +1,13 @@
 ---
 name: spec-lifecycle
-description: Drives a spec through intake → scaffold → clarify → diagram → track → sync → tasks → review in a half-autonomous loop, stopping at every phase gate for user approval. Use when the user asks to "通しで設計" / "spec-lifecycle" / "spec-full" / "spec を最後まで".
+description: spec を intake → scaffold → clarify → diagram → track → sync → tasks → review の順に半自律で進め、各 phase gate でユーザー承認を待つ orchestrator。"通しで設計" / "spec-lifecycle" / "spec-full" / "spec を最後まで" で起動する。
 ---
+
 # Spec Lifecycle
 
-spec を 1 phase ずつ進める **半自律 orchestrator**。
+spec を 1 phase ずつ進める **半自律 orchestrator**。設計プロセス全体 (scaffold 〜 prompts 生成) を
+**単一コンテキストで** 進め、各 phase の手順は `references/phase-*.md` を on-demand で Read する
+(別 skill 呼び出しに分割しない)。
 ドメイン判断は必ずユーザーに確認を取り、推測では進めない。
 各 phase 完了時に `spec-review` (fresh-context evaluator) を必ず通す。
 
@@ -17,7 +20,16 @@ spec を 1 phase ずつ進める **半自律 orchestrator**。
 
 - `AGENTS.md` の `Spec Workflow Contract`
 - `references/phase-guide.md` (本プロジェクトで毎回確認する論点)
+- 各 phase の手順は実行時に該当 `references/phase-*.md` を Read する (下記実行フロー参照)
+- `styleguide-documents` skill (spec / phase 文書を書く際の品質基準)
 - 対象 spec の `index.md` (再開時)
+
+## 単一コンテキスト原則
+
+論点テーブル・PhaseStatus・`spec-review` 結果は **この orchestrator の単一コンテキストで保持** する。
+各 phase に入ったときだけ該当 `references/phase-*.md` を Read し、phase をまたいで状態を引き継ぐ
+(参考 repo の `sekkei` と同方針)。phase の手順を別 skill として再起動せず、コンテキストの分断を避ける。
+intake (phase 1) と review gate (phase 8) のみ、再利用ユーティリティとして別 skill を呼ぶ。
 
 ## 入力
 
@@ -63,13 +75,13 @@ spec を 1 phase ずつ進める **半自律 orchestrator**。
 進捗をこのチェックリストで追う (各 phase 完了時に更新):
 
 ```text
-- [ ] Phase 1: intake (issue-read / requirement)
-- [ ] Phase 2: scaffold (spec-draft) → review
-- [ ] Phase 3: clarify (spec-resolve 全件) → review
-- [ ] Phase 4: diagram (spec-diagrams) → review
-- [ ] Phase 5: track (spec-track) → review
-- [ ] Phase 6: sync (spec-sync, 該当時) → review
-- [ ] Phase 7: tasks (spec-prompts) → review
+- [ ] Phase 1: intake (spec-issue-read / spec-requirement)
+- [ ] Phase 2: scaffold (phase-scaffold.md) → review
+- [ ] Phase 3: clarify (phase-clarify.md 全件) → review
+- [ ] Phase 4: diagram (phase-diagram.md) → review
+- [ ] Phase 5: track (phase-track.md) → review
+- [ ] Phase 6: sync (phase-sync.md, 該当時) → review
+- [ ] Phase 7: tasks (phase-prompts.md) → review
 - [ ] 各 phase 完了時: PhaseStatus 更新 + WIP commit
 ```
 
@@ -85,23 +97,23 @@ spec を 1 phase ずつ進める **半自律 orchestrator**。
 
 ### 2. phase 実行ループ
 
-各 phase のサイクル:
+各 phase のサイクル (phase 2-7 は該当 reference を Read してから実行):
 
 ```text
-[ユーザー同意] → [skill 実行] → [ハンドオフ判定] → [spec-review] → [指摘対応判定]
+[ユーザー同意] → [reference Read + phase 実行] → [ハンドオフ判定] → [spec-review] → [指摘対応判定]
   → [PhaseStatus 更新] → [次 phase 提案] → [ユーザー同意] → …
 ```
 
-| Phase | Skill                                       | 必須停止タイミング                 |
-| ----- | ------------------------------------------- | ---------------------------------- |
-| 1     | `spec-issue-read` または `spec-requirement` | 要件曖昧なら停止                   |
-| 2     | `spec-draft`                                | 上位文書と矛盾で停止               |
-| 3     | `spec-resolve` (全件)                       | **全論点で毎回停止** (必須)        |
-| 4     | `spec-diagrams`                             | 未確定論点があれば停止             |
-| 5     | `spec-track`                                | 未確定論点があれば停止             |
-| 6     | `spec-sync` (該当時のみ)                    | 上位文書反映先の判断が読めない場合 |
-| 7     | `spec-prompts`                              | 未確定論点があれば停止             |
-| 8     | `spec-review` (phase 2 以降の完了時)        | NEEDS_WORK 残存                    |
+| Phase | 実行 (Read する reference / 呼ぶ skill)            | 必須停止タイミング                 |
+| ----- | -------------------------------------------------- | ---------------------------------- |
+| 1     | skill: `spec-issue-read` または `spec-requirement` | 要件曖昧なら停止                   |
+| 2     | `references/phase-scaffold.md`                     | 上位文書と矛盾で停止               |
+| 3     | `references/phase-clarify.md` (全件)               | **全論点で毎回停止** (必須)        |
+| 4     | `references/phase-diagram.md`                      | 未確定論点があれば停止             |
+| 5     | `references/phase-track.md`                        | 未確定論点があれば停止             |
+| 6     | `references/phase-sync.md` (該当時のみ)            | 上位文書反映先の判断が読めない場合 |
+| 7     | `references/phase-prompts.md`                      | 未確定論点があれば停止             |
+| 8     | skill: `spec-review` (phase 2 以降の完了時)        | NEEDS_WORK 残存                    |
 
 ### 3. レビュー (各 phase 完了時)
 
@@ -127,10 +139,11 @@ phase 完了 (レビュー指摘対応含む) ごとに spec の `## 設計フ�
 各 phase 完了時、PhaseStatus 更新とあわせて WIP commit を残す (`workflow-git` の運用に従う)。
 長時間 run でも phase 単位で handoff が保全され、git log が進捗の第二記録になる。protected branch へは直接コミットしない。
 
-### 5. spec-resolve と spec-track の二重追記防止
+### 5. clarify と track の二重追記防止
 
-`spec-resolve` は決定内容を `## 上位資料からの変更点` に追記する責務を持つ。
-phase 5 `spec-track` では **spec-resolve で未追記の変更のみ** 反映する。
+phase: clarify (`phase-clarify.md`) は決定内容を `## 上位資料からの変更点` に追記する責務を持つ
+(追記行に `source: clarify` を残す)。
+phase: track (`phase-track.md`) では **clarify で未追記の変更のみ** 反映する。
 
 ### 6. 進捗報告
 
