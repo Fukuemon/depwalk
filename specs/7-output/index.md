@@ -482,7 +482,7 @@ core/internal/output/
 ### Testing
 
 - 横断規約は [context/testing.md](../../context/testing.md)。詳細な検証境界は D7 で確定する。
-- unit: 各 formatter が Traversal result (循環あり / 合流あり / cutoff あり / 空 / `startNotFound`) から期待どおりの出力を生成すること。
+- unit: 各 formatter が Traversal result から期待どおりの出力を生成すること (検証する具体ケースの正本は `## 解決済みの論点 > D7` の fixture 一覧)。
 - E2E: 生成物が各形式としてパース可能であること (S3 の測定方法)。
 - Console (D2 で確定した規則の検証観点):
   - 合流 (ダイヤモンド) graph で、共有 node の部分木が展開されるのは 1 回だけで、2 回目以降が `(既出)` の葉になること (出力行数が到達 edge 数に対して線形に収まること)。
@@ -764,6 +764,7 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 2 回目) | 1 回目の指摘は全件解消を確認。新規 blocking 1 件: `maxDepth=0` で `Edges` は空だが `Cutoffs` が非空になるため、「到達なし」を `Edges` 空だけで判定すると誤って `(呼び出し元なし)` を出力し、規則 7 の cutoff 行も出ない (規則 7 と規則 8 が矛盾)                                                 | 「到達なし」を **`Edges` 空 かつ `Cutoffs` 空** に狭め、EARS / D5 表 / E2・E2' / D2 規則 8 / Flowchart 2 を統一。D7 に `maxDepth=0` と `maxDepth=0 + 起点 self-loop` の fixture を追加                                                                                                              |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 3 回目) | 2 回目の修正自体は実装照合で正しいと確認 (4 境界ケース)。blocking 1 件: **修正の適用漏れ** — Formatter の分岐条件が「`Edges` 空だけ」のまま D6 / Interface 設計 / Flowchart 1 の 4 箇所に残存し、実装者が最初に読む場所で誤出力が再現しうる。minor: 「すべて cutoff」が self-loop 例外と食い違う | 4 箇所を `View.Status` / `Edges` / **`Cutoffs`** の 3 条件に統一 (grep で残存ゼロを確認)。self-loop 例外を上位 feature doc と一致させた                                                                                                                                                             |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 4 回目) | 述語の統一は解消を確認 (全数突合)。適用漏れ 2 件: ①Flowchart 2 の A4 に「すべて cutoff」が残存 ②`## テスト / 評価方針` の fixture 一覧が D7 より古く、`maxDepth=0` の回帰テストが tasks から落ちる恐れ                                                                                           | ①図の注記を本文と同じ述語に修正 ②fixture の列挙をやめ **D7 への参照 1 行に置き換え**、二重管理を解消 (3 回続いた「片方だけ直す」の根本対処)                                                                                                                                                         |
+| 2026-07-11 | **PASS** (phase: diagram / 5 回目)   | 全観点 PASS。二重規範 6 カテゴリ (到達なし判定 / self-loop / cutoff 行位置 / Formatter 分岐 / fixture 一覧 / entry point signature) を全数突合し、旧述語の残存ゼロ・単一正本化を確認。実装との回帰照合も一致                                                                                     | 非ブロッキング提案 (unit 概括も D7 参照に統一) を反映。phase: track / sync / tasks へ進める                                                                                                                                                                                                         |
 
 ## 変更履歴
 
@@ -782,6 +783,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | diagram gate 2 回目の指摘に対応: 「到達なし」の判定を `Edges` 空 かつ `Cutoffs` 空に狭め、`maxDepth=0` の誤出力 (`(呼び出し元なし)`) を修正 (D2 規則 8 / D5 / D7)                          |
 | 2026-07-11 | Fukuemon | diagram gate 3 回目の指摘に対応: Formatter の分岐条件を `Status` / `Edges` / `Cutoffs` の 3 条件に統一 (適用漏れ 4 箇所)、self-loop 例外を上位 doc と一致                                  |
 | 2026-07-11 | Fukuemon | diagram gate 4 回目の指摘に対応: Flowchart 2 の self-loop 例外を修正し、fixture 一覧を D7 への参照に置き換えて二重管理を解消                                                               |
+| 2026-07-11 | Fukuemon | diagram gate 5 回目で **PASS**。unit 概括も D7 参照に統一 (二重規範の残り火を除去)                                                                                                         |
 
 ## 備考
 

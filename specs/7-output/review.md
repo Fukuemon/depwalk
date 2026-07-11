@@ -147,3 +147,39 @@ Verdict: **NEEDS_WORK**
 ### 根本原因メモ (以降の phase で再発させないために)
 
 diagram gate で 3 回続けて出た指摘 (#16 / #18 / #19) は、いずれも「同じ規範を spec 内の複数箇所に列挙し、片方だけ直した」ことが原因。**正本を 1 箇所に置き、他は参照 1 行にする** (Spec Workflow Contract の「同じ規範を複数ファイルに再掲しない」と同じ原則を spec 内部にも適用する) ことで構造的に防ぐ。
+
+## Review 2026-07-11 (phase: diagram gate / 5 回目)
+
+Verdict: **PASS** — diagram gate 通過。
+
+### 観点別評価
+
+- **上位文書整合: PASS** — 変更提案 3 件が上位文書の宣言との差分として正しく捕捉され、spec が上位文書を勝手に書き換えていない。ADR-0001 / 0002 を覆す決定なし。
+- **未解決論点 / 実装対象明示 / template 必須節 / EARS acceptance: PASS**
+- **prompts 自己完結性 / 正本境界: N/A** (prompts 未生成、sync 未実行)
+
+### 二重規範の網羅確認 (根本原因への対処の検証)
+
+指定 6 カテゴリを全数突合し、**旧述語の残存ゼロ / 単一正本化**を確認:
+
+| 規範                   | 判定                                                          |
+| ---------------------- | ------------------------------------------------------------- |
+| 「到達なし」の判定条件 | 全 10 箇所が `Edges` 空 **かつ** `Cutoffs` 空                 |
+| self-loop の扱い       | 規則 4 / 8 / D7 / 図で一貫。「すべて cutoff」の残存なし       |
+| cutoff 行の位置        | 規則 7 と図が一致 (子の最後)                                  |
+| Formatter の分岐条件   | 全 4 箇所が `Status` / `Edges` / `Cutoffs` の 3 条件          |
+| fixture ケース一覧     | 正本は D7 のみ。他は参照 1 行                                 |
+| entry point signature  | 全 5 箇所が `Write(w, f, in)` で一致。旧 signature の残存なし |
+
+### 実装との回帰照合
+
+`targetMethodId` の方向 (`search.go` / `result.go`)、`Result.Cycles` を Console の打ち切りに使わない根拠 (`cycleEdges`)、`maxDepth=0` の意味論 (起点 self-loop のみ `edges` に残る)、`Result` が `direction` / `start` / `minDepth` を持たないこと — すべて実装と一致。
+
+### 非ブロッキング提案と対応
+
+20. `## 機能仕様 > Testing` の unit 概括が D7 fixture 一覧より粗く `maxDepth=0` を含まない → **D7 への参照に統一** (根本原因の残り火を除去)。
+21. Flowchart 1 の Formatter 分岐ノードの配置順 (読み手の実装順との一致) → 意味的矛盾はないため据え置き。
+
+### 次アクション
+
+phase: track / sync / tasks へ進んでよい。
