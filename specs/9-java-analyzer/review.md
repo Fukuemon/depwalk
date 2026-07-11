@@ -262,3 +262,58 @@ Verdict: **PASS**
 ### 残る advisory (次 phase で扱う)
 
 - エラーケース表 row3 (パース不能ファイルの継続) は Sequence の `opt` でのみ表現されている。phase 9 のテスト観点で「部分解析の継続」を明示的な検証項目に落とす。
+
+## Review 2026-07-11 (phase 6-9: Interface / Content / Performance / Test 設計)
+
+Verdict: **NEEDS_WORK**
+
+### 指摘 (blocking)
+
+1. **`--analyzer-meta` の合成規則と `classpath` (string 配列) の型が噛み合わない** — 「繰り返しは配列に積む」だけでは、1 回指定 (最頻ケース) の値が string か要素 1 の配列か未定義で、metadata 表の「string 配列」と両立しない。D3 / D10 が依存する「値としての空配列」を `key=value` 形式で表現する方法も未定義。
+2. **index のレビュー表が diagram 3 回目 (PASS) に追随していない** — phase 5.5 の状態は PASS 前提なのに、表は diagram 2 回目で止まっている (「文書メタ情報の同期」違反)。
+
+### 指摘 (advisory)
+
+- 除外 package の表記ゆれ (`java` と `java.*`)。`liftExcludePackages` に渡す正規値が二通りに読める。
+- 未解決 symbol 混在 fixture での「解析継続」(エラーケース表 row1) が E2E 観点に明示されていない。
+- Kotlin 検討の記録が変更履歴のみ。phase: sync のハンドオフ時に判断根拠ごと拾う。
+- 実装 prompts で「viper を導入しない」制約 (`context/toolchain.md`) を明示する。
+
+### 対応 (完了)
+
+- blocking 1: `--analyzer-meta` の合成規則を確定 — **値は常に JSON 配列に積む** (1 回指定 → 要素 1 の配列 / 繰り返し → 指定順に追加 / **空値 `key=` → 空配列** / `=` なし → validation error)。Go 側テスト観点にも 4 ケースを同期した。
+- blocking 2: レビュー表に diagram 3 回目 PASS の行を追加した。
+- advisory: 除外 package の正規値を「wildcard を含まない package prefix (`java` / `javax` / `jakarta`)」に統一 (D11 B2 / EARS)。E2E 観点に未解決 symbol 混在 fixture の継続を追加。Kotlin 記録と viper 制約は phase: sync / phase 10 で拾う (残タスクとして本記録に留める)。
+
+## Review 2026-07-11 (phase 6-9, 2 回目)
+
+Verdict: **NEEDS_WORK** (メタ同期の追随漏れ + advisory 2 件。設計内容の欠陥なし)
+
+### 指摘
+
+- blocking: index のレビュー表が phase 6-9 の 1 回目に、変更履歴が合成規則の確定に、それぞれ未追随。
+- advisory: D11 図の除外 package ラベルが `java.*` 表記のまま。`--analyzer-meta` の `=` 分割位置が未規定。
+
+### 対応 (完了)
+
+- レビュー表 / 変更履歴に対応行を追加。D11 図ラベルを「既定 prefix: java / javax / jakarta」に統一 (Mermaid 再検証済み)。合成規則に「分割は最初の `=` (value 側に `=` を含んでよい)」を追記。
+
+## Review 2026-07-11 (phase 6-9, 3 回目)
+
+Verdict: **NEEDS_WORK** (指摘は記録同期のみ: 2 回目の記録が review.md / index レビュー表 / 変更履歴に未追記)
+
+### 対応 (完了)
+
+- 本ファイルに 2 回目 / 3 回目の記録を追記。index のレビュー表と変更履歴に対応行を追加。
+- advisory: Go 側テスト観点に「value に `=` を含むケース」を追加し、合成規則の全分岐をテスト観点と一対一にした。
+
+### 残タスク (後続 phase で拾う)
+
+- phase: sync — Kotlin 検討の判断根拠を feature doc / `context/toolchain.md` へのハンドオフ時に拾う。
+- phase 10 (prompts) — 「viper を導入しない」制約 (`context/toolchain.md`) を実装 prompt に明示する。
+
+## Review 2026-07-11 (phase 6-9, 4 回目)
+
+Verdict: **PASS**
+
+全観点で PASS (prompts / 正本境界は未実施のため N/A)。phase 6-9 (Interface / Content / Performance / Test 設計) の gate を通過。次回 (phase 10) のレビューで、性能 baseline 計測タスクが実装分割に現れることを確認する。

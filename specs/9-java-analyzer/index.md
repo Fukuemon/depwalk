@@ -25,10 +25,10 @@
 | 4   | 論点整理                    | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                            |
 | 5   | 論点解決                    | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)          |
 | 5.5 | 図 (phase: diagram)         | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目) |
-| 6   | Interface / Routing 設計    | 未着手     |            | flag / 環境変数 / metadata の key 名をここで確定する (D2 / D3)                                                                                           |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                          |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                          |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                          |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-11 | `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key (`classpath` / `liftExcludePackages`) を確定。実装言語は Java を維持        |
+| 7   | Content / Data 設計         | レビュー済 | 2026-07-11 | 永続データなし / `analyzers/java/` 配置 / fixture 配置を確定                                                                                             |
+| 8   | Performance / Security 設計 | レビュー済 | 2026-07-11 | 方式 (streaming / AST 破棄 / stderr 計測) と Fallback 方針を記載。数値目標は実測 baseline 後                                                             |
+| 9   | Test / Metrics 設計         | レビュー済 | 2026-07-11 | 三層 (Java unit / Go fake / 実 jar E2E) の feature 固有観点と計測指標を記載                                                                              |
 | 10  | 実装分割                    | 未着手     |            |                                                                                                                                                          |
 | 11  | レビュー済                  | 未着手     |            |                                                                                                                                                          |
 
@@ -121,7 +121,7 @@ EARS 風で振る舞いを記述する。
 - WHEN Core が Analyzer process を起動し stdin へ `analysisRequest` を 1 件送信して close したとき、システムは対象 Java ソースを read-only で解析し、結果を stdout へ JSONL で逐次出力する。
 - WHEN 呼び出し先の型が解決できたとき、システムは `methodSymbol` (caller / callee 双方) と、両者を参照する `callEdge` を出力する。
 - WHERE 呼び出し先が interface / 抽象メソッドであるとき、システムは D11 の規則で決まる帰属型のメソッドを callee として `callEdge` を出力し、`callEdge.metadata.dispatch` に dispatch 種別を標識する。
-- IF 呼び出し先メソッドの宣言サイトが scope 外で、その宣言型が引き上げ除外 package (既定: `java.*` / `javax.*` / `jakarta.*`) に属するとき、システムは `methodSymbol` / `callEdge` を出力しない (解析失敗ではないため `diagnostic` も出さない)。例: `userService.toString()` (`java.lang.Object#toString`)、レシーバ静的型が scope 内の `com.example.MyCollection` である場合の `myCollection.iterator()` (宣言サイトが `java.*` 側にある)。
+- IF 呼び出し先メソッドの宣言サイトが scope 外で、その宣言型が引き上げ除外 package (既定 prefix: `java` / `javax` / `jakarta`。segment 単位 prefix 一致 / D11) に属するとき、システムは `methodSymbol` / `callEdge` を出力しない (解析失敗ではないため `diagnostic` も出さない)。例: `userService.toString()` (`java.lang.Object#toString`)、レシーバ静的型が scope 内の `com.example.MyCollection` である場合の `myCollection.iterator()` (宣言サイトが `java.*` 側にある)。
 - IF 呼び出し先メソッドの宣言サイトもレシーバの静的型もいずれも scope 外であるとき、システムは `methodSymbol` / `callEdge` を出力しない (同上)。
 - IF 呼び出し先の型が解決できないとき、システムは `callEdge` を出力せず `diagnostic` (`severity: warning` または `partialFailure`) として未解決を報告し、解析を継続する。
 - IF 個別ファイルがパース不能なとき、システムは該当ファイルを `diagnostic` で報告し、他ファイルの解析を継続する (部分解析を許容する)。
@@ -166,7 +166,7 @@ EARS 風で振る舞いを記述する。
 - 解決順序: ① CLI flag (例: `--analyzer-cmd "java -jar /path/analyzer.jar"`) → ② 環境変数 (例: `DEPWALK_ANALYZER_CMD`) → ③ どちらも無ければ実行前に validation error で拒否する。
 - Core は受け取った文字列を exec するだけで、`java` / jar / JVM の存在を知らない。言語固有の分岐と path 解決規約を Core に持ち込まないことで S5 (2 つ目以降の Analyzer 追加時に Core 無変更) を担保する。
 - 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入せず、後続の CLI interface spec で必要になった時点で ③ の前段として足せる形にしておく。
-- 解決順序 (flag 主 + 環境変数 fallback) は本 spec で確定する。**flag / 環境変数 / metadata passthrough の具体名は phase 6 (Interface 設計) で確定する** — 本 spec の実装対象に Core の初回配線が含まれ、Analyzer 側の classpath 必須検査 (D3) が key 名の合意を前提とするため。CLI 引数の**完全仕様** (出力形式 / 探索方向 / 深さ上限などの全 flag 体系) は後続の CLI interface spec が正本。
+- 解決順序 (flag 主 + 環境変数 fallback) は本 spec で確定する。具体名は phase 6 で確定済み: **`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta key=value`** (`## Interface 設計` が正本)。CLI 引数の**完全仕様** (出力形式 / 探索方向 / 深さ上限などの全 flag 体系) は後続の CLI interface spec が正本。
 
 **利点**: E2E / contract test で fake analyzer (任意の実行可能ファイル) に差し替えられるため、JVM を持たない環境でも Core 側のテストが回る (D10 に影響)。
 
@@ -176,13 +176,13 @@ EARS 風で振る舞いを記述する。
 
 **依存 jar の classpath を必須入力とする。** classpath なしでの解析は許可しない。
 
-**必須性の粒度**: `analysisRequest.metadata` の classpath **key は必須**とし、**値としての空配列は許容する** (依存を持たない純 Java プロジェクト / テスト fixture のため)。key 自体が無い場合のみ `JAVA_MISSING_CLASSPATH` の `error` とする。key 名は phase 6 (Interface 設計) で確定する。
+**必須性の粒度**: `analysisRequest.metadata` の classpath **key は必須**とし、**値としての空配列は許容する** (依存を持たない純 Java プロジェクト / テスト fixture のため)。key 自体が無い場合のみ `JAVA_MISSING_CLASSPATH` の `error` とする。key 名は `classpath` (phase 6 で確定。`## Interface 設計` が正本)。
 
 **検査のタイミング**: classpath の key 検査と、指定された jar の存在 / 読み取り可否の検査は、**解析開始前に一括で** (pre-flight) 行う。型解決の途中で jar 欠落を遅延検出すると、それまでに出力済みの `methodSymbol` / `callEdge` を Core が受け取った状態で fatal になり、部分的な結果が「一見成功した出力」として観測されうるため。いずれも `error` + 非ゼロ exit で即停止する (D8)。
 
 - TypeSolver 構成: `ReflectionTypeSolver` (JDK 標準型) + `JavaParserTypeSolver` (対象プロジェクトの source root) + `JarTypeSolver` (依存 jar)。
 - 理由: プロジェクト内のメソッド呼び出しであっても、レシーバの型を知るために library 型が必要になる (例: Spring Data の `JpaRepository` を継承した interface、`Optional` / `Stream` チェーン、library 由来の generics)。classpath を欠くと未解決 `diagnostic` が多発し、S1 / S2 (網羅性) が実用レベルに届かない。必須にすることで解析精度が常に一定になる。
-- **classpath の受け渡し**: `analysisRequest.metadata` に載せる (protocol の `metadata` は「言語固有または Analyzer 固有の hint。Core の共通処理は依存しない」と定義済みのため契約変更は不要)。Core 側は言語固有の flag (`--java-classpath` 等) を持たず、**汎用の passthrough flag** (例: `--analyzer-metadata key=value`) で metadata へ素通しする。意味づけを知るのは Analyzer だけであり、S5 を守る。
+- **classpath の受け渡し**: `analysisRequest.metadata` に載せる (protocol の `metadata` は「言語固有または Analyzer 固有の hint。Core の共通処理は依存しない」と定義済みのため契約変更は不要)。Core 側は言語固有の flag (`--java-classpath` 等) を持たず、**汎用の passthrough flag** `--analyzer-meta key=value` (phase 6 で確定) で metadata へ素通しする。意味づけを知るのは Analyzer だけであり、S5 を守る。
 - **必須性の検査場所**: Core は言語非依存で「Java には classpath が要る」ことを知らないため、検査は **Analyzer 側**で行う。classpath が metadata に無い場合、Analyzer は protocol の `error` record を出力し非ゼロ exit code で終了する (既存の process contract のまま成立する)。
 - classpath の生成 (`./gradlew dependencies` 等) は利用者 / CI の責務とする。Analyzer が対象プロジェクトの build tool を叩いて自動取得する案は、対象を read-only に保つ原則 (`context/architecture.md` State Boundary) と衝突し、build 失敗が解析失敗に直結するため Phase1 では採らない。将来必要になれば別 spec で扱う。
 
@@ -337,7 +337,7 @@ Phase1 の必須仕様:
 | **宣言サイトが scope 外**で、宣言型が**引き上げ除外 package**                                         | 出力しない                                            | `userService.toString()` (`java.lang.Object#toString`) / `equals` / `hashCode`                                                                                                            |
 | **宣言サイトが scope 外**で、**レシーバの静的型も scope 外**                                          | 出力しない (`methodSymbol` / `callEdge` とも出さない) | `String#equals` / `List#add`                                                                                                                                                              |
 
-**引き上げ除外 package (B2)**: 既定で `java.*` / `javax.*` / `jakarta.*` を引き上げ対象から除外する。`analysisRequest.metadata` で除外 package を上書き可能にする (key 名は phase 6 で確定)。除外しないと `toString` / `equals` / `hashCode` が scope 内の全型ぶん node 化され、D11 自身のノイズ排除根拠と矛盾するため。除外判定は宣言型の binary name に対する **`.` 区切り segment 単位の prefix 一致**で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
+**引き上げ除外 package (B2)**: 既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix。本 spec の他所の `java.*` という表現はこの prefix 一致の言い換え)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする (phase 6 で確定。`## Interface 設計` が正本)。除外しないと `toString` / `equals` / `hashCode` が scope 内の全型ぶん node 化され、D11 自身のノイズ排除根拠と矛盾するため。除外判定は宣言型の binary name に対する **`.` 区切り segment 単位の prefix 一致**で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
 
 **その他の呼び出し形**:
 
@@ -425,27 +425,64 @@ depwalk は CLI ツールであり、利用者の操作は `depwalk analyze` の
 
 ### UI / API / Event Interface
 
-(phase 6 で確定する)
+Java Analyzer の外部 interface は 3 面ある。protocol record の schema は analyzer-protocol feature doc が正本で、本 spec は Java 固有の具体名だけを定義する。
+
+**(1) CLI (Core 初回配線 / 本 spec で実装する最小 flag)**
+
+| 項目                 | 名前                   | 形式 / 意味                                                                                                               |
+| -------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 起動コマンド flag    | `--analyzer-cmd`       | 文字列 1 つ (例: `"java -jar analyzers/java.jar"`)。**shell を介さず shell-word 分割して exec する** (injection を避ける) |
+| 起動コマンド環境変数 | `DEPWALK_ANALYZER_CMD` | 同形式。解決順序は flag → 環境変数 → どちらも無ければ実行前に validation error (D2)                                       |
+| metadata passthrough | `--analyzer-meta`      | `key=value` 形式で繰り返し指定可。Core は key / value の意味を解釈しない (D3)。合成規則は下記                             |
+
+**`--analyzer-meta` の合成規則** (Core が metadata の JSON を組み立てる規則。Analyzer 側の型分岐を不要にするため、値の型を常に一定にする):
+
+- **値は常に JSON 配列に積む**。1 回だけ指定した場合も要素 1 の配列になる (`--analyzer-meta classpath=/a.jar` → `{"classpath": ["/a.jar"]}`)。
+- 同一 key の繰り返しは、指定順に配列へ追加する (`--analyzer-meta classpath=/a.jar --analyzer-meta classpath=/b.jar` → `{"classpath": ["/a.jar", "/b.jar"]}`)。
+- **値が空文字列の場合、その key を空配列として登録する** (`--analyzer-meta classpath=` → `{"classpath": []}`)。D3 の「key は必須 / 空配列は許容」(依存なし fixture) を CLI から表現する手段はこれ。
+- 分割は**最初の `=`** で行う (value 側に `=` を含んでよい)。`=` を含まない指定は validation error として実行前に拒否する。
+
+`DEPWALK_` prefix は depwalk の環境変数の名前空間とする。CLI 引数の完全仕様 (出力形式 / 探索方向 / 深さ上限等) は後続の CLI interface spec が正本で、上記は拡張可能な最小集合。
+
+**(2) `analysisRequest.metadata` の Java Analyzer 固有 key**
+
+| key                   | 型          | 必須/任意                                | 意味                                                                                                                 |
+| --------------------- | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `classpath`           | string 配列 | **必須** (key として。空配列は許容 / D3) | 依存 jar / classes dir の path。key 不在は `JAVA_MISSING_CLASSPATH` の `error`                                       |
+| `liftExcludePackages` | string 配列 | 任意                                     | 引き上げ除外 package (D11)。指定時は既定値 (`java` / `javax` / `jakarta`) を**置き換える**。segment 単位 prefix 一致 |
+
+未知 key は protocol の規則どおり無視する。Core は本表を知らない (Analyzer 側のみが解釈する)。
+
+**(3) process contract**
+
+stdin (`analysisRequest` 1 件 → close) / stdout (JSONL 逐次) / stderr (計測ログ、protocol 対象外) / exit code (0 = 成功、非ゼロ = fatal)。正本は analyzer-protocol feature doc と ADR-0001。
 
 ### Props / Request / Response
 
-(phase 6 で確定する)
+- Request: `analysisRequest` (protocol 正本)。Java Analyzer は `language: "java"` 以外を `JAVA_INVALID_REQUEST` の `error` として拒否する。
+- Response: `methodSymbol` / `callEdge` / `diagnostic` / `error` (protocol 正本)。Java 固有の内容は D5 (signature / methodId)、D7 (`metadata.dispatch`)、D8 (code 体系)、D11 (`metadata.declaringType` / `inherited`) で確定済み。
 
 ## Content / Data 設計
 
 ### 保存・管理するデータ
 
-(phase 7 で確定する)
+- **永続データは持たない**。Java Analyzer は 1 request = 1 process で起動され、解析結果は stdout の JSONL としてのみ出力する (`context/architecture.md` State Boundary と整合)。
+- process 内で保持するのは SymbolSolver の型解決キャッシュと、record 出力に必要な最小限の中間状態のみ (D9)。解析済みファイルの AST は逐次破棄する。
+- 出力 record の内容 (`signature` / `methodId` / `metadata.dispatch` / `metadata.declaringType`・`inherited`) は D5 / D7 / D11 が正本。
 
 ### コンテンツ配置 / package / route
 
-(phase 7 で確定する)
+- 実装は `analyzers/java/` に閉じる (`context/architecture.md` Package Boundary)。Core と Go package / Java code を共有しない。
+- Gradle (Kotlin DSL) の単一 module とし、`gradlew` wrapper を同梱する (D1)。内部 package 構成は実装 prompts で確定する (責務の目安: request 受領 / AST 解析・型解決 / 帰属型決定 (D11) / record 出力)。
+- fixture は `testdata/fixtures/java/` (E2E 用サンプル Java/Spring プロジェクト)、protocol の JSONL fixture は既存の `testdata/analyzer-protocol/` を使う (D10)。
 
 ## Performance / Security 設計
 
 ### Performance
 
-(phase 8 で確定する)
+- **方式** (D9 で確定): `methodSymbol` / `callEdge` を逐次 stdout へ flush する streaming 出力。解析済みファイルの AST は逐次破棄し、グラフ全体を Analyzer 側でメモリ保持しない。
+- **観測性** (D9): 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol の parse 対象外)。
+- **数値目標**: Phase1 実装時に fixture プロジェクトの実測値 (ファイル数 / 所要時間 / 最大 RSS) を baseline として記録し、その後に確定する (`## 未確定事項` で決定者・期限付き管理。確定値の正本は phase: sync 後の feature doc に一本化し、本節には決定時スナップショットを残す)。
 
 ### Security / Privacy
 
@@ -466,17 +503,43 @@ depwalk は CLI ツールであり、利用者の操作は `depwalk analyze` の
 
 ### Fallback
 
-(phase 8 で確定する)
+- **部分解析を許容する**のが基本方針 (E1 / E3): 個別ファイルのパース失敗・型解決失敗は `diagnostic` で観測可能にして解析を継続し、部分結果を返す。
+- **fatal に倒す**のは「継続すると不完全なグラフが正と誤認されるケース」のみ: classpath key 不在 (`JAVA_MISSING_CLASSPATH`)、jar 欠落 (`JAVA_MISSING_JAR`)、未対応 request (`JAVA_INVALID_REQUEST`)、内部エラー (`JAVA_INTERNAL_ERROR`)。いずれも pre-flight または即時に `error` + 非ゼロ exit で停止する (D3 / D8)。
+- degrade 実行 (classpath なしで精度を落として続行する等) は提供しない (D3 で不採用と決定済み)。
 
 ## テスト / 評価方針
 
 ### テスト観点
 
-(phase 9 で確定する。[context/testing.md](../../context/testing.md) の Protocol contract test を正本として継承する)
+三層構成は D10 が正本。横断規約と Protocol contract test の観点一覧は [context/testing.md](../../context/testing.md) を継承する。本 feature 固有の観点:
+
+**Java unit test (JUnit / `analyzers/java/`)**
+
+- D5: signature / `methodId` の正規化 — overload / generics erasure / varargs / nested class (`$`) / constructor (`<init>`) / static initializer (`<clinit>`) / 匿名クラス採番の決定性
+- D6: `symbolKind` の割り当て — インスタンス初期化子・フィールド初期化子が constructor に畳み込まれること、lambda 内の呼び出しが囲みメソッドに帰属し `viaLambda: true` が立つこと
+- D7 / D11: 帰属型の決定規則 — 宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、除外 package (既定値と `liftExcludePackages` による置き換え、segment 単位 prefix 一致)、`this` / `super` / static / `new` の各形、`metadata.dispatch` の値
+- D8: `diagnostic` / `error` の code と severity の対応、pre-flight 検査 (classpath key 不在 / jar 欠落 / `language != "java"`) が解析開始前に fatal になること
+- D4: `fullGraph` / `reachableFromEntrypoints` の出力範囲 (宣言列挙 ∪ call site 由来、entrypoints 空は全体扱い)
+- **EARS の優先順位**: 「出力する」条 (WHEN / WHERE) に対し「出力しない」条 (IF) が例外として優先されることをテスト名で明示する
+
+**Go 側 process contract (fake analyzer / JVM 不要)**
+
+- `--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` の解決順序と、どちらも無い場合の実行前拒否 (D2)
+- `--analyzer-meta key=value` の合成規則 (D3 / Interface 設計): 1 回指定 → 要素 1 の配列、繰り返し → 指定順の配列、空値 (`key=`) → 空配列、`=` なし → validation error、value に `=` を含む指定 → 最初の `=` で分割
+- shell を介さない shell-word 分割で exec されること
+- 既存の contract test 観点 (stdin close / 逐次 parse / stderr 非 parse / exit code) は #12 実装済みのものを再利用する
+
+**E2E (実 jar / `testdata/fixtures/java/`)**
+
+- 既知の caller / callee 集合と `depwalk analyze` の出力の照合 (S1 / S2)
+- interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)
+- パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること (部分解析の継続 / エラーケース表 row3)
+- 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと (エラーケース表 row1 の継続)
 
 ### 計測指標
 
-(phase 9 で確定する)
+- 実測 baseline: fixture プロジェクトに対する解析ファイル数 / 所要時間 / 最大 RSS (D9。stderr の計測出力から取得)
+- 解析品質: 未解決 symbol 件数 / パース失敗ファイル数 (diagnostic の集計)。fixture では期待値 (既知の未解決数) と照合する
 
 ## フロー / シーケンス
 
@@ -519,7 +582,7 @@ sequenceDiagram
     participant JA as Java Analyzer process (JVM)
     participant Src as Java / Spring ソース (read-only)
 
-    User->>Core: depwalk analyze (起動コマンド指定。flag 名は phase 6 で確定 / D2)
+    User->>Core: depwalk analyze --analyzer-cmd "java -jar ..." (D2 / phase 6 確定)
     Core->>Core: 起動コマンドを解決 (flag → 環境変数)
     Core->>JA: process 起動
     Core->>JA: stdin: analysisRequest (JSONL 1 件) → close
@@ -566,7 +629,7 @@ flowchart TD
     resolve -->|"No"| diag["diagnostic: JAVA_UNRESOLVED_SYMBOL<br/>callEdge は出さない (D8)"]
     resolve -->|"Yes"| site{"宣言サイト (override 解決後) は<br/>scope 内か"}
     site -->|"Yes"| declared["帰属型 = 宣言型<br/>例: com.example.BaseService#save"]
-    site -->|"No"| excluded{"宣言型が引き上げ除外 package か<br/>既定: java.* / javax.* / jakarta.*"}
+    site -->|"No"| excluded{"宣言型が引き上げ除外 package か<br/>既定 prefix: java / javax / jakarta"}
     excluded -->|"Yes"| skip["出力しない<br/>(仕様。diagnostic も出さない)"]
     excluded -->|"No"| recv{"レシーバの静的型は scope 内か<br/>static は参照した型 / new は生成する型"}
     recv -->|"No"| skip
@@ -645,22 +708,31 @@ flowchart TD
 | 2026-07-11 | **PASS** (clarify 5)     | 全観点 PASS。D1-D11 が protocol 契約を変更せずに成立し、EARS / D4-D10 / エラー表が D11 を正本として一貫。未決ゼロ                                                                                | advisory 2 件 (宣言サイトの定義を abstract / interface に適用可能な表現へ、`iterator()` の例に前提を明記) を反映。phase: diagram へ進む                                                      |
 | 2026-07-11 | NEEDS_WORK (diagram)     | User Flow 節が placeholder のままで本文と drift。図が本文より先に規定していた 3 点 (flag 名 / classpath 検査の順序 / node 母集合)                                                                | User Flow を記入し設計フェーズ状況に図の行を追加。Sequence の flag を例示表記へ、D3 に pre-flight 検査を明記、D11 図に node 母集合の但し書きを追加                                           |
 | 2026-07-11 | NEEDS_WORK (diagram 2)   | D11 図のキャプションが過剰補正で図自身 (declared 枝) と矛盾。変更履歴が D3 への決定追加に追随していない                                                                                          | キャプションを書き分け、図の emit を declared / lifted の 2 枝に分割して node 母集合 ①/② と対応づけ。変更履歴に対応行を追加。「正本」の向きも統一                                            |
+| 2026-07-11 | **PASS** (diagram 3)     | 全観点 PASS。3 図が本文 (D1-D11 / EARS / エラーケース表 / node 母集合) と一致し、図が本文に根拠を持たない仕様を新設していないことを確認                                                          | phase 6 (Interface 設計) へ進む                                                                                                                                                              |
+| 2026-07-11 | NEEDS_WORK (phase 6-9)   | `--analyzer-meta` の合成規則が未定義 (1 回指定の型 / 空配列の表現)。レビュー表が diagram 3 回目 PASS に未追随                                                                                    | 合成規則を確定 (常に配列 / 空値 `key=` → 空配列 / `=` なし → 拒否) し Go テスト観点に同期。除外 package の正規値を統一。PASS 行を追加                                                        |
+| 2026-07-11 | NEEDS_WORK (phase 6-9 ②) | メタ同期の追随漏れ (レビュー表 / 変更履歴) + D11 図ラベルの表記ゆれ + `=` 分割位置の未規定                                                                                                       | 表・履歴を同期。図ラベルを既定 prefix 表記に統一。合成規則に「最初の `=` で分割」を追記                                                                                                      |
+| 2026-07-11 | NEEDS_WORK (phase 6-9 ③) | 2 回目の記録が review.md / レビュー表 / 変更履歴に未追記 (記録同期のみ)                                                                                                                          | 各記録を同期。Go テスト観点に value 内 `=` のケースを追加                                                                                                                                    |
+| 2026-07-11 | **PASS** (phase 6-9 ④)   | 全観点 PASS。記録同期の完了と、確定した interface が protocol 契約と矛盾しないことを確認                                                                                                         | phase 10 (実装分割) へ進む                                                                                                                                                                   |
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                                                                                                                                                                                                       |
-| ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-11 | Fukuemon | phase: scaffold — index.md を作成、D1-D10 を初期論点として列挙                                                                                                                                                                                 |
-| 2026-07-11 | Fukuemon | spec-review NEEDS_WORK 対応 — `core` を実装対象 ◯ (初回配線のみ) に、S5 の表現を修正、context への影響表と D6 の注記を追加                                                                                                                     |
-| 2026-07-11 | Fukuemon | spec-review 再指摘対応 — S5 / P4 の明確化を Design Doc への変更提案として登録 (整合表・影響表)、context: engineering 行を追加                                                                                                                  |
-| 2026-07-11 | Fukuemon | spec-review 3 回目対応 — phase 3 備考 / phase 2 状態 / レビュー記録のメタ情報を実態に同期                                                                                                                                                      |
-| 2026-07-11 | Fukuemon | phase: clarify — D1-D10 をすべて決定 (未決ゼロ)。ADR-0003 (D2) の起票を決定                                                                                                                                                                    |
-| 2026-07-11 | Fukuemon | spec-review (clarify) 対応 — D11 (scope 外呼び出しの node 化基準) を追加起票し決定。classpath の key/空配列の粒度、constructor の signature、metadata key 名の確定先、性能目標の追跡を明記                                                     |
-| 2026-07-11 | Fukuemon | spec-review (clarify 2 回目) 対応 — D11 の帰属規則を「宣言型優先、scope 外のときだけレシーバ型へ引き上げ」に修正 (scope 内継承での node 分裂を防止)。D5 の signature 定義と EARS を帰属型基準に同期                                            |
-| 2026-07-11 | Fukuemon | spec-review (clarify 3 回目) 対応 — D11 の「宣言型」を実際の宣言サイトと定義 (override の dead node を回避)。引き上げ除外 package (既定 `java.*` / `javax.*` / `jakarta.*`、metadata で上書き可) と `fullGraph` の node 母集合の列挙方法を追加 |
-| 2026-07-11 | Fukuemon | spec-review (clarify 4 回目) 対応 — EARS を D11 の除外 package 分岐に同期 (WHERE 条を D11 参照化 + IF 条を追加)。D5 の括弧書き / D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲を整理                                             |
-| 2026-07-11 | Fukuemon | phase: diagram — 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成 (Mermaid CLI でレンダリング検証済み)                                                                                                     |
-| 2026-07-11 | Fukuemon | spec-review (diagram) 対応 — User Flow 節を記入。D3 に「検査のタイミング」(classpath / jar の pre-flight 一括検査) を追加。Sequence の flag を例示表記化。D11 図のキャプションと emit 枝を node 母集合 (①/②) に対応づけ                        |
+| 日付       | 変更者   | 変更内容                                                                                                                                                                                                                                                                  |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | Fukuemon | phase: scaffold — index.md を作成、D1-D10 を初期論点として列挙                                                                                                                                                                                                            |
+| 2026-07-11 | Fukuemon | spec-review NEEDS_WORK 対応 — `core` を実装対象 ◯ (初回配線のみ) に、S5 の表現を修正、context への影響表と D6 の注記を追加                                                                                                                                                |
+| 2026-07-11 | Fukuemon | spec-review 再指摘対応 — S5 / P4 の明確化を Design Doc への変更提案として登録 (整合表・影響表)、context: engineering 行を追加                                                                                                                                             |
+| 2026-07-11 | Fukuemon | spec-review 3 回目対応 — phase 3 備考 / phase 2 状態 / レビュー記録のメタ情報を実態に同期                                                                                                                                                                                 |
+| 2026-07-11 | Fukuemon | phase: clarify — D1-D10 をすべて決定 (未決ゼロ)。ADR-0003 (D2) の起票を決定                                                                                                                                                                                               |
+| 2026-07-11 | Fukuemon | spec-review (clarify) 対応 — D11 (scope 外呼び出しの node 化基準) を追加起票し決定。classpath の key/空配列の粒度、constructor の signature、metadata key 名の確定先、性能目標の追跡を明記                                                                                |
+| 2026-07-11 | Fukuemon | spec-review (clarify 2 回目) 対応 — D11 の帰属規則を「宣言型優先、scope 外のときだけレシーバ型へ引き上げ」に修正 (scope 内継承での node 分裂を防止)。D5 の signature 定義と EARS を帰属型基準に同期                                                                       |
+| 2026-07-11 | Fukuemon | spec-review (clarify 3 回目) 対応 — D11 の「宣言型」を実際の宣言サイトと定義 (override の dead node を回避)。引き上げ除外 package (既定 `java.*` / `javax.*` / `jakarta.*`、metadata で上書き可) と `fullGraph` の node 母集合の列挙方法を追加                            |
+| 2026-07-11 | Fukuemon | spec-review (clarify 4 回目) 対応 — EARS を D11 の除外 package 分岐に同期 (WHERE 条を D11 参照化 + IF 条を追加)。D5 の括弧書き / D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲を整理                                                                        |
+| 2026-07-11 | Fukuemon | phase: diagram — 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成 (Mermaid CLI でレンダリング検証済み)                                                                                                                                |
+| 2026-07-11 | Fukuemon | spec-review (diagram) 対応 — User Flow 節を記入。D3 に「検査のタイミング」(classpath / jar の pre-flight 一括検査) を追加。Sequence の flag を例示表記化。D11 図のキャプションと emit 枝を node 母集合 (①/②) に対応づけ                                                   |
+| 2026-07-11 | Fukuemon | 実装言語の再確認 — Kotlin 案を検討したが Java を維持 (JDK 25 の sealed interface + record + pattern matching で Kotlin の主利点が得られ、JavaParser interop では Kotlin の null 安全が platform type で効かないため)。`context/toolchain.md` の確定値どおりで変更提案なし |
+| 2026-07-11 | Fukuemon | phase 6-9 — Interface 設計 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta` / metadata key `classpath`・`liftExcludePackages`)、Content / Data、Performance / Fallback、テスト観点・計測指標を記入。D2 / D3 / D11 / Sequence の先送り箇所を確定名で同期     |
+| 2026-07-11 | Fukuemon | spec-review (phase 6-9) 対応 — `--analyzer-meta` の合成規則を確定 (常に JSON 配列 / 空値は空配列 / `=` なしは拒否)。除外 package の正規値を wildcard なしの prefix に統一。E2E 観点に未解決 symbol 混在 fixture を追加                                                    |
+| 2026-07-11 | Fukuemon | spec-review (phase 6-9 ②③) 対応 — D11 図ラベルを既定 prefix 表記に統一、合成規則に「最初の `=` で分割」を追記、レビュー記録を同期、Go テスト観点に value 内 `=` ケースを追加                                                                                              |
 
 ## 備考
 
