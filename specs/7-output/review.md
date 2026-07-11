@@ -99,3 +99,20 @@ Verdict: **NEEDS_WORK**
 10. Flowchart 1 で `startNotFound` / 到達なしが Formatter 選択を迂回していた → **Formatter を迂回しない**形に修正 (「該当なし」の見せ方は形式ごとに異なるため、各 Formatter が `View.Status` / 空 `Edges` を見て分岐する)。Flowchart 2 にも status 分岐と到達なしの枝を追加。
 11. cutoff 行の位置を図が先取りしていた → D2 規則 7 に「**位置はその node の子の最後**」を明記し、本文と図を一致させた。
 12. sequence の `minDepth` が未反映の変更提案である旨の注記が無かった → `Note over Trv` に「D3 の変更提案。sync で traversal feature doc へ反映」を追加。
+
+## Review 2026-07-11 (phase: diagram gate / 2 回目)
+
+Verdict: **NEEDS_WORK**
+
+1 回目の指摘 (D2 規則 4 の visit 入口初期化 / `output.Write` entry point / Formatter 迂回なし / cutoff 行位置) はいずれも**解消を確認**。self-loop・root self-loop・3 要素 SCC の 3 ケースを図の意味論でトレースして正しさを検証済み。新規 blocking 1 件。
+
+### blocking 指摘と対応
+
+13. **`maxDepth=0` で Console が `(呼び出し元なし)` という誤出力になる** — spec は「到達なし」を `Edges が空` という条件だけで定義していたが、traversal の契約では **`maxDepth=0` は起点のみを到達集合に含め、起点の隣接 edge をすべて `depthLimit` cutoff にする** ([traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md)、`core/internal/traversal/traversal.go` の `MaxDepth` / `result.go`)。このとき `Edges` は空だが `Cutoffs` は非空であり、呼び出し元は**存在するが深さ上限で切られただけ**。従来の定義では事実に反する `(呼び出し元なし)` を出力し、さらに D2 規則 7 が要求する `… (depth limit: N edges cut)` も出力されない (規則 7 と規則 8 が同じ入力で矛盾した出力を規定していた)。
+
+- **対応**: 「到達なし」の条件を **`Edges` が空 かつ `Cutoffs` も空** に狭めた。`Edges` が空でも `Cutoffs` が非空なら root 行 + 規則 7 の cutoff 行を出す。EARS / D5 表 / E2・E2' / D2 規則 8 / Flowchart 2 を同じ条件で書き直し、D7 の fixture に `maxDepth=0` と `maxDepth=0 + 起点 self-loop` (誘導 edge + `cycle` が残るため別経路) を追加。JSON 側は `depthCutoffs[]` を常に出すため影響なし。
+
+### minor 指摘と対応
+
+14. D2 規則 8 の「tree を組まず」が D5 表・図と食い違う → 到達なしは root 行のみを出す形に文言を統一 (規則 8 / 規則 9 に分割)。
+15. メタ情報のステータス行が「phase: clarify 完了」のままだった → 「phase: clarify / diagram 完了」に更新。
