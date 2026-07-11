@@ -54,3 +54,29 @@ Verdict: **NEEDS_WORK**
 ### minor 指摘と対応
 
 7. cutoff ラベルの表記ゆれ (`… (depth limit: N)` が D2 決定文と Interface 設計に残存) → `… (depth limit: N edges cut)` に統一。
+
+## Review 2026-07-11 (phase: clarify gate / 3 回目)
+
+Verdict: **PASS** — clarify gate 通過。
+
+### 観点別評価
+
+- **上位文書整合: PASS** — 3 件の変更提案 (traversal `minDepth` / `Output → Traversal` 依存 / S3 の 2 層照合) がいずれも上位文書の宣言との差分として正しく捕捉され、spec 単独で上位文書を書き換えていない。ADR-0001 / 0002 を覆す決定なし。
+- **未解決論点: PASS** — D1-D7 の決定欄がすべて埋まり、未確定事項は「sync 未反映の変更提案 3 件」と「CLI spec 依存 (本 spec では解決不能・境界を D5 で明文化)」に整理済み。下流 phase は空プレースホルダのまま。
+- **実装対象明示: PASS** — target 一覧が `context/project.md` の対象ドメインと完全一致。越境 (`output → traversal`) を隠さず変更提案として宣言。
+- **template 必須節 / EARS acceptance: PASS** — 必須節・サブ節をすべて充足。EARS 7 件が golden 検証観点と 1:1 対応。
+- **prompts 自己完結性 / 正本境界: N/A** — prompts 未生成、sync 未実行 (現段階は spec が作業正本でよい)。
+
+### 実装照合による確認 (2 回目 blocking #6 の修正検証)
+
+`result.go` の cutoff 記録 (`for id := range nodes` → `g.Neighbors(id, dir)` → `next := nextNode(e, dir)` が到達集合外なら記録、`TargetMinDepth = depths[next]`)、`search.go` の `nextNode` (`DirectionCaller` → `e.CallerID`)、`graph.go` の `Neighbors(id, DirectionCaller) = incoming[id]` を突き合わせ、**caller 方向では dangling するのが `callerMethodId` 側**であることを確認。spec の `targetMethodId` の定義と D7 の両方向検証観点はこの構造と厳密に一致する。
+
+### 参考 (非ブロッキング)
+
+1. golden の置き場所 (`core/internal/output/testdata/golden/`) は Go の package-local `testdata/` 慣習として妥当だが、`context/testing.md` の他の行は repo root の `testdata/` を指す文脈が多い。→ **phase: sync で `context/testing.md` に 1 行補足する変更提案として記録済み**。
+2. D2 規則 7 の「cutoff edge を持つ node」がどちらの endpoint か暗黙 → **反映済み** (到達側 endpoint = `targetMethodId` ではない方、と明記)。
+3. E1 行の「閉路の先を `(cycle)`」が D2 の back edge 規則より緩い → **反映済み** (「経路上の祖先に戻る edge の先」に統一)。
+
+### 次アクション
+
+phase: diagram / track / sync / tasks へ進んでよい。sync では 3 件の変更提案の反映、Design Doc Q3 の「解決済み」更新、`design/features/output/DesignDoc_output.md` への正本ハンドオフを行う。
