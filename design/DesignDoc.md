@@ -42,7 +42,7 @@ depwalk はこの調査を自動化することを目的とする。
 | S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                                                                                                                                                                                                     |
 | S3  | 呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる                     | 各形式でパース / レンダリング可能な出力が得られる (Output Engine 層の照合は [feature doc](features/output/DesignDoc_output.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する)                                               |
 | S4  | Spring DI 経由の呼び出し先を実体まで解決できる (Phase2 以降)                     | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                           |
-| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)                                                                                                                                                                            |
+| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | **2 つ目以降**の言語 Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)。初号機 (Java) 導入時の言語非依存な初回配線 (`depwalk analyze` command / Analyzer 起動コマンド解決) は対象外とする                                    |
 
 ### スコープ
 
@@ -158,12 +158,12 @@ flowchart LR
 
 ### 設計原則 (Design Principles)
 
-| #   | 原則                                    | 内容                                                                             | 狙い                    |
-| --- | --------------------------------------- | -------------------------------------------------------------------------------- | ----------------------- |
-| P1  | Core は言語非依存                       | 呼び出しグラフの構築・探索・出力は言語によらない。言語差は Analyzer へ閉じ込める | マルチ言語化の容易さ    |
-| P2  | Analyzer は独立プロセス                 | Core から各言語ランタイムへの依存を避ける (Java→JVM、TypeScript→Node.js、Go→Go)  | ランタイム混在の回避    |
-| P3  | Analyzer は共通 Protocol を実装         | Core は Analyzer 内部を知らず、受け取るのは graph model と diagnostics のみ      | 結合点の最小化          |
-| P4  | Core は Analyzer をプラグインとして扱う | Analyzer 追加時に Core 変更を不要とする                                          | 拡張時の変更局所化 (S5) |
+| #   | 原則                                    | 内容                                                                                                                   | 狙い                    |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| P1  | Core は言語非依存                       | 呼び出しグラフの構築・探索・出力は言語によらない。言語差は Analyzer へ閉じ込める                                       | マルチ言語化の容易さ    |
+| P2  | Analyzer は独立プロセス                 | Core から各言語ランタイムへの依存を避ける (Java→JVM、TypeScript→Node.js、Go→Go)                                        | ランタイム混在の回避    |
+| P3  | Analyzer は共通 Protocol を実装         | Core は Analyzer 内部を知らず、受け取るのは graph model と diagnostics のみ                                            | 結合点の最小化          |
+| P4  | Core は Analyzer をプラグインとして扱う | Analyzer 追加時に Core 変更を不要とする (2 つ目以降の Analyzer 追加が対象。初号機導入時の言語非依存な初回配線は対象外) | 拡張時の変更局所化 (S5) |
 
 ## Communication Protocol
 
@@ -202,7 +202,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | 呼び出しグラフのデータモデル (Graph) | [DesignDoc_graph.md](features/graph/DesignDoc_graph.md)                                     | 完了                               |
 | 出力形式 (Console/JSON/DOT/Mermaid)  | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了 (DOT / Mermaid 実装は Phase4) |
 | Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了                               |
-| Java Analyzer                        | (未作成)                                                                                    | 未着手                             |
+| Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了                               |
 
 ### Engineering Context (How: 横断規約)
 
