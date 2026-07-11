@@ -163,7 +163,7 @@ EARS 風で振る舞いを記述する。
 
 ### D2 (= Design Doc Open Question Q3): Console ツリー表現 (2026-07-11 決定)
 
-**決定**: 罫線ツリーで、**初出の node のみ部分木を展開する**。再登場した node は葉として `(既出)` を付け、展開しない。循環は `(cycle)` で打ち切り、深さ上限で切られた枝は `… (depth limit: N)` で「続きがある」ことを明示する。深さラベル (`[d2]` 等) は付けない。
+**決定**: 罫線ツリーで、**初出の node のみ部分木を展開する** (これが停止性を保証する)。展開しない葉には、経路上の祖先に戻る場合は `(cycle)`、別の枝で展開済みの場合は `(既出)` を付ける。深さ上限で切られた枝は `… (depth limit: N edges cut)` で「続きがある」ことを明示する。深さラベル (`[d2]` 等) は付けない。
 
 Traversal result は tree ではなく集合 (到達 node 集合 + 誘導 edge 集合) であるため、**tree 化の規則を Output 側の仕様として定義する** ([traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md): 「tree 構築は Output 側で行う」)。
 
@@ -253,6 +253,7 @@ UserService.findById(Long)  [UserService.java:42]
       "edgeId": "<edgeId>",
       "callerMethodId": "<methodId>",
       "calleeMethodId": "<methodId>",
+      "targetMethodId": "<methodId>",
       "targetMinDepth": 3,
       "callSite": { "path": "...", "startLine": 12 }
     }
@@ -264,7 +265,9 @@ UserService.findById(Long)  [UserService.java:42]
 - `status` は `ok` / `startNotFound` (`traversal.Status` と同値)。`direction` は `caller` / `callee`。
 - `cycle` は `Result.Cycles` の注釈に対応する bool。**false でも省略せず常に出力する** (利用者が field の有無を分岐しなくて済むようにする)。
 - `sourceLocation` / `callSite` は Protocol 上 optional のため、欠落時は field ごと省略する。
-- **`depthCutoffs[]` の `calleeMethodId` は `nodes[]` に存在しない** (深さ上限の外側にある node のため到達集合に含まれない。`traversal.Result` は cutoff 先の symbol を保持しない)。利用者はこの参照が dangling であることを前提にする。この非対称性は Traversal result の契約に由来する。
+- **`depthCutoffs[]` の `targetMethodId` は `nodes[]` に存在しない (dangling)**。`targetMethodId` は **探索方向の接続先** を指し、`direction=caller` なら `callerMethodId`、`direction=callee` なら `calleeMethodId` と同じ値になる (`core/internal/traversal/search.go` の `nextNode(e, dir)` の定義に対応。caller 方向の探索は callee → caller へ辿るため、深さ上限の外側にあるのは caller 側)。既存の `targetMinDepth` はこの `targetMethodId` の minDepth である。
+  - `targetMethodId` を持たせることで、利用者は `direction` を見て `callerMethodId` / `calleeMethodId` のどちらが dangling かを分岐せずに済む。
+  - cutoff 先の node が `nodes[]` にないのは、深さ上限の外側にあり到達集合に含まれないため (`traversal.Result` は cutoff 先の symbol を保持しない)。この非対称性は Traversal result の契約に由来する。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。到達集合は順序非保証のため、この固定が出力の決定性を担保する。
 
 #### 版管理
@@ -466,7 +469,7 @@ core/internal/output/
   - `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順で、同一 Result から常に同一のバイト列が得られること。
   - node の `minDepth` が起点 0 からの最短距離に一致すること (合流 graph で最短経路側の値を採ること)。
   - `cycle` が false の場合も field が出力されること。`sourceLocation` / `callSite` が欠落する場合に field ごと省略されること。
-  - `depthCutoffs[]` の `calleeMethodId` が `nodes[]` に存在しない (dangling) ことを、契約として明示的に検証すること。
+  - `depthCutoffs[]` の `targetMethodId` が `nodes[]` に存在しない (dangling) ことを、**caller / callee の両方向で**検証すること。caller 方向では `targetMethodId == callerMethodId`、callee 方向では `targetMethodId == calleeMethodId` になり、もう一方の endpoint は `nodes[]` に存在する。
 
 ## Interface 設計
 
@@ -475,7 +478,7 @@ core/internal/output/
 - Output Engine の入力は **Graph と Traversal result の 2 つ**に確定 (D1)。symbol は Graph の読み取り API から引くため、symbol table を第 3 引数として渡さない。
 - **Formatter interface**: `Formatter.Format(w io.Writer, v View) error`。入力は `Graph` + `traversal.Result` + `traversal.Request` (= `Input`) で、そこから symbol 解決済み・sort 済みの中間表現 `View` を 1 度構築し、各 formatter が描画する (D6 で確定。型は `## 解決済みの論点 > D6`)。
 - Output が `error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ。`startNotFound` / 到達なしは正常系として各形式で表現する (D5)。exit code と表示は CLI の責務。
-- **Console 出力**: 罫線ツリー / 初出のみ展開 / `(既出)` / `(cycle)` / `… (depth limit: N)` / 子行は `callSite`、root は宣言位置 (D2 で確定。tree 構築規則と書式の詳細は `## 解決済みの論点 > D2`)。
+- **Console 出力**: 罫線ツリー / 初出のみ展開 / `(cycle)` (経路上の祖先) / `(既出)` (別枝で展開済み) / `… (depth limit: N edges cut)` / 子行は `callSite`、root は宣言位置 (D2 で確定。tree 構築規則と書式の詳細は `## 解決済みの論点 > D2`)。
 - Console の tree 化は Output Engine 内に閉じる。Traversal は tree を保持しないため、tree 構築を Traversal 側へ押し戻さない。
 - **JSON 出力**: フラットな graph (`nodes[]` / `edges[]` / `depthCutoffs[]`)。node は `minDepth` を持つ (D3 で確定。schema は `## 解決済みの論点 > D3`)。
 - **DOT / Mermaid 出力 (Phase4 実装)**: 本 spec では Formatter interface と「表現すべき意味」の要件 (G-1〜G-7) までを確定し、具体構文は Phase4 spec に送る (D4)。tree 化は行わず、到達 graph をそのまま描く。
@@ -637,10 +640,11 @@ sequenceDiagram
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK)    | 指摘要点                                                                                                                                                                                                                                                                                         | 対応                                                                                                                                                                                                                                                             |
-| ---------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-11 | PASS (phase: scaffold)      | 全観点 PASS。非ブロッキング提案 3 件: ①Console の EARS 述語は D2 確定時に具体化 ②未確定事項に決定者 / 期限 ③D1(b) の供給元                                                                                                                                                                       | ② は本 spec に反映済み。① / ③ は phase: clarify で D2 / D1 を解くときに対応する                                                                                                                                                                                  |
-| 2026-07-11 | NEEDS_WORK (phase: clarify) | blocking 3 件: ①D2 の `(cycle)` 判定が `Result.Cycles` の意味論と矛盾し 3 要素 SCC で node が tree から欠落 ②`output → traversal` の package 依存が上位文書に未宣言 ③Performance 節が placeholder のまま phase 表は「完了」。minor 2 件: `depth limit: N` の曖昧さ / `View.Start` の symbol 欠落 | ①経路上の祖先への back edge で判定する規則へ修正 (ユーザー承認済み。回帰テスト観点を追加) ②Design Doc / architecture.md への変更提案として記録 ③D6 の結論を反映 ④`… (depth limit: N edges cut)` に変更 ⑤`NodeView` の symbol 欠落許容を D6 に明記 → 再レビューへ |
+| 日付       | 結果 (PASS / NEEDS_WORK)             | 指摘要点                                                                                                                                                                                                                                                                                         | 対応                                                                                                                                                                                                                                              |
+| ---------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | PASS (phase: scaffold)               | 全観点 PASS。非ブロッキング提案 3 件: ①Console の EARS 述語は D2 確定時に具体化 ②未確定事項に決定者 / 期限 ③D1(b) の供給元                                                                                                                                                                       | ② は本 spec に反映済み。① / ③ は phase: clarify で D2 / D1 を解くときに対応する                                                                                                                                                                   |
+| 2026-07-11 | NEEDS_WORK (phase: clarify / 1 回目) | blocking 3 件: ①D2 の `(cycle)` 判定が `Result.Cycles` の意味論と矛盾し 3 要素 SCC で node が tree から欠落 ②`output → traversal` の package 依存が上位文書に未宣言 ③Performance 節が placeholder のまま phase 表は「完了」。minor 2 件: `depth limit: N` の曖昧さ / `View.Start` の symbol 欠落 | ①経路上の祖先への back edge で判定する規則へ修正 (ユーザー承認済み。回帰テスト観点を追加) ②Design Doc / architecture.md への変更提案として記録 ③D6 の結論を反映 ④`… (depth limit: N edges cut)` に変更 ⑤`NodeView` の symbol 欠落許容を D6 に明記 |
+| 2026-07-11 | NEEDS_WORK (phase: clarify / 2 回目) | 1 回目の blocking 3 件は解消確認。新規 blocking 1 件: `depthCutoffs[]` の dangling 参照が探索方向で逆 (caller 方向では `callerMethodId` 側が dangling)。minor: cutoff ラベルの表記ゆれ                                                                                                           | schema に `targetMethodId` (探索方向の接続先) を追加し、D7 の検証観点を両方向で書き分け (ユーザー承認済み)。表記を統一 → 再レビューへ                                                                                                             |
 
 ## 変更履歴
 
@@ -653,6 +657,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | phase: clarify で D3 (JSON schema / 版管理) を決定。traversal feature doc への変更提案 (`minDepth` 公開) が発生                                                                            |
 | 2026-07-11 | Fukuemon | phase: clarify で D4 (DOT/Mermaid I/F) / D5 (エラー境界) / D6 (Formatter interface + View) / D7 (テスト境界) を決定。論点 D1-D7 がすべて解決                                               |
 | 2026-07-11 | Fukuemon | clarify gate の spec-review (NEEDS_WORK) を受けて修正: D2 の `(cycle)` 判定を back edge 方式へ、`output → traversal` 依存を変更提案として宣言、Performance 節を確定、cutoff ラベルを明確化 |
+| 2026-07-11 | Fukuemon | clarify gate 2 回目の指摘に対応: `depthCutoffs[]` に `targetMethodId` を追加し dangling 参照を方向非依存に (D3 / D7)                                                                       |
 
 ## 備考
 
