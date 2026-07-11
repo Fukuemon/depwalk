@@ -7,7 +7,7 @@
 ## メタ情報
 
 - Issue: `#7`
-- ステータス: `In Progress` (phase: clarify / diagram / track / sync / tasks 完了。実装 prompts 5 件を生成済み。最終レビュー (phase: review) 待ち)
+- ステータス: `Done` (phase 11 完了、spec-sync 完了、prompts 生成済み。実装フェーズへ進める)
 - 作成日: 2026-07-11
 - 更新日: 2026-07-11
 - Branch: `feature/7`
@@ -29,7 +29,7 @@
 | 8   | Performance / Security 設計 | レビュー済 | 2026-07-11 | 逐次書き出し。streaming 機構は導入しない (D6)                              |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-07-11 | golden + パース検証を unit 層に (D7)                                       |
 | 10  | 実装分割                    | 完了       | 2026-07-11 | prompts 5 件を生成 (P1 並列 2 + P2 + P3 並列 2)                            |
-| 11  | レビュー済                  | 未着手     |            |                                                                            |
+| 11  | レビュー済                  | 完了       | 2026-07-11 | 最終レビュー (phase 8) で PASS。実装フェーズへ進める                       |
 
 ## 上位文書整合
 
@@ -825,6 +825,7 @@ DOT / Mermaid (Phase4) は prompts を生成しない。I/F 要件 G-1〜G-7 は
 | 2026-07-11 | NEEDS_WORK (phase: tasks / 1 回目)   | blocking: View に direction が無く JSON の direction 出力と Console の子方向判定が Formatter で不可能 (P3 が完遂不能)。moderate: P2_01 の registry 実装が自由選択で P3 の並列前提が壊れうる。minor: CutoffView.TargetMethodID の導出規則が P2_01 に未転記                                                                        | View に Direction を追加 (feature doc → spec → prompts を同時修正)。P2_01 の完了条件に「P3 が output.go を編集せず登録できる構造」を明記。TargetMethodID の導出規則を P2_01 に転記                                                                                                                  |
 | 2026-07-11 | NEEDS_WORK (phase: tasks / 2 回目)   | 指摘 41-43 の解消を確認。新規 blocking 2: ①型名 traversal.Direction が実在しない (正: graph.Direction) ②NodeView に MinDepth が無く JSON の minDepth が View 境界を通過不能 (41 と同型)。minor: P3_02 が traversal 型を参照                                                                                                      | View 境界の全数チェック表を作成し、graph.Direction へ修正 + NodeView.MinDepth 追加 + View 型の field を 5 箇所で確定。P3_02 の出力元を View に統一                                                                                                                                                  |
 | 2026-07-11 | **PASS** (phase: tasks / 3 回目)     | 指摘 44-46 の解消を確認。View 境界の全数対応表を Console / JSON の全出力項目と突合し欠けなし。prompts の全型・関数・field の実在性を実装と全数突合。絶対ガード 10 セクション回帰なし                                                                                                                                             | 非ブロッキング 3 件 (MinDepth コメントの表記 / View.EdgeView.Cycle の経路表記 / 規則 2・6 の Result 参照) を反映。phase 8 (最終レビュー) へ進める                                                                                                                                                   |
+| 2026-07-11 | **PASS** (phase 8 最終レビュー)      | 全観点 PASS。上位文書への反映を実文書で全数 spot-check、prompts 5 件の型・関数の実在性を実装と照合、正本境界の最終状態 (feature doc 2 本 = durable 正本 / spec = 決定時スナップショット) を確認                                                                                                                                  | lifecycle 完了。実装セッションへ handoff 可能                                                                                                                                                                                                                                                       |
 
 ## 変更履歴
 
@@ -859,6 +860,7 @@ DOT / Mermaid (Phase4) は prompts を生成しない。I/F 要件 G-1〜G-7 は
 | 2026-07-11 | Fukuemon | tasks gate の指摘に対応: View に Direction を追加 (feature doc / D6 スナップショット / prompts P2_01・P3_01・P3_02 を同時修正)                                                                                                                                                                            |
 | 2026-07-11 | Fukuemon | tasks gate 2 回目の指摘に対応: graph.Direction へ型名修正、NodeView.MinDepth 追加、View 境界の全数対応表で欠落ゼロを確認                                                                                                                                                                                  |
 | 2026-07-11 | Fukuemon | tasks gate 3 回目で **PASS**。非ブロッキング 3 件 (表記の統一) を反映                                                                                                                                                                                                                                     |
+| 2026-07-11 | Fukuemon | 最終レビュー (phase 8) で PASS。spec を Done に更新し lifecycle を完了                                                                                                                                                                                                                                    |
 
 ## 備考
 
