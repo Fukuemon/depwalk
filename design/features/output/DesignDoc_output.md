@@ -73,11 +73,12 @@ func Write(w io.Writer, f Format, in Input) error
 
 // 全 formatter が共有する中間表現 (symbol 解決済み / sort 済み)
 type View struct {
-    Status  traversal.Status
-    Start   NodeView
-    Nodes   []NodeView   // methodId の辞書順
-    Edges   []EdgeView   // edgeId の辞書順。Cycle flag を持つ
-    Cutoffs []CutoffView // edgeId の辞書順
+    Status    traversal.Status
+    Direction traversal.Direction // 探索方向 (Request から引き継ぐ)
+    Start     NodeView
+    Nodes     []NodeView   // methodId の辞書順
+    Edges     []EdgeView   // edgeId の辞書順。Cycle flag を持つ
+    Cutoffs   []CutoffView // edgeId の辞書順
 }
 
 type Formatter interface {
@@ -88,6 +89,7 @@ type Formatter interface {
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 Result から常に同一のバイト列を出力する。
 - symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する ([graph feature doc](../graph/DesignDoc_graph.md) が属性の正本)。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
 - `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
+- **`View` は `Request` の `direction` / `start` を保持して Formatter へ運ぶ** (JSON の `direction` field と Console の子方向判定・文言分岐が必要とするため)。
 - 出力は `io.Writer` への逐次書き出しで足り、専用の streaming 機構は導入しない (graph は全体がメモリ上にあり、出力サイズは到達集合に比例する)。
 
 ### エラー境界
