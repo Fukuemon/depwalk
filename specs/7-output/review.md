@@ -304,3 +304,11 @@ Verdict: **NEEDS_WORK**
 用語規約は全数確認で**適合** (handoff 済み spec 自身やその節を「正本」と呼ぶ箇所ゼロ)。正本境界も PASS。残る指摘は 1 件のみ:
 
 40. **[blocking] メタ情報同期の 1 周遅れ再発** — 3 回目の指摘対応を本文に適用しながら、レビュー表と変更履歴が 3 回目の結果を未記録 (指摘 38 と同一クラス)。→ **3 回目と 4 回目の行を同時に記録**し、「対応 commit が常に 1 レビュー分遅れる」連鎖を断った。
+
+## Review 2026-07-11 (phase: sync gate / 5 回目)
+
+Verdict: **PASS** — sync gate 通過。
+
+全観点 PASS。上位文書への反映の残存を実文書で再確認 (Design Doc の依存先 / C4 図 / Q3 / S3、feature doc 2 本の実在)。用語規約は全数 grep で適合。レビュー表・変更履歴・review.md の 3 系統が同期し、メタ情報同期の 1 周遅れ連鎖は断たれた。
+
+次アクション: phase: tasks へ。`## 実装分割` を確定し、fixture ケースは output feature doc のテスト観点 (durable 正本) から導出する。
