@@ -236,3 +236,28 @@ diagram gate #16 / #18 / #19、track gate #25 / #28 はすべて同一原因 (�
 - sync 作業の正本 = `## 上位資料からの変更点` のみ (整合テーブル / 未確定事項 / 要約行はすべて参照に降格)
 - fixture ケースの正本 = D7 のみ (Testing 節は参照)
 - Console tree 規則の正本 = D2 のみ (図・EARS・E1 は参照ないし同一述語)
+
+## Review 2026-07-11 (phase: track gate / 4 回目)
+
+Verdict: **PASS** — track gate 通過。
+
+### 観点別評価
+
+- **上位文書整合: PASS** — 整合テーブル全 13 行を実文書と突合し記述が事実と一致。3 回目で欠落していた 2 行 (README 索引 / testing.md runtime contract) が追加され、**整合テーブルと変更点テーブルの乖離はゼロ**。
+- **未解決論点 / 実装対象明示 / template 必須節 / EARS acceptance: PASS**
+- **prompts 自己完結性 / 正本境界: N/A** (prompts 未生成、sync 未実行)
+
+### 重点確認の結果
+
+1. **二重列挙は構造的に解消**と判断された。整合テーブル 13 行と変更点テーブル (Design Doc 4 / feature doc 4 / context 4 / ADR 1) を全数マッピングし、**片側にしかない行はゼロ**。
+2. **sync 作業は変更点テーブルのみから漏れなく導ける**ことを確認 (Design Doc 4 件 / feature doc 新規 2 本 + README 索引 + traversal / context 4 件 / ADR なし / spec 側の snapshot 降格)。
+3. **二重正本なし** — D1 = graph feature doc、D2-D7 = output feature doc、context/architecture.md は package 境界の記述に留め正本を graph feature doc へ委譲。
+
+### 非ブロッキング提案と対応
+
+30. `## 未確定事項` に「要点」として部分的な内訳の再掲が残っていた (通算 5 回踏んだパターンの残り火) → **参照 1 行に純化**して完全に閉じた。
+31. `## 上位文書整合` の blockquote が箇条書きを分断していた → blockquote を先頭に移動し、3 つの bullet を連続させた。
+
+### 次アクション
+
+phase: sync へ進んでよい。
