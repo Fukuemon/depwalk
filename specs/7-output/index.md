@@ -35,7 +35,7 @@
 
 正本 (PRD ※本プロダクトは統合モードのため未作成、Why/What は [Design Doc](../../design/DesignDoc.md) に統合 / [Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
-> **本節の役割**: 下表は「**確認した上位文書と、その整合方針 (継承 / 補足 / 変更提案)**」の記録であり、**phase: sync で実施する作業の網羅リストではない**。sync 作業の唯一の正本は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群とする (同じ規範を 2 箇所に列挙して片方だけ更新される drift を避けるため)。
+> **本節の役割**: 下表は「**確認した上位文書と、その整合方針 (継承 / 補足 / 変更提案)**」の記録であり、**phase: sync で実施する作業の網羅リストではない**。sync 作業の唯一の管理箇所は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群とする (同じ規範を 2 箇所に列挙して片方だけ更新される drift を避けるため)。
 
 - PRD 更新要否: 不要 (本プロダクトは統合モード。Why / What は Design Doc に統合)
 - Design Doc 更新要否: 要 → **2026-07-11 の sync で反映済み** (反映内容の正本は `## 上位資料からの変更点 > Design Doc への影響`)
@@ -435,7 +435,7 @@ core/internal/output/
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
 - **論点 D1-D7 はすべて解決済み** (2026-07-11、決定者: Fukuemon)。Design Doc Open Question Q3 は D2 で解決した。
-- **上位文書への反映は 2026-07-11 の phase: sync で完了** (全行 `[反映済]`。反映対象の唯一の正本は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群)。durable 成果の正本は feature doc 2 本 (graph = D1 / output = D2-D7) へハンドオフ済みで、spec の該当節は決定時スナップショットに降格した。
+- **上位文書への反映は 2026-07-11 の phase: sync で完了** (全行 `[反映済]`。反映対象の唯一の管理箇所は [`## 上位資料からの変更点`](#上位資料からの変更点) のテーブル群)。durable 成果の正本は feature doc 2 本 (graph = D1 / output = D2-D7) へハンドオフ済みで、spec の該当節は決定時スナップショットに降格した。
 - CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化済み)。これは本 spec 内では解決不能な依存であり、下流 phase を止める未決事項ではない。
 
 ## 実装対象
@@ -595,7 +595,7 @@ D6 で確定。詳細は `## 機能仕様 > Performance` と `## 解決済みの
 ### テスト観点
 
 - **unit (golden)**: 各 formatter の出力を golden file と比較する (`core/internal/output/testdata/golden/`)。書式 (D2 / D3) と決定性 (同一 Result → 同一バイト列) を同時に担保する。
-- **fixture ケース**: 正本は `## 解決済みの論点 > D7` の一覧 (二重管理を避けるため本節では再掲しない)。`maxDepth=0` 系と 3 要素 SCC の回帰ケースを含む。
+- **fixture ケース**: durable 正本は [Output feature doc のテスト観点](../../design/features/output/DesignDoc_output.md#テスト観点) (二重管理を避けるため本節では再掲しない)。決定経緯は `## 解決済みの論点 > D7`。`maxDepth=0` 系と 3 要素 SCC の回帰ケースを含む。
 - **パース可否 (S3)**: JSON は `encoding/json` で unmarshal 可能であること。DOT / Mermaid の構文検証は Phase4 で同層に追加する。
 - **エラー境界 (D5)**: 未対応 format が出力を書き出す前に `error` になること。`startNotFound` / 到達なしが `error` にならないこと。
 - 詳細な観点は `## 機能仕様 > Testing` を参照。横断規約は [context/testing.md](../../context/testing.md)。
