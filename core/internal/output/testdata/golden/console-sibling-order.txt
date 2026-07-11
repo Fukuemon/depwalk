@@ -1,0 +1,5 @@
+Root()
+├─ Alpha()
+├─ Child(A)
+├─ Child(A)
+└─ Child(B)

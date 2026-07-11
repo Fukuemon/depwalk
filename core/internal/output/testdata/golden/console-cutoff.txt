@@ -1,0 +1,3 @@
+A()
+└─ B()
+   └─ … (depth limit: 2 edges cut)
