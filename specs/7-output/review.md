@@ -183,3 +183,20 @@ Verdict: **PASS** — diagram gate 通過。
 ### 次アクション
 
 phase: track / sync / tasks へ進んでよい。
+
+## Review 2026-07-11 (phase: track gate / 1 回目)
+
+Verdict: **NEEDS_WORK**
+
+### 指摘と対応
+
+22. **[blocking] Design Doc 成功条件 S3 の測定方法への反映行が欠落** — #6 は S1/S2 の測定方法に「Traversal 層照合 (feature doc 正本) + CLI 出力照合の 2 層」注記を **Design Doc と `context/testing.md` の両方**に入れている。#7 は同じ 2 層構造を D7 で決めながら、反映先を `context/testing.md` だけに振り分け、Design Doc の S3 行を「継承」扱いにしていた。このままだと sync 後の Design Doc が「#7 で完了しない測定方法」を宣言したまま残り、S1/S2 と非対称な drift になる。
+    - **対応**: Design Doc への影響テーブルに S3 の 2 層照合の行を追加し、上位文書整合の S3 行を「継承」→「**変更提案**」に改めた。
+23. **[moderate] D1 (graph の symbol 値型) の durable 正本を output feature doc に置く振り分けが不適切** — `graph.Node.Symbol` / `graph.Edge.CallSite` は Graph Engine の横断データモデルで、読み手は Output だけではない (Traversal も graph を読む)。「出力形式 feature doc」を正本にすると、将来の graph model 変更が Output の doc を正本として要求することになる。加えて同じ D1 が feature doc 行と context 行の双方に載り、二重正本の芽になっていた。
+    - **対応**: **`design/features/graph/DesignDoc_graph.md` を新設**して D1 の正本を持たせる (ユーザー判断)。output feature doc は D2-D7 の正本とし、D1 は graph feature doc への参照 1 行にする。`context/architecture.md` は package 境界の記述に留め、正本として graph feature doc を参照させる。Design Doc の feature 一覧にも Graph Engine 行を追加する。
+24. **[minor] ラベル不整合** — `context/testing.md` が上位文書整合では「変更提案」、変更点テーブルでは「(予定)」になっていた → 変更提案リストを 4 件に統一し、3 箇所のラベルを揃えた。
+
+### 妥当と判断された点
+
+- **ADR 不要 (確定)** の判定は妥当と評価された。ADR-0001 は Analyzer↔Core の wire protocol、ADR-0002 は Core 実装基盤に閉じており、いずれも Core 内 package 間の依存方向や Core↔利用者の出力 schema を決めていない。D6 の依存追加は「Core 内は単方向」を保った明文化で P1-P4 を覆さない。
+- 二重追記なし (D1 を除く。上記 23 で解消)。
