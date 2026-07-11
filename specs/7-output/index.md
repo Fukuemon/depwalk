@@ -7,7 +7,7 @@
 ## メタ情報
 
 - Issue: `#7`
-- ステータス: `In Progress` (phase: clarify 完了。phase: diagram / track / sync / tasks が残る)
+- ステータス: `In Progress` (phase: clarify / diagram 完了。phase: track / sync / tasks が残る)
 - 作成日: 2026-07-11
 - 更新日: 2026-07-11
 - Branch: `feature/7`
@@ -122,7 +122,8 @@ EARS 風で振る舞いを記述する。
 - WHEN format が `console` の時、システムは起点メソッドを根とするツリーを出力し、経路上の祖先に戻る edge の先には `(cycle)`、別の枝で展開済みの node には `(既出)`、深さ上限で切られた枝には `… (depth limit: N edges cut)` を付ける。到達 node はすべて最低 1 回 tree に現れる (D2)。
 - WHEN format が `json` の時、システムは `schemaVersion` / `status` / `direction` / `start` / `nodes[]` / `edges[]` / `depthCutoffs[]` を持つ JSON を、id の辞書順で出力する (D3)。
 - IF Traversal result の status が `startNotFound` の時、システムは各形式で「該当なし」を明示し、`error` を返さない (D5)。
-- IF 到達集合が起点のみで edge が空の時、システムは Console で `(呼び出し元なし)` / `(呼び出し先なし)` を、JSON で起点 1 件 + 空の `edges` を出力する (D5)。
+- IF 到達 edge も depthLimit cutoff も無い時 (起点が孤立している時)、システムは Console で `(呼び出し元なし)` / `(呼び出し先なし)` を、JSON で起点 1 件 + 空の `edges` を出力する (D5)。
+- IF 到達 edge は無いが depthLimit cutoff がある時 (`maxDepth=0` 等)、システムは Console で root 行 + `… (depth limit: N edges cut)` を出力し、`(呼び出し元なし)` とは出力しない (D2 規則 8)。
 - IF 未対応の format が指定された時、システムは出力を一切書き出さずに `error` を返す (対応形式を案内する。プロセス exit code は CLI の責務) (D5)。
 - THE SYSTEM SHALL 同一の Traversal result に対して常に同一のバイト列を出力する (到達集合が順序非保証であっても、出力は決定的にする)。
 
@@ -179,7 +180,9 @@ Traversal result は tree ではなく集合 (到達 node 集合 + 誘導 edge �
    - **`(既出)`** = 祖先ではないが、tree の別の枝で既に展開済みの node。合流 (ダイヤモンド構造) を意味する。
    - 判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` は使わない** — `Result.Cycles` は「両端が同一 SCC に属する誘導 edge すべて」というグラフ全体の性質であり (`core/internal/traversal/result.go` の `cycleEdges`)、SCC 内の最初の edge も注釈対象になる。これを打ち切り条件に使うと、A→B→C→A のような 3 要素 SCC で最初の edge A→B が打ち切られ、**C が tree に一度も現れなくなる**。`Result.Cycles` は JSON の `cycle` フラグ (D3) には正しく使える。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の **到達側 endpoint** (= `targetMethodId` ではない方。探索方向の手前側で、到達 node 集合に属する) の子として 1 行出す。**位置はその node の子の最後** (通常の子 edge をすべて出した後)。N はその node からの cutoff edge 数 (深さ上限値ではない)。cutoff の先の node (`targetMethodId`) は到達集合外なので名前は出さない。
-8. **`startNotFound` / 到達なし** は tree を組まず、D5 の表に従った文言を出す (Console formatter 内の分岐)。
+8. **到達なし** = `Edges` が空 **かつ** `Cutoffs` も空のとき。root 行のみを出し、その子として `(呼び出し元なし)` / `(呼び出し先なし)` を出す (子の展開は行わない)。
+   - **`Edges` が空でも `Cutoffs` が非空なら「到達なし」ではない**。root 行 + 規則 7 の `… (depth limit: N edges cut)` を出す。これは `maxDepth=0` で必ず起きる (traversal の契約上、`maxDepth=0` は起点のみを到達集合に含め、**起点の隣接 edge はすべて cutoff になる** — [traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md))。呼び出し元は存在するが深さ上限で切られただけなので、`(呼び出し元なし)` と出してはならない。
+9. **`startNotFound`** は tree を組まず、D5 の表に従った文言を出す (Console formatter 内の分岐)。
 
 #### 行の書式
 
@@ -312,12 +315,13 @@ UserService.findById(Long)  [UserService.java:42]
 
 #### 各ケースの扱い
 
-| ケース                            | Console                                                              | JSON                                                   | DOT / Mermaid          | 戻り値  |
-| --------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------- | ------- |
-| 起点不在 (`status=startNotFound`) | `該当なし: 起点メソッドが解析結果に存在しません (<start>)`           | `status: "startNotFound"` + `nodes` / `edges` は空配列 | 空グラフの有効構文     | `nil`   |
-| 到達なし (起点のみ、edge が空)    | root 行 + `└─ (呼び出し元なし)` (callee 方向では `(呼び出し先なし)`) | `nodes` に起点 1 件、`edges` は空配列                  | 起点 node のみのグラフ | `nil`   |
-| 未対応 format 指定                | —                                                                    | —                                                      | —                      | `error` |
-| `io.Writer` への書き込み失敗      | —                                                                    | —                                                      | —                      | `error` |
+| ケース                                              | Console                                                                       | JSON                                                         | DOT / Mermaid             | 戻り値  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------- | ------- |
+| 起点不在 (`status=startNotFound`)                   | `該当なし: 起点メソッドが解析結果に存在しません (<start>)`                    | `status: "startNotFound"` + `nodes` / `edges` は空配列       | 空グラフの有効構文        | `nil`   |
+| 到達なし (`Edges` も `Cutoffs` も空)                | root 行 + `└─ (呼び出し元なし)` (callee 方向では `(呼び出し先なし)`)          | `nodes` に起点 1 件、`edges` は空配列                        | 起点 node のみのグラフ    | `nil`   |
+| `Edges` は空だが `Cutoffs` が非空 (`maxDepth=0` 等) | root 行 + `… (depth limit: N edges cut)`。**`(呼び出し元なし)` とは出さない** | `nodes` に起点 1 件、`edges` は空配列、`depthCutoffs` は非空 | 起点 node + cutoff の表現 | `nil`   |
+| 未対応 format 指定                                  | —                                                                             | —                                                            | —                         | `error` |
+| `io.Writer` への書き込み失敗                        | —                                                                             | —                                                            | —                         | `error` |
 
 - **未対応 format** は出力を一切書き出す前に validation で弾く (`requirements.md` V1)。エラーは対応形式を案内する内容とする。
 - **exit code / エラーメッセージの表示先 (stdout / stderr)** は Output Engine の責務ではない。Output は `error` を返すところまでを担い、プロセス終了コードと表示は **CLI interface spec** に委ねる (`## スコープ > やらないこと`)。
@@ -409,7 +413,7 @@ core/internal/output/
 
 - **golden で担保するもの**: 書式 (D2 の Console 罫線 / 標識、D3 の JSON schema) と **決定性** (同一 Result から常に同一のバイト列 = `## 要件の解釈` の `THE SYSTEM SHALL`)。決定性は golden 比較で自然に検出できる (sort を忘れると golden が不安定になる)。
 - **S3 のパース可否**: JSON は `encoding/json` で unmarshal できることを unit test で検証する。DOT / Mermaid は Phase4 実装時に同層で構文検証を追加する (D4 G-7)。
-- **fixture のケース**: 循環 (self-loop / 相互再帰) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし / `startNotFound` を最低限そろえる (`## 機能仕様 > Testing` の観点に対応)。
+- **fixture のケース**: 循環 (self-loop / 相互再帰 / 3 要素 SCC) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし (`Edges` も `Cutoffs` も空) / **`maxDepth=0`** (`Edges` は空だが `Cutoffs` が非空) / **`maxDepth=0` + 起点 self-loop** (誘導 edge + `cycle` が残るため別経路を通る) / `startNotFound` を最低限そろえる (`## 機能仕様 > Testing` の観点に対応)。
 - **既存規約との整合**: [context/testing.md](../../context/testing.md) の「Golden fixture は `testdata/` 配下に置く」に従う。`go-cmp` は初期導入しない方針のため、golden 比較は文字列比較で行う。テストは仕様単位の `Test...` 関数に分ける (巨大な table-driven に異なる仕様を混ぜない)。
 
 **S1/S2 と同じ 2 層構造 (context への補足が必要)**: `context/testing.md` は S3 (各出力形式のパース可否) を「サンプル Java/Spring repo による E2E」に位置づけているが、CLI 層の E2E は CLI interface spec 完了後にしか完成しない。したがって S3 の照合は **Output 層 (本 spec の unit / golden、formatter が Traversal result から各形式を生成できること)** と **CLI 層 (CLI 出力そのものの照合)** の 2 層からなる。これは #6 が S1/S2 で採った分界と同じ構造であり、phase: sync で `context/testing.md` に補足する。
@@ -485,6 +489,7 @@ core/internal/output/
   - 循環 (self-loop / 相互再帰) を含む graph で無限展開しないこと。
   - **3 要素以上の SCC (A→B→C→A) で、循環に属する node がすべて tree に現れること** (最初の edge で SCC 全体を切り落とさない)。`(cycle)` が付くのは経路上の祖先に戻る edge の先だけであること (D2 規則 6 の回帰テスト)。
   - **self-loop (`B → B`) が `(既出)` ではなく `(cycle)` になること**、および **root の self-loop で root の部分木が二重出力されないこと** (D2 規則 4 の「visit 入口で自分を展開済み / 祖先集合に入れる」の回帰テスト)。
+  - **`maxDepth=0` で `(呼び出し元なし)` を出さず、root 行 + `… (depth limit: N edges cut)` を出すこと** (D2 規則 8 の回帰テスト)。traversal の契約上、`maxDepth=0` は `Edges` が空・`Cutoffs` が非空になるため、「到達なし」と誤判定してはならない。起点 self-loop がある場合は誘導 edge (+ `cycle` 注釈) が残るため、通常の tree 経路を通ること。
   - 合流で再登場した node には `(既出)`、経路上の祖先に戻る場合は `(cycle)` と、標識が区別されること。
   - `depthLimit` cutoff を持つ node の下に `… (depth limit: N edges cut)` が出て、N が当該 node からの cutoff edge 数に一致すること。
   - 兄弟の並び順が `qualifiedName` → `signature` → `methodId` の辞書順で固定され、同一 Result から常に同一のバイト列が得られること (到達集合の map 順序に依存しないこと)。
@@ -568,13 +573,14 @@ D6 で確定。詳細は `## 機能仕様 > Performance` と `## 解決済みの
 
 ### エラーケース
 
-| #   | ケース                               | ユーザーへの見せ方                                                                                         | リカバリ                                                                  |
-| --- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| E1  | 循環参照を含むグラフ                 | Console は**経路上の祖先に戻る edge の先**を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3) | 正常系。無限展開させない (停止性は「初出のみ展開」が保証。D2)             |
-| E2  | 到達なし (起点のみ、edge が空)       | Console は root 行 + `(呼び出し元なし)` / `(呼び出し先なし)`、JSON は起点 1 件 + 空 `edges`                | 正常系。`error` を返さない (D5)                                           |
-| E3  | 起点不在 (`status = startNotFound`)  | Console は `該当なし: 起点メソッドが解析結果に存在しません (<start>)`、JSON は `status` + 空配列           | 正常系。`error` を返さない (D5)                                           |
-| E4  | 未対応 format 指定                   | 対応形式を案内する `error` を返す (出力は一切書き出さない)                                                 | `output.Write` が Formatter 選択より前に validation で拒否 (V1 / D5 / D6) |
-| E5  | 出力先への書き込み失敗 (`io.Writer`) | `error` を返す                                                                                             | 表示 / exit code は CLI の責務 (D5)                                       |
+| #   | ケース                                              | ユーザーへの見せ方                                                                                                   | リカバリ                                                                  |
+| --- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| E1  | 循環参照を含むグラフ                                | Console は**経路上の祖先に戻る edge の先**を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3)           | 正常系。無限展開させない (停止性は「初出のみ展開」が保証。D2)             |
+| E2  | 到達なし (`Edges` も `Cutoffs` も空)                | Console は root 行 + `(呼び出し元なし)` / `(呼び出し先なし)`、JSON は起点 1 件 + 空 `edges`                          | 正常系。`error` を返さない (D5)                                           |
+| E2' | `Edges` は空だが `Cutoffs` が非空 (`maxDepth=0` 等) | Console は root 行 + `… (depth limit: N edges cut)` (`(呼び出し元なし)` とは出さない)、JSON は `depthCutoffs` を出す | 正常系。呼び出し元は存在するが深さ上限で切られただけ (D2 規則 8)          |
+| E3  | 起点不在 (`status = startNotFound`)                 | Console は `該当なし: 起点メソッドが解析結果に存在しません (<start>)`、JSON は `status` + 空配列                     | 正常系。`error` を返さない (D5)                                           |
+| E4  | 未対応 format 指定                                  | 対応形式を案内する `error` を返す (出力は一切書き出さない)                                                           | `output.Write` が Formatter 選択より前に validation で拒否 (V1 / D5 / D6) |
+| E5  | 出力先への書き込み失敗 (`io.Writer`)                | `error` を返す                                                                                                       | 表示 / exit code は CLI の責務 (D5)                                       |
 
 ### Fallback
 
@@ -633,7 +639,9 @@ flowchart TD
     S{"View.Status は"} -- "startNotFound" --> S1["該当なし: 起点メソッドが解析結果に存在しません (start)<br/>tree は組まない (D5)"]
     S -- "ok" --> A["root = 起点 node を出力<br/>(位置は宣言位置 Symbol.Source)"]
     A --> A2{"到達 edge があるか"}
-    A2 -- "No" --> A3["(呼び出し元なし) / (呼び出し先なし) を出力<br/>= 到達なし (D5)"]
+    A2 -- "No" --> A4{"cutoff があるか<br/>(maxDepth=0 では起点の隣接 edge が<br/>すべて cutoff になる)"}
+    A4 -- "No" --> A3["(呼び出し元なし) / (呼び出し先なし) を出力<br/>= 到達なし (D5)"]
+    A4 -- "Yes" --> B
     A2 -- "Yes" --> B["visit(node = root, 祖先集合 = {}, 展開済み = {})"]
     B --> B2["visit 入口: 現 node を展開済みに記録し<br/>祖先集合に加える<br/>(これにより self-loop も (cycle) になり<br/>root が再展開されない)"]
     B2 --> C["View.Edges から探索方向の子 edge を列挙し<br/>qualifiedName → signature → methodId 順に sort"]
@@ -753,6 +761,7 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (phase: clarify / 2 回目) | 1 回目の blocking 3 件は解消確認。新規 blocking 1 件: `depthCutoffs[]` の dangling 参照が探索方向で逆 (caller 方向では `callerMethodId` 側が dangling)。minor: cutoff ラベルの表記ゆれ                                                                                                           | schema に `targetMethodId` (探索方向の接続先) を追加し、D7 の検証観点を両方向で書き分け (ユーザー承認済み)。表記を統一                                                                                                                                                                              |
 | 2026-07-11 | **PASS** (phase: clarify / 3 回目)   | 全観点 PASS。blocking なし。`targetMethodId` の定義が `nextNode(e, dir)` / cutoff 記録ロジックと厳密に一致することを実装照合で確認。非ブロッキング 3 件: ①golden の置き場所 (package-local testdata) の解釈揺れ ②D2 規則 7 の endpoint が暗黙 ③E1 行の表現が D2 より緩い                         | ② / ③ は本 spec に反映済み。① は `context/testing.md` への変更提案として phase: sync で反映する                                                                                                                                                                                                     |
 | 2026-07-11 | NEEDS_WORK (phase: diagram / 1 回目) | blocking 2 件: ①Flowchart 2 で祖先集合の初期化が抜け self-loop が `(既出)` になり root が二重展開 ②sequence の `Format(w, Input)` が D6 と signature 不一致 (= format 検証 / View 構築 / Formatter 選択を担う entry point が未定義)。他 moderate 1 / minor 2                                     | ①D2 規則 4 に「visit 入口で自分を展開済み / 祖先集合に入れる」を明記し図と回帰テスト観点を追加 ②D6 に公開 entry point `output.Write(w, format, Input)` を追加 (ユーザー承認済み) ③`startNotFound` / 到達なしが Formatter を迂回しない形に修正 ④cutoff 行の位置を明記 ⑤minDepth の変更提案注記を追加 |
+| 2026-07-11 | NEEDS_WORK (phase: diagram / 2 回目) | 1 回目の指摘は全件解消を確認。新規 blocking 1 件: `maxDepth=0` で `Edges` は空だが `Cutoffs` が非空になるため、「到達なし」を `Edges` 空だけで判定すると誤って `(呼び出し元なし)` を出力し、規則 7 の cutoff 行も出ない (規則 7 と規則 8 が矛盾)                                                 | 「到達なし」を **`Edges` 空 かつ `Cutoffs` 空** に狭め、EARS / D5 表 / E2・E2' / D2 規則 8 / Flowchart 2 を統一。D7 に `maxDepth=0` と `maxDepth=0 + 起点 self-loop` の fixture を追加                                                                                                              |
 
 ## 変更履歴
 
@@ -768,6 +777,7 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | clarify gate 2 回目の指摘に対応: `depthCutoffs[]` に `targetMethodId` を追加し dangling 参照を方向非依存に (D3 / D7)                                                                       |
 | 2026-07-11 | Fukuemon | clarify gate 3 回目で PASS。phase: diagram で `## フロー / シーケンス` に 3 図を生成 (出力フロー / Console tree 構築 / sequence)。mermaid-cli でレンダリング検証済み                       |
 | 2026-07-11 | Fukuemon | diagram gate の指摘に対応: D2 規則 4 に visit 入口の初期化を明記 (self-loop / root 二重展開の修正)、D6 に公開 entry point `output.Write` を追加、図を本文と一致させた                      |
+| 2026-07-11 | Fukuemon | diagram gate 2 回目の指摘に対応: 「到達なし」の判定を `Edges` 空 かつ `Cutoffs` 空に狭め、`maxDepth=0` の誤出力 (`(呼び出し元なし)`) を修正 (D2 規則 8 / D5 / D7)                          |
 
 ## 備考
 
