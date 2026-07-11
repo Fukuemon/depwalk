@@ -48,7 +48,7 @@
 ### ステップ 2: tree 構築規則 1-6 (root / 子 / 兄弟順序 / 展開順序 / 初出のみ展開 / cycle・既出の標識) を実装する
 
 1. テストを先に書く (TDD): 「合流 (ダイヤモンド) graph で共有 node の部分木が展開されるのは 1 回だけで、2 回目以降が `(既出)` の葉になる」「3 要素以上の SCC (A→B→C→A) で循環に属する node がすべて tree に現れ、`(cycle)` が付くのは経路上の祖先に戻る edge の先だけになる」「self-loop (`B → B`) が `(既出)` ではなく `(cycle)` になり、root の self-loop で root の部分木が二重出力されない」「兄弟の並び順が `qualifiedName` → `signature` → `methodId` の辞書順で固定される」の golden test を追加する
-2. Console formatter に pre-order DFS の tree 構築を実装する。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む。self-loop / root 二重展開を防ぐための必須初期化)。再登場 node の標識判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`Result.Cycles` (`View.EdgeView.Cycle`) は使わない**
+2. Console formatter に pre-order DFS の tree 構築を実装する。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む。self-loop / root 二重展開を防ぐための必須初期化)。再登場 node の標識判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`Result.Cycles` (`View.Edges[].Cycle`) は使わない**
 3. `## 検証コマンド` を実行する
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す
 5. 指摘を対応してから次へ
@@ -148,7 +148,7 @@ type View struct {
 3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力の決定性を担保)。
 4. **展開順序** = 上記順序の pre-order DFS。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む)。これにより self-loop も規則 6 の `(cycle)` になり、root の self-loop で root が再展開されることもない。
 5. **初出のみ展開** = 部分木を展開するのは tree 中で最初に出現したときの 1 回のみ。出力行数は O(到達 edge 数) に収まり、**停止性はこの規則だけで保証される**。
-6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`View.EdgeView.Cycle` は使わない** (この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られ node が tree から消える):
+6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`View.Edges[].Cycle` は使わない** (この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られ node が tree から消える):
    - **`(cycle)`** = 現在の経路上の祖先に戻る edge (back edge) の先。
    - **`(既出)`** = 祖先ではないが、別の枝で展開済みの node (合流)。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の到達側 endpoint の子として、**子の最後に** 1 行出す。N はその node からの cutoff edge 数。cutoff 先 (`TargetMethodID`) は到達集合外のため名前を出さない。
