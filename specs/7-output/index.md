@@ -23,7 +23,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-11 | `requirements.md` から本 spec を scaffold。scaffold gate で PASS      |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-11 | Design Doc / context / ADR / traversal / analyzer-protocol と矛盾なし |
 | 4   | 論点整理                    | レビュー済 | 2026-07-11 | D1-D7 を初期論点として列挙 (Q3 は D2 が引き取る)                      |
-| 5   | 論点解決                    | 未着手     |            | 全論点が未決。phase: clarify で 1 件ずつ確定する                      |
+| 5   | 論点解決                    | 進行中     | 2026-07-11 | D1 / D2 (= Q3) 解決済み。D3-D7 が未決                                 |
 | 6   | Interface / Routing 設計    | 未着手     |            | Formatter I/F は D1 / D6 の決定に依存                                 |
 | 7   | Content / Data 設計         | 未着手     |            | JSON schema は D3 の決定に依存                                        |
 | 8   | Performance / Security 設計 | 未着手     |            |                                                                       |
@@ -128,40 +128,97 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                                                                  | 決定候補                                                                                                                                                                                                           | 決定 |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
-| D1  | Output が表示する symbol 情報 (`qualifiedName` / `signature` / `sourceLocation`) の受け渡し経路。現行 `graph.Node` は `methodId` のみ持つ             | (a) `graph.Node` に `MethodSymbol` payload を持たせ Output は Graph から引く / (b) Output に symbol table (`map[methodId]MethodSymbol`) を別入力で渡す / (c) methodId のみ表示し symbol は出さない                 | 未決 |
-| D2  | **Q3**: Console ツリー表現。到達集合 (非 tree) から tree を組む際の、深さ表示・循環参照・`depthLimit` cutoff・合流 (同一 node 複数経路) の見せ方      | 罫線ツリー (`├─`/`└─`) + 深さ / 合流 node の再掲 vs 参照印 (`(既出)`) / 循環 edge の `(cycle)` 標識 / cutoff の `... (depth limit)` 標識。tree の根と枝の決定規則 (どの edge を親子とするか) も含む                | 未決 |
-| D3  | JSON 出力スキーマと版管理。フィールド構成、`schemaVersion` の採番系 (Analyzer Protocol の `schemaVersion` と同一系統か独立か)、後方互換方針、要素順序 | フィールド案: `schemaVersion` / `status` / `start` / `direction` / `nodes[]` / `edges[]` (`cycle` flag) / `depthCutoffs[]`。順序は methodId / edgeId の辞書順に固定。版は Protocol と独立の output schema 版とする | 未決 |
-| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                | (a) 共通 Formatter interface のみ定め、DOT / Mermaid の構文詳細は Phase4 spec へ送る / (b) 構文まで本 spec で確定する                                                                                              | 未決 |
-| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)               | `startNotFound` と空グラフは**正常系**として各形式で表現、未対応 format は Output API の呼び出し前 validation エラー。exit code は CLI spec                                                                        | 未決 |
-| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                      | `Format(w io.Writer, r traversal.Result, opts) error` 相当の interface + format ごとの実装。全件メモリ構築か逐次書き出しか                                                                                         | 未決 |
-| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                              | unit: 各 formatter の出力を golden 比較 / E2E: 生成した JSON を `encoding/json` で、DOT / Mermaid を構文パースで検証。golden の置き場所は `testdata/`                                                              | 未決 |
+| #   | 論点                                                                                                                                                   | 決定候補                                                                                                                                                                                                           | 決定         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| D1  | Output が表示する symbol 情報 (`qualifiedName` / `signature` / `sourceLocation` / `callSite`) の受け渡し経路。現行 `graph.Node` は `methodId` のみ持つ | (a) `graph` に固有の値型で保持し Output は Graph から引く / (b) `graph.Node` に `protocol.MethodSymbol` (wire DTO) をそのまま埋める / (c) methodId のみ表示                                                        | **決定 (a)** |
+| D2  | **Q3**: Console ツリー表現。到達集合 (非 tree) から tree を組む際の、深さ表示・循環参照・`depthLimit` cutoff・合流 (同一 node 複数経路) の見せ方       | 罫線ツリー + **初出のみ展開** (`(既出)` 参照印) / 循環は `(cycle)` で打ち切り / cutoff は `… (depth limit: N)` / 深さラベルなし / 子行は `callSite`、root は宣言位置                                               | **決定**     |
+| D3  | JSON 出力スキーマと版管理。フィールド構成、`schemaVersion` の採番系 (Analyzer Protocol の `schemaVersion` と同一系統か独立か)、後方互換方針、要素順序  | フィールド案: `schemaVersion` / `status` / `start` / `direction` / `nodes[]` / `edges[]` (`cycle` flag) / `depthCutoffs[]`。順序は methodId / edgeId の辞書順に固定。版は Protocol と独立の output schema 版とする | 未決         |
+| D4  | DOT / Mermaid の I/F 方針 (Phase4 実装)。Formatter をどう抽象化し、`cycle` / cutoff / 起点をどう図示するか。本 spec でどこまで決めるか                 | (a) 共通 Formatter interface のみ定め、DOT / Mermaid の構文詳細は Phase4 spec へ送る / (b) 構文まで本 spec で確定する                                                                                              | 未決         |
+| D5  | 空グラフ / `startNotFound` / 未対応 format の扱いと、Output Engine とエラーの境界 (どこまでを戻り値のエラーとし、どこから CLI の責務か)                | `startNotFound` と空グラフは**正常系**として各形式で表現、未対応 format は Output API の呼び出し前 validation エラー。exit code は CLI spec                                                                        | 未決         |
+| D6  | Formatter の Go interface 形状と出力先。大規模グラフでの streaming / バッファリング方針 (非機能: 実用時間で出力)                                       | `Format(w io.Writer, r traversal.Result, opts) error` 相当の interface + format ごとの実装。全件メモリ構築か逐次書き出しか                                                                                         | 未決         |
+| D7  | テストの検証境界。golden file test を導入するか、S3 の「パース可否」照合をどの層で行うか (`context/testing.md` との整合)                               | unit: 各 formatter の出力を golden 比較 / E2E: 生成した JSON を `encoding/json` で、DOT / Mermaid を構文パースで検証。golden の置き場所は `testdata/`                                                              | 未決         |
 
 ## 解決済みの論点
 
 (phase: clarify で確定したものをここに移動する)
 
-- (なし)
+### D1: symbol 情報は Graph が保持し、Output は Graph から引く (2026-07-11 決定)
+
+**決定**: `graph` package に表示用の値型を持たせる。`graph.Node` は `ID` (Analyzer の `methodId`) に加えて `Symbol` (`QualifiedName` / `Signature` / `Source`) を保持し、`graph.Edge` は `CallSite` を保持する。`protocol` の wire record から graph の値型への変換は、graph 構築時 (Analyze Use Case 層) に 1 回だけ行う。Output Engine は Graph の読み取り API から symbol を引く。
+
+**理由**:
+
+- `methodId` は Analyzer が決定的に生成する **不透明な stable ID** であり、人間可読な名前である保証も Analyzer version をまたぐ永続性もない ([analyzer-protocol feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) の `methodId` 定義)。したがって Console / JSON が `methodId` のみを出す案 (c) は成立しない。
+- 依存方向が `Output Engine → Graph Engine → Model` となり、[Design Doc モジュール責務](../../design/DesignDoc.md) および [context/architecture.md](../../context/architecture.md) の Package Boundary と一致する。Graph Engine の責務 (Node 管理 / Edge 管理) の範囲内に収まる。
+- symbol table を別入力で渡す案 (b) は、「table が到達 node 集合を漏れなく覆っていること」という**暗黙の不変条件**を新設し、graph と table の 2 つを同期させる必要が生じる。node 属性は node と同じ場所に置くほうが不変条件が 1 つ減る。
+- wire DTO をそのまま埋める案 (b') は変換コストがゼロな一方、`schemaVersion` / `recordType` という wire 専用フィールドを Core の graph model に持ち込む。graph 固有の値型にすることでこれを避ける。
+
+**派生する詳細**:
+
+- `SourceLocation` は `protocol` package の型を再利用する。この型は `path` / `startLine` 等の純粋な値のみで wire 専用フィールドを持たないため、再利用しても本決定の理由 (wire 表現を core domain に入れない) に反しない。依存方向も `Graph Engine → Model` の範囲内。
+- 本決定により Graph Engine (`core/internal/graph`) への差分が確定するため、実装対象の `core` は条件付きではなく確定 ◯ になる。
+- edge の `callSite` を Console / JSON でどう見せるかは D2 / D3 で決める (保持することのみ本決定で確定)。
+
+### D2 (= Design Doc Open Question Q3): Console ツリー表現 (2026-07-11 決定)
+
+**決定**: 罫線ツリーで、**初出の node のみ部分木を展開する**。再登場した node は葉として `(既出)` を付け、展開しない。循環は `(cycle)` で打ち切り、深さ上限で切られた枝は `… (depth limit: N)` で「続きがある」ことを明示する。深さラベル (`[d2]` 等) は付けない。
+
+Traversal result は tree ではなく集合 (到達 node 集合 + 誘導 edge 集合) であるため、**tree 化の規則を Output 側の仕様として定義する** ([traversal feature doc](../../design/features/traversal/DesignDoc_traversal.md): 「tree 構築は Output 側で行う」)。
+
+#### tree 構築規則
+
+1. **root** = 起点 node。
+2. **子** = 誘導 edge 集合 (`Result.Edges`) を探索方向に辿った先の node。caller 方向なら子は「呼び出し元」、callee 方向なら子は「呼び出し先」。
+3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順。到達集合は順序非保証のため、この並び順の固定が出力の決定性を担保する。
+4. **展開順序** = 上記順序に従った pre-order DFS。展開順が決定的なので、どの出現が「初出」かも決定的になる。
+5. **初出のみ展開** = ある node の部分木を展開するのは、tree 中で最初に出現したときの 1 回のみ。2 回目以降の出現は `(既出)` を付けた葉にする。これにより出力行数は **O(到達 edge 数)** に収まり、合流 (ダイヤモンド構造) で指数的に膨らまない。
+6. **`(cycle)`** = `Result.Cycles` に注釈された edge の先。閉路を構成する edge の先端は必ず既出 node になるため、`(既出)` ではなく `(cycle)` を優先して表示し、展開しない。
+7. **`… (depth limit: N)`** = `Result.DepthCutoffs` に記録された edge を持つ node の子として 1 行出す。N はその node からの cutoff edge 数。cutoff 先の node は到達集合外なので名前は出さない。
+
+#### 行の書式
+
+- **node ラベル** = `qualifiedName` + `signature`。
+- **位置情報**: 子行は **`edge.CallSite`** (= その呼び出しを行っている行) を出す。tree の各子行は edge を表すため、影響調査で「どこで呼んでいるか」に直接飛べることを優先する。root は edge を持たないため、node の宣言位置 (`Symbol.Source`) を出す。位置が欠落している場合 (`callSite` / `sourceLocation` は Protocol 上 optional) は位置表記を省略する。
+- メソッド自体の宣言位置は Console では出さない (JSON には node / edge の両方を含める → D3)。
+
+```text
+UserService.findById(Long)  [UserService.java:42]
+├─ UserController.getUser(Long)  [UserController.java:31]
+│  └─ ApiFilter.doFilter()  [ApiFilter.java:20]
+├─ AdminController.getUser(Long)  [AdminController.java:18]
+│  └─ ApiFilter.doFilter()  (既出)
+├─ UserBatch.execute()  [UserBatch.java:55]
+│  └─ … (depth limit: 2)
+└─ CacheWarmer.warm()  [CacheWarmer.java:8]
+   └─ UserService.findById(Long)  (cycle)
+```
+
+**理由**:
+
+- 呼び出しグラフでは共有メソッド (Filter / Util / Repository 等) が多数の経路から到達する。経路ごとにフル展開する案は「その経路を辿るとこうなる」が完全に見える一方、実コードのダイヤモンド構造で出力が指数的に膨らみ、Console として実用にならない。初出のみ展開なら出力サイズの上限が到達 edge 数で読める。
+- `(既出)` の node は tree の別の場所に必ず完全な部分木があるため、情報は失われない (参照先を辿れば読める)。
+- 深さラベルはインデントと冗長であり、行を長くする割に得られる情報が少ないため付けない。深さ情報が必要な用途 (機械処理) は JSON 側が担う。
+
+**空グラフ / 起点不在 (`startNotFound`) の Console 表現は D5 で決める。**
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1-D7 がすべて未決。**決定者: Fukuemon / 期限: Phase1 設計時 (本 spec の phase: clarify)**。phase: clarify で 1 件ずつ確定する (D2 = Design Doc Open Question Q3 の管理を引き継ぐ。`requirements.md` の Q3 と決定者 / 期限を揃える)。
+- D3-D7 が未決 (D1 / D2 は 2026-07-11 に解決済み)。**決定者: Fukuemon / 期限: Phase1 設計時 (本 spec の phase: clarify)**。phase: clarify で 1 件ずつ確定する (D2 = Design Doc Open Question Q3 の管理を引き継ぐ。`requirements.md` の Q3 と決定者 / 期限を揃える)。
 - CLI interface spec が未起票のため、`--format` の引数名・exit code・エラー出力先 (stdout / stderr) は本 spec では確定できない。本 spec は Output Engine の戻り値までを責務境界とし、CLI 側の契約は当該 spec に委ねる (D5 で境界を明文化する)。
 
 ## 実装対象
 
 正規 target は `context/project.md` の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                                                              |
-| ------------------- | :------: | ----------------------------------------------------------------------------------------------------- |
-| `output`            |    ◯     | Console / JSON / DOT / Mermaid formatter (`core/internal/output`)。本 spec の主対象                   |
-| `core`              |    ◯     | D1 が graph model 拡張を選ぶ場合のみ `core/internal/graph` に symbol payload を追加 (D1 の決定に従属) |
-| `traversal`         |    -     | 入力元。#6 で確定済み。本 spec では変更しない                                                         |
-| `analyzer-protocol` |    -     | Model schema の正本。#8 で確定済み。本 spec では再定義しない                                          |
-| `java-analyzer`     |    -     | 非該当                                                                                                |
+| モジュール          | 実装有無 | 主な責務                                                                                                                    |
+| ------------------- | :------: | --------------------------------------------------------------------------------------------------------------------------- |
+| `output`            |    ◯     | Console / JSON / DOT / Mermaid formatter (`core/internal/output`)。本 spec の主対象                                         |
+| `core`              |    ◯     | `core/internal/graph` に symbol 値型を追加 (`Node.Symbol` / `Edge.CallSite`) と、graph 構築時の wire → 値型変換 (D1 で確定) |
+| `traversal`         |    -     | 入力元。#6 で確定済み。本 spec では変更しない                                                                               |
+| `analyzer-protocol` |    -     | Model schema の正本。#8 で確定済み。本 spec では再定義しない                                                                |
+| `java-analyzer`     |    -     | 非該当                                                                                                                      |
 
 ## 機能仕様
 
@@ -201,22 +258,54 @@ EARS 風で振る舞いを記述する。
 - 横断規約は [context/testing.md](../../context/testing.md)。詳細な検証境界は D7 で確定する。
 - unit: 各 formatter が Traversal result (循環あり / 合流あり / cutoff あり / 空 / `startNotFound`) から期待どおりの出力を生成すること。
 - E2E: 生成物が各形式としてパース可能であること (S3 の測定方法)。
+- Console (D2 で確定した規則の検証観点):
+  - 合流 (ダイヤモンド) graph で、共有 node の部分木が展開されるのは 1 回だけで、2 回目以降が `(既出)` の葉になること (出力行数が到達 edge 数に対して線形に収まること)。
+  - 循環 (self-loop / 相互再帰) を含む graph で無限展開せず、閉路を構成する edge の先が `(cycle)` で打ち切られること。
+  - `depthLimit` cutoff を持つ node の下に `… (depth limit: N)` が出て、N が当該 node からの cutoff edge 数に一致すること。
+  - 兄弟の並び順が `qualifiedName` → `signature` → `methodId` の辞書順で固定され、同一 Result から常に同一のバイト列が得られること (到達集合の map 順序に依存しないこと)。
+  - 子行に `callSite`、root に宣言位置が出ること。位置が欠落している場合に位置表記を省略しても破綻しないこと。
 
 ## Interface 設計
 
 ### UI / API / Event Interface
 
-- (phase: clarify の D1 / D5 / D6 決定後に確定)
+- Output Engine の入力は **Graph と Traversal result の 2 つ**に確定 (D1)。symbol は Graph の読み取り API から引くため、symbol table を第 3 引数として渡さない。
+- Formatter の interface 形状 (シグネチャ / 出力先 / options) は D6 で確定する。format の受け付けと未対応 format の扱いは D5 で確定する。
+- **Console 出力**: 罫線ツリー / 初出のみ展開 / `(既出)` / `(cycle)` / `… (depth limit: N)` / 子行は `callSite`、root は宣言位置 (D2 で確定。tree 構築規則と書式の詳細は `## 解決済みの論点 > D2`)。
+- Console の tree 化は Output Engine 内に閉じる。Traversal は tree を保持しないため、tree 構築を Traversal 側へ押し戻さない。
 
 ### Props / Request / Response
 
-- (同上)
+- Graph が保持する表示用の値型 (D1 で確定):
+
+  ```go
+  // core/internal/graph
+  type Node struct {
+      ID     string // Analyzer の methodId (不透明な stable ID)
+      Symbol Symbol
+  }
+
+  type Symbol struct {
+      QualifiedName string
+      Signature     string
+      Source        *protocol.SourceLocation
+  }
+
+  type Edge struct {
+      ID       string
+      CallerID string
+      CalleeID string
+      CallSite *protocol.SourceLocation
+  }
+  ```
+
+- `protocol.MethodSymbol` / `protocol.CallEdge` (wire record) から上記値型への変換は graph 構築時に 1 回だけ行い、wire 専用フィールド (`schemaVersion` / `recordType`) は Core の graph model に持ち込まない。
 
 ## Content / Data 設計
 
 ### 保存・管理するデータ
 
-- Output Engine は状態を持たない (`State Boundary`: 中間状態は Core プロセス内、永続ストアなし)。
+- Output Engine は状態を持たない (`State Boundary`: 中間状態は Core プロセス内、永続ストアなし)。表示に要する属性は Graph が保持する (D1)。
 - JSON 出力のスキーマと `schemaVersion` は D3 で確定する。
 
 ### コンテンツ配置 / package / route
@@ -238,13 +327,13 @@ EARS 風で振る舞いを記述する。
 
 ### エラーケース
 
-| #   | ケース                               | ユーザーへの見せ方                               | リカバリ                         |
-| --- | ------------------------------------ | ------------------------------------------------ | -------------------------------- |
-| E1  | 循環参照を含むグラフ                 | Console で循環箇所を標識、JSON で `cycle` を表現 | 正常系。無限ループさせない (D2)  |
-| E2  | 空グラフ / 起点のみ (edge が空)      | 各形式で空グラフを明示                           | 正常系 (D5)                      |
-| E3  | 起点不在 (`status = startNotFound`)  | 各形式で「該当なし」を明示                       | 正常系。エラーにしない (D5)      |
-| E4  | 未対応 format 指定                   | 対応形式を案内するエラーを返す                   | 出力前に拒否 (V1 / D5)           |
-| E5  | 出力先への書き込み失敗 (`io.Writer`) | 呼び出し側へエラーを返す                         | CLI 側で報告 (D5 で境界を明文化) |
+| #   | ケース                               | ユーザーへの見せ方                                                                 | リカバリ                             |
+| --- | ------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ |
+| E1  | 循環参照を含むグラフ                 | Console は閉路の先を `(cycle)` で打ち切り表示、JSON は edge に `cycle` を表現 (D3) | 正常系。無限展開させない (D2 で確定) |
+| E2  | 空グラフ / 起点のみ (edge が空)      | 各形式で空グラフを明示                                                             | 正常系 (D5)                          |
+| E3  | 起点不在 (`status = startNotFound`)  | 各形式で「該当なし」を明示                                                         | 正常系。エラーにしない (D5)          |
+| E4  | 未対応 format 指定                   | 対応形式を案内するエラーを返す                                                     | 出力前に拒否 (V1 / D5)               |
+| E5  | 出力先への書き込み失敗 (`io.Writer`) | 呼び出し側へエラーを返す                                                           | CLI 側で報告 (D5 で境界を明文化)     |
 
 ### Fallback
 
@@ -302,10 +391,10 @@ sequenceDiagram
 
 ### Design Doc への影響
 
-| 対象節                         | 変更内容                                                                                | 理由                    |
-| ------------------------------ | --------------------------------------------------------------------------------------- | ----------------------- |
-| Open Questions Q3              | (予定) D2 の決定を受けて「解決済み」へ更新し、feature doc を正本として参照させる        | Q3 は本 feature が正本  |
-| 詳細の所在 / Feature 設計 一覧 | (予定) 「出力形式 (Console/JSON/DOT/Mermaid)」行に新規 feature doc を紐付け、状態を更新 | 現在「未作成 / 未着手」 |
+| 対象節                         | 変更内容                                                                                      | 理由                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Open Questions Q3              | (予定) 「解決済み」へ更新し、feature doc を正本として参照させる <!-- source: clarify (D2) --> | Q3 は本 feature が正本。D2 で決定済み |
+| 詳細の所在 / Feature 設計 一覧 | (予定) 「出力形式 (Console/JSON/DOT/Mermaid)」行に新規 feature doc を紐付け、状態を更新       | 現在「未作成 / 未着手」               |
 
 ### feature doc への影響
 
@@ -315,16 +404,16 @@ sequenceDiagram
 
 ### context への影響
 
-| 対象 doc / 節                              | 変更内容                                                                           | 理由            |
-| ------------------------------------------ | ---------------------------------------------------------------------------------- | --------------- |
-| `context/architecture.md` Package Boundary | (D1 次第) `graph.Node` が symbol payload を持つ場合、Graph Engine の責務記述を補足 | D1 の決定に従属 |
-| `context/testing.md`                       | (D7 次第) golden file test を導入する場合、test 方針へ追記                         | D7 の決定に従属 |
+| 対象 doc / 節                              | 変更内容                                                                                                                                                              | 理由                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `context/architecture.md` Package Boundary | (予定) Graph Engine が node / edge の表示用属性 (`Symbol` / `CallSite`) を保持し、wire record → 値型の変換を graph 構築時に行う旨を補足 <!-- source: clarify (D1) --> | D1 で確定。依存方向 (Graph Engine → Model) 自体は不変 |
+| `context/testing.md`                       | (D7 次第) golden file test を導入する場合、test 方針へ追記                                                                                                            | D7 の決定に従属                                       |
 
 ### ADR の新規 / 更新
 
-| ADR ID | 変更内容                        | 理由                                                                                                          |
-| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| (なし) | 現時点では新規 ADR 不要の見込み | 既存の Core package 境界 (ADR-0002) / Protocol 判断 (ADR-0001) の範囲内。D1 / D3 が長期判断を伴う場合は再判定 |
+| ADR ID | 変更内容                | 理由                                                                                                                                                                                     |
+| ------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (なし) | 現時点では新規 ADR 不要 | D1 は既存の Core package 境界 (ADR-0002) / Protocol 判断 (ADR-0001) の範囲内に収まり、依存方向を変えないため ADR 不要と判定。D3 が長期判断 (出力 schema の版管理方針) を伴う場合は再判定 |
 
 ## レビュー
 
@@ -340,6 +429,8 @@ sequenceDiagram
 | ---------- | -------- | --------------------------------------------------------------------- |
 | 2026-07-11 | Fukuemon | phase: scaffold で初版作成 (上位文書突合 + D1-D7 列挙)                |
 | 2026-07-11 | Fukuemon | scaffold gate の spec-review で PASS。未確定事項に決定者 / 期限を追記 |
+| 2026-07-11 | Fukuemon | phase: clarify で D1 (symbol 情報の受け渡し経路) を決定               |
+| 2026-07-11 | Fukuemon | phase: clarify で D2 (= Design Doc Q3。Console ツリー表現) を決定     |
 
 ## 備考
 
