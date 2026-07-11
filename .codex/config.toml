@@ -1,5 +1,3 @@
-default_permissions = "rulesync"
-
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
@@ -15,9 +13,6 @@ url = "https://mcp.deepwiki.com/mcp"
 
 [features]
 hooks = true
-
-[permissions.rulesync.filesystem]
-":minimal" = "read"
 
 [permissions.rulesync.network]
 enabled = true
