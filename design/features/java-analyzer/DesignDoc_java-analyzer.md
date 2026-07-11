@@ -172,6 +172,15 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - **AST の逐次破棄**: 解析済みファイルの AST を保持し続けない。保持するのは SymbolSolver の型解決キャッシュと、`callEdge` 出力に必要な最小限の情報に限る。
 - **計測の観測性**: 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol record としては出さない)。
 - **数値目標**: 未定。Phase1 実装時に fixture プロジェクトの実測値 (ファイル数 / 所要時間 / 最大 RSS) を baseline として記録し、その後に本 doc へ確定値を記録する。現時点は方式のみを Phase1 の必須仕様として確定し、数値目標は実測 baseline 取得後に本 doc へ追記する。
+- **baseline 実測値 (計測日 2026-07-12)**: `testdata/fixtures/java/project` (Java ソース 10 ファイル、うち 1 ファイルは意図的にパース不能) を `core/e2e` (`TestJavaAnalyzerFixtureE2E/PerformanceBaseline`) から実 jar (`analyzers/java/build/libs/java-analyzer.jar`, JDK 25 / Eclipse Temurin 25.0.3+9, Apple Silicon darwin/arm64) で解析した実測値。
+
+  | 指標           | 実測値                                      | 取得元                                                                      |
+  | -------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+  | 解析ファイル数 | 10                                          | Analyzer stderr (`analyzedFiles=10`)                                        |
+  | 所要時間       | 約 500ms (500〜521ms、複数回実行のばらつき) | Analyzer stderr (`durationMs=...`)                                          |
+  | 最大 RSS       | 約 128,008,192 bytes (約 122 MiB)           | `os.ProcessState.SysUsage()` (`syscall.Rusage.Maxrss`, darwin は byte 単位) |
+
+  fixture 規模が小さい (10 ファイル) ため JVM 起動コストの寄与が大きく、この baseline は「小規模プロジェクトでの下限に近い値」として扱う。数値目標 (SLO) の確定は本 baseline を踏まえた別作業とする。
 
 ### 帰属型の決定規則
 
