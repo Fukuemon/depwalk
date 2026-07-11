@@ -129,24 +129,95 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                         | 決定候補                                                                                                                                                                                                                                           | 決定 |
-| --- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| D1  | Java Analyzer の build tool / JDK version / 配布形態                                                         | A) Gradle + shadow (fat) jar / B) Maven + shade plugin。JDK は 17 LTS / 21 LTS                                                                                                                                                                     | 未決 |
-| D2  | Core が Analyzer をどう発見・起動するか (実行コマンドの解決)                                                 | A) CLI flag で jar path 指定 / B) 環境変数 / C) `java -jar` 固定 + 既定 path / D) Core に同梱                                                                                                                                                      | 未決 |
-| D3  | SymbolSolver の型解決範囲 (source root のみか、依存 jar を classpath に含めるか)                             | A) source root のみ (JDK 標準型は解決) / B) 依存 jar を classpath 指定で受け取る / C) build tool から自動解決                                                                                                                                      | 未決 |
-| D4  | Phase1 で対応する `analysisMode` の範囲                                                                      | A) `fullGraph` のみ / B) `fullGraph` + `reachableFromEntrypoints` 両方                                                                                                                                                                             | 未決 |
-| D5  | `methodId` / `signature` の正規化規則 (generics / varargs / inner class / lambda / 匿名クラス)               | 完全修飾名 + erasure ベースの parameter type list。lambda / 匿名クラスの命名規則を決める                                                                                                                                                           | 未決 |
-| D6  | Phase1 で node 化する `symbolKind` の範囲                                                                    | A) `method` / `constructor` のみ / B) `initializer` も含める / C) lambda も含める (※ protocol の `symbolKind` enum は `method` / `constructor` / `function` / `initializer` のみ。lambda を独立 node にするなら契約変更 = major bump の判断が要る) | 未決 |
-| D7  | interface / 抽象メソッド呼び出しの Phase1 での扱い (宣言型のメソッドを callee にするか、diagnostic にするか) | A) 宣言型のメソッドを callee として edge を張る / B) 未解決 `diagnostic` にする / C) 両方 (metadata で dispatch 種別を標識)                                                                                                                        | 未決 |
-| D8  | `diagnostic.code` 体系と、未解決/部分解析の分類粒度                                                          | prefix 付き code (例: `JAVA_UNRESOLVED_SYMBOL`) と severity の対応表を定める                                                                                                                                                                       | 未決 |
-| D9  | 大規模プロジェクトの性能 / メモリ方針 (streaming 出力、目標値)                                               | record を逐次 flush する streaming 出力。目標値 (対象規模 / 実行時間) を定める                                                                                                                                                                     | 未決 |
-| D10 | テスト戦略 (Java 側 fixture プロジェクト、contract test の実行方式、CI に JVM を要求するか)                  | A) Java 側 unit test + Go 側 contract test を fixture jar 経由で結合 / B) Java 側で contract test を完結                                                                                                                                           | 未決 |
+| #   | 論点                                                                                                         | 決定候補                                                                                                                                                                                                                                           | 決定     |
+| --- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| D1  | ~~Java Analyzer の build tool / JDK version / 配布形態~~                                                     | (解決済み → `## 解決済みの論点` D1)                                                                                                                                                                                                                | 解決済み |
+| D2  | ~~Core が Analyzer をどう発見・起動するか (実行コマンドの解決)~~                                             | (解決済み → `## 解決済みの論点` D2)                                                                                                                                                                                                                | 解決済み |
+| D3  | ~~SymbolSolver の型解決範囲 (source root のみか、依存 jar を classpath に含めるか)~~                         | (解決済み → `## 解決済みの論点` D3)                                                                                                                                                                                                                | 解決済み |
+| D4  | ~~Phase1 で対応する `analysisMode` の範囲~~                                                                  | (解決済み → `## 解決済みの論点` D4)                                                                                                                                                                                                                | 解決済み |
+| D5  | ~~`methodId` / `signature` の正規化規則~~                                                                    | (解決済み → `## 解決済みの論点` D5。lambda / 匿名クラスの命名は D6 の結果に従って拡張する)                                                                                                                                                         | 解決済み |
+| D6  | Phase1 で node 化する `symbolKind` の範囲                                                                    | A) `method` / `constructor` のみ / B) `initializer` も含める / C) lambda も含める (※ protocol の `symbolKind` enum は `method` / `constructor` / `function` / `initializer` のみ。lambda を独立 node にするなら契約変更 = major bump の判断が要る) | 未決     |
+| D7  | interface / 抽象メソッド呼び出しの Phase1 での扱い (宣言型のメソッドを callee にするか、diagnostic にするか) | A) 宣言型のメソッドを callee として edge を張る / B) 未解決 `diagnostic` にする / C) 両方 (metadata で dispatch 種別を標識)                                                                                                                        | 未決     |
+| D8  | `diagnostic.code` 体系と、未解決/部分解析の分類粒度                                                          | prefix 付き code (例: `JAVA_UNRESOLVED_SYMBOL`) と severity の対応表を定める                                                                                                                                                                       | 未決     |
+| D9  | 大規模プロジェクトの性能 / メモリ方針 (streaming 出力、目標値)                                               | record を逐次 flush する streaming 出力。目標値 (対象規模 / 実行時間) を定める                                                                                                                                                                     | 未決     |
+| D10 | テスト戦略 (Java 側 fixture プロジェクト、contract test の実行方式、CI に JVM を要求するか)                  | A) Java 側 unit test + Go 側 contract test を fixture jar 経由で結合 / B) Java 側で contract test を完結                                                                                                                                           | 未決     |
 
 ## 解決済みの論点
 
-(phase: clarify で確定したものをここに移動する)
+### D1: build tool / JDK version / 配布形態 (2026-07-11 決定)
 
--
+- **build tool: Gradle (Kotlin DSL)**。`gradlew` wrapper を同梱し、CI に Gradle 本体の事前インストールを要求しない。将来 Kotlin Analyzer を追加するときにも同じ build 基盤を使える。
+- **JDK: 25 LTS** (Analyzer process の runtime)。Gradle toolchain で JDK 25 を固定する。これは Analyzer 自身が動く JVM の version であり、解析対象ソースの言語レベルとは独立して扱う (JavaParser は自身の runtime より新しい言語レベルも parse できる)。
+- **配布形態: 単一 fat jar** (Gradle Shadow plugin)。Core は `java -jar <path>` の 1 コマンドで起動でき、D2 の起動契約を最も単純にできる。
+
+**留意点 (Phase3 で確認)**: SootUp の bytecode frontend が最新の class file version に追随しているかは、Phase3 で SootUp を統合するときに確認する。Phase1 は JavaParser の source ベース解析のみのため、Phase1 のリスクにはならない。
+
+**波及**: `context/toolchain.md` の標準スタック (Java Analyzer 行) を確定値に更新し、`context/project.md` の Quick Commands に Java の build / test コマンドを追加する (phase: sync)。CI に JDK 25 を要求する。
+
+### D2: Analyzer 起動コマンドの解決 (2026-07-11 決定)
+
+**CLI flag を第一とし、環境変数を fallback とする言語非依存の解決順序**を Core に持たせる。
+
+- 解決順序: ① CLI flag (例: `--analyzer-cmd "java -jar /path/analyzer.jar"`) → ② 環境変数 (例: `DEPWALK_ANALYZER_CMD`) → ③ どちらも無ければ実行前に validation error で拒否する。
+- Core は受け取った文字列を exec するだけで、`java` / jar / JVM の存在を知らない。言語固有の分岐と path 解決規約を Core に持ち込まないことで S5 (2 つ目以降の Analyzer 追加時に Core 無変更) を担保する。
+- 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入せず、後続の CLI interface spec で必要になった時点で ③ の前段として足せる形にしておく。
+- flag / 環境変数の正式名称と CLI 引数の完全仕様は後続の CLI interface spec が正本。本 spec は「flag 主 + 環境変数 fallback」という解決順序を確定する。
+
+**利点**: E2E / contract test で fake analyzer (任意の実行可能ファイル) に差し替えられるため、JVM を持たない環境でも Core 側のテストが回る (D10 に影響)。
+
+**波及**: `context/project.md` の Quick Commands に最小 `depwalk analyze` の起動例を記入する (source: clarify / D1・D2)。
+
+### D3: SymbolSolver の型解決範囲 (2026-07-11 決定)
+
+**依存 jar の classpath を必須入力とする。** classpath なしでの解析は許可しない。
+
+- TypeSolver 構成: `ReflectionTypeSolver` (JDK 標準型) + `JavaParserTypeSolver` (対象プロジェクトの source root) + `JarTypeSolver` (依存 jar)。
+- 理由: プロジェクト内のメソッド呼び出しであっても、レシーバの型を知るために library 型が必要になる (例: Spring Data の `JpaRepository` を継承した interface、`Optional` / `Stream` チェーン、library 由来の generics)。classpath を欠くと未解決 `diagnostic` が多発し、S1 / S2 (網羅性) が実用レベルに届かない。必須にすることで解析精度が常に一定になる。
+- **classpath の受け渡し**: `analysisRequest.metadata` に載せる (protocol の `metadata` は「言語固有または Analyzer 固有の hint。Core の共通処理は依存しない」と定義済みのため契約変更は不要)。Core 側は言語固有の flag (`--java-classpath` 等) を持たず、**汎用の passthrough flag** (例: `--analyzer-metadata key=value`) で metadata へ素通しする。意味づけを知るのは Analyzer だけであり、S5 を守る。
+- **必須性の検査場所**: Core は言語非依存で「Java には classpath が要る」ことを知らないため、検査は **Analyzer 側**で行う。classpath が metadata に無い場合、Analyzer は protocol の `error` record を出力し非ゼロ exit code で終了する (既存の process contract のまま成立する)。
+- classpath の生成 (`./gradlew dependencies` 等) は利用者 / CI の責務とする。Analyzer が対象プロジェクトの build tool を叩いて自動取得する案は、対象を read-only に保つ原則 (`context/architecture.md` State Boundary) と衝突し、build 失敗が解析失敗に直結するため Phase1 では採らない。将来必要になれば別 spec で扱う。
+
+**波及**:
+
+- 要求定義のバリデーション方針 V1 (「対象パスに Java/Spring ソースが存在すること」) に classpath 必須を追加する。
+- テスト fixture (サンプル Java/Spring プロジェクト) にも classpath の準備が必要になる (D10 で実行方式を決める)。
+- Core の CLI に汎用 metadata passthrough flag が必要 (実装対象 `core` の初回配線に含める)。
+
+### D4: Phase1 で対応する `analysisMode` の範囲 (2026-07-11 決定)
+
+**`fullGraph` と `reachableFromEntrypoints` の両方を Phase1 で実装する。**
+
+protocol は 2 モードの名前と既定値 (未指定時は `fullGraph`) しか定義していないため、Java Analyzer 側の意味論を本 spec で確定する:
+
+| モード                     | 出力範囲                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `fullGraph`                | scope (`include` / `exclude` 適用後) 内の全 `methodSymbol` と、その間の全 `callEdge`                              |
+| `reachableFromEntrypoints` | `entrypoints` から **呼び出し先 (callee) 方向に推移的に到達する** `methodSymbol` と、それらの間の `callEdge` のみ |
+
+- `entrypoints` が未指定または空配列の場合は、`analysisMode` の値によらず scope 全体の call graph 生成要求として扱う (protocol の既定義に従う)。
+- **caller 探索 (S1) との関係**: `reachableFromEntrypoints` で得たグラフは呼び出し先方向にしか広がらないため、caller 探索の入力としては不完全になる。したがって **caller 方向の問い合わせでは Core が `fullGraph` を選ぶ**責務を持つ。`reachableFromEntrypoints` は callee 方向の調査で大規模リポジトリの出力量を削るための最適化と位置づける。
+- モード選択の CLI 上の露出 (利用者が明示指定できるか、Core が問い合わせ方向から自動選択するか) は後続の CLI interface spec が正本。本 spec では Analyzer が両モードを実装することと、上記の意味論を確定する。
+
+### D5: `methodId` / `signature` の正規化規則 (2026-07-11 決定)
+
+**型表記は erasure + JVM binary name、`methodId` は可読な文字列そのものとする。**
+
+| 項目            | 規則                                                                         | 例                                                      |
+| --------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 型名            | JVM binary name (nested class は `$` 区切り)                                 | `com.example.Outer$Inner`                               |
+| generics        | erasure で消去する (型引数を保持しない)                                      | `List<String>` → `java.util.List`                       |
+| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                    | `String...` → `java.lang.String[]`                      |
+| `signature`     | `<宣言型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` | `com.example.UserService#findById(java.lang.Long)`      |
+| `qualifiedName` | 表示・debug 用の完全修飾名 (protocol の定義どおり)                           | `com.example.UserService.findById`                      |
+| `methodId`      | `java:` prefix + `signature` (hash しない)                                   | `java:com.example.UserService#findById(java.lang.Long)` |
+
+**根拠**:
+
+- Java の overload 解決は erasure ベースであり、erasure が同一の overload は言語仕様上コンパイルできない。したがって erasure だけで overload の区別に十分で、generics を保持しても一意性は増えない。
+- source 表記 (`com.example.Outer.Inner`) は package 区切りと nested 区切りを区別できない。binary name はこの曖昧さがなく、Phase3 で統合する SootUp の型表記とも揃う。
+- `methodId` を hash しないのは、protocol が JSONL を選んだ理由の一つ「デバッグ容易 (テキストで観測可能)」と一貫させるため。JSONL のサイズは増えるが、test 失敗時の出力と JSONL の目視追跡が可能になる利点を優先する。決定性は文字列生成規則が決定的であることで満たす。
+
+**未確定 (D6 に従属)**: lambda / 匿名クラスを node 化するかは D6 で決める。node 化する場合、その命名規則を本規則の拡張として D6 の決定時に確定する。
 
 ## 未確定事項
 
@@ -231,12 +302,14 @@ EARS 風で振る舞いを記述する。
 
 ### エラーケース
 
-| #   | ケース                          | ユーザーへの見せ方              | リカバリ                         |
-| --- | ------------------------------- | ------------------------------- | -------------------------------- |
-| 1   | 型解決できないシンボル          | `diagnostic` で未解決を報告     | 解析継続 (部分結果を返す)        |
-| 2   | DI 経由で実体が一意に定まらない | (Phase2 以降で確定)             | Phase2/3 で解決度を上げる        |
-| 3   | パース不能なソースファイル      | `diagnostic` で該当ファイル報告 | 他ファイルの解析を継続           |
-| 4   | 解析継続不能な致命的エラー      | `error` record + 非ゼロ exit    | Core が fatal failure として扱う |
+| #   | ケース                                       | ユーザーへの見せ方                           | リカバリ                                                                                          |
+| --- | -------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1   | 型解決できないシンボル                       | `diagnostic` で未解決を報告                  | 解析継続 (部分結果を返す)                                                                         |
+| 2   | DI 経由で実体が一意に定まらない              | (Phase2 以降で確定)                          | Phase2/3 で解決度を上げる                                                                         |
+| 3   | パース不能なソースファイル                   | `diagnostic` で該当ファイル報告              | 他ファイルの解析を継続                                                                            |
+| 4   | 解析継続不能な致命的エラー                   | `error` record + 非ゼロ exit                 | Core が fatal failure として扱う                                                                  |
+| 5   | classpath が metadata に無い (D3 で必須化)   | Analyzer が `error` record + 非ゼロ exit     | 利用者が classpath を用意して再実行する (Core は言語固有の必須性を知らないため検査は Analyzer 側) |
+| 6   | classpath の一部 jar が存在しない / 読めない | (D8 で `diagnostic` か `error` かを確定する) | (D8 で確定する)                                                                                   |
 
 ### Fallback
 
@@ -310,7 +383,7 @@ sequenceDiagram
 | 対象 doc / 節                       | 変更内容                                                                                                                                                                                                       | 理由                                                                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `context/project.md` Quick Commands | Java Analyzer の build / test コマンドを追加 (D1 / D10 の決定後)。「開発起動」「E2E」行 (現在「後続の CLI interface spec で確定」) に、本 spec が実装する最小 `depwalk analyze` の起動例を暫定値として記入する | 現状 Go (`cd core && ...`) のみで Java 側のコマンド契約を持たない。最小 analyze を実装するため起動手段が確定する (全 flag 体系は CLI interface spec が正本) |
-| `context/toolchain.md` 標準スタック | build tool / JDK version を確定値に更新 (D1)                                                                                                                                                                   | 現在「JavaParser / SymbolSolver / SootUp を利用」までしか固定されていない                                                                                   |
+| `context/toolchain.md` 標準スタック | Java Analyzer 行を確定値に更新: build tool = Gradle (Kotlin DSL) + Shadow plugin、JDK = 25 LTS (Gradle toolchain で固定)、配布形態 = 単一 fat jar (source: clarify / D1)                                       | 現在「JavaParser / SymbolSolver / SootUp を利用」までしか固定されていない                                                                                   |
 | `context/engineering.md`            | Analyzer build を束ねる wrapper (make-like) 導入要否の判断を反映                                                                                                                                               | 「Analyzer build を束ねる必要が出た時点で検討」と保留されている                                                                                             |
 | `context/testing.md`                | Java Analyzer 側の contract test 実行方式 / CI の JVM 要求を追記 (D10)。S5 の再掲箇所 (「新 Analyzer 追加時は Protocol contract test の通過を必須」) が Design Doc 側の明確化に追随しているか確認する          | Protocol contract test の実行主体が Go 側のみを前提にしている                                                                                               |
 | `context/architecture.md`           | Package Boundary の S5 再掲 (「Analyzer 追加で Core に差分が出ないこと (S5)」) を Design Doc 側の明確化に追随させる                                                                                            | S5 の測定方法を変更提案するため、再掲箇所に drift が残らないようにする                                                                                      |
