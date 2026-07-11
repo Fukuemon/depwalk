@@ -208,3 +208,57 @@ Verdict: **PASS**
 ### 残る advisory (次 phase で扱う)
 
 - EARS の WHEN / WHERE 条は「出力する」を述べ、除外は後続の IF 条が担う構造。テスト設計 (phase 9) で「IF 条が例外として優先される」ことを明示する。
+
+## Review 2026-07-11 (phase: diagram)
+
+Verdict: **NEEDS_WORK**
+
+3 図 (利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー) は上位文書・protocol 契約・EARS・エラーケース表と整合しており、図が新しい仕様を作っている箇所も限定的だった。指摘はメタの drift と、図が本文より先に規定していた 3 点。
+
+### 指摘 (blocking)
+
+- `## 機能仕様 > User Flow` が「(phase: clarify / diagram で確定する)」の placeholder のまま。両 phase とも完了しており本文とメタが drift している。設計フェーズ状況にも diagram 完了が表現されていない。
+
+### 指摘 (advisory)
+
+1. Sequence が `--analyzer-cmd` を確定値のように書いているが、D2 は「具体名は phase 6 で確定」としている (図が本文より先に名前を固定して読める)。
+2. Flowchart が「classpath key 検査 → jar 読み取り検査 → 解析」という**事前検査の順序**を確定させているが、本文 D3 / D8 は pre-flight か遅延検出かを規定していない (図だけが実装順序を規定している)。
+3. D11 図は call site 由来の判定のみを描いているが、node 母集合は「宣言列挙 ∪ call site 由来」の和集合。図だけ読むと node が call site 由来のみに見える。
+
+### 対応 (完了)
+
+- User Flow 節を記入し (`depwalk analyze` 実行から結果取得までの 6 ステップ)、図への参照を張った。設計フェーズ状況に phase 5.5 (図) 行を追加し、phase 6 の備考に「flag / metadata の key 名をここで確定する」と明記した。
+- advisory 1: Sequence の flag 表記を「起動コマンド指定 (flag 名は phase 6 で確定 / D2)」に改めた。
+- advisory 2: D3 に「検査のタイミング」を追加し、**classpath key 検査と jar の存在 / 読み取り検査を解析開始前に一括で (pre-flight) 行う**ことと、その根拠 (遅延検出すると出力済み record が「一見成功した部分結果」として観測されうる) を明記した。図の分岐が本文に根拠を持つようにした。
+- advisory 3: D11 図のキャプションに「本図は node 母集合のうち② call site 由来の node だけを扱う。scope 内宣言のメソッドは呼び出しの有無によらず宣言列挙で node 化される (①)」と明記した。
+
+## Review 2026-07-11 (phase: diagram, 2 回目)
+
+Verdict: **NEEDS_WORK**
+
+前回 advisory 1 (flag 表記) / 2 (classpath 検査の順序) は解消を確認。新たに 2 件。
+
+### 指摘 (blocking)
+
+1. **D11 図のキャプションが図自身と矛盾** — 前回 advisory 3 への対応が過剰補正になり、「本図は② call site 由来の node だけを扱う」と書いたが、図には `declared` 枝 (宣言サイトが scope 内 = ① 側) が存在する。キャプションどおりなら「対象外のはずのものが描かれている」ことになり、図どおりなら ① の node が call site 経由でも出力されるように読めて node 母集合の定義と割れる。
+2. **変更履歴が diagram レビュー対応に追随していない** — D3 への「検査のタイミング」追加は図の追加を超える**決定内容の追加**であり、変更履歴に行が要る。
+
+### 指摘 (advisory)
+
+- User Flow の「図は `## フロー / シーケンス` を正本とする」と D11 図の「正本は D11 のテキスト、図はその可視化」で「正本」の向きが逆に読める。
+
+### 対応 (完了)
+
+- キャプションを書き分けた: 本図が扱うのは「呼び出し 1 件ごとの callee 帰属型の決定」であり node 母集合の列挙ではない。`declared` 枝の `methodSymbol` は ① 宣言列挙で既に node 化済みで、この枝の出力は `callEdge` の参照先確定を意味する。`lifted` 枝だけが ② call site 由来の新規 node を生む。あわせて図の `emit` を `declared` / `lifted` の 2 枝に分割し、キャプションと一対一に対応させた (Mermaid CLI で再検証済み)。
+- 変更履歴に「spec-review (diagram) 対応 — User Flow 記入 / D3 の pre-flight 検査 / Sequence の flag 表記 / D11 図のキャプションと emit 枝」の行を追加した。
+- advisory: User Flow の記述を「図示は `## フロー / シーケンス` を参照。**仕様の正本は本文の決定 (D1-D11) であり、図はその可視化**」に統一した。
+
+## Review 2026-07-11 (phase: diagram, 3 回目)
+
+Verdict: **PASS**
+
+全観点で PASS (prompts / 正本境界は未実施のため N/A)。3 図が本文 (D1-D11 / EARS / エラーケース表 / User Flow / node 母集合の定義) と一致し、図が本文に根拠を持たない仕様を新設している箇所は検出されなかった。phase: diagram の gate を通過。
+
+### 残る advisory (次 phase で扱う)
+
+- エラーケース表 row3 (パース不能ファイルの継続) は Sequence の `opt` でのみ表現されている。phase 9 のテスト観点で「部分解析の継続」を明示的な検証項目に落とす。

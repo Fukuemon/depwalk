@@ -17,19 +17,20 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                            |
-| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                    |
-| 2   | 下書き                      | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                        |
-| 3   | 上位文書突合                | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし               |
-| 4   | 論点整理                    | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                   |
-| 5   | 論点解決                    | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目) |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                                                                                                                                 |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                 |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                 |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                 |
-| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                 |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                 |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                     |
+| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | GitHub issue #9 / requirements.md を確認済み                                                                                                             |
+| 2   | 下書き                      | レビュー済 | 2026-07-11 | scaffold 完了。spec-review PASS (4 回目)                                                                                                                 |
+| 3   | 上位文書突合                | 完了       | 2026-07-11 | S5 / P4 の測定方法に齟齬を検出し Design Doc への変更提案として登録 (phase: sync で反映)。feature doc / context / ADR とは矛盾なし                        |
+| 4   | 論点整理                    | 完了       | 2026-07-11 | D1-D10 を初期論点として列挙。D11 は clarify 中に spec-review が検出し追加起票                                                                            |
+| 5   | 論点解決                    | レビュー済 | 2026-07-11 | D1-D11 をすべて決定 (未決ゼロ)。D11 は spec-review が検出した追加論点。Q2 と性能数値目標は決定者・期限付きで保留管理。spec-review PASS (5 回目)          |
+| 5.5 | 図 (phase: diagram)         | レビュー済 | 2026-07-11 | 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成し Mermaid CLI で検証。User Flow 節も記入。spec-review PASS (3 回目) |
+| 6   | Interface / Routing 設計    | 未着手     |            | flag / 環境変数 / metadata の key 名をここで確定する (D2 / D3)                                                                                           |
+| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                          |
+| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                          |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                          |
+| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                          |
+| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                          |
 
 ## 上位文書整合
 
@@ -176,6 +177,8 @@ EARS 風で振る舞いを記述する。
 **依存 jar の classpath を必須入力とする。** classpath なしでの解析は許可しない。
 
 **必須性の粒度**: `analysisRequest.metadata` の classpath **key は必須**とし、**値としての空配列は許容する** (依存を持たない純 Java プロジェクト / テスト fixture のため)。key 自体が無い場合のみ `JAVA_MISSING_CLASSPATH` の `error` とする。key 名は phase 6 (Interface 設計) で確定する。
+
+**検査のタイミング**: classpath の key 検査と、指定された jar の存在 / 読み取り可否の検査は、**解析開始前に一括で** (pre-flight) 行う。型解決の途中で jar 欠落を遅延検出すると、それまでに出力済みの `methodSymbol` / `callEdge` を Core が受け取った状態で fatal になり、部分的な結果が「一見成功した出力」として観測されうるため。いずれも `error` + 非ゼロ exit で即停止する (D8)。
 
 - TypeSolver 構成: `ReflectionTypeSolver` (JDK 標準型) + `JavaParserTypeSolver` (対象プロジェクトの source root) + `JarTypeSolver` (依存 jar)。
 - 理由: プロジェクト内のメソッド呼び出しであっても、レシーバの型を知るために library 型が必要になる (例: Spring Data の `JpaRepository` を継承した interface、`Optional` / `Stream` チェーン、library 由来の generics)。classpath を欠くと未解決 `diagnostic` が多発し、S1 / S2 (網羅性) が実用レベルに届かない。必須にすることで解析精度が常に一定になる。
@@ -382,7 +385,16 @@ Phase1 の必須仕様:
 
 ### User Flow
 
-(phase: clarify / diagram で確定する)
+depwalk は CLI ツールであり、利用者の操作は `depwalk analyze` の実行 1 つに集約される。
+
+1. 利用者 / CI が `depwalk analyze` を実行する (解析対象 path と Analyzer 起動コマンドを指定)。
+2. Core が Analyzer 起動コマンドを解決する (CLI flag → 環境変数 の順。どちらも無ければ実行前に拒否する / D2)。
+3. Core が `analysisRequest` を組み立て、Analyzer process を起動して stdin へ 1 件送信し close する。classpath 等の言語固有 hint は `metadata` として素通しする (D3)。
+4. Java Analyzer が classpath を検証し (欠落は fatal / D3・D8)、Java ソースを read-only で解析して `methodSymbol` / `callEdge` / `diagnostic` を stdout へ逐次出力する。
+5. Core が JSONL を逐次 parse / validate して graph を構築し、traversal / output へ渡す。未解決や部分解析は `diagnostic` として利用者へ伝播する。
+6. Analyzer が非ゼロ exit した場合、Core は fatal failure として扱う。
+
+図示は [`## フロー / シーケンス`](#フロー--シーケンス) を参照 (Flowchart = 本 User Flow の分岐、Sequence = Core ↔ Analyzer の contract、帰属型決定フロー = D11 の可視化)。**仕様の正本は本文の決定 (D1-D11) であり、図はその可視化**とする。
 
 ### Reuse Policy
 
@@ -468,18 +480,99 @@ Phase1 の必須仕様:
 
 ## フロー / シーケンス
 
-(phase: diagram で生成する)
+depwalk は CLI ツールであり UI を持たないため、「ユーザー操作起点」は **`depwalk analyze` の実行**とする。
 
 ### Flowchart (ユーザー操作起点)
 
+利用者 / CI が `depwalk analyze` を実行してから結果を得るまで。Core が言語を知らないまま Analyzer を起動する点 (D2)、Java 固有の検証が Analyzer 側で行われる点 (D3) が読めるようにする。
+
 ```mermaid
 flowchart TD
+    start["利用者 / CI が depwalk analyze を実行"] --> resolve{"Analyzer 起動コマンドを解決<br/>flag → 環境変数 の順 (D2)"}
+    resolve -->|"どちらも未指定"| cmderr["Core validation error<br/>非ゼロ exit"]
+    resolve -->|"解決できた"| req["Core が analysisRequest を生成<br/>metadata を passthrough (D3)"]
+    req --> spawn["Analyzer process を起動し<br/>stdin へ 1 件送信して close"]
+    spawn --> cpcheck{"classpath の key があるか (D3)"}
+    cpcheck -->|"無い"| cperr["error: JAVA_MISSING_CLASSPATH<br/>非ゼロ exit"]
+    cpcheck -->|"ある (空配列も可)"| jarcheck{"classpath の jar を全て読めるか"}
+    jarcheck -->|"読めない"| jarerr["error: JAVA_MISSING_JAR<br/>非ゼロ exit"]
+    jarcheck -->|"読めた"| analyze["JavaParser で AST 解析<br/>SymbolSolver で型解決"]
+    analyze --> emit["methodSymbol / callEdge / diagnostic を<br/>stdout へ逐次出力 (D9)"]
+    emit --> exit{"Analyzer の exit code"}
+    exit -->|"非ゼロ"| fatal["Core は fatal failure として扱う"]
+    exit -->|"0"| buildgraph["Core が graph を構築し<br/>traversal / output へ渡す"]
+    buildgraph --> done["呼び出し関係を出力<br/>diagnostic を利用者へ伝播"]
+    cmderr --> failend["失敗として終了"]
+    cperr --> fatal
+    jarerr --> fatal
+    fatal --> failend
 ```
 
 ### Sequence
 
+Core と Analyzer の JSONL 越しのやり取り。契約 (`analysisRequest` を 1 件送って stdin を close、stdout は逐次 parse、stderr は protocol 対象外、exit code で成否) は analyzer-protocol feature doc が正本。
+
 ```mermaid
 sequenceDiagram
+    actor User as 利用者 / CI
+    participant Core as Core (Go / 言語非依存)
+    participant JA as Java Analyzer process (JVM)
+    participant Src as Java / Spring ソース (read-only)
+
+    User->>Core: depwalk analyze (起動コマンド指定。flag 名は phase 6 で確定 / D2)
+    Core->>Core: 起動コマンドを解決 (flag → 環境変数)
+    Core->>JA: process 起動
+    Core->>JA: stdin: analysisRequest (JSONL 1 件) → close
+    Note over Core,JA: classpath は metadata で passthrough (D3)<br/>Core は中身の意味を知らない
+
+    alt classpath の key が無い
+        JA-->>Core: stdout: error (JAVA_MISSING_CLASSPATH)
+        JA-->>Core: 非ゼロ exit
+        Core-->>User: fatal failure
+    else classpath の jar が読めない
+        JA-->>Core: stdout: error (JAVA_MISSING_JAR)
+        JA-->>Core: 非ゼロ exit
+        Core-->>User: fatal failure
+    else 解析可能
+        JA->>Src: source root を走査 (read-only)
+        JA->>JA: AST 解析 / 型解決 / 帰属型の決定 (D11)
+        loop 検出ごとに逐次 flush (D9)
+            JA-->>Core: stdout: methodSymbol
+            JA-->>Core: stdout: callEdge (metadata.dispatch 付き / D7)
+            opt 未解決 symbol / パース失敗
+                JA-->>Core: stdout: diagnostic (JAVA_UNRESOLVED_SYMBOL / JAVA_PARSE_ERROR)
+            end
+            Core->>Core: JSONL を逐次 parse / validate
+        end
+        JA-->>Core: stderr: 解析ファイル数 / 所要時間 / 未解決件数 (protocol 対象外 / D9)
+        JA-->>Core: exit code 0
+        Core->>Core: graph 構築 → traversal → output
+        Core-->>User: 呼び出し関係 + diagnostic
+    end
+```
+
+### 帰属型の決定フロー (D11)
+
+呼び出し 1 件ごとに、callee をどの型のメソッドとして出力するか (あるいは出力しないか) を決める規則。実装 (`analyzers/java/`) と Java unit test (D10) が従う正本は D11 のテキスト、本図はその可視化。
+
+**本図が扱うのは「呼び出し 1 件ごとに callee の帰属型を決めること」**であり、node 母集合の列挙そのものではない。両者の関係は次のとおり:
+
+- `declared` 枝 (宣言サイトが scope 内) が指す `methodSymbol` は、**① 宣言列挙で既に node 化されている**。この枝の `emit` は node の重複生成ではなく、`callEdge` の参照先が確定することを意味する。
+- `lifted` 枝 (scope 外宣言の引き上げ) だけが、**② call site 由来の新規 node** を生む (scope 内に宣言が無いため宣言列挙では出せない)。
+
+```mermaid
+flowchart TD
+    call["呼び出し式を検出"] --> resolve{"SymbolSolver で解決できたか"}
+    resolve -->|"No"| diag["diagnostic: JAVA_UNRESOLVED_SYMBOL<br/>callEdge は出さない (D8)"]
+    resolve -->|"Yes"| site{"宣言サイト (override 解決後) は<br/>scope 内か"}
+    site -->|"Yes"| declared["帰属型 = 宣言型<br/>例: com.example.BaseService#save"]
+    site -->|"No"| excluded{"宣言型が引き上げ除外 package か<br/>既定: java.* / javax.* / jakarta.*"}
+    excluded -->|"Yes"| skip["出力しない<br/>(仕様。diagnostic も出さない)"]
+    excluded -->|"No"| recv{"レシーバの静的型は scope 内か<br/>static は参照した型 / new は生成する型"}
+    recv -->|"No"| skip
+    recv -->|"Yes"| lifted["帰属型 = レシーバの静的型へ引き上げ<br/>例: com.example.UserRepository#findById<br/>継承元は metadata.declaringType に保持"]
+    declared --> edge1["callEdge を出力 (metadata.dispatch を標識 / D7)<br/>callee の methodSymbol は宣言列挙で出力済み (母集合 ①)"]
+    lifted --> edge2["引き上げ node の methodSymbol を新規出力 (母集合 ②)<br/>+ callEdge を出力 (metadata.dispatch を標識 / D7)"]
 ```
 
 ## 実装分割
@@ -550,6 +643,8 @@ sequenceDiagram
 | 2026-07-11 | NEEDS_WORK (clarify 3)   | D11 の「宣言型」が override 時に一意でない (dead node か取りこぼしか)。引き上げが `Object#toString` 等を巻き込みノイズ排除根拠と衝突。`fullGraph` の node 母集合の列挙方法が未定義               | 宣言型を「実際の宣言サイト」と定義。引き上げ除外 package (既定 JDK / metadata で上書き可) を導入。node 母集合を「宣言列挙 ∪ call site 由来の引き上げ node」と定義。D7 / D10 / エラー表も同期 |
 | 2026-07-11 | NEEDS_WORK (clarify 4)   | EARS が D11 の第 3 分岐 (引き上げ除外 package) に追随しておらず、`myCollection.iterator()` で EARS と D11 が逆の結論を出す (決定内容の欠陥ではなく同期漏れ)                                      | EARS の WHERE 条を D11 参照に改め、除外 package の IF 条を追加。D5 の括弧書きも D11 参照に統一。advisory (D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲) も反映                |
 | 2026-07-11 | **PASS** (clarify 5)     | 全観点 PASS。D1-D11 が protocol 契約を変更せずに成立し、EARS / D4-D10 / エラー表が D11 を正本として一貫。未決ゼロ                                                                                | advisory 2 件 (宣言サイトの定義を abstract / interface に適用可能な表現へ、`iterator()` の例に前提を明記) を反映。phase: diagram へ進む                                                      |
+| 2026-07-11 | NEEDS_WORK (diagram)     | User Flow 節が placeholder のままで本文と drift。図が本文より先に規定していた 3 点 (flag 名 / classpath 検査の順序 / node 母集合)                                                                | User Flow を記入し設計フェーズ状況に図の行を追加。Sequence の flag を例示表記へ、D3 に pre-flight 検査を明記、D11 図に node 母集合の但し書きを追加                                           |
+| 2026-07-11 | NEEDS_WORK (diagram 2)   | D11 図のキャプションが過剰補正で図自身 (declared 枝) と矛盾。変更履歴が D3 への決定追加に追随していない                                                                                          | キャプションを書き分け、図の emit を declared / lifted の 2 枝に分割して node 母集合 ①/② と対応づけ。変更履歴に対応行を追加。「正本」の向きも統一                                            |
 
 ## 変更履歴
 
@@ -564,6 +659,8 @@ sequenceDiagram
 | 2026-07-11 | Fukuemon | spec-review (clarify 2 回目) 対応 — D11 の帰属規則を「宣言型優先、scope 外のときだけレシーバ型へ引き上げ」に修正 (scope 内継承での node 分裂を防止)。D5 の signature 定義と EARS を帰属型基準に同期                                            |
 | 2026-07-11 | Fukuemon | spec-review (clarify 3 回目) 対応 — D11 の「宣言型」を実際の宣言サイトと定義 (override の dead node を回避)。引き上げ除外 package (既定 `java.*` / `javax.*` / `jakarta.*`、metadata で上書き可) と `fullGraph` の node 母集合の列挙方法を追加 |
 | 2026-07-11 | Fukuemon | spec-review (clarify 4 回目) 対応 — EARS を D11 の除外 package 分岐に同期 (WHERE 条を D11 参照化 + IF 条を追加)。D5 の括弧書き / D4 の相互参照 / prefix 一致の segment 粒度 / D10 の検証範囲を整理                                             |
+| 2026-07-11 | Fukuemon | phase: diagram — 利用者起点フロー / Core ↔ Analyzer シーケンス / 帰属型決定フロー (D11) の 3 図を生成 (Mermaid CLI でレンダリング検証済み)                                                                                                     |
+| 2026-07-11 | Fukuemon | spec-review (diagram) 対応 — User Flow 節を記入。D3 に「検査のタイミング」(classpath / jar の pre-flight 一括検査) を追加。Sequence の flag を例示表記化。D11 図のキャプションと emit 枝を node 母集合 (①/②) に対応づけ                        |
 
 ## 備考
 
