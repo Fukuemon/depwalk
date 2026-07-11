@@ -358,3 +358,38 @@ Verdict: **PASS**
 
 - 性能 baseline 計測タスクが実装分割に現れること。
 - 「viper を導入しない」制約 (`context/toolchain.md`) を実装 prompt に明示すること。
+
+## Review 2026-07-12 (phase: prompts)
+
+Verdict: **NEEDS_WORK**
+
+### 観点別評価
+
+- 上位文書整合: NEEDS_WORK (承認済み ADR-0004 / ADR-0005 が整合表・関連資料に未登録。ADR-0005 の「単一後続 feature / 型階層補完先行」が spec / feature doc の Phase2 → Phase3 宣言と順序・分割で食い違う)
+- prompts 自己完結性: NEEDS_WORK (P2_02 の target `e2e` が `context/project.md` の対象ドメイン一覧に無く命名規則違反)
+- 未解決論点 / 実装対象明示 / template 必須節 / EARS acceptance / 正本境界: PASS
+
+### 指摘 (blocking)
+
+1. P2_02 を target 一覧内の値 (core) に改名し実装分割表を同期すること。
+2. ADR-0004 / 0005 を整合表・関連資料に登録し、段階導入境界の記述 (spec 背景 / スコープ、feature doc 段階導入表) を ADR-0005 に追随させること。
+
+### 対応 (完了)
+
+- 指摘 1: P2_02 prompt (target `e2e`) を `P2_02_core_e2e-fixture-baseline.md` に改名し、index.md の実装タスク案表と `P1_01` / `P2_01` の後続 prompt 参照を同期した。
+- 指摘 2: index.md の上位文書整合表・ADR の新規 / 更新表・関連資料に ADR-0004 / ADR-0005 (#21 の境界決定) を登録し、背景・やらないことの段階導入境界の記述を ADR-0005 に追随させた。feature doc (`design/features/java-analyzer/DesignDoc_java-analyzer.md`) の関連 ADR・段階導入表・将来作業割り当ての記述 (dispatch 標識 / override の既知の制約) も ADR-0005 (#21) に追随させた。
+
+## Review 2026-07-12 (phase: prompts, 2 回目)
+
+Verdict: **PASS**
+
+### 観点別評価
+
+全 7 観点 PASS (上位文書整合 / 未解決論点 / 実装対象明示 / template 必須節 / EARS acceptance / prompts 自己完結性 / 正本境界)。
+
+- 前回指摘 2 件の解消を確認: ① P2_02 は `P2_02_core_e2e-fixture-baseline.md` に改名済みで target が対象ドメイン一覧内、② ADR-0004 / ADR-0005 が整合表・関連資料・ADR 表に登録され、段階導入境界の記述 (spec 背景 / feature doc 段階導入表) が ADR-0005 (単一後続 feature #21 / 型階層補完先行) に追随済み。
+- prompts 4 件は必須 10 セクション完備、antipatterns 制約ブロック逐語一致、探索誘発表現なし、命名規則準拠、依存表 (P1 並列 / P2_01→P1_02 / P2_02→P1_01+P2_01) が各 prompt の前提条件節と整合。
+
+### 参考 (非ブロッキング / 次 phase で解消)
+
+- P2_02 の E2E test 配置先が未確定だが、不明点ハンドリングで停止・確認に誘導されており自己完結性違反ではない (次善: prompt 内で配置先を確定)。

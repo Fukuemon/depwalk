@@ -1,19 +1,19 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-11 / Status: 完了
+> 最終更新: 2026-07-12 / Status: 完了
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は契約を変更せず Java 側の実装方式を定める。
 
 ## メタ
 
-| 項目           | 値                                                                                                                                                                                                                                                                                             |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                         |
-| 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項) |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                                                                                           |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)                                                                                                    |
-| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)                                                                                                                                                                                                                                       |
-| 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                      |
+| 項目           | 値                                                                                                                                                                                                                                                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                                                           |
+| 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項)                                   |
+| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                                                                                                                             |
+| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)、[ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) |
+| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)                                                                                                                                                                                                                                                                         |
+| 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                                                        |
 
 ## 背景・要件解釈
 
@@ -135,13 +135,13 @@ lambda 本体内の呼び出しは、囲みメソッドを caller とする `cal
 
 ### dispatch 標識
 
-Phase1 は DI 解決を行わないため、interface / 抽象メソッド呼び出しの callee は「帰属型の決定規則」で決まる帰属型 (interface / 抽象クラスを含む) のメソッドになる。実装クラスのメソッドへの辺は Phase2 (Spring Bean / DI 解決) 以降で追加する。
+Phase1 は DI 解決を行わないため、interface / 抽象メソッド呼び出しの callee は「帰属型の決定規則」で決まる帰属型 (interface / 抽象クラスを含む) のメソッドになる。実装クラスのメソッドへの辺は後続 feature (#21 / ADR-0005) で追加する。
 
-`callEdge.metadata.dispatch` に呼び出しの種別を持たせる: `static` (static メソッド呼び出し) / `virtual` (具象クラスの instance メソッド) / `interface` (interface 経由) / `abstract` (抽象クラスの抽象メソッド経由)。利用者は「この辺は宣言型止まりで実体ではない」と判別でき、Phase2/3 で実装候補の辺を足すときの土台にもなる。
+`callEdge.metadata.dispatch` に呼び出しの種別を持たせる: `static` (static メソッド呼び出し) / `virtual` (具象クラスの instance メソッド) / `interface` (interface 経由) / `abstract` (抽象クラスの抽象メソッド経由)。利用者は「この辺は宣言型止まりで実体ではない」と判別でき、後続 feature (#21 / ADR-0005) で実装候補の辺を足すときの土台にもなる。
 
 未解決 `diagnostic` に倒す案は採らない。Spring プロジェクトでは呼び出しの大半が interface 越しであり、辺を落とすと S1 / S2 (網羅性) が Phase1 で実用にならないため。
 
-「Spring DI 経由の呼び出し先を実体まで解決できる」(S4) は Phase2 以降の成功条件であり、Phase1 では宣言型止まりであることが仕様である。
+「Spring DI 経由の呼び出し先を実体まで解決できる」(S4) は後続 feature (#21 / ADR-0005) 以降の成功条件であり、Phase1 では宣言型止まりであることが仕様である。
 
 ### diagnostic / error code 体系
 
@@ -202,7 +202,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - 未解決との区別: scope 外呼び出しの省略は「解析できなかった」ではなく「仕様として出力しない」ため、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` は出さない。型解決自体に失敗した場合のみ `diagnostic` とする。
 - protocol 整合: 出力する `callEdge` の caller / callee はいずれも出力済み `methodSymbol` を参照するため、「valid な `callEdge` は解決済み `methodSymbol` を参照する」という契約を満たす。
 
-**Phase1 の既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は Phase3 (Interface Dispatch / Override 解決, SootUp) の担当とする。
+**Phase1 の既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は後続 feature (#21 / ADR-0005) の担当とする。
 
 **node 母集合 (列挙方法)**: `fullGraph` の `methodSymbol` は次の和集合とする。
 
@@ -213,11 +213,14 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
 ### 段階導入
 
-| Phase  | 範囲                                                                                      |
-| ------ | ----------------------------------------------------------------------------------------- |
-| Phase1 | JavaParser + SymbolSolver による静的呼び出し抽出 (本 doc の確定内容)                      |
-| Phase2 | Spring Bean / DI 解決 (interface 呼び出しの実装クラスへの解決、S4 の達成)                 |
-| Phase3 | SootUp 統合による Interface Dispatch / Override 解決 (統合範囲 Q2 は Phase3 着手前に決定) |
+| Phase              | 範囲                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase1             | JavaParser + SymbolSolver による静的呼び出し抽出 (本 doc の確定内容)                                                                                                                                                                                                                                                                         |
+| 後続 feature (#21) | SootUp による型階層 / Interface Dispatch / Override 候補の補完と、Spring Bean / DI 解決による候補絞り込み (S4 の達成)。実装は型階層補完 → Spring 候補絞り込み → 統合 E2E の順に分割する ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。SootUp の call graph 委譲範囲 (Q2) は #21 spec の clarify phase で決定する |
+
+Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて確定する呼び出しの完全追跡は初期スコープに含めない ([ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md))。静的に候補を導ける場合は候補と根拠を出力し、確定できない場合は候補・未解決理由を観測可能にする。
+
+> 本 doc 内の「Phase2」「Phase3」という旧呼称は、ADR-0005 (2026-07-11) により後続 feature (#21) に統合された。
 
 ## 主要シナリオ / フロー
 
