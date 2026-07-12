@@ -43,8 +43,10 @@ public final class Main {
     public static int run(InputStream in, OutputStream out, OutputStream err) {
         Instant start = Instant.now();
         ObjectMapper mapper = ProtocolObjectMapper.create();
+        PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
+        RecordWriter writer = new RecordWriter(out, mapper);
 
-        try (RecordWriter writer = new RecordWriter(out, mapper)) {
+        try {
             AnalysisRequest request;
             try {
                 request = new RequestReader(mapper).read(in);
@@ -55,21 +57,47 @@ public final class Main {
                 return 1;
             }
 
+            PreflightValidator.Validated validated;
             try {
-                PreflightValidator.validate(request);
+                validated = PreflightValidator.validate(request);
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
                 return 1;
             }
 
-            AnalysisRunner.RunStats stats = AnalysisRunner.run(request, writer);
-            Duration elapsed = Duration.between(start, Instant.now());
-            MetricsSummary summary = new MetricsSummary(stats.analyzedFileCount(), elapsed.toMillis(), stats.unresolvedCount());
-            PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
-            MetricsReporter.report(errStream, summary);
-            return 0;
+            try {
+                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, validated.classpath(), writer);
+                Duration elapsed = Duration.between(start, Instant.now());
+                MetricsSummary summary = new MetricsSummary(stats.analyzedFileCount(), elapsed.toMillis(), stats.unresolvedCount());
+                MetricsReporter.report(errStream, summary);
+                return 0;
+            } catch (RuntimeException e) {
+                // H1: 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
+                // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
+                return reportInternalError(writer, errStream, e);
+            }
         } catch (IOException e) {
+            // M2: record の書き出し自体が失敗した場合 (stdout が壊れている等)。無言で 1 を返さず、
+            // stderr へ理由を残す。
+            errStream.println("failed to write analyzer output: " + e.getClass().getName() + ": " + e.getMessage());
             return 1;
+        } finally {
+            try {
+                writer.close();
+            } catch (IOException ignored) {
+                // best-effort close; exit code is already decided above.
+            }
         }
+    }
+
+    private static int reportInternalError(RecordWriter writer, PrintStream errStream, RuntimeException e) {
+        String detail = e.getClass().getName() + ": " + e.getMessage();
+        errStream.println("internal error during analysis: " + detail);
+        try {
+            writer.write(ErrorRecord.of(JavaErrorCode.JAVA_INTERNAL_ERROR.code(), "internal error during analysis: " + detail));
+        } catch (IOException ignored) {
+            // stdout may already be unusable; stderr already has the exception detail.
+        }
+        return 1;
     }
 }

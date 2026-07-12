@@ -61,12 +61,100 @@ class PreflightValidatorTest {
         assertDoesNotThrow(() -> PreflightValidator.validate(request));
     }
 
-    private static AnalysisRequest requestWithLanguageAndMetadata(String language, Map<String, Object> metadata) {
+    @Test
+    void rejectsNullWorkspaceRoot() {
+        AnalysisRequest request = requestWithLanguageAndMetadataAndWorkspaceRoot(
+                "java", Map.of("classpath", List.of()), null);
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsEmptyWorkspaceRoot() {
+        AnalysisRequest request = requestWithLanguageAndMetadataAndWorkspaceRoot(
+                "java", Map.of("classpath", List.of()), "  ");
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsNonExistentWorkspaceRoot() {
+        String missing = tempDir.resolve("does-not-exist").toString();
+        AnalysisRequest request = requestWithLanguageAndMetadataAndWorkspaceRoot(
+                "java", Map.of("classpath", List.of()), missing);
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsWorkspaceRootThatIsNotADirectory() throws IOException {
+        Path file = tempDir.resolve("not-a-directory");
+        Files.writeString(file, "content");
+        AnalysisRequest request = requestWithLanguageAndMetadataAndWorkspaceRoot(
+                "java", Map.of("classpath", List.of()), file.toString());
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void allowsExistingDirectoryWorkspaceRoot() {
+        AnalysisRequest request = requestWithLanguageAndMetadata("java", Map.of("classpath", List.of()));
+
+        assertDoesNotThrow(() -> PreflightValidator.validate(request));
+    }
+
+    @Test
+    void rejectsLiftExcludePackagesThatIsNotAList() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "liftExcludePackages", "com.example"));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsLiftExcludePackagesWithNonStringElement() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "liftExcludePackages", List.of("com.example", 42)));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void allowsEmptyLiftExcludePackagesArrayAsNoExclusions() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "liftExcludePackages", List.of()));
+
+        assertDoesNotThrow(() -> PreflightValidator.validate(request));
+    }
+
+    @Test
+    void validateReturnsTypedClasspathForDownstreamUse() throws Exception {
+        Path jar = tempDir.resolve("dep.jar");
+        Files.writeString(jar, "exists");
+        AnalysisRequest request = requestWithLanguageAndMetadata("java", Map.of("classpath", List.of(jar.toString())));
+
+        PreflightValidator.Validated validated = PreflightValidator.validate(request);
+
+        assertEquals(List.of(jar.toString()), validated.classpath());
+    }
+
+    private AnalysisRequest requestWithLanguageAndMetadata(String language, Map<String, Object> metadata) {
+        return requestWithLanguageAndMetadataAndWorkspaceRoot(language, metadata, tempDir.toString());
+    }
+
+    private static AnalysisRequest requestWithLanguageAndMetadataAndWorkspaceRoot(
+            String language, Map<String, Object> metadata, String workspaceRoot) {
         return new AnalysisRequest(
                 "1",
                 "analysisRequest",
                 "req-1",
-                "/workspace/depwalk",
+                workspaceRoot,
                 language,
                 null,
                 null,

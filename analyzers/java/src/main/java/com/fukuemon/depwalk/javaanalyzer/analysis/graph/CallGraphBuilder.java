@@ -78,13 +78,29 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof MethodDeclaration md) {
-            MethodSymbol symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), md.resolve());
+            MethodSymbol symbol;
+            try {
+                ResolvedMethodDeclaration resolved = md.resolve();
+                symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
+            } catch (RuntimeException e) {
+                reportUnresolvedDeclaration(md, "failed to resolve method declaration: " + md.getNameAsString());
+                recurseChildren(node, ctx.withCaller(List.of()));
+                return;
+            }
             accumulator.addNode(symbol);
             recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
             return;
         }
         if (node instanceof ConstructorDeclaration cd) {
-            MethodSymbol symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), cd.resolve());
+            MethodSymbol symbol;
+            try {
+                ResolvedConstructorDeclaration resolved = cd.resolve();
+                symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
+            } catch (RuntimeException e) {
+                reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
+                recurseChildren(node, ctx.withCaller(List.of()));
+                return;
+            }
             accumulator.addNode(symbol);
             recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
             return;
@@ -241,6 +257,22 @@ public final class CallGraphBuilder {
                 null));
     }
 
+    /**
+     * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗 (H2)。呼び出し式側の
+     * {@link #reportUnresolved(Node, WalkContext)} と異なり、宣言そのものが対象のため
+     * {@code relatedMethodId} は付けない。その宣言だけ skip し、解析全体は継続する。
+     */
+    private void reportUnresolvedDeclaration(Node declNode, String message) {
+        accumulator.incrementUnresolved();
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
+                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
+                message,
+                sourceLocationOf(declNode),
+                null,
+                null));
+    }
+
     // ------------------------------------------------------------------
     // node construction
     // ------------------------------------------------------------------
@@ -275,7 +307,14 @@ public final class CallGraphBuilder {
         SourceLocation sourceLocation = null;
         Map<String, Object> metadata = null;
         if (attribution.outcome() == AttributionResult.Outcome.SCOPE_INTERNAL) {
+            // synthetic default constructor は自身の AST を持たない ({@code toAst()} が空) ため、
+            // 宣言型の AST 位置へフォールバックする。これにより ensureDefaultConstructorNode と
+            // 同一内容になり、同一 methodId の node がどの経路から生成されても内容が一致する
+            // (GraphAccumulator の first-wins 重複排除で情報が失われない)。
             Node ast = resolved.toAst().orElse(null);
+            if (ast == null) {
+                ast = resolved.declaringType().toAst().orElse(null);
+            }
             sourceLocation = ast != null ? sourceLocationOf(ast) : null;
         } else if (attribution.outcome() == AttributionResult.Outcome.LIFTED) {
             metadata = Map.of(
@@ -310,9 +349,13 @@ public final class CallGraphBuilder {
         List<String> ids = new ArrayList<>();
         String declaringBinaryName = BinaryNames.forTypeLikeNode(enclosingType);
         for (ConstructorDeclaration cd : constructors) {
-            List<String> paramTypes = paramBinaryNames(cd.resolve());
-            String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
-            ids.add(MethodIds.methodId(signature));
+            try {
+                List<String> paramTypes = paramBinaryNames(cd.resolve());
+                String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
+                ids.add(MethodIds.methodId(signature));
+            } catch (RuntimeException e) {
+                reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
+            }
         }
         return ids;
     }
@@ -417,10 +460,16 @@ public final class CallGraphBuilder {
                 .orElse(null);
     }
 
+    /**
+     * node の source 位置。schema は {@code startLine} を 1-based で要求するため、位置が不明な場合
+     * ({@code node.getBegin()} が空) は {@code startLine: 0} を出さず sourceLocation 自体を省略する
+     * (null を返す)。
+     */
     private SourceLocation sourceLocationOf(Node node) {
-        Path filePath = filePathOf(node);
-        String relativePath = filePath != null ? workspaceRoot.relativize(filePath).toString() : "";
-        int startLine = node.getBegin().map(p -> p.line).orElse(0);
-        return SourceLocation.of(relativePath, startLine);
+        return node.getBegin().map(p -> {
+            Path filePath = filePathOf(node);
+            String relativePath = filePath != null ? workspaceRoot.relativize(filePath).toString() : "";
+            return SourceLocation.of(relativePath, p.line);
+        }).orElse(null);
     }
 }

@@ -11,7 +11,6 @@ import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 import com.fukuemon.depwalk.javaanalyzer.protocol.CallEdge;
 import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
-import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSelector;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 
 import com.github.javaparser.JavaParser;
@@ -25,8 +24,8 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSol
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,16 +33,24 @@ import java.util.stream.Collectors;
  * Java Analyzer 解析本体のオーケストレーション。P1_02 の scaffold (request 受領 / pre-flight /
  * {@link RecordWriter}) の上に、AST 解析・型解決・帰属型決定・record 生成を実装する。
  *
- * <p>性能方針 (design doc 「性能方針」): AST はファイル単位で逐次破棄する (保持するのは
+ * <p>性能方針 (design doc 「性能方針」/ D9): AST はファイル単位で逐次破棄する (保持するのは
  * SymbolSolver の型解決キャッシュと、node/edge/diagnostic の最小限の集計 = {@link GraphAccumulator})。
- * {@code reachableFromEntrypoints} は母集合全体からの到達可能性フィルタが必要なため、node/edge の
- * 集計自体は解析完了後に一括で {@link RecordWriter} へ書き出す (各 record 自体は書き込み時に
- * 即座に flush されるため、record 単位の streaming 契約は保たれる)。
+ * record の書き出しはモードによって挙動が異なる (M1):
+ * <ul>
+ *   <li>{@code fullGraph} (既定 / {@code reachableFromEntrypoints} かつ entrypoints 空の場合を含む):
+ *       ファイル単位の解析が終わるごとに、その時点で新たに確定した node / edge / diagnostic を
+ *       即座に {@link RecordWriter} へ flush する。母集合全体を待たずに record を逐次出力するため、
+ *       グラフ全体をメモリ保持しない (node の重複出力を避けるため、出力済み {@code methodId} の集合
+ *       のみ保持する)。</li>
+ *   <li>{@code reachableFromEntrypoints} (entrypoints 指定あり): 到達可能性フィルタ
+ *       ({@link ReachabilityFilter}) が母集合全体の adjacency を必要とするため、node / edge は
+ *       解析完了後に一括でフィルタ + 書き出しを行う。diagnostic はこのモードでも検出時に即 write
+ *       する。</li>
+ * </ul>
  */
 public final class AnalysisRunner {
 
     private static final String ANALYSIS_MODE_REACHABLE = "reachableFromEntrypoints";
-    private static final String METADATA_CLASSPATH = "classpath";
 
     private AnalysisRunner() {
     }
@@ -51,13 +58,16 @@ public final class AnalysisRunner {
     public record RunStats(long analyzedFileCount, long unresolvedCount) {
     }
 
-    public static RunStats run(AnalysisRequest request, RecordWriter writer) throws IOException {
+    /**
+     * @param classpath pre-flight ({@code PreflightValidator#validate}) で型検証済みの
+     *                  jar / classes dir path 一覧。raw metadata をここで再 cast しない。
+     */
+    public static RunStats run(AnalysisRequest request, List<String> classpath, RecordWriter writer) throws IOException {
         Path workspaceRoot = Path.of(request.workspaceRoot()).toAbsolutePath().normalize();
         List<Path> scopeFileList = ScopeFiles.enumerate(workspaceRoot, request.include(), request.exclude());
         Set<Path> scopeFileSet = ScopeFiles.toMembershipSet(scopeFileList);
 
-        List<String> classpathJars = readClasspath(request.metadata());
-        CombinedTypeSolver typeSolver = TypeSolverFactory.create(workspaceRoot, classpathJars);
+        CombinedTypeSolver typeSolver = TypeSolverFactory.create(workspaceRoot, classpath);
         JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
         ParserConfiguration config = new ParserConfiguration().setSymbolResolver(symbolSolver);
         JavaParser parser = new JavaParser(config);
@@ -66,6 +76,13 @@ public final class AnalysisRunner {
         AttributionResolver attributionResolver = new AttributionResolver(scopeFileSet, liftExcludePackages);
         GraphAccumulator accumulator = new GraphAccumulator();
         CallGraphBuilder builder = new CallGraphBuilder(workspaceRoot, attributionResolver, accumulator);
+
+        boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
+
+        // fullGraph (streaming) 用の「出力済み」進捗マーカー。reachableMode では未使用。
+        Set<String> writtenMethodIds = new HashSet<>();
+        int edgesWrittenCount = 0;
+        int diagnosticsWrittenCount = 0;
 
         long analyzedFileCount = 0;
         for (Path file : scopeFileList) {
@@ -84,14 +101,29 @@ public final class AnalysisRunner {
             builder.process(cu);
             analyzedFileCount++;
             // cu はここでスコープを抜け、以降 GC 対象になる (AST の逐次破棄)。
+
+            if (!reachableMode) {
+                for (MethodSymbol node : accumulator.nodesByMethodId().values()) {
+                    if (writtenMethodIds.add(node.methodId())) {
+                        writer.write(node);
+                    }
+                }
+                List<CallEdge> allEdges = accumulator.edges();
+                for (int i = edgesWrittenCount; i < allEdges.size(); i++) {
+                    writer.write(allEdges.get(i));
+                }
+                edgesWrittenCount = allEdges.size();
+
+                List<Diagnostic> allDiagnostics = accumulator.diagnostics();
+                for (int i = diagnosticsWrittenCount; i < allDiagnostics.size(); i++) {
+                    writer.write(allDiagnostics.get(i));
+                }
+                diagnosticsWrittenCount = allDiagnostics.size();
+            }
         }
 
-        List<MethodSymbol> nodesToWrite;
-        List<CallEdge> edgesToWrite;
-        if (ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request)) {
+        if (reachableMode) {
             ReachabilityFilter.Result filtered = ReachabilityFilter.apply(accumulator, request.entrypoints());
-            nodesToWrite = filtered.nodes();
-            edgesToWrite = filtered.edges();
             for (String unmatched : filtered.unmatchedSelectors()) {
                 writer.write(Diagnostic.of(
                         JavaDiagnosticCode.JAVA_ENTRYPOINT_NOT_FOUND.severity(),
@@ -101,19 +133,15 @@ public final class AnalysisRunner {
                         null,
                         null));
             }
-        } else {
-            nodesToWrite = List.copyOf(accumulator.nodesByMethodId().values());
-            edgesToWrite = accumulator.edges();
-        }
-
-        for (MethodSymbol node : nodesToWrite) {
-            writer.write(node);
-        }
-        for (CallEdge edge : edgesToWrite) {
-            writer.write(edge);
-        }
-        for (Diagnostic diagnostic : accumulator.diagnostics()) {
-            writer.write(diagnostic);
+            for (MethodSymbol node : filtered.nodes()) {
+                writer.write(node);
+            }
+            for (CallEdge edge : filtered.edges()) {
+                writer.write(edge);
+            }
+            for (Diagnostic diagnostic : accumulator.diagnostics()) {
+                writer.write(diagnostic);
+            }
         }
 
         return new RunStats(analyzedFileCount, accumulator.unresolvedCount());
@@ -121,12 +149,6 @@ public final class AnalysisRunner {
 
     private static boolean hasEntrypoints(AnalysisRequest request) {
         return request.entrypoints() != null && !request.entrypoints().isEmpty();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<String> readClasspath(Map<String, Object> metadata) {
-        Object raw = metadata.get(METADATA_CLASSPATH);
-        return ((List<Object>) raw).stream().map(String.class::cast).toList();
     }
 
     private static Diagnostic parseErrorDiagnostic(Path workspaceRoot, Path file, String message) {

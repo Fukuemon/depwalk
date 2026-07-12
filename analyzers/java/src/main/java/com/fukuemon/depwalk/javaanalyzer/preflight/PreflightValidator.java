@@ -18,15 +18,26 @@ public final class PreflightValidator {
 
     private static final String LANGUAGE_JAVA = "java";
     private static final String METADATA_CLASSPATH = "classpath";
+    private static final String METADATA_LIFT_EXCLUDE_PACKAGES = "liftExcludePackages";
 
     private PreflightValidator() {
     }
 
     /**
+     * pre-flight 検査で確定した型付きの検証済み入力。下流 ({@code AnalysisRunner}) は raw metadata を
+     * 再 cast せず本 record の値を使う。
+     *
+     * @param classpath {@code metadata.classpath} の検証済み jar / classes dir path 一覧
+     */
+    public record Validated(List<String> classpath) {
+    }
+
+    /**
+     * @return 型検証済みの入力値 ({@link Validated})
      * @throws AnalyzerFatalException {@code JAVA_INVALID_REQUEST} / {@code JAVA_MISSING_CLASSPATH} /
      *                                 {@code JAVA_MISSING_JAR} のいずれか
      */
-    public static void validate(AnalysisRequest request) throws AnalyzerFatalException {
+    public static Validated validate(AnalysisRequest request) throws AnalyzerFatalException {
         if (!LANGUAGE_JAVA.equals(request.language())) {
             throw new AnalyzerFatalException(
                     JavaErrorCode.JAVA_INVALID_REQUEST,
@@ -40,12 +51,64 @@ public final class PreflightValidator {
                     "analysisRequest.metadata is missing required key \"classpath\"");
         }
 
-        for (String entry : readClasspath(metadata.get(METADATA_CLASSPATH))) {
+        List<String> classpath = readClasspath(metadata.get(METADATA_CLASSPATH));
+        for (String entry : classpath) {
             Path path = Path.of(entry);
             if (!Files.exists(path) || !Files.isReadable(path)) {
                 throw new AnalyzerFatalException(
                         JavaErrorCode.JAVA_MISSING_JAR,
                         "classpath entry does not exist or is not readable: " + entry);
+            }
+        }
+
+        validateWorkspaceRoot(request.workspaceRoot());
+        validateLiftExcludePackages(metadata);
+
+        return new Validated(classpath);
+    }
+
+    /**
+     * {@code workspaceRoot} が null / 空 / 存在しない / directory でない場合は {@code JAVA_INVALID_REQUEST}
+     * で fatal とする (M4)。
+     */
+    private static void validateWorkspaceRoot(String workspaceRoot) throws AnalyzerFatalException {
+        if (workspaceRoot == null || workspaceRoot.isBlank()) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.workspaceRoot must not be null or empty");
+        }
+        Path path = Path.of(workspaceRoot);
+        if (!Files.exists(path)) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.workspaceRoot does not exist: " + workspaceRoot);
+        }
+        if (!Files.isDirectory(path)) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.workspaceRoot is not a directory: " + workspaceRoot);
+        }
+    }
+
+    /**
+     * {@code liftExcludePackages} は key 不在なら既定値 (呼び出し側で処理)。指定時は文字列配列でなければ
+     * {@code JAVA_INVALID_REQUEST} で fatal とする (M5)。空配列は「除外なし」として正当。
+     */
+    private static void validateLiftExcludePackages(Map<String, Object> metadata) throws AnalyzerFatalException {
+        if (!metadata.containsKey(METADATA_LIFT_EXCLUDE_PACKAGES)) {
+            return;
+        }
+        Object raw = metadata.get(METADATA_LIFT_EXCLUDE_PACKAGES);
+        if (!(raw instanceof List<?> rawList)) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.metadata.liftExcludePackages must be a string array");
+        }
+        for (Object element : rawList) {
+            if (!(element instanceof String)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_REQUEST,
+                        "analysisRequest.metadata.liftExcludePackages element must be a string: " + element);
             }
         }
     }
