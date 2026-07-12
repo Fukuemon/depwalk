@@ -62,6 +62,7 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 - 実行時profile、外部設定、条件評価を含むSpring ApplicationContextの完全再現
 - Analyzer Protocolの破壊的変更
 - KotlinなどJava以外の言語解析
+- Gradleマルチモジュール（複数source root）プロジェクト対応（Issue #24へ切り出し。本issueは単一source rootプロジェクトを前提とする — spec D1付随決定）
 
 動的呼び出しの完全追跡を初期スコープに含めない理由と再検討条件は [ADR-0004](../../adr/0004-defer-runtime-call-tracing.md)、SootUpとSpring DI解決を採用して一つのfeatureとして扱う理由は [ADR-0005](../../adr/0005-adopt-sootup-and-spring-di-resolution.md) に従う。
 
@@ -131,3 +132,4 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | 2026-07-12 | Claude | clarify: Q3をspec index.mdのD3決定 (条件評価せず検出・記録のみ) を参照する形で決定済みへ更新                                                                    |
 | 2026-07-12 | Claude | clarify: Q4をspec index.mdのD4決定 (宣言メソッドedge + runtime-providedマーカー区別) を参照する形で決定済みへ更新                                               |
 | 2026-07-12 | Claude | clarify: spec D5決定 (性能増分は数値基準を定めず計測・記録を受け入れ基準に、SLOは#22で確定) を監査/非機能要件へ反映。Q1〜Q4解消により未決事項解消フェーズを完了 |
+| 2026-07-12 | Claude | clarify再レビュー指摘反映: スコープ「やらないこと」にGradleマルチモジュール非対応 (#24切り出し) / 単一source root前提を追記                                     |
