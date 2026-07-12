@@ -15,19 +15,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                                                                                  |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                                                                                                                                                     |
-| 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み)                                                                                                                         |
-| 3   | 上位文書突合                | 完了       | 2026-07-12 | 整合確認済み・矛盾なし (上位文書への反映は sync phase)。track phase: clarify (D1〜D6) / diagram の変更点を「上位資料からの変更点」に反映済み (上位文書自体は未編集、反映は sync phase)。track レビュー済 (2026-07-12) |
-| 4   | 論点整理                    | レビュー済 | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)                                                                                                                                |
-| 5   | 論点解決                    | レビュー済 | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                                                                                                                                           |
-| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-12 | D1/D2 で解決済み。フロー図 (CLI 起点の解析フロー) / シーケンス図 (dispatch 解決処理) 生成完了、spec-review PASS (非 blocker 3 件、実装時留意)                                                                         |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                                                                                       |
-| 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                                                                                                                                          |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                                                       |
-| 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定                                                                                                                                  |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                                                       |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                                                                                                         |
+| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                                                                                                                                                                            |
+| 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み)                                                                                                                                                |
+| 3   | 上位文書突合                | 完了       | 2026-07-12 | sync phase 完了: 「上位資料からの変更点」全 11 行を上位文書 (Design Doc 1 件 / feature doc 7 件 / context 1 件 / ADR 2 件) へ反映し、durable 成果を正本ハンドオフ済み (Interface / Content・Data / Performance 設計節をスナップショット降格) |
+| 4   | 論点整理                    | レビュー済 | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)                                                                                                                                                       |
+| 5   | 論点解決                    | レビュー済 | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                                                                                                                                                                  |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-12 | D1/D2 で解決済み。フロー図 (CLI 起点の解析フロー) / シーケンス図 (dispatch 解決処理) 生成完了、spec-review PASS (非 blocker 3 件、実装時留意)                                                                                                |
+| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                                                                                                              |
+| 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                                                                                                                                                                 |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                                                                              |
+| 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定                                                                                                                                                         |
+| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                                                                              |
 
 ## 上位文書整合
 
@@ -244,6 +244,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## Interface 設計
 
+> 以下は決定時スナップショット (2026-07-12 sync phase で正本ハンドオフ済み)。正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) (dispatch 標識 / Interface 設計節)。本節は決定経緯の記録として残す。
+
 ### UI / API / Event Interface
 
 - 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D3 解決済み: Spring 条件評価は行わず、条件アノテーションの検出・記録のみを metadata / diagnostic に追加する。条件付き Bean を含む場合は候補が 1 件でも一意扱いにしない。D4 解決済み: Spring Data 等の実行時生成実装は疑似実装ノードを合成せず、宣言メソッドへの edge のみを保持する。既知マーカー (初期は Spring Data `Repository` 型階層) に合致する場合は diagnostic の理由を「未解決」ではなく「runtime-provided」として区別する。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
@@ -254,6 +256,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## Content / Data 設計
 
+> 以下は決定時スナップショット (2026-07-12 sync phase で正本ハンドオフ済み)。正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) (段階導入 / コンテンツ配置に相当する節)。本節は決定経緯の記録として残す。
+
 ### 保存・管理するデータ
 
 - 永続ストアは持たない (既存方針を継承)。Core プロセス内の中間状態としてのみ graph を保持する。
@@ -263,6 +267,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は実装分割時に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) の検出・記録ロジックも `analyzers/java/` 内で行い、条件評価は実装しない (D3)。実行時生成実装の既知マーカー (初期は Spring Data `Repository` 型階層) の照合ロジックも `analyzers/java/` 内に持ち、疑似実装ノードは合成しない (D4)。
 
 ## Performance / Security 設計
+
+> Performance 節は決定時スナップショット (2026-07-12 sync phase で正本ハンドオフ済み)。正本は [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) (性能方針節)。本節は決定経緯の記録として残す。Security / Privacy 節は既存方針の継承のみのためハンドオフ対象外。
 
 ### Performance
 
@@ -408,36 +414,36 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ### Design Doc への影響
 
-| 対象節            | 変更内容                                                                                                  | 理由                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| Open Questions Q2 | 「SootUp 統合範囲」を解決 — 型階層補完のみ (call graph 生成は委譲しない)。sync phase で Design Doc へ反映 | source: clarify (spec D1 で決定) |
+| 対象節            | 変更内容                                                                                                  | 理由                             | 状態                |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------- |
+| Open Questions Q2 | 「SootUp 統合範囲」を解決 — 型階層補完のみ (call graph 生成は委譲しない)。sync phase で Design Doc へ反映 | source: clarify (spec D1 で決定) | 反映済 (2026-07-12) |
 
 ### feature doc への影響
 
-| 対象 doc / 節                                                            | 変更内容                                                                                                                                                                                                                                                | 理由                                              |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| feature doc (java-analyzer) dispatch 標識 (`callEdge.metadata.dispatch`) | 複数 dispatch 候補は call site ごとの複数 CallEdge (宣言型 edge 保持 + metadata で解決根拠) で表す拡張が確定。sync phase で feature doc へ反映                                                                                                          | source: clarify (spec D2 で決定)                  |
-| feature doc (java-analyzer) 段階導入 / 既知の制約 (override)             | SootUp の役割を確定 — 型階層・override・interface 実装候補の索引としてのみ使用し call graph 生成は委譲しない。SootUp の view 構築は lazy に行う。「virtual dispatch の解決は後続 feature (#21) の担当」の記述を具体化。sync phase で feature doc へ反映 | source: clarify (spec D1 で決定)                  |
-| feature doc (java-analyzer) 段階導入 (後続 feature (#21) の範囲)         | Spring 条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) は条件評価を行わず検出・記録のみとし、候補は常に保持する方針を新規追記。sync phase で feature doc へ反映                                                                           | source: clarify (spec D3 で決定)                  |
-| feature doc (java-analyzer) 段階導入 (後続 feature (#21) の範囲)         | Spring Data 等の実行時生成実装は宣言メソッドへの edge のみを保持し、既知の runtime-provided マーカー (初期は Spring Data `Repository` 型階層のみ) で区別する方針を新規追記。sync phase で feature doc へ反映                                            | source: clarify (spec D4 で決定)                  |
-| feature doc (java-analyzer) 性能方針                                     | SootUp / Spring 解析追加分の性能増分は数値の合否基準を定めず計測・記録までを受け入れ基準とする方針 (SLO は #22 で確定) と、SootUp の view lazy 構築という設計原則を追記。sync phase で feature doc へ反映                                               | source: clarify (spec D5 で決定)                  |
-| feature doc (java-analyzer) 段階導入 / テスト観点                        | 観測責務の境界 (Analyzer JSONL の metadata / diagnostic までを #21 の責務とし、CLI 出力への表出は #22 へ引き継ぐ) を新規追記。sync phase で feature doc へ反映                                                                                          | source: clarify (spec D6 で決定)                  |
-| feature doc (java-analyzer) テスト観点 (E2E)                             | Spring Boot fixture の新規作成が必要 (現状 `testdata/fixtures/java/` に Spring fixture なし)。単一 source root 前提での fixture 追加をテスト戦略節へ追記。sync phase で feature doc へ反映                                                              | source: clarify (spec D1/前提制約, D3, D4 で決定) |
+| 対象 doc / 節                                                            | 変更内容                                                                                                                                                                                                                                                | 理由                                              | 状態                |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------- |
+| feature doc (java-analyzer) dispatch 標識 (`callEdge.metadata.dispatch`) | 複数 dispatch 候補は call site ごとの複数 CallEdge (宣言型 edge 保持 + metadata で解決根拠) で表す拡張が確定。sync phase で feature doc へ反映                                                                                                          | source: clarify (spec D2 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) 段階導入 / 既知の制約 (override)             | SootUp の役割を確定 — 型階層・override・interface 実装候補の索引としてのみ使用し call graph 生成は委譲しない。SootUp の view 構築は lazy に行う。「virtual dispatch の解決は後続 feature (#21) の担当」の記述を具体化。sync phase で feature doc へ反映 | source: clarify (spec D1 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) 段階導入 (後続 feature (#21) の範囲)         | Spring 条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) は条件評価を行わず検出・記録のみとし、候補は常に保持する方針を新規追記。sync phase で feature doc へ反映                                                                           | source: clarify (spec D3 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) 段階導入 (後続 feature (#21) の範囲)         | Spring Data 等の実行時生成実装は宣言メソッドへの edge のみを保持し、既知の runtime-provided マーカー (初期は Spring Data `Repository` 型階層のみ) で区別する方針を新規追記。sync phase で feature doc へ反映                                            | source: clarify (spec D4 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) 性能方針                                     | SootUp / Spring 解析追加分の性能増分は数値の合否基準を定めず計測・記録までを受け入れ基準とする方針 (SLO は #22 で確定) と、SootUp の view lazy 構築という設計原則を追記。sync phase で feature doc へ反映                                               | source: clarify (spec D5 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) 段階導入 / テスト観点                        | 観測責務の境界 (Analyzer JSONL の metadata / diagnostic までを #21 の責務とし、CLI 出力への表出は #22 へ引き継ぐ) を新規追記。sync phase で feature doc へ反映                                                                                          | source: clarify (spec D6 で決定)                  | 反映済 (2026-07-12) |
+| feature doc (java-analyzer) テスト観点 (E2E)                             | Spring Boot fixture の新規作成が必要 (現状 `testdata/fixtures/java/` に Spring fixture なし)。単一 source root 前提での fixture 追加をテスト戦略節へ追記。sync phase で feature doc へ反映                                                              | source: clarify (spec D1/前提制約, D3, D4 で決定) | 反映済 (2026-07-12) |
 
 ### context への影響
 
-| 対象 doc / 節                                         | 変更内容                                                                                                                                                           | 理由                                                                                                                |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| context/toolchain.md (Java Analyzer の解析スタック節) | SootUp の確定範囲を D1 で確定 — 型階層・override・interface 実装候補の索引のみ (call graph 生成は委譲しない)。「確定範囲は Q2 で詰める」の記述を確定内容に更新する | source: clarify (spec D1 で決定)。D1 (Design Doc Q2 解決) の toolchain への伝播。ADR-0005 の context 反映指示に従う |
+| 対象 doc / 節                                         | 変更内容                                                                                                                                                           | 理由                                                                                                                | 状態                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| context/toolchain.md (Java Analyzer の解析スタック節) | SootUp の確定範囲を D1 で確定 — 型階層・override・interface 実装候補の索引のみ (call graph 生成は委譲しない)。「確定範囲は Q2 で詰める」の記述を確定内容に更新する | source: clarify (spec D1 で決定)。D1 (Design Doc Q2 解決) の toolchain への伝播。ADR-0005 の context 反映指示に従う | 反映済 (2026-07-12) |
 
 - context/testing.md は更新不要: 既に「サンプル Java/Spring プロジェクト」を前提とした三層テスト戦略が記載済みで、#21 の Spring Boot fixture 追加はその枠内 (feature doc テスト観点行で管理)。
 
 ### ADR の新規 / 更新
 
-| ADR ID   | 変更内容                                                                                         | 理由                             |
-| -------- | ------------------------------------------------------------------------------------------------ | -------------------------------- |
-| ADR-0005 | 未決事項だった SootUp の call graph 生成委譲範囲が確定 (型階層補完のみに限定)。sync phase で反映 | source: clarify (spec D1 で決定) |
-| ADR-0005 | 未決事項 (候補 edge / 解決根拠 / 曖昧性の Protocol 表現) が確定 — sync phase で反映              | source: clarify (spec D2 で決定) |
+| ADR ID   | 変更内容                                                                                         | 理由                             | 状態                |
+| -------- | ------------------------------------------------------------------------------------------------ | -------------------------------- | ------------------- |
+| ADR-0005 | 未決事項だった SootUp の call graph 生成委譲範囲が確定 (型階層補完のみに限定)。sync phase で反映 | source: clarify (spec D1 で決定) | 反映済 (2026-07-12) |
+| ADR-0005 | 未決事項 (候補 edge / 解決根拠 / 曖昧性の Protocol 表現) が確定 — sync phase で反映              | source: clarify (spec D2 で決定) | 反映済 (2026-07-12) |
 
 ## レビュー
 
@@ -471,6 +477,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | track phase: 上位資料からの変更点を最新化。feature doc への影響行を 6 件追加 (D1/D3/D4/D5/D6/Spring Boot fixture)。Design Doc / ADR / context / PRD は既存記録済み・変更なしを確認 |
 | 2026-07-12 | Claude | track レビュー指摘 3 件対応 (context への影響テーブルに D1 → toolchain.md 反映行を追加、testing.md 更新不要の根拠記録、ADR テーブル D1 行の文言統一)                               |
 | 2026-07-12 | Claude | track 再レビュー PASS。非 blocker (sync phase で context/toolchain.md の最終更新日を同時更新) を記録し、track phase 完了                                                           |
+| 2026-07-12 | Claude | sync phase: 上位文書 11 件反映 (Design Doc 1 / feature doc 7 / context 1 / ADR 2) + 正本ハンドオフ (Interface / Content・Data / Performance 設計節を feature doc へ)               |
 
 ## 備考
 
