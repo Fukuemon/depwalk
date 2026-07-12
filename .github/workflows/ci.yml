@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  go:
+    name: Go (JVM-free)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+
+      - name: Check gofmt
+        run: test -z "$(gofmt -l .)"
+        working-directory: core
+
+      - name: go vet
+        run: go vet ./...
+        working-directory: core
+
+      - name: go build
+        run: go build ./...
+        working-directory: core
+
+      - name: go test
+        run: go test ./...
+        working-directory: core
+
+      - name: go mod tidy diff check
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+        working-directory: core
+
+      - name: Dependency boundary gate (core must not depend on analyzers/)
+        run: |
+          if go list -deps ./... | grep -E "analyzers/"; then
+            echo "core must not depend on analyzers/<language>/ packages"
+            exit 1
+          fi
+        working-directory: core
+
+  java-e2e:
+    name: Java + E2E (JDK 25 / Gradle)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+
+      - name: Build and test Java Analyzer
+        run: ./gradlew test shadowJar
+        working-directory: analyzers/java
+
+      - name: Run Go E2E tests
+        run: go test ./e2e/... -v
+        working-directory: core
