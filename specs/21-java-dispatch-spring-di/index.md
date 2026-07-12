@@ -135,14 +135,14 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                           | 決定候補                                                                   | 決定     |
-| --- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
-| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない)                            | 解決済み |
-| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  | A1: call site ごとの複数候補 edge (宣言型 edge 保持 + metadata で解決根拠) | 解決済み |
-| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  | A: 条件評価しない (条件の検出・記録のみ、候補は常に保持)                   | 解決済み |
-| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                                            | 未決     |
-| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                            | 未決     |
-| D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  | A: JSONL metadata + diagnostic まで (CLI 出力表出は #22 へ引き継ぎ)        | 解決済み |
+| #   | 論点                                                                                                           | 決定候補                                                                            | 決定     |
+| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない)                                     | 解決済み |
+| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  | A1: call site ごとの複数候補 edge (宣言型 edge 保持 + metadata で解決根拠)          | 解決済み |
+| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  | A: 条件評価しない (条件の検出・記録のみ、候補は常に保持)                            | 解決済み |
+| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                | A: 宣言メソッド edge のみ + runtime-provided マーカー区別 (初期は Spring Data のみ) | 解決済み |
+| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                                     | 未決     |
+| D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  | A: JSONL metadata + diagnostic まで (CLI 出力表出は #22 へ引き継ぎ)                 | 解決済み |
 
 ## 解決済みの論点
 
@@ -172,11 +172,18 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
   - 決定日: 2026-07-12
   - 決定者: Fukuemon
 
+- **D4: Spring Data 等の実行時生成実装は「宣言メソッドへの edge のみ + 既知の実行時提供マーカー検出による区別記録」で表す (案 A)。疑似実装ノードは合成しない。**
+  - 具体化: 実装候補ゼロの interface 呼び出しは E1 の一般規則 (未解決 diagnostic + 宣言型 edge 保持) で処理する。ただし既知マーカーに合致する場合は「未解決」ではなく「runtime-provided (framework が実行時に提供、意図的に解決しない)」として metadata / diagnostic の理由を区別する。既知マーカーの初期対応は Spring Data の `Repository` 型階層のみとし、他フレームワーク (`@FeignClient`、MyBatis Mapper 等) の追加は後続とする。
+  - 決定理由: Repository が大量にある実プロジェクトで diagnostic を「本当に調べるべき未解決」と「仕様どおり解決しないもの」に区別でき、ノイズで本物の未解決が埋もれるのを防ぐ (案 B の欠点)。疑似ノード合成 (案 C) はソースに存在しないノードが graph / 出力に混入し methodId 規則と整合せず、生成実装の先は辿れないため traversal 上の価値もない。ADR-0004 (実行時 Proxy 非対象) と整合。
+  - トレードオフとして受容: 既知マーカー一覧の保守が必要 (初期は Spring Data のみに限定)。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
+
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1, D2, D3, D6 は解決済み。D4, D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+- D1, D2, D3, D4, D6 は解決済み。D5 のみ未決のため、Interface / Routing 設計以降の下流 phase は D5 の論点解決を待つ。
 
 ## 実装対象
 
@@ -195,7 +202,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 ### User Flow
 
 1. Core が既存 Analyzer 起動契約 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD`、`--analyzer-meta`) に従って Java Analyzer process を起動し、`analysisRequest` を送信する (契約は変更しない想定)。
-2. Java Analyzer は JavaParser/SymbolSolver によるソース抽出に加え、SootUp で型階層・依存 jar を補完し、Spring 解析で DI 候補を絞り込む (D1〜D4 の結論により具体化)。
+2. Java Analyzer は JavaParser/SymbolSolver によるソース抽出に加え、SootUp で型階層・依存 jar を補完し、Spring 解析で DI 候補を絞り込む (D1〜D4 の決定を反映)。
 3. 実装候補への call edge、解決根拠、曖昧性を Protocol の `methodSymbol` / `callEdge` / `diagnostic` として stdout へ出力する。
 4. Core / Traversal / Output は既存契約のまま結果を処理する (D2 の結論次第で候補 edge の扱いに補足が入りうる)。
 
@@ -224,17 +231,17 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 ### Testing
 
 - [context/testing.md](../../context/testing.md) の Java Analyzer 三層 (Java unit / Go process contract (fake, JVM 不要) / 実 jar E2E) を踏襲する。
-- SootUp / Spring 解析固有の観点は D4 解決後に追記する (条件アノテーション検出・記録 (D3) のテストケースは実装分割時に具体化)。
+- SootUp / Spring 解析固有の観点として、Spring Data `Repository` 経由呼び出しの runtime-provided マーカー検出テスト (D4) を追加する。条件アノテーション検出・記録 (D3) のテストケースとあわせ、具体化は実装分割時に行う。
 
 ## Interface 設計
 
 ### UI / API / Event Interface
 
-- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D3 解決済み: Spring 条件評価は行わず、条件アノテーションの検出・記録のみを metadata / diagnostic に追加する。条件付き Bean を含む場合は候補が 1 件でも一意扱いにしない。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D3 解決済み: Spring 条件評価は行わず、条件アノテーションの検出・記録のみを metadata / diagnostic に追加する。条件付き Bean を含む場合は候補が 1 件でも一意扱いにしない。D4 解決済み: Spring Data 等の実行時生成実装は疑似実装ノードを合成せず、宣言メソッドへの edge のみを保持する。既知マーカー (初期は Spring Data `Repository` 型階層) に合致する場合は diagnostic の理由を「未解決」ではなく「runtime-provided」として区別する。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
 
 ### Props / Request / Response
 
-- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。D2 により、複数 dispatch 候補は caller → 各実装候補への複数 `callEdge` (宣言型への既存 edge も保持) で表現し、各 edge の metadata に解決根拠 (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`) を付与する。フィールド名の最終形は設計時に確定する。D3 により、`@Profile` / `@ConditionalOnProperty` 等の条件アノテーション付き Bean は評価せず無条件に候補として列挙し、「条件付きである」事実と条件種別を metadata / diagnostic に追加する (絞り込みには使わない、条件付き候補を含む場合は 1 件でも `resolution: unique` にしない)。D4 の候補・曖昧性表現の残る項目は D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
+- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。D2 により、複数 dispatch 候補は caller → 各実装候補への複数 `callEdge` (宣言型への既存 edge も保持) で表現し、各 edge の metadata に解決根拠 (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`) を付与する。フィールド名の最終形は設計時に確定する。D3 により、`@Profile` / `@ConditionalOnProperty` 等の条件アノテーション付き Bean は評価せず無条件に候補として列挙し、「条件付きである」事実と条件種別を metadata / diagnostic に追加する (絞り込みには使わない、条件付き候補を含む場合は 1 件でも `resolution: unique` にしない)。D4 により、実装候補ゼロの interface 呼び出しは E1 の一般規則 (未解決 diagnostic + 宣言型 edge 保持) に従うが、既知の実行時提供マーカー (初期は Spring Data `Repository` 型階層) に合致する場合は diagnostic の理由を「runtime-provided」として区別する。疑似実装ノードは合成しない。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
 
 ## Content / Data 設計
 
@@ -244,7 +251,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### コンテンツ配置 / package / route
 
-- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) の検出・記録ロジックも `analyzers/java/` 内で行い、条件評価は実装しない (D3)。
+- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は実装分割時に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) の検出・記録ロジックも `analyzers/java/` 内で行い、条件評価は実装しない (D3)。実行時生成実装の既知マーカー (初期は Spring Data `Repository` 型階層) の照合ロジックも `analyzers/java/` 内に持ち、疑似実装ノードは合成しない (D4)。
 
 ## Performance / Security 設計
 
@@ -260,12 +267,12 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### エラーケース
 
-| #   | ケース                             | ユーザーへの見せ方                                                                | リカバリ                                                       |
-| --- | ---------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続                                                | 宣言型の edge を保持                                           |
-| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力                                                            | 複数候補 edge + 宣言型 edge 保持 (D2)                          |
-| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力                                                    | JavaParser 結果のみで解析継続                                  |
-| E4  | 条件付き Bean を静的に確定できない | 条件付きであることと条件種別を metadata / diagnostic に記録し、候補を無条件に列挙 | 条件評価は行わず (D3)、候補 1 件でも一意扱いせず曖昧候補とする |
+| #   | ケース                             | ユーザーへの見せ方                                                                                                                                                    | リカバリ                                                       |
+| --- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続。ただし既知の実行時提供マーカー (初期は Spring Data `Repository` 型階層) に合致する場合は理由を「runtime-provided」として区別 (D4) | 宣言型の edge を保持 (疑似実装ノードは合成しない)              |
+| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力                                                                                                                                                | 複数候補 edge + 宣言型 edge 保持 (D2)                          |
+| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力                                                                                                                                        | JavaParser 結果のみで解析継続                                  |
+| E4  | 条件付き Bean を静的に確定できない | 条件付きであることと条件種別を metadata / diagnostic に記録し、候補を無条件に列挙                                                                                     | 条件評価は行わず (D3)、候補 1 件でも一意扱いせず曖昧候補とする |
 
 ### Fallback
 
@@ -278,7 +285,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 - [context/testing.md](../../context/testing.md) の三層構成 (Java unit / Go process contract / 実 jar E2E) を踏襲。
 - Spring Boot fixture による E2E で、既知の caller / callee 集合との照合を行う (graph 照合が基本、CLI 出力照合は #22 完了後)。
-- 具体的な test case は D1〜D4 解決後に追記する。
+- 具体的な test case は実装分割時に追記する。
 
 ### 計測指標
 
@@ -369,6 +376,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D2 (複数 dispatch 候補は call site ごとの複数候補 edge、案 A1) を決定として反映。付随論点 D6 (曖昧性・解決根拠の CLI 出力での観測可能性) を追加 |
 | 2026-07-12 | Claude | clarify: D6 (観測は Analyzer JSONL の metadata + diagnostic までを #21 の責務とし、CLI 出力表出は #22 へ引き継ぐ、案 A) を決定として反映                 |
 | 2026-07-12 | Claude | clarify: D3 (Spring 条件評価は行わず、条件アノテーションの検出・記録のみ行う、案 A) を決定として反映                                                     |
+| 2026-07-12 | Claude | clarify: D4 (実行時生成実装は宣言メソッド edge のみ + runtime-provided マーカー区別、初期は Spring Data のみ、案 A) を決定として反映                     |
 
 ## 備考
 
