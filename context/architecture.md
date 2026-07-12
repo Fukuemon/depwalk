@@ -14,7 +14,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / 宣言位置、`CallSite`) を保持し、Protocol wire record → graph 値型の変換は graph 構築時 (Analyze Use Case 層) に 1 回だけ行う。wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
 - Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
-- **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。Analyzer 追加で Core に差分が出ないこと (S5)。
+- **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
 
 Go 側 Core の初期 package 境界は次とする。
 
