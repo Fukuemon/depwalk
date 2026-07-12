@@ -25,7 +25,7 @@
 | 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |           |
 | 3   | 上位文書突合                | 完了       | 2026-07-12 |           |
 | 4   | 論点整理                    | 完了       | 2026-07-12 |           |
-| 5   | 論点解決                    | 未着手     |            |           |
+| 5   | 論点解決                    | 完了       | 2026-07-12 |           |
 | 6   | Interface / Routing 設計    | 未着手     |            |           |
 | 7   | Content / Data 設計         | 未着手     |            |           |
 | 8   | Performance / Security 設計 | 未着手     |            |           |
@@ -39,7 +39,7 @@
 
 - PRD 更新要否: 不要
 - Design Doc 更新要否: 不要
-- ADR 起票要否: 要 (論点 #10 の結論次第で新規 ADR または既存 ADR-0003 改訂の可能性あり)
+- ADR 起票要否: 不要 (D10 で ADR-0003 無改訂を確定)
 
 | 上位文書      | 節 / 該当箇所                                                                                       | 整合方針 (継承 / 補足 / 変更提案)                                           |
 | ------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -59,7 +59,7 @@
 - `design/DesignDoc.md`: S1-S3 成功条件 / モジュール責務 CLI / Phase 計画
 - 関連 issue / ticket:
   - issue: https://github.com/Fukuemon/depwalk/issues/22
-  - 決定経緯 (issue 単位の作業記録): `specs/9-java-analyzer/` (D2/D4/P2_02)、`specs/6-traversal/` (Request/Result API)、`specs/7-output/` (D6 `output.Write` / D7 golden test)、`specs/21-java-dispatch-spring-di/` (D2 複数候補 edge の metadata 表現、D6 観測レイヤーの責務境界 — call edge metadata の CLI 表出判断を #22 へ引き継ぎ)
+  - 決定経緯 (issue 単位の作業記録): `specs/9-java-analyzer/` (D2/D4/P2_02)、`specs/6-traversal/` (Request/Result API)、`specs/7-output/` (D6 `output.Write` / D7 golden test)、`specs/21-java-dispatch-spring-di/` (D2 複数候補 edge の metadata 表現、D6 観測レイヤーの責務境界 — call edge metadata の CLI 表出判断を #22 へ引き継ぎ。#21 の clarify は別ブランチ系列で進行中のため、本ブランチには requirements.md のみ存在。index.md への参照は merge 後に解決)
   - 関連 issue: #9 (実装済み) / #6 / #7 / #21 (D6 論点 (D11) を引き継ぎ)
 
 ## 背景
@@ -125,7 +125,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 (`spec-resolve` で確定したものをここに移動する)
 
-- #22 D1: method selector は 1 引数の統合書式 `<qualifiedName>#<メソッド名>[(<引数型リスト>)]` とする。括弧付きで signature 完全指定 (例: `com.example.UserService#findById(java.lang.Long)`)、括弧省略時はメソッド名のみで指定 (例: `com.example.UserService#findById`)。Analyzer の signature 表記 (feature doc java-analyzer の methodId 節) と同一の表記体系。flag 名 / 位置引数かどうかは D2・D3 で確定する。オーバーロード曖昧性は、signature 省略時に同名メソッドが複数一致した場合、候補の完全 signature を一覧表示してエラー終了する (自動選択しない。exit code は D8 で確定)。一致 1 件ならそれを採用する。graph node との照合は node が保持する symbol 情報 (qualifiedName / signature) を走査して行い、Core は methodId の文字列形式 (`java:` prefix 等) に依存しない (Decision Priority 2: 言語非依存)。graph.Node に必要フィールドが不足していれば `graph` package の convert で保持を追加する (core ドメイン内の軽微変更)。理由: methodId 文字列形式への非依存は言語非依存原則と整合し、曖昧時の自動選択をしないことで CI 向けの予測可能性を確保できるため。
+- #22 D1: method selector は 1 引数の統合書式 `<型の binary name>#<メソッド名>[(<引数型リスト>)]` とする (用語は feature doc `DesignDoc_java-analyzer.md` の methodId 節に合わせる)。括弧付きで signature 完全指定 (例: `com.example.UserService#findById(java.lang.Long)`)、括弧省略時はメソッド名のみで指定 (例: `com.example.UserService#findById`)。Analyzer の signature 表記 (feature doc java-analyzer の methodId 節) と同一の表記体系。flag 名 / 位置引数かどうかは D2・D3 で確定する。オーバーロード曖昧性は、signature 省略時に同名メソッドが複数一致した場合、候補の完全 signature を一覧表示してエラー終了する (自動選択しない。exit code は D8 で確定)。一致 1 件ならそれを採用する。graph node との照合は node が保持する symbol 情報 (qualifiedName / signature) を走査して行い、Core は methodId の文字列形式 (`java:` prefix 等) に依存しない (Decision Priority 2: 言語非依存)。graph.Node に必要フィールドが不足していれば `graph` package の convert で保持を追加する (core ドメイン内の軽微変更)。理由: methodId 文字列形式への非依存は言語非依存原則と整合し、曖昧時の自動選択をしないことで CI 向けの予測可能性を確保できるため。
 - #22 D2: 探索クエリは `analyze` コマンドへの flag 追加で提供する (サブコマンド分割しない)。形は `depwalk analyze <path> --language java --analyzer-cmd ... --method <selector> --direction <dir> --max-depth <n> --format <fmt>` (各 flag の名前・既定値は D3-D5 で確定)。後方互換: `--method` 省略時は現行のサマリ動作 (件数 1 行 + diagnostics) を維持し、既存 flag (`--analyzer-cmd` / `--language` / `--analyzer-meta`) は変更しない。拡張余地の宣言: 将来の新出力形式は `--format` の値追加で、新しいクエリ種別 (例: パス探索) が必要になった場合はサブコマンド新設でも flag 追加でも拡張できる構造とする (issue 完了条件「後方互換の拡張余地が宣言されている」に対応)。理由: 実装最小・既存動作の後方互換維持・issue の「flag 体系」の表現と一致し、analyzer 起動系 flag の重複定義を避けられるため。
 - #22 D3: 探索方向 flag は `--direction`、値は `caller` / `callee` (traversal の `graph.Direction` に対応)。任意 flag で既定値は `caller` — 影響調査の主用途 (S1: このメソッドを変えたら誰に影響するか) を既定にする。不正値は許容値一覧を添えてエラーとする。理由: 主ユースケースの入力を最短にでき、既定の意味が直感的なため。
 - #22 D4: 深さ上限 flag は `--max-depth`、非負整数。任意 flag で既定は無制限 (未指定時は traversal の `MaxDepth` に nil を渡す)。0 は「起点のみ」(traversal の意味論をそのまま継承)。負値はエラーとする。指定時に深さ超過で打ち切られた場合は traversal の depthLimit cutoff 注釈が出力に反映される (出力表現は #7 output の View 仕様に従う)。理由: traversal の意味論と 1:1 対応で最も素直であり、循環は traversal が処理済みで結果は有限のため。
@@ -285,9 +285,10 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 ### feature doc への影響
 
-| 対象 doc / 節                | 変更内容                                                                                                                       | 理由                               |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| (反映先は sync phase で確定) | method selector の CLI 書式・曖昧性解決規則を CLI interface の設計として design 側へ反映予定。状態=未反映 (source: clarify D1) | D1 決定の durable な設計成果のため |
+| 対象 doc / 節                | 変更内容                                                                                                                                        | 理由                                |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| (反映先は sync phase で確定) | method selector の CLI 書式・曖昧性解決規則を CLI interface の設計として design 側へ反映予定。状態=未反映 (source: clarify D1)                  | D1 決定の durable な設計成果のため  |
+| (反映先は sync phase で確定) | graph.Edge / output.EdgeView への Metadata 透過追加と JSON edge の metadata フィールドを design 側へ反映予定。状態=未反映 (source: clarify D11) | D11 決定の durable な設計成果のため |
 
 ### context への影響
 
@@ -309,6 +310,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | ---------- | ------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------- |
 | 2026-07-12 | NEEDS_WORK               | (scaffold phase) EARS 要件記述が未記入 (S1-S3 から 3 件追加要)、フェーズ表の突合状態未同期 | 対応済 (EARS 追加・フェーズ表同期) |
 | 2026-07-12 | PASS                     | (scaffold 再) 指摘なし (前回指摘対応を確認)                                                | —                                  |
+| 2026-07-12 | NEEDS_WORK               | (clarify phase) メタ情報同期 3 件 + 用語揺れ等 2 件                                        | 対応済 (同 commit)                 |
 
 ## 変更履歴
 
@@ -329,6 +331,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | clarify        | D9 (E2E: os/exec バイナリ起動 + golden 照合) を確定                                 |
 | 2026-07-12 | clarify        | D10 (規約 path による既定解決: 見送り、ADR-0003 無改訂) を確定                      |
 | 2026-07-12 | clarify        | D11 (call edge metadata: JSON のみ透過) を確定。全論点解決、論点整理 phase 完了     |
+| 2026-07-12 | clarify        | clarify レビュー指摘対応 (メタ情報同期・用語統一)                                   |
 
 ## 備考
 

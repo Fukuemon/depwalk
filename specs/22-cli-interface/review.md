@@ -28,3 +28,24 @@ Verdict: PASS
 - EARS acceptance: PASS — S1/S2/S3 の WHEN 形式 3 件、観測可能な記述 (前回指摘 1 対応確認)
 - prompts 自己完結性 / 正本境界: N/A (scaffold 段階)
 - 補足 (非ブロッキング): レビュー表の「対応方針をユーザー確認中」を「対応済」へ同期すること → 本記録で対応
+
+## Review 2026-07-12 (clarify phase gate)
+
+Verdict: NEEDS_WORK
+
+- 上位文書整合: PASS — D1-D11 の全決定を feature doc / context / ADR-0003 / 実装現状 (traversal.go / output types.go / cli analyze.go) と実地照合し一致
+- 未解決論点: PASS — 論点テーブル空、D1-D11 解決済み、未確定事項なし、下流節は placeholder (期待どおり)
+- 実装対象明示: PASS — 5 target 一致、output の ◯ 昇格経緯と traversal の逸脱時手続きが読める
+- template 必須節: NEEDS_WORK — メタ情報同期 3 件 (下記指摘 1-3)
+- EARS acceptance: PASS — S1/S2/S3 の観測手段が D8/D9 で裏付け済み
+- prompts 自己完結性 / 正本境界: N/A
+
+指摘:
+
+1. フェーズ表「論点解決」が未着手のまま (実態: 全解決) → 完了へ同期
+2. 整合ヘッダ「ADR 起票要否: 要」が D10 確定後も残存 → 不要へ同期
+3. D11 の graph/output Metadata 追加が「feature doc への影響」に未記載 → 反映予定行を追記
+4. (非ブロッキング) specs/21 参照が本ブランチで未解決な旨を関連資料に注記
+5. (非ブロッキング) D1 の <qualifiedName> 用語が feature doc の定義と揺れ → <型の binary name> へ統一
+
+総評: D1-D11 は相互矛盾なく上位文書・実装と整合。残りはメタ情報同期のみで修正後 PASS 可能な水準。
