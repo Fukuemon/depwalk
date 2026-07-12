@@ -19,12 +19,12 @@
 | --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------- |
 | 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
 | 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
-| 3   | 上位文書突合                | 進行中     | 2026-07-12 | Design Doc / feature doc / ADR-0004 / ADR-0005 / context と整合確認済み。矛盾なし             |
+| 3   | 上位文書突合                | 完了       | 2026-07-12 | 整合確認済み・矛盾なし (上位文書への反映は sync phase)                                        |
 | 4   | 論点整理                    | 完了       | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)        |
 | 5   | 論点解決                    | 完了       | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                   |
-| 6   | Interface / Routing 設計    | 未着手     |            | Q1/Q2 (SootUp 範囲 / 候補表現) の解決待ち                                                     |
+| 6   | Interface / Routing 設計    | 未着手     |            | D1/D2 で解決済み (2026-07-12)                                                                 |
 | 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
-| 8   | Performance / Security 設計 | 未着手     |            | 性能 baseline (Issue #9) との比較方針は論点解決後に確定                                       |
+| 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                  |
 | 9   | Test / Metrics 設計         | 未着手     |            |                                                                                               |
 | 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定          |
 | 11  | レビュー済                  | 未着手     |            |                                                                                               |
@@ -34,7 +34,7 @@
 正本 ([Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
 
 - PRD 更新要否: 不要 (本プロジェクトは統合モードのため独立 PRD なし。Design Doc の Why/What が正)
-- Design Doc 更新要否: 不要 (成功条件 S4/S5、Open Questions Q2、Future Work「後続 feature (#21)」の記述が本 spec の前提と整合。Q2 の決定を spec 側で行い、決定後に Design Doc の Q2 状態を「解決済み」へ更新する運用は sync phase で扱う)
+- Design Doc 更新あり (sync phase で実施): Open Question Q2 の解決状態反映 (D1 により「型階層補完のみ」で確定)。成功条件 S4/S5、Future Work「後続 feature (#21)」の記述は本 spec の前提と整合しており、本文との矛盾はなし
 - ADR 起票要否: 不要 (ADR-0004 / ADR-0005 の決定枠内。新規 ADR 化が必要な代替案は現時点で発見していない)
 
 | 上位文書                    | 節 / 該当箇所                                                                                                                         | 整合方針 (継承 / 補足 / 変更提案)                                 |
@@ -200,9 +200,9 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 | モジュール          | 実装有無 | 主な責務                                                                                                                   |
 | ------------------- | :------: | -------------------------------------------------------------------------------------------------------------------------- |
 | `core`              |    -     | 変更なし。Spring / JVM / SootUp の意味を解釈しない (S5)                                                                    |
-| `traversal`         |    -     | D2 (候補 edge を複数 edge で表す場合) の結論次第で、探索・重複排除の扱いに影響しうる (備考)                                |
+| `traversal`         |    -     | 変更なし。D2 (call site 単位の複数候補 edge) により Traversal 変更不要が確定 (edge を区別しない BFS がそのまま候補へ到達)  |
 | `output`            |    -     | 変更なし想定                                                                                                               |
-| `analyzer-protocol` |    -     | D1/D2 (候補表現・SootUp call graph 委譲範囲) の結論次第で、非破壊的な metadata / diagnostic 追加が発生しうる (備考)        |
+| `analyzer-protocol` |    -     | schema 変更なし。既存 CallEdge.metadata / Diagnostic への値追加のみ (非破壊、D1〜D4/D6)                                    |
 | `java-analyzer`     |    ◯     | Interface Dispatch / Override 解決、SootUp 型階層補完、Spring Bean / DI 解決、候補統合・重複排除、metadata/diagnostic 出力 |
 
 ## 機能仕様
@@ -212,7 +212,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 1. Core が既存 Analyzer 起動契約 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD`、`--analyzer-meta`) に従って Java Analyzer process を起動し、`analysisRequest` を送信する (契約は変更しない想定)。
 2. Java Analyzer は JavaParser/SymbolSolver によるソース抽出に加え、SootUp で型階層・依存 jar を補完し、Spring 解析で DI 候補を絞り込む (D1〜D4 の決定を反映)。
 3. 実装候補への call edge、解決根拠、曖昧性を Protocol の `methodSymbol` / `callEdge` / `diagnostic` として stdout へ出力する。
-4. Core / Traversal / Output は既存契約のまま結果を処理する (D2 の結論次第で候補 edge の扱いに補足が入りうる)。
+4. Core / Traversal / Output は既存契約のまま結果を処理する (D2 確定: 候補 edge は宣言型 edge と同様に通常の CallEdge として扱われ、Traversal は edge を区別しない BFS のため変更なしで候補へ到達する)。
 
 ### Reuse Policy
 
@@ -372,9 +372,10 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                    | 対応     |
-| ---------- | ------------------------ | ------------------------------------------- | -------- |
-| 2026-07-12 | PASS                     | scaffold: 非 blocker 2 件 (文言ずれ / typo) | 修正済み |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                    | 対応                   |
+| ---------- | ------------------------ | ------------------------------------------- | ---------------------- |
+| 2026-07-12 | PASS                     | scaffold: 非 blocker 2 件 (文言ずれ / typo) | 修正済み               |
+| 2026-07-12 | NEEDS_WORK→修正済み      | clarify: stale 記述 8 件 (決定の伝播漏れ)   | 全件修正、再レビューへ |
 
 ## 変更履歴
 
@@ -388,6 +389,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D3 (Spring 条件評価は行わず、条件アノテーションの検出・記録のみ行う、案 A) を決定として反映                                                     |
 | 2026-07-12 | Claude | clarify: D4 (実行時生成実装は宣言メソッド edge のみ + runtime-provided マーカー区別、初期は Spring Data のみ、案 A) を決定として反映                     |
 | 2026-07-12 | Claude | clarify: D5 (性能増分は数値基準を定めず計測・記録を受け入れ基準に、SLO は #22 で確定、案 A) を決定として反映。D1〜D6 全論点解決、clarify phase 完了      |
+| 2026-07-12 | Claude | clarify レビュー指摘 8 件対応 (stale 記述を D1〜D6 決定内容に同期)                                                                                       |
 
 ## 備考
 
@@ -401,4 +403,4 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 - data-testid 一覧 → appendices/testid.md
 -->
 
-現時点でこの機能に該当する appendix は見当たらない (UI / DB / 認可 / 画面 / data-testid のいずれも対象外)。SootUp / Spring DI 解決の候補表現規則が具体化した段階で、`analyzer-protocol` の schema 変更点をまとめる appendix (例: `appendices/api.md` に準じた protocol schema 差分) の要否を clarify phase 以降に再検討する。
+現時点でこの機能に該当する appendix は見当たらない (UI / DB / 認可 / 画面 / data-testid のいずれも対象外)。clarify 完了時点の結論: 取り込む appendix なし。metadata / diagnostic の値追加は既存 schema の範囲内のため protocol schema 差分 appendix も不要。以後 diagram / tasks phase で必要が生じた場合のみ再検討する。
