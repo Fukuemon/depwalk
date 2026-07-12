@@ -101,12 +101,12 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 
 ## 未決事項（論点）
 
-| #   | 論点                                                     | 決定者   | 期限          | 状態 | メモ                             |
-| --- | -------------------------------------------------------- | -------- | ------------- | ---- | -------------------------------- |
-| Q1  | SootUpを型階層補完だけに使うか、call graph生成まで使うか | Fukuemon | clarify phase | 未決 | Design Doc Q2を継承              |
-| Q2  | 複数dispatch候補を複数edgeで表すかmetadataで表すか       | Fukuemon | clarify phase | 未決 | Traversalへの影響を確認          |
-| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 未決 | profile / property / conditional |
-| Q4  | Spring Data等の実行時生成実装をどの抽象度で表すか        | Fukuemon | clarify phase | 未決 | 実行時Proxy自体は非対象          |
+| #   | 論点                                                     | 決定者   | 期限          | 状態                                | メモ                             |
+| --- | -------------------------------------------------------- | -------- | ------------- | ----------------------------------- | -------------------------------- |
+| Q1  | SootUpを型階層補完だけに使うか、call graph生成まで使うか | Fukuemon | clarify phase | 決定 (spec D1 参照: 型階層補完のみ) | Design Doc Q2を継承              |
+| Q2  | 複数dispatch候補を複数edgeで表すかmetadataで表すか       | Fukuemon | clarify phase | 未決                                | Traversalへの影響を確認          |
+| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 未決                                | profile / property / conditional |
+| Q4  | Spring Data等の実行時生成実装をどの抽象度で表すか        | Fukuemon | clarify phase | 未決                                | 実行時Proxy自体は非対象          |
 
 ## 関連資料
 
@@ -124,3 +124,4 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | 2026-07-11 | Codex  | 動的解析の非採用とSootUp / Spring DI採用のADRを関連付け                                                                                               |
 | 2026-07-11 | Codex  | GitHub Issue #21を起票しメタ情報を同期                                                                                                                |
 | 2026-07-12 | Claude | ADR-0005追随 (起点 / 上位文書参照の旧Phase呼称を統合feature表現へ更新)、E2E受け入れ基準の検証レベル (graph照合基本 / CLI出力照合は#22完了後) を明確化 |
+| 2026-07-12 | Claude | clarify: Q1をspec index.mdのD1決定 (型階層補完のみ) を参照する形で決定済みへ更新                                                                      |

@@ -20,8 +20,8 @@
 | 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
 | 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
 | 3   | 上位文書突合                | 進行中     | 2026-07-12 | Design Doc / feature doc / ADR-0004 / ADR-0005 / context と整合確認済み。矛盾なし             |
-| 4   | 論点整理                    | 未着手     |            | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理する                                |
-| 5   | 論点解決                    | 未着手     |            |                                                                                               |
+| 4   | 論点整理                    | 進行中     | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理中 (D1 解決、D2〜D5 は未決)         |
+| 5   | 論点解決                    | 進行中     | 2026-07-12 | D1 (SootUp 型階層補完のみ) を解決済み。D2〜D5 は未決のため継続                                |
 | 6   | Interface / Routing 設計    | 未着手     |            | Q1/Q2 (SootUp 範囲 / 候補表現) の解決待ち                                                     |
 | 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
 | 8   | Performance / Security 設計 | 未着手     |            | 性能 baseline (Issue #9) との比較方針は論点解決後に確定                                       |
@@ -94,6 +94,11 @@ Java Analyzer / Analyzer Protocol の責務であり、Core は Spring / JVM / S
 - Analyzer Protocol の破壊的変更
 - Kotlin など Java 以外の言語解析
 - CLI 引数の完全仕様確定 (→ #22 CLI interface spec)
+- Gradle マルチモジュール (複数 source root) プロジェクトへの対応 (→ #24 へ切り出し。D1 決定に付随する前提制約、詳細は「設計時の論点」D1 参照)
+
+### 前提制約
+
+- 解析対象は単一 source root プロジェクトのみとする。Spring Boot fixture も単一モジュールで作成する。Gradle マルチモジュール対応は [#24](https://github.com/Fukuemon/depwalk/issues/24) で扱う (D1 決定に付随、clarify phase で判明)。
 
 ## 要件の解釈
 
@@ -130,25 +135,29 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                           | 決定候補 | 決定 |
-| --- | -------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            |          | 未決 |
-| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  |          | 未決 |
-| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |          | 未決 |
-| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |          | 未決 |
-| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |          | 未決 |
+| #   | 論点                                                                                                           | 決定候補                                        | 決定     |
+| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | -------- |
+| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない) | 解決済み |
+| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  |                                                 | 未決     |
+| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |                                                 | 未決     |
+| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                 | 未決     |
+| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                 | 未決     |
 
 ## 解決済みの論点
 
 (`spec-resolve` で確定したものをここに移動する)
 
--
+- **D1: SootUp を型階層補完のみに使う (案 A)。call graph 生成までは委譲しない。**
+  - 決定理由: ADR-0005 の責務境界 (JavaParser = source AST / 呼び出し式 / symbol 抽出、SootUp = bytecode / 依存 jar の型階層・override・interface 実装候補の補完) と整合する。Phase 1 資産 (CallGraphBuilder / AttributionResolver / methodId 正規化 D5) をそのまま延長でき、callSite の行番号精度が source 由来で保たれる。SootUp call graph (CHA/RTA) の追加能力は依存 jar 内部の呼び出し連鎖だが、帰属型規則 (D11) が scope 外 edge を出力しない現行仕様では活きず、Spring DI 絞り込みはどちらの案でも自前実装のため最終精度は同等。時間 / RSS 増分も抑えられる。
+  - 前提制約: 解析対象は単一 source root プロジェクトのみとする。Gradle マルチモジュール (複数 source root) 対応は #21 のスコープ外とし、[#24](https://github.com/Fukuemon/depwalk/issues/24) へ切り出した。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 上記 D1〜D5 がすべて未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+- D1 は解決済み。D2〜D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
 
 ## 実装対象
 
@@ -202,11 +211,11 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### UI / API / Event Interface
 
-- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1/D2 の結論待ち)。
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 の結論待ち)。
 
 ### Props / Request / Response
 
-- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。候補・曖昧性表現の具体的な metadata / diagnostic 項目は D1〜D4 解決後に確定する。
+- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。候補・曖昧性表現の具体的な metadata / diagnostic 項目は D2〜D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
 
 ## Content / Data 設計
 
@@ -216,7 +225,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### コンテンツ配置 / package / route
 
-- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D1〜D4 解決後に確定)。
+- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D2〜D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。
 
 ## Performance / Security 設計
 
@@ -299,9 +308,9 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ### Design Doc への影響
 
-| 対象節 | 変更内容 | 理由 |
-| ------ | -------- | ---- |
-|        |          |      |
+| 対象節            | 変更内容                                                                                                  | 理由                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Open Questions Q2 | 「SootUp 統合範囲」を解決 — 型階層補完のみ (call graph 生成は委譲しない)。sync phase で Design Doc へ反映 | source: clarify (spec D1 で決定) |
 
 ### feature doc への影響
 
@@ -317,9 +326,9 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ### ADR の新規 / 更新
 
-| ADR ID | 変更内容 | 理由 |
-| ------ | -------- | ---- |
-|        |          |      |
+| ADR ID   | 変更内容                                                                      | 理由                             |
+| -------- | ----------------------------------------------------------------------------- | -------------------------------- |
+| ADR-0005 | 未決事項だった SootUp の call graph 生成委譲範囲が確定 (型階層補完のみに限定) | source: clarify (spec D1 で決定) |
 
 ## レビュー
 
@@ -335,6 +344,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | ---------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | 2026-07-12 | Claude | requirements.md と上位文書を基に index.md を新規作成 (scaffold)                                            |
 | 2026-07-12 | Claude | scaffold 完了、spec-review PASS。非 blocker 指摘 2 件 (feature doc 行の文言ずれ / 「からから」typo) を修正 |
+| 2026-07-12 | Claude | clarify: D1 (SootUp を型階層補完のみに使う) を決定として反映。Gradle マルチモジュール対応を #24 へ切り出し |
 
 ## 備考
 
