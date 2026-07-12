@@ -24,7 +24,7 @@
 | 1   | 起票                        | 完了       | 2026-07-12 | issue #22 |
 | 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |           |
 | 3   | 上位文書突合                | 完了       | 2026-07-12 |           |
-| 4   | 論点整理                    | 進行中     | 2026-07-12 |           |
+| 4   | 論点整理                    | 完了       | 2026-07-12 |           |
 | 5   | 論点解決                    | 未着手     |            |           |
 | 6   | Interface / Routing 設計    | 未着手     |            |           |
 | 7   | Content / Data 設計         | 未着手     |            |           |
@@ -115,11 +115,11 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                                                    | 決定候補 | 決定 |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D11 | call edge metadata (`resolution` / `provenance` / `dispatch` 等) を CLI 出力 (Console / JSON) にどう表出するか — #21 の D6 から引き継ぎ |          | 未決 |
+| #   | 論点 | 決定候補 | 決定 |
+| --- | ---- | -------- | ---- |
+|     |      |          |      |
 
-背景 (D11): #21 (Interface Dispatch / Spring DI 解決) は call site 単位の複数候補 edge を出力し、確定/曖昧の区別と解決根拠を `callEdge.metadata` に持たせる (spec: `specs/21-java-dispatch-spring-di/index.md` の D2/D6)。現状 Core は取り込み時に metadata を破棄する (graph.Edge / output.EdgeView に Metadata なし) ため、CLI 出力への表出には Core graph / output への非破壊的な metadata 通過が必要。候補 edge を CI で機械処理する用途 (確定 edge のみ利用等) の要否を含め #22 で判断する。決定者: Fukuemon / 期限: #22 の clarify / 状態: 未決。
+(すべて解決済み。「解決済みの論点」を参照)
 
 ## 解決済みの論点
 
@@ -135,24 +135,25 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - #22 D8: エラー / exit code 体系は 3 区分とする。exit 0: 探索成功 — 結果が空 (到達 node なし) や depthLimit cutoff 注釈付きも成功扱いとし、結果は stdout へ。exit 1: 実行時エラー — Analyzer 起動失敗、protocol 違反、出力書き込み失敗など Core 内部・外部プロセス起因の失敗。exit 2: 入力エラー — 不正な flag 値 (`--direction` / `--format` / `--max-depth` の値域外)、method selector のオーバーロード曖昧 (D1: 候補一覧を stderr へ)、対象メソッドが graph に存在しない (traversal の startNotFound)。エラーメッセージ・候補一覧・diagnostics は stderr、探索結果のみ stdout (S3 の機械パース性を保護)。startNotFound を exit 2 に割り当てる理由: CI が typo や消滅メソッドを exit code だけで検知できる。traversal 層では正常 status だが、CLI 層では「利用者の指定が graph と不一致」という入力問題として扱う。補足: Cobra 既定の exit 1 に依存せず、エラー種別を判別して os.Exit を制御する実装が必要になる。
 - #22 D9: E2E の CLI 出力照合は os/exec によるバイナリ起動で行う。TestMain 等で `go build` した depwalk バイナリを実プロセスとして起動し、stdout / stderr / exit code を検証する真の E2E とする (flag パースや D8 の exit code 制御 (0/1/2) も検証範囲に含む)。照合粒度は console / json とも golden file との完全一致とし、json は加えて Unmarshal 成功を検証して S3 (機械的パース可能) を直接担保する。golden file の置き場所は既存の fixture 規約 (testdata/ 配下) に合わせ、具体 path は既存 E2E fixture の配置を踏襲する。既存のグラフレベル E2E (analyze.Run 直接呼び出し) は残し、CLI プロセス E2E を追加する 2 層構成とする (context/testing.md の E2E 2 層構造の宣言と対応)。理由: issue 完了条件「E2E が CLI 出力レベルで期待値と照合される」を文字通り満たし、JDK + fat jar の重いセットアップは既存 E2E が既に持つため追加コストが小さく、golden 方式は spec #7 と一貫するため。
 - #22 D10: 規約 path による Analyzer 既定解決は #22 では導入を見送る。現行の解決順序 (`--analyzer-cmd` → `DEPWALK_ANALYZER_CMD` → 拒否) を維持し、ADR-0003 は無改訂とする。理由: 主利用者 (開発者 / CI) は明示指定で既に機能している。規約 path の設計 (置き場所・バージョン整合) は Analyzer の配布方式が固まってからの方が安全。ADR-0003 は「必要になった時点で前段に追加できる形」を既に宣言しており、本決定はその要否判断 (今は不要) の記録で issue のスコープを満たす。
+- #22 D11: call edge metadata (`resolution` / `provenance` / `dispatch` 等、#21 の D6 から引き継ぎ) は JSON のみ透過 (passthrough) とする。`graph.Edge` と `output.EdgeView` に Metadata (protocol.Metadata = map[string]any) を非破壊で追加し、graph convert で破棄をやめて保持、JSON formatter は omitempty で edge にそのまま載せる。スキーマ非依存 (#21 が確定させる resolution / provenance 等のキー名に依存しない)。console への人間向け表現は見送り、#21 のスキーマ確定後に設計する。背景: #21 は call site 単位の複数候補 edge を出力し、確定/曖昧の区別と解決根拠を `callEdge.metadata` に持たせる (spec: `specs/21-java-dispatch-spring-di/index.md` の D2/D6)。現状 Core は取り込み時に metadata を破棄する (graph.Edge / output.EdgeView に Metadata なし) ため、CLI 出力への表出には Core graph / output への非破壊的な metadata 通過が必要。前提: #21 の clarify (D2/D6) は別ブランチ系列で進行中で feature/22 には未マージ。本決定は #21 のスキーマ詳細に依存しない透過方式を選ぶことでブランチ乖離の影響を回避している。理由: CI の機械処理用途 (確定 edge のみ利用等) が #21 実装時に Core 無変更で成立する (Decision Priority 1: 将来拡張性)。map 透過なので #21 の未確定スキーマにギャンブルしない。なお JSON 出力の edge に metadata フィールドが追加される点は後続 phase (diagram / 機能仕様記述) で反映する。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D11 が未解決 (clarify 進行中) であり、clarify phase で解消する。
+- なし (D1-D11 全論点解決済み)。
 
 ## 実装対象
 
 正規 target は `context/project.md` の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                                   |
-| ------------------- | :------: | -------------------------------------------------------------------------- |
-| `core`              |    ◯     | CLI entrypoint / analyze use case / E2E                                    |
-| `traversal`         |    -     | 既存 API を利用、変更なし想定。公開 API 変更が必要になった場合は論点に戻す |
-| `output`            |    -     | 既存 API を利用、変更なし想定。公開 API 変更が必要になった場合は論点に戻す |
-| `analyzer-protocol` |    -     | `AnalysisRequest` の Entrypoints / AnalysisMode は定義済みで利用のみ       |
-| `java-analyzer`     |    -     | 変更しない                                                                 |
+| モジュール          | 実装有無 | 主な責務                                                                                              |
+| ------------------- | :------: | ----------------------------------------------------------------------------------------------------- |
+| `core`              |    ◯     | CLI entrypoint / analyze use case / E2E / graph convert の Metadata 保持 (D11 で決定)                 |
+| `traversal`         |    -     | 既存 API を利用、変更なし想定。公開 API 変更が必要になった場合は論点に戻す                            |
+| `output`            |    ◯     | EdgeView / JSON formatter に Metadata 透過追加 (「変更なし想定」から論点経由で正式に変更、D11 で決定) |
+| `analyzer-protocol` |    -     | `AnalysisRequest` の Entrypoints / AnalysisMode は定義済みで利用のみ                                  |
+| `java-analyzer`     |    -     | 変更しない                                                                                            |
 
 ## 機能仕様
 
@@ -327,6 +328,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | clarify        | D8 (exit code: 0/1/2 の 3 区分) を確定                                              |
 | 2026-07-12 | clarify        | D9 (E2E: os/exec バイナリ起動 + golden 照合) を確定                                 |
 | 2026-07-12 | clarify        | D10 (規約 path による既定解決: 見送り、ADR-0003 無改訂) を確定                      |
+| 2026-07-12 | clarify        | D11 (call edge metadata: JSON のみ透過) を確定。全論点解決、論点整理 phase 完了     |
 
 ## 備考
 
