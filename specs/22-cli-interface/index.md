@@ -117,7 +117,6 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 | #   | 論点                                                                                                                                  | 決定候補 | 決定 |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D7  | Entrypoints の扱い — method selector を `AnalysisRequest.Entrypoints` に渡すか、callee 方向で reachableFromEntrypoints を使うか       |          | 未決 |
 | D8  | エラー / exit code 体系 — `traversal.Status` (startNotFound 等)・depthLimit cutoff の CLI 上の表現、exit code 規約                    |          | 未決 |
 | D9  | E2E の CLI 出力照合方式 — os/exec で depwalk バイナリを起動するか、cli package を関数呼び出しするか。golden file の置き場所・照合粒度 |          | 未決 |
 | D10 | 規約 path による Analyzer 既定解決の要否 — ADR-0003 前段を今回導入するか見送るか。導入時は ADR 改訂 or 新 ADR                         |          | 未決 |
@@ -132,12 +131,13 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - #22 D4: 深さ上限 flag は `--max-depth`、非負整数。任意 flag で既定は無制限 (未指定時は traversal の `MaxDepth` に nil を渡す)。0 は「起点のみ」(traversal の意味論をそのまま継承)。負値はエラーとする。指定時に深さ超過で打ち切られた場合は traversal の depthLimit cutoff 注釈が出力に反映される (出力表現は #7 output の View 仕様に従う)。理由: traversal の意味論と 1:1 対応で最も素直であり、循環は traversal が処理済みで結果は有限のため。
 - #22 D5: 出力形式 flag は `--format`、任意 flag で既定値は `console`。値域は output registry に formatter 実装が登録されているもののみ (現時点: console / json)。未登録値は登録済み一覧を添えてエラーとする。dot / mermaid は Format 定数の予約のみで CLI には露出しない。将来は formatter 実装 + registry 登録だけで CLI に自動露出する (拡張余地の宣言の一部としてこの機構を明記)。理由: 人間が読む console を既定にでき (CI は `--format json` を明示)、CLI 層に許可値をハードコードしないことで Phase 4 の形式追加時に CLI 変更を不要にできるため。
 - #22 D6: 探索方向に関わらず Core は常に fullGraph で解析する。実装位置は analyze use case (`core/internal/analyze`) — AnalysisRequest 組み立て時に AnalysisMode を明示的に fullGraph に設定する (protocol の暗黙既定に依存しない)。analysisMode は CLI flag として露出しない。spec #9 D4 の「caller 方向で Core が fullGraph を選ぶ責務」は本決定 (常時 fullGraph) により自明に満たされる。callee 方向の reachableFromEntrypoints による部分解析は将来の性能最適化として拡張余地に送る (今回スコープ外)。理由: 方向による挙動分岐を排して Phase1 スコープを最小化でき、D1 の「graph node 走査による曖昧性検出」と完全整合する (部分解析だと曖昧性解決が Analyzer 依存になる)。mode 設定を use case に置くのは architecture.md の use case orchestration 責務と整合するため。
+- #22 D7: method selector を `AnalysisRequest.Entrypoints` には渡さない (Entrypoints は空のまま)。selector の照合は graph 構築後に Core が node 走査で行う (D1 の決定を踏襲)。entrypoints も CLI flag として露出しない。理由: D6 で常時 fullGraph のため Analyzer 側に entrypoint 情報は不要であり、露出面を最小化して将来の部分解析導入時に改めて設計するため。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D7-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
+- 設計時の論点 D8-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
 
 ## 実装対象
 
@@ -319,6 +319,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | clarify        | D4 (深さ上限 flag: --max-depth 既定無制限) を確定         |
 | 2026-07-12 | clarify        | D5 (出力形式 flag: --format 既定 console) を確定          |
 | 2026-07-12 | clarify        | D6 (解析モード: 常時 fullGraph・use case 設定) を確定     |
+| 2026-07-12 | clarify        | D7 (Entrypoints: 非使用・CLI 非露出) を確定               |
 
 ## 備考
 
