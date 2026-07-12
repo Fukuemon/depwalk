@@ -8,6 +8,10 @@ import java.util.Map;
  * 既定値 {@code java} / {@code javax} / {@code jakarta}。{@code analysisRequest.metadata} の
  * {@code liftExcludePackages} 指定時は既定値を置き換える (追加ではない)。
  * 判定は宣言型の binary name に対する {@code .} 区切り segment 単位の prefix 一致。
+ *
+ * <p>{@code liftExcludePackages} の型検証 (List か、要素が String か) は
+ * {@link com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator} が解析開始前に行う (M5)。
+ * 本クラスは検証済みの入力を受け取る前提で、型不正時のフォールバックは持たない。
  */
 public final class LiftExcludePackages {
 
@@ -24,14 +28,8 @@ public final class LiftExcludePackages {
         if (metadata == null || !metadata.containsKey(METADATA_KEY)) {
             return new LiftExcludePackages(DEFAULT_PREFIXES);
         }
-        Object raw = metadata.get(METADATA_KEY);
-        if (!(raw instanceof List<?> rawList)) {
-            return new LiftExcludePackages(DEFAULT_PREFIXES);
-        }
-        List<String> values = rawList.stream()
-                .filter(String.class::isInstance)
-                .map(String.class::cast)
-                .toList();
+        List<?> rawList = (List<?>) metadata.get(METADATA_KEY);
+        List<String> values = rawList.stream().map(String.class::cast).toList();
         return new LiftExcludePackages(values);
     }
 
