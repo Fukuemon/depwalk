@@ -1,0 +1,351 @@
+# Java Analyzer で Interface Dispatch と Spring DI を解決する
+
+> spec 本体。要求の正は [requirements.md](requirements.md)。本 doc は spec-lifecycle (scaffold 〜 review) の作業記録であり、durable な設計成果は sync phase で上位文書 (Design Doc / feature doc / ADR) へハンドオフする。
+
+## メタ情報
+
+- Issue: `#21`
+- ステータス: `設計中`
+- 作成日: 2026-07-12
+- 更新日: 2026-07-12
+- Branch: `feature/21`
+- Owner: Fukuemon
+
+## 設計フェーズ状況
+
+状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
+
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                          |
+| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
+| 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
+| 3   | 上位文書突合                | 進行中     | 2026-07-12 | Design Doc / feature doc / ADR-0004 / ADR-0005 / context と整合確認済み。矛盾なし             |
+| 4   | 論点整理                    | 未着手     |            | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理する                                |
+| 5   | 論点解決                    | 未着手     |            |                                                                                               |
+| 6   | Interface / Routing 設計    | 未着手     |            | Q1/Q2 (SootUp 範囲 / 候補表現) の解決待ち                                                     |
+| 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
+| 8   | Performance / Security 設計 | 未着手     |            | 性能 baseline (Issue #9) との比較方針は論点解決後に確定                                       |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                               |
+| 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定          |
+| 11  | レビュー済                  | 未着手     |            |                                                                                               |
+
+## 上位文書整合
+
+正本 ([Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。
+
+- PRD 更新要否: 不要 (本プロジェクトは統合モードのため独立 PRD なし。Design Doc の Why/What が正)
+- Design Doc 更新要否: 不要 (成功条件 S4/S5、Open Questions Q2、Future Work「後続 feature (#21)」の記述が本 spec の前提と整合。Q2 の決定を spec 側で行い、決定後に Design Doc の Q2 状態を「解決済み」へ更新する運用は sync phase で扱う)
+- ADR 起票要否: 不要 (ADR-0004 / ADR-0005 の決定枠内。新規 ADR 化が必要な代替案は現時点で発見していない)
+
+| 上位文書                    | 節 / 該当箇所                                                                                                                         | 整合方針 (継承 / 補足 / 変更提案)                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Design Doc                  | 成功条件 S4 (Spring DI 経由の呼び出し先を実体まで解決)                                                                                | 継承                                                              |
+| Design Doc                  | 成功条件 S5 (Core 無変更) — SootUp / Spring 解析は `java-analyzer` に閉じ、Core / analyzer-protocol の破壊的変更をしない              | 継承                                                              |
+| Design Doc                  | Future Work「後続 feature (#21)」(型階層補完 (SootUp) → Spring 絞り込みの順で実装)                                                    | 継承                                                              |
+| Design Doc                  | Open Questions Q2 (SootUp 統合範囲、期限「#21 spec の clarify 前」)                                                                   | 継承 (本 spec の論点 Q1 として引き継ぎ、clarify phase で解決する) |
+| feature doc (java-analyzer) | 段階導入 (Phase1 は本 doc 確定済み、後続 feature (#21) は型階層補完 → Spring 候補絞り込み → 統合 E2E の順)                            | 継承                                                              |
+| feature doc (java-analyzer) | dispatch 標識 (`callEdge.metadata.dispatch`)、帰属型の決定規則、`methodId`/`signature` 正規化規則                                     | 継承 (#21 の実装候補 edge が土台にする既存契約)                   |
+| feature doc (java-analyzer) | 性能方針・baseline (数値目標未確定 (実測 baseline は feature doc に記録済み)、#22 完了時に確定予定)                                   | 継承 (#21 の追加解析コストは既存 baseline との比較対象として扱う) |
+| context (architecture.md)   | Package Boundary (`java-analyzer` は Core `internal` に入れない、Core → Analyzer は Protocol 経由のみ)                                | 継承                                                              |
+| context (testing.md)        | Java Analyzer 三層 (Java unit / Go process contract (fake, JVM 不要) / 実 jar E2E)                                                    | 継承                                                              |
+| ADR-0004                    | 動的呼び出しの完全追跡は非対象。候補と根拠の観測可能性、再検討条件                                                                    | 継承                                                              |
+| ADR-0005                    | SootUp + Spring DI を単一 feature (#21) として段階導入。責務境界 (JavaParser/SymbolSolver・SootUp・Spring DI・Core)。実装 prompt 順序 | 継承                                                              |
+
+矛盾は検出していない。requirements.md の記述はいずれも上位文書の枠内にとどまり、上位文書側の更新提案は発生していない。
+
+## 関連資料
+
+- `design/DesignDoc.md`: 成功条件 S4/S5、Open Questions Q2、Future Work「後続 feature (#21)」
+- `design/features/java-analyzer/DesignDoc_java-analyzer.md`: 段階導入、dispatch 標識、帰属型決定規則、性能方針
+- 関連 issue: [#21](https://github.com/Fukuemon/depwalk/issues/21) / 起点 [#9](https://github.com/Fukuemon/depwalk/issues/9)
+- `adr/0004-defer-runtime-call-tracing.md`
+- `adr/0005-adopt-sootup-and-spring-di-resolution.md`
+- `specs/9-java-analyzer/index.md`: Phase1 の `methodId`/`signature` 正規化規則 (D5)、帰属型決定規則 (D11)、性能・メモリ方針 (D9)、テスト戦略 (D10) の決定記録
+
+## 背景
+
+Issue #9 の Phase1 は JavaParser + SymbolSolver によるソース中心の静的解析で、interface / 基底型経由の呼び出しは宣言メソッドまでしか callee にならない。Spring Boot では interface 越しのサービス・repository 呼び出しが一般的であり、宣言メソッドだけでは「どの実装を変更すると呼び出し元へ影響するか」という変更影響調査の主要経路が実装クラスへ接続されず、Design Doc の成功条件 S4 を満たさない。
+
+本 spec は、ADR-0005 により単一 feature として統合された次の 2 点を Java Analyzer の拡張として設計する。
+
+1. SootUp による source / bytecode / 依存 jar をまたぐ型階層補完と Interface Dispatch / Override 候補の解決。
+2. Spring の Bean 定義・注入規則の解析による、dispatch 候補から実際の Bean 候補への絞り込み。
+
+Java Analyzer / Analyzer Protocol の責務であり、Core は Spring / JVM / SootUp の意味を解釈しない (S5、ADR-0005)。動的追跡 (Reflection / AspectJ Runtime / 実行時 Proxy) の完全解決は ADR-0004 により非対象のままとする。
+
+## スコープ
+
+### やること
+
+- Interface Dispatch、継承、override、interface default method の解決
+- SootUp による bytecode / 依存 jar の型階層・dispatch 情報の補完
+- Spring stereotype と `@Bean` による Bean 候補の収集
+- constructor / field / setter injection の解決
+- `@Qualifier` / `@Primary` および一意候補による Bean 選択
+- JavaParser / SootUp / Spring 解析結果の統合と call edge 重複排除
+- 既存 Analyzer Protocol の metadata / diagnostic を用いた解決根拠・曖昧性の表現 (非破壊的な追加のみ)
+- Spring Boot fixture による unit / integration / E2E テスト
+
+### やらないこと
+
+- Reflection、AspectJ Runtime、実行時 Proxy の動的追跡 (ADR-0004)
+- SpEL や任意文字列から動的に選択されるクラス・メソッドの完全解決
+- 実行時 profile、外部設定、条件評価を含む Spring ApplicationContext の完全再現
+- Analyzer Protocol の破壊的変更
+- Kotlin など Java 以外の言語解析
+- CLI 引数の完全仕様確定 (→ #22 CLI interface spec)
+
+## 要件の解釈
+
+### 実現したいユーザー価値
+
+- Java/Spring Boot コードの変更影響を調査する開発者が、interface 越し・DI 経由の呼び出しについても「宣言型止まり」ではなく静的に特定できる実装候補まで影響調査できる。
+- 解析結果を CI やレビューで利用するチームが、候補が一意でない場合でも根拠 (diagnostic / metadata) を確認しながら解析を継続利用できる。
+
+### 成功条件
+
+- interface または基底型経由の呼び出しについて、静的型階層から到達可能な実装候補への call edge を生成できる (Design Doc S4 の一部)。
+- Spring の DI 情報から注入される Bean 候補を絞り込み、実装メソッドへの call edge を生成できる (S4)。
+- source と依存 jar の型情報を統合し、JavaParser だけでは不足する dispatch 情報を SootUp で補完できる。
+- 解決が一意でない場合も候補と diagnostic を保持し、根拠なく一つの実装へ確定しない (ADR-0004 の境界を継承)。
+- Core / analyzer-protocol の破壊的変更を発生させない (S5)。
+
+### 対象ユーザー / 操作主体
+
+- Java/Spring Boot コードの変更影響を調査する開発者
+- 解析結果を CI やレビューで利用するチーム
+- Java Analyzer と Analyzer Protocol を保守する開発者
+
+EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システムは `<expected behavior>` する)。
+
+- WHEN interface または基底型を通じてメソッドが呼ばれたとき、Java Analyzer は静的型階層から到達可能な実装候補への call edge を出力する。
+- WHEN Spring Bean が constructor、field または setter で注入されるとき、Java Analyzer は Bean 定義と選択規則に従って実装候補への call edge を出力する。
+- WHERE `@Qualifier` または `@Primary` で候補が一意になる場合、Java Analyzer は選択された Bean の実装メソッドを解決結果として出力する。
+- IF 複数の実装候補が残る場合、Java Analyzer は解析を失敗させず、候補と曖昧性を diagnostic または metadata に出力する。
+- IF source から必要な型階層を取得できず依存 jar に情報がある場合、Java Analyzer は SootUp で補完して dispatch を解決する。
+- IF Reflection、実行時 Proxy または実行時条件がなければ確定できない場合、Java Analyzer は推測で一意に確定せず未解決理由を出力する。
+- WHEN Spring Boot E2E fixture を解析したとき、既知の caller / callee 集合と一致する。検証は graph 上の既知 caller / callee 集合との照合を基本とし、CLI 出力レベルの照合は CLI interface spec (#22) 完了後に完成する (#22 完了を前提条件とする)。
+
+## 設計時の論点
+
+設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
+
+| #   | 論点                                                                                                           | 決定候補 | 決定 |
+| --- | -------------------------------------------------------------------------------------------------------------- | -------- | ---- |
+| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            |          | 未決 |
+| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  |          | 未決 |
+| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |          | 未決 |
+| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |          | 未決 |
+| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |          | 未決 |
+
+## 解決済みの論点
+
+(`spec-resolve` で確定したものをここに移動する)
+
+-
+
+## 未確定事項
+
+(決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
+
+- 上記 D1〜D5 がすべて未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+
+## 実装対象
+
+正規 target は `context/project.md` の対象ドメイン一覧を正本とする。
+
+| モジュール          | 実装有無 | 主な責務                                                                                                                   |
+| ------------------- | :------: | -------------------------------------------------------------------------------------------------------------------------- |
+| `core`              |    -     | 変更なし。Spring / JVM / SootUp の意味を解釈しない (S5)                                                                    |
+| `traversal`         |    -     | D2 (候補 edge を複数 edge で表す場合) の結論次第で、探索・重複排除の扱いに影響しうる (備考)                                |
+| `output`            |    -     | 変更なし想定                                                                                                               |
+| `analyzer-protocol` |    -     | D1/D2 (候補表現・SootUp call graph 委譲範囲) の結論次第で、非破壊的な metadata / diagnostic 追加が発生しうる (備考)        |
+| `java-analyzer`     |    ◯     | Interface Dispatch / Override 解決、SootUp 型階層補完、Spring Bean / DI 解決、候補統合・重複排除、metadata/diagnostic 出力 |
+
+## 機能仕様
+
+### User Flow
+
+1. Core が既存 Analyzer 起動契約 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD`、`--analyzer-meta`) に従って Java Analyzer process を起動し、`analysisRequest` を送信する (契約は変更しない想定)。
+2. Java Analyzer は JavaParser/SymbolSolver によるソース抽出に加え、SootUp で型階層・依存 jar を補完し、Spring 解析で DI 候補を絞り込む (D1〜D4 の結論により具体化)。
+3. 実装候補への call edge、解決根拠、曖昧性を Protocol の `methodSymbol` / `callEdge` / `diagnostic` として stdout へ出力する。
+4. Core / Traversal / Output は既存契約のまま結果を処理する (D2 の結論次第で候補 edge の扱いに補足が入りうる)。
+
+### Reuse Policy
+
+- 第一原則は feature / colocation とする。SootUp / Spring 解析ロジックは `analyzers/java/` 内に閉じ、Core / analyzer-protocol へ持ち出さない (ADR-0005, S5)。
+- 共通化は複数 feature / app をまたぐ再利用が明確になってから行う。
+
+### Performance
+
+- Issue #9 で取得した Phase1 baseline (fixture: `testdata/fixtures/java/project`、10 ファイル、約500ms、最大RSS 約122MiB) との比較で、SootUp / Spring 解析追加分の時間・最大 RSS を計測する (D5 で許容基準を確定)。
+- 数値目標の確定方針は [context/architecture.md](../../context/architecture.md) / feature doc の性能方針を継承する。
+
+### Routing / URL State
+
+- 該当なし (CLI ツールであり URL state を持たない)。
+
+### Content / Assets
+
+- 該当なし。解析対象はソース + 依存 jar (`classpath` metadata) であり、コンテンツ配信は発生しない。
+
+### UI Reuse
+
+- 該当なし (CLI 出力のみ。Console / JSON フォーマットは既存 Output Engine を変更なく再利用する想定)。
+
+### Testing
+
+- [context/testing.md](../../context/testing.md) の Java Analyzer 三層 (Java unit / Go process contract (fake, JVM 不要) / 実 jar E2E) を踏襲する。
+- SootUp / Spring 解析固有の観点は D1〜D4 解決後に追記する。
+
+## Interface 設計
+
+### UI / API / Event Interface
+
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1/D2 の結論待ち)。
+
+### Props / Request / Response
+
+- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。候補・曖昧性表現の具体的な metadata / diagnostic 項目は D1〜D4 解決後に確定する。
+
+## Content / Data 設計
+
+### 保存・管理するデータ
+
+- 永続ストアは持たない (既存方針を継承)。Core プロセス内の中間状態としてのみ graph を保持する。
+
+### コンテンツ配置 / package / route
+
+- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D1〜D4 解決後に確定)。
+
+## Performance / Security 設計
+
+### Performance
+
+- D5 (性能予算) の解決後に確定する。
+
+### Security / Privacy
+
+- 解析対象ソース・依存 jar は読み取り専用として扱う (既存方針を継承、context/architecture.md の State Boundary)。
+
+## Error / Fallback 設計
+
+### エラーケース
+
+| #   | ケース                             | ユーザーへの見せ方                 | リカバリ                                    |
+| --- | ---------------------------------- | ---------------------------------- | ------------------------------------------- |
+| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続 | 宣言型の edge を保持                        |
+| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力             | 複数候補 edge または宣言型 edge (D2 で確定) |
+| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力     | JavaParser 結果のみで解析継続               |
+| E4  | 条件付き Bean を静的に確定できない | 条件未確定として候補を保持         | 実行環境を推測しない                        |
+
+### Fallback
+
+- 一意に確定できない場合は根拠なく一つへ絞らず、候補と未解決理由を diagnostic / metadata で観測可能にする (ADR-0004 を継承)。
+
+## テスト / 評価方針
+
+### テスト観点
+
+- [context/testing.md](../../context/testing.md) の三層構成 (Java unit / Go process contract / 実 jar E2E) を踏襲。
+- Spring Boot fixture による E2E で、既知の caller / callee 集合との照合を行う (graph 照合が基本、CLI 出力照合は #22 完了後)。
+- 具体的な test case は D1〜D4 解決後に追記する。
+
+### 計測指標
+
+- 解析時間・最大 RSS (Issue #9 baseline との差分、D5 で許容基準を確定)。
+- 未解決 / 候補件数の diagnostic 出力件数 (観測可能性の担保)。
+
+## フロー / シーケンス
+
+(`spec-diagrams` で生成。spec の主要操作を Mermaid 図に落とす)
+
+### Flowchart (ユーザー操作起点)
+
+```mermaid
+flowchart TD
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+```
+
+## 実装分割
+
+### 実装タスク案
+
+ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲する想定。詳細は tasks phase で確定する。
+
+| Phase | 対象 | 概要 | 依存 |
+| ----- | ---- | ---- | ---- |
+| P1    |      |      |      |
+
+### prompts 生成方針
+
+- `context/project.md` の対象ドメインのうち `java-analyzer` を中心に分割する。
+- 型階層補完 (SootUp) → Spring 候補絞り込み → 統合 E2E の順に並列実装できない依存関係を持つため、直列分割を基本とする (ADR-0005)。
+
+## 上位資料からの変更点
+
+本 spec で PRD / Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。`spec-track` / `spec-sync` で更新する。
+
+### PRD への影響
+
+| 対象節 | 変更内容 | 理由 |
+| ------ | -------- | ---- |
+|        |          |      |
+
+### Design Doc への影響
+
+| 対象節 | 変更内容 | 理由 |
+| ------ | -------- | ---- |
+|        |          |      |
+
+### feature doc への影響
+
+| 対象 doc / 節 | 変更内容 | 理由 |
+| ------------- | -------- | ---- |
+|               |          |      |
+
+### context への影響
+
+| 対象 doc / 節 | 変更内容 | 理由 |
+| ------------- | -------- | ---- |
+|               |          |      |
+
+### ADR の新規 / 更新
+
+| ADR ID | 変更内容 | 理由 |
+| ------ | -------- | ---- |
+|        |          |      |
+
+## レビュー
+
+`spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
+
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                    | 対応     |
+| ---------- | ------------------------ | ------------------------------------------- | -------- |
+| 2026-07-12 | PASS                     | scaffold: 非 blocker 2 件 (文言ずれ / typo) | 修正済み |
+
+## 変更履歴
+
+| 日付       | 変更者 | 変更内容                                                                                                   |
+| ---------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| 2026-07-12 | Claude | requirements.md と上位文書を基に index.md を新規作成 (scaffold)                                            |
+| 2026-07-12 | Claude | scaffold 完了、spec-review PASS。非 blocker 指摘 2 件 (feature doc 行の文言ずれ / 「からから」typo) を修正 |
+
+## 備考
+
+<!--
+追加 appendix が必要な spec は、templates/specs/appendices/ から該当 topic を取り込むこと:
+
+- API endpoint / request / response → appendices/api.md
+- ER 図 / DDL / シードデータ → appendices/database.md
+- ロール別 UI 制御 / API 認可マトリクス → appendices/authorization.md
+- 画面コンポーネントツリー / 表示条件 → appendices/screen-spec.md
+- data-testid 一覧 → appendices/testid.md
+-->
+
+現時点でこの機能に該当する appendix は見当たらない (UI / DB / 認可 / 画面 / data-testid のいずれも対象外)。SootUp / Spring DI 解決の候補表現規則が具体化した段階で、`analyzer-protocol` の schema 変更点をまとめる appendix (例: `appendices/api.md` に準じた protocol schema 差分) の要否を clarify phase 以降に再検討する。
