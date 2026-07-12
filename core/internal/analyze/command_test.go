@@ -94,9 +94,29 @@ func TestSplitCommand(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "trailing backslash is rejected",
+			name:    "trailing backslash is kept literal",
 			command: `java -jar java.jar\`,
-			wantErr: true,
+			want:    []string{"java", "-jar", `java.jar\`},
+		},
+		{
+			name:    "windows absolute path backslashes are kept literal",
+			command: `C:\jdk\bin\java.exe -jar x.jar`,
+			want:    []string{`C:\jdk\bin\java.exe`, "-jar", "x.jar"},
+		},
+		{
+			name:    "backslash before space still escapes",
+			command: `a\ b`,
+			want:    []string{"a b"},
+		},
+		{
+			name:    "backslash before quote still escapes",
+			command: `\"quoted\"`,
+			want:    []string{`"quoted"`},
+		},
+		{
+			name:    "escaped space merges adjacent quoted segment into one word",
+			command: `C:\dir\ "arg two"`,
+			want:    []string{`C:\dir arg two`},
 		},
 	}
 
