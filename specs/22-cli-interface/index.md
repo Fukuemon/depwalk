@@ -117,7 +117,6 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 | #   | 論点                                                                                                                                                                            | 決定候補 | 決定 |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D5  | 出力形式 flag — 名前・値 (console/json)・既定値。output registry の dot/mermaid を露出するか隠すか                                                                              |          | 未決 |
 | D6  | caller 方向で fullGraph を選ぶ責務の実装位置 — cli 層か analyze use case か。analysisMode / Entrypoints を CLI に露出するか (spec #9 D4 は「露出は CLI interface spec で確定」) |          | 未決 |
 | D7  | Entrypoints の扱い — method selector を `AnalysisRequest.Entrypoints` に渡すか、callee 方向で reachableFromEntrypoints を使うか                                                 |          | 未決 |
 | D8  | エラー / exit code 体系 — `traversal.Status` (startNotFound 等)・depthLimit cutoff の CLI 上の表現、exit code 規約                                                              |          | 未決 |
@@ -132,12 +131,13 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - #22 D2: 探索クエリは `analyze` コマンドへの flag 追加で提供する (サブコマンド分割しない)。形は `depwalk analyze <path> --language java --analyzer-cmd ... --method <selector> --direction <dir> --max-depth <n> --format <fmt>` (各 flag の名前・既定値は D3-D5 で確定)。後方互換: `--method` 省略時は現行のサマリ動作 (件数 1 行 + diagnostics) を維持し、既存 flag (`--analyzer-cmd` / `--language` / `--analyzer-meta`) は変更しない。拡張余地の宣言: 将来の新出力形式は `--format` の値追加で、新しいクエリ種別 (例: パス探索) が必要になった場合はサブコマンド新設でも flag 追加でも拡張できる構造とする (issue 完了条件「後方互換の拡張余地が宣言されている」に対応)。理由: 実装最小・既存動作の後方互換維持・issue の「flag 体系」の表現と一致し、analyzer 起動系 flag の重複定義を避けられるため。
 - #22 D3: 探索方向 flag は `--direction`、値は `caller` / `callee` (traversal の `graph.Direction` に対応)。任意 flag で既定値は `caller` — 影響調査の主用途 (S1: このメソッドを変えたら誰に影響するか) を既定にする。不正値は許容値一覧を添えてエラーとする。理由: 主ユースケースの入力を最短にでき、既定の意味が直感的なため。
 - #22 D4: 深さ上限 flag は `--max-depth`、非負整数。任意 flag で既定は無制限 (未指定時は traversal の `MaxDepth` に nil を渡す)。0 は「起点のみ」(traversal の意味論をそのまま継承)。負値はエラーとする。指定時に深さ超過で打ち切られた場合は traversal の depthLimit cutoff 注釈が出力に反映される (出力表現は #7 output の View 仕様に従う)。理由: traversal の意味論と 1:1 対応で最も素直であり、循環は traversal が処理済みで結果は有限のため。
+- #22 D5: 出力形式 flag は `--format`、任意 flag で既定値は `console`。値域は output registry に formatter 実装が登録されているもののみ (現時点: console / json)。未登録値は登録済み一覧を添えてエラーとする。dot / mermaid は Format 定数の予約のみで CLI には露出しない。将来は formatter 実装 + registry 登録だけで CLI に自動露出する (拡張余地の宣言の一部としてこの機構を明記)。理由: 人間が読む console を既定にでき (CI は `--format json` を明示)、CLI 層に許可値をハードコードしないことで Phase 4 の形式追加時に CLI 変更を不要にできるため。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D5-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
+- 設計時の論点 D6-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
 
 ## 実装対象
 
@@ -317,6 +317,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | clarify        | D2 (CLI 構造: analyze への flag 追加) を確定              |
 | 2026-07-12 | clarify        | D3 (探索方向 flag: --direction 既定 caller) を確定        |
 | 2026-07-12 | clarify        | D4 (深さ上限 flag: --max-depth 既定無制限) を確定         |
+| 2026-07-12 | clarify        | D5 (出力形式 flag: --format 既定 console) を確定          |
 
 ## 備考
 
