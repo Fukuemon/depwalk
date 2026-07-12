@@ -59,8 +59,8 @@
 - `design/DesignDoc.md`: S1-S3 成功条件 / モジュール責務 CLI / Phase 計画
 - 関連 issue / ticket:
   - issue: https://github.com/Fukuemon/depwalk/issues/22
-  - 決定経緯 (issue 単位の作業記録): `specs/9-java-analyzer/` (D2/D4/P2_02)、`specs/6-traversal/` (Request/Result API)、`specs/7-output/` (D6 `output.Write` / D7 golden test)
-  - 関連 issue: #9 (実装済み) / #6 / #7 / #21 (独立)
+  - 決定経緯 (issue 単位の作業記録): `specs/9-java-analyzer/` (D2/D4/P2_02)、`specs/6-traversal/` (Request/Result API)、`specs/7-output/` (D6 `output.Write` / D7 golden test)、`specs/21-java-dispatch-spring-di/` (D2 複数候補 edge の metadata 表現、D6 観測レイヤーの責務境界 — call edge metadata の CLI 表出判断を #22 へ引き継ぎ)
+  - 関連 issue: #9 (実装済み) / #6 / #7 / #21 (D6 論点 (D11) を引き継ぎ)
 
 ## 背景
 
@@ -115,11 +115,14 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                                                  | 決定候補 | 決定 |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D8  | エラー / exit code 体系 — `traversal.Status` (startNotFound 等)・depthLimit cutoff の CLI 上の表現、exit code 規約                    |          | 未決 |
-| D9  | E2E の CLI 出力照合方式 — os/exec で depwalk バイナリを起動するか、cli package を関数呼び出しするか。golden file の置き場所・照合粒度 |          | 未決 |
-| D10 | 規約 path による Analyzer 既定解決の要否 — ADR-0003 前段を今回導入するか見送るか。導入時は ADR 改訂 or 新 ADR                         |          | 未決 |
+| #   | 論点                                                                                                                                    | 決定候補 | 決定 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
+| D8  | エラー / exit code 体系 — `traversal.Status` (startNotFound 等)・depthLimit cutoff の CLI 上の表現、exit code 規約                      |          | 未決 |
+| D9  | E2E の CLI 出力照合方式 — os/exec で depwalk バイナリを起動するか、cli package を関数呼び出しするか。golden file の置き場所・照合粒度   |          | 未決 |
+| D10 | 規約 path による Analyzer 既定解決の要否 — ADR-0003 前段を今回導入するか見送るか。導入時は ADR 改訂 or 新 ADR                           |          | 未決 |
+| D11 | call edge metadata (`resolution` / `provenance` / `dispatch` 等) を CLI 出力 (Console / JSON) にどう表出するか — #21 の D6 から引き継ぎ |          | 未決 |
+
+背景 (D11): #21 (Interface Dispatch / Spring DI 解決) は call site 単位の複数候補 edge を出力し、確定/曖昧の区別と解決根拠を `callEdge.metadata` に持たせる (spec: `specs/21-java-dispatch-spring-di/index.md` の D2/D6)。現状 Core は取り込み時に metadata を破棄する (graph.Edge / output.EdgeView に Metadata なし) ため、CLI 出力への表出には Core graph / output への非破壊的な metadata 通過が必要。候補 edge を CI で機械処理する用途 (確定 edge のみ利用等) の要否を含め #22 で判断する。決定者: Fukuemon / 期限: #22 の clarify / 状態: 未決。
 
 ## 解決済みの論点
 
@@ -137,7 +140,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D8-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
+- 設計時の論点 D8-D11 が未解決 (clarify 進行中) であり、clarify phase で解消する。
 
 ## 実装対象
 
@@ -308,18 +311,19 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 ## 変更履歴
 
-| 日付       | 変更者         | 変更内容                                                  |
-| ---------- | -------------- | --------------------------------------------------------- |
-| 2026-07-12 | spec-lifecycle | scaffold 作成                                             |
-| 2026-07-12 | spec-lifecycle | scaffold レビュー指摘対応 (EARS 記述追加・フェーズ表同期) |
-| 2026-07-12 | spec-lifecycle | scaffold 再レビュー PASS                                  |
-| 2026-07-12 | clarify        | D1 (method selector 書式) を確定                          |
-| 2026-07-12 | clarify        | D2 (CLI 構造: analyze への flag 追加) を確定              |
-| 2026-07-12 | clarify        | D3 (探索方向 flag: --direction 既定 caller) を確定        |
-| 2026-07-12 | clarify        | D4 (深さ上限 flag: --max-depth 既定無制限) を確定         |
-| 2026-07-12 | clarify        | D5 (出力形式 flag: --format 既定 console) を確定          |
-| 2026-07-12 | clarify        | D6 (解析モード: 常時 fullGraph・use case 設定) を確定     |
-| 2026-07-12 | clarify        | D7 (Entrypoints: 非使用・CLI 非露出) を確定               |
+| 日付       | 変更者         | 変更内容                                                                            |
+| ---------- | -------------- | ----------------------------------------------------------------------------------- |
+| 2026-07-12 | spec-lifecycle | scaffold 作成                                                                       |
+| 2026-07-12 | spec-lifecycle | scaffold レビュー指摘対応 (EARS 記述追加・フェーズ表同期)                           |
+| 2026-07-12 | spec-lifecycle | scaffold 再レビュー PASS                                                            |
+| 2026-07-12 | clarify        | D1 (method selector 書式) を確定                                                    |
+| 2026-07-12 | clarify        | D2 (CLI 構造: analyze への flag 追加) を確定                                        |
+| 2026-07-12 | clarify        | D3 (探索方向 flag: --direction 既定 caller) を確定                                  |
+| 2026-07-12 | clarify        | D4 (深さ上限 flag: --max-depth 既定無制限) を確定                                   |
+| 2026-07-12 | clarify        | D5 (出力形式 flag: --format 既定 console) を確定                                    |
+| 2026-07-12 | clarify        | D6 (解析モード: 常時 fullGraph・use case 設定) を確定                               |
+| 2026-07-12 | clarify        | D7 (Entrypoints: 非使用・CLI 非露出) を確定                                         |
+| 2026-07-12 | Claude         | #21 の D6 から論点引き継ぎ。D11 (call edge metadata の CLI 出力表出方法) を新規追加 |
 
 ## 備考
 
