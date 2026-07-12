@@ -86,12 +86,12 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 
 ## 例外シナリオ
 
-| #   | シナリオ                         | ユーザーへの見せ方               | 代替手段                                   |
-| --- | -------------------------------- | -------------------------------- | ------------------------------------------ |
-| E1  | Bean候補が0件                    | 未解決diagnosticを出力し解析継続 | 宣言型のedgeを保持                         |
-| E2  | Bean候補が複数件で絞り込めない   | 候補一覧と曖昧性を出力           | 複数候補edgeまたは宣言型edge。設計時に確定 |
-| E3  | bytecodeをSootUpが読めない       | 対象と原因をdiagnosticへ出力     | JavaParser結果のみで解析継続               |
-| E4  | 条件付きBeanを静的に確定できない | 条件未確定として候補を保持       | 実行環境を推測しない                       |
+| #   | シナリオ                         | ユーザーへの見せ方               | 代替手段                                |
+| --- | -------------------------------- | -------------------------------- | --------------------------------------- |
+| E1  | Bean候補が0件                    | 未解決diagnosticを出力し解析継続 | 宣言型のedgeを保持                      |
+| E2  | Bean候補が複数件で絞り込めない   | 候補一覧と曖昧性を出力           | 複数候補edge + 宣言型edge保持 (spec D2) |
+| E3  | bytecodeをSootUpが読めない       | 対象と原因をdiagnosticへ出力     | JavaParser結果のみで解析継続            |
+| E4  | 条件付きBeanを静的に確定できない | 条件未確定として候補を保持       | 実行環境を推測しない                    |
 
 ## 監査/非機能要件
 
@@ -101,12 +101,12 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 
 ## 未決事項（論点）
 
-| #   | 論点                                                     | 決定者   | 期限          | 状態                                | メモ                             |
-| --- | -------------------------------------------------------- | -------- | ------------- | ----------------------------------- | -------------------------------- |
-| Q1  | SootUpを型階層補完だけに使うか、call graph生成まで使うか | Fukuemon | clarify phase | 決定 (spec D1 参照: 型階層補完のみ) | Design Doc Q2を継承              |
-| Q2  | 複数dispatch候補を複数edgeで表すかmetadataで表すか       | Fukuemon | clarify phase | 未決                                | Traversalへの影響を確認          |
-| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 未決                                | profile / property / conditional |
-| Q4  | Spring Data等の実行時生成実装をどの抽象度で表すか        | Fukuemon | clarify phase | 未決                                | 実行時Proxy自体は非対象          |
+| #   | 論点                                                     | 決定者   | 期限          | 状態                                               | メモ                             |
+| --- | -------------------------------------------------------- | -------- | ------------- | -------------------------------------------------- | -------------------------------- |
+| Q1  | SootUpを型階層補完だけに使うか、call graph生成まで使うか | Fukuemon | clarify phase | 決定 (spec D1 参照: 型階層補完のみ)                | Design Doc Q2を継承              |
+| Q2  | 複数dispatch候補を複数edgeで表すかmetadataで表すか       | Fukuemon | clarify phase | 決定 (spec D2 参照: call site 単位の複数候補 edge) | Traversalへの影響を確認          |
+| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 未決                                               | profile / property / conditional |
+| Q4  | Spring Data等の実行時生成実装をどの抽象度で表すか        | Fukuemon | clarify phase | 未決                                               | 実行時Proxy自体は非対象          |
 
 ## 関連資料
 
@@ -125,3 +125,4 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | 2026-07-11 | Codex  | GitHub Issue #21を起票しメタ情報を同期                                                                                                                |
 | 2026-07-12 | Claude | ADR-0005追随 (起点 / 上位文書参照の旧Phase呼称を統合feature表現へ更新)、E2E受け入れ基準の検証レベル (graph照合基本 / CLI出力照合は#22完了後) を明確化 |
 | 2026-07-12 | Claude | clarify: Q1をspec index.mdのD1決定 (型階層補完のみ) を参照する形で決定済みへ更新                                                                      |
+| 2026-07-12 | Claude | clarify: Q2をspec index.mdのD2決定 (call site単位の複数候補edge) を参照する形で決定済みへ更新。E2の代替手段も同決定に合わせて確定                     |
