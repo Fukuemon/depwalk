@@ -6,6 +6,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.LiftExcludePackage
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
+import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.scope.ScopeFiles;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
@@ -67,9 +68,16 @@ public final class AnalysisRunner {
         List<Path> scopeFileList = ScopeFiles.enumerate(workspaceRoot, request.include(), request.exclude());
         Set<Path> scopeFileSet = ScopeFiles.toMembershipSet(scopeFileList);
 
-        CombinedTypeSolver typeSolver = TypeSolverFactory.create(workspaceRoot, classpath);
+        // JavaParser の既定 languageLevel (POPULAR = JAVA_11 相当) は record を構文サポートしないため
+        // (「Record Declarations are not supported... starting from 'JAVA_14'」でパース自体が失敗する)、
+        // toolchain の JDK バージョン (build.gradle) に合わせて JAVA_25 まで引き上げる (メインパーサ /
+        // JavaParserTypeSolver 内部パーサの両方に一致させる必要がある)。
+        ParserConfiguration.LanguageLevel languageLevel = ParserConfiguration.LanguageLevel.JAVA_25;
+        CombinedTypeSolver typeSolver = TypeSolverFactory.create(workspaceRoot, classpath, languageLevel);
         JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
-        ParserConfiguration config = new ParserConfiguration().setSymbolResolver(symbolSolver);
+        ParserConfiguration config = new ParserConfiguration()
+                .setSymbolResolver(symbolSolver)
+                .setLanguageLevel(languageLevel);
         JavaParser parser = new JavaParser(config);
 
         LiftExcludePackages liftExcludePackages = LiftExcludePackages.fromMetadata(request.metadata());
@@ -152,7 +160,7 @@ public final class AnalysisRunner {
     }
 
     private static Diagnostic parseErrorDiagnostic(Path workspaceRoot, Path file, String message) {
-        String relative = workspaceRoot.relativize(file).toString();
+        String relative = RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString());
         return Diagnostic.of(
                 JavaDiagnosticCode.JAVA_PARSE_ERROR.severity(),
                 JavaDiagnosticCode.JAVA_PARSE_ERROR.code(),

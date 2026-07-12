@@ -1,5 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.scope;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.FileSystems;
@@ -58,7 +60,7 @@ public final class ScopeFiles {
      * (Windows の {@code \} 区切りを吸収する。{@code /} 区切り入力はそのまま)。
      */
     static Path toMatchablePath(String rawRelativePath) {
-        return Path.of(rawRelativePath.replace('\\', '/'));
+        return Path.of(RelativePaths.toRecordPath(rawRelativePath));
     }
 
     /** {@link #enumerate} の結果を membership check 用の正規化済み {@link Set} に変換する。 */

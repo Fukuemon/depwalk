@@ -134,6 +134,8 @@ Java の overload 解決は erasure ベースであり、erasure だけで overl
 
 lambda 本体内の呼び出しは、囲みメソッドを caller とする `callEdge` として出力する。遅延実行される呼び出しであることは `callEdge.metadata` に `viaLambda: true` を立てて標識する (Core の graph 構築は `metadata` に依存しないため契約上は無害)。
 
+method reference (`this::toDto` / `Foo::bar` / `Foo::new`) も lambda と同じ原則で扱う: 独立 node にせず、method reference を字句的に囲むメソッドを caller とする `callEdge` を出力し、参照先メソッド (D11 の帰属型決定規則を適用) を callee とする。遅延実行であることは `callEdge.metadata` に `viaMethodReference: true` を立てて標識する (`viaLambda` とは独立した flag。method reference が lambda 本体の中に現れた場合は両方が立つ)。constructor reference (`Foo::new`) は D11 の `new` 規則を適用し、callee を `Foo` の canonical constructor (`<init>`) とする (constructor は継承されないため引き上げは発生せず、`Foo` が scope 外なら出力しない)。
+
 ### dispatch 標識
 
 Phase1 は DI 解決を行わないため、interface / 抽象メソッド呼び出しの callee は「帰属型の決定規則」で決まる帰属型 (interface / 抽象クラスを含む) のメソッドになる。実装クラスのメソッドへの辺は後続 feature (#21 / ADR-0005) で追加する。

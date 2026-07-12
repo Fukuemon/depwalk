@@ -1,5 +1,8 @@
 package com.example;
 
+import static com.example.MathUtils.square;
+import static com.example.lib.StaticUtils.util;
+
 public class UserService extends BaseService {
 
     @Override
@@ -32,5 +35,13 @@ public class UserService extends BaseService {
 
     public void constructScopeExternal() {
         new com.example.lib.ExternalRepo();
+    }
+
+    public void invokeScopeExternalStaticImport() {
+        util();
+    }
+
+    public void invokeScopeInternalStaticImport() {
+        square();
     }
 }

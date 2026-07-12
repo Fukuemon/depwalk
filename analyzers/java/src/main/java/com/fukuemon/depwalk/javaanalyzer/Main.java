@@ -75,6 +75,13 @@ public final class Main {
                 // H1: 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
                 // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
                 return reportInternalError(writer, errStream, e);
+            } catch (IOException e) {
+                // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
+                // pre-flight をすり抜けた読み取り失敗) も RuntimeException と同様に継続不能な内部エラーと
+                // して扱い、best-effort で JAVA_INTERNAL_ERROR record を書く。writer.write 自体が失敗する
+                // ケース (M2, stdout が壊れている) は reportInternalError 内で個別に catch し、その場合は
+                // stderr のメッセージのみが残る。
+                return reportInternalError(writer, errStream, e);
             }
         } catch (IOException e) {
             // M2: record の書き出し自体が失敗した場合 (stdout が壊れている等)。無言で 1 を返さず、
@@ -90,7 +97,7 @@ public final class Main {
         }
     }
 
-    private static int reportInternalError(RecordWriter writer, PrintStream errStream, RuntimeException e) {
+    private static int reportInternalError(RecordWriter writer, PrintStream errStream, Exception e) {
         String detail = e.getClass().getName() + ": " + e.getMessage();
         errStream.println("internal error during analysis: " + detail);
         try {

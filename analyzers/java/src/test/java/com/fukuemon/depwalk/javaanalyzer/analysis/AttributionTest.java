@@ -145,4 +145,56 @@ class AttributionTest {
                 "constructor calls are never lifted, out-of-scope new must be omitted: " + edges);
         assertTrue(ran.byType("diagnostic").isEmpty());
     }
+
+    /**
+     * D11 (無修飾 static import): {@code import static com.example.lib.StaticUtils.util; util();}
+     * は「参照した型」= 宣言型 (StaticUtils) そのものであり、enclosing class (UserService) へは
+     * 引き上げない。宣言型・参照型ともに scope 外のため出力しない (diagnostic も出さない)。
+     */
+    @Test
+    void unqualifiedStaticImportOutOfScopeIsOmittedWithoutLiftToEnclosingOrDiagnostic() throws Exception {
+        AnalysisTestSupport.Ran ran = runDefault();
+        List<Map<String, Object>> edges = ran.byType("callEdge");
+        assertFalse(edges.stream().anyMatch(e ->
+                        "java:com.example.UserService#invokeScopeExternalStaticImport()".equals(e.get("callerMethodId"))),
+                "out-of-scope static import call must not be lifted to the enclosing class: " + edges);
+        assertFalse(ran.byType("methodSymbol").stream().anyMatch(n ->
+                        "java:com.example.lib.StaticUtils#util()".equals(n.get("methodId"))),
+                "out-of-scope static import callee must not be emitted as a node either: " + ran.byType("methodSymbol"));
+        assertTrue(ran.byType("diagnostic").isEmpty());
+    }
+
+    /**
+     * D11 (無修飾 static import, scope 内): 宣言型 (MathUtils) が scope 内であれば、通常の
+     * 「宣言サイトが scope 内」規則により、そのまま宣言型へ帰属する (enclosing への引き上げは
+     * 発生しない、そもそも発生させる必要がない)。
+     */
+    @Test
+    void unqualifiedStaticImportInScopeAttributesToTheDeclaringType() throws Exception {
+        List<Map<String, Object>> edges = runDefault().byType("callEdge");
+        assertTrue(hasEdge(edges,
+                "java:com.example.UserService#invokeScopeInternalStaticImport()",
+                "java:com.example.MathUtils#square()"));
+    }
+
+    /**
+     * D11: 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
+     * static メンバ) の場合は、従来どおり enclosing class への引き上げを維持する (static import 由来
+     * ではなく、通常の継承メンバ参照であるため)。
+     */
+    @Test
+    void unqualifiedInheritedStaticCallStillLiftsToEnclosingSubtype() throws Exception {
+        AnalysisTestSupport.Ran ran = runDefault();
+        List<Map<String, Object>> edges = ran.byType("callEdge");
+        String calleeId = "java:com.example.UserRepository#staticFind()";
+        assertTrue(hasEdge(edges, "java:com.example.UserRepository#invokeInheritedStaticUnqualified()", calleeId));
+
+        Map<String, Object> liftedNode = ran.byType("methodSymbol").stream()
+                .filter(n -> calleeId.equals(n.get("methodId")))
+                .findFirst()
+                .orElseThrow();
+        Map<?, ?> metadata = (Map<?, ?>) liftedNode.get("metadata");
+        assertEquals("com.example.lib.ExternalRepo", metadata.get("declaringType"));
+        assertEquals(Boolean.TRUE, metadata.get("inherited"));
+    }
 }

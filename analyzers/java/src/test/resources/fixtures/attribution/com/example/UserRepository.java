@@ -11,4 +11,8 @@ public class UserRepository extends ExternalRepo {
     public void invokeExternalDirect(ExternalRepo repo) {
         repo.find(2L);
     }
+
+    public void invokeInheritedStaticUnqualified() {
+        staticFind();
+    }
 }

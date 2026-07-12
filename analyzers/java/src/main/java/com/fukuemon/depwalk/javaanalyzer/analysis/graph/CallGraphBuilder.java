@@ -6,6 +6,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResult;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
+import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
@@ -14,19 +15,26 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
+import com.github.javaparser.ast.body.CompactConstructorDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.InitializerDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.LambdaExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
+import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
+import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.nio.file.Path;
@@ -105,6 +113,23 @@ public final class CallGraphBuilder {
             recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
             return;
         }
+        if (node instanceof CompactConstructorDeclaration ccd) {
+            // record の compact constructor (`record User(String name) { User { validate(); } }`)。
+            // canonical constructor 扱いとし、signature は record component の erasure 型列にする。
+            // JavaParser の CompactConstructorDeclaration#resolve() は未実装
+            // (UnsupportedOperationException) なため、record の component 列から自前で計算する。
+            MethodSymbol symbol;
+            try {
+                symbol = buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd);
+            } catch (RuntimeException e) {
+                reportUnresolvedDeclaration(ccd, "failed to resolve compact constructor declaration: " + ccd.getNameAsString());
+                recurseChildren(node, ctx.withCaller(List.of()));
+                return;
+            }
+            accumulator.addNode(symbol);
+            recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+            return;
+        }
         if (node instanceof InitializerDeclaration id) {
             if (!containsAnyCall(id)) {
                 recurseChildren(node, ctx);
@@ -137,6 +162,11 @@ public final class CallGraphBuilder {
         }
         if (node instanceof MethodCallExpr mce) {
             processMethodCall(mce, ctx);
+            recurseChildren(node, ctx);
+            return;
+        }
+        if (node instanceof MethodReferenceExpr mre) {
+            processMethodReference(mre, ctx);
             recurseChildren(node, ctx);
             return;
         }
@@ -190,7 +220,7 @@ public final class CallGraphBuilder {
         }
 
         TypeSite declaringSite = typeSiteOf(resolved.declaringType());
-        TypeSite receiverSite = receiverSiteOf(mce, ctx);
+        TypeSite receiverSite = receiverSiteOf(mce, ctx, resolved, declaringSite);
         AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
         if (attribution.isOmitted()) {
             return;
@@ -243,6 +273,157 @@ public final class CallGraphBuilder {
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+    }
+
+    /** {@code Foo::new} の source 上の識別子 ({@code getIdentifier()} が返す値)。 */
+    private static final String METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER = "new";
+
+    /**
+     * D6 の lambda 既定 (囲みメソッドへ帰属 + {@code viaLambda: true}) と同じ原則を method reference
+     * ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) に適用する。囲みメソッドを caller、
+     * 参照先メソッド (D11 の帰属規則適用) を callee とする {@code callEdge} を出力し、
+     * {@code metadata.viaMethodReference: true} で標識する (Core は metadata を解釈しないため契約変更なし)。
+     */
+    private void processMethodReference(MethodReferenceExpr mre, WalkContext ctx) {
+        if (METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER.equals(mre.getIdentifier())) {
+            processConstructorReference(mre, ctx);
+            return;
+        }
+
+        ResolvedMethodDeclaration resolved;
+        try {
+            resolved = mre.resolve();
+        } catch (RuntimeException e) {
+            reportUnresolved(mre, ctx);
+            return;
+        }
+
+        TypeSite declaringSite = typeSiteOf(resolved.declaringType());
+        TypeSite receiverSite = typeSiteOfExpression(mre.getScope());
+        AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
+        if (attribution.isOmitted()) {
+            return;
+        }
+
+        MethodSymbol calleeSymbol = buildMethodSymbol(attribution, resolved);
+        accumulator.addNode(calleeSymbol);
+
+        String dispatch = dispatchOf(resolved);
+        Map<String, Object> metadata = methodReferenceEdgeMetadata(dispatch, ctx.viaLambda());
+        SourceLocation callSite = sourceLocationOf(mre);
+        for (String callerId : ctx.callerMethodIds()) {
+            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
+        }
+    }
+
+    /**
+     * constructor reference ({@code Foo::new}) の扱い。D11 の {@code new} 規則 (constructor は継承され
+     * ないため引き上げは発生しない) をそのまま適用し、scope 外なら出力しない。{@code JavaParser} は
+     * constructor reference の {@code resolve()} を未実装 ({@code UnsupportedOperationException}) と
+     * しているため、参照先型の constructor 一覧から候補を自前で選ぶ (単一候補ならそれを使い、複数候補
+     * のときは呼び出し先の関数型インタフェースの SAM 引数数で絞り込む)。
+     */
+    private void processConstructorReference(MethodReferenceExpr mre, WalkContext ctx) {
+        ResolvedReferenceTypeDeclaration scopeDecl;
+        try {
+            ResolvedType scopeType = mre.getScope().calculateResolvedType();
+            if (!scopeType.isReferenceType()) {
+                reportUnresolved(mre, ctx);
+                return;
+            }
+            scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
+            if (scopeDecl == null) {
+                reportUnresolved(mre, ctx);
+                return;
+            }
+        } catch (RuntimeException e) {
+            reportUnresolved(mre, ctx);
+            return;
+        }
+
+        TypeSite declaringSite = typeSiteOf(scopeDecl);
+        AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
+        if (attribution.isOmitted()) {
+            return;
+        }
+
+        ResolvedConstructorDeclaration resolvedCtor = selectConstructor(scopeDecl.getConstructors(), mre);
+        if (resolvedCtor == null) {
+            reportUnresolved(mre, ctx);
+            return;
+        }
+
+        MethodSymbol calleeSymbol = buildConstructorSymbol(attribution, resolvedCtor);
+        accumulator.addNode(calleeSymbol);
+
+        Map<String, Object> metadata = methodReferenceEdgeMetadata(null, ctx.viaLambda());
+        SourceLocation callSite = sourceLocationOf(mre);
+        for (String callerId : ctx.callerMethodIds()) {
+            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
+        }
+    }
+
+    /**
+     * constructor reference の候補選択。候補が 1 つならそれを使う。複数の overload があるときは、
+     * {@code mre} が代入される関数型インタフェースの SAM (single abstract method) の引数数に一致する
+     * ものを選ぶ。一致がゼロ / 複数 (曖昧) / SAM 引数数が推論できない場合は {@code null} (呼び出し側で
+     * {@code JAVA_UNRESOLVED_SYMBOL} diagnostic にする)。
+     */
+    private ResolvedConstructorDeclaration selectConstructor(List<ResolvedConstructorDeclaration> ctors, MethodReferenceExpr mre) {
+        if (ctors.isEmpty()) {
+            return null;
+        }
+        if (ctors.size() == 1) {
+            return ctors.get(0);
+        }
+        int arity = inferFunctionalInterfaceArity(mre);
+        if (arity < 0) {
+            return null;
+        }
+        ResolvedConstructorDeclaration match = null;
+        for (ResolvedConstructorDeclaration ctor : ctors) {
+            if (ctor.getNumberOfParams() == arity) {
+                if (match != null) {
+                    return null;
+                }
+                match = ctor;
+            }
+        }
+        return match;
+    }
+
+    /** {@code mre} が代入される関数型インタフェースの SAM の引数数。推論できなければ {@code -1}。 */
+    private int inferFunctionalInterfaceArity(MethodReferenceExpr mre) {
+        try {
+            ResolvedType functionalType = mre.calculateResolvedType();
+            if (!functionalType.isReferenceType()) {
+                return -1;
+            }
+            ResolvedReferenceTypeDeclaration decl = functionalType.asReferenceType().getTypeDeclaration().orElse(null);
+            if (decl == null) {
+                return -1;
+            }
+            for (MethodUsage methodUsage : decl.getAllMethods()) {
+                if (methodUsage.getDeclaration().isAbstract()) {
+                    return methodUsage.getNoParams();
+                }
+            }
+        } catch (RuntimeException e) {
+            return -1;
+        }
+        return -1;
+    }
+
+    private Map<String, Object> methodReferenceEdgeMetadata(String dispatch, boolean viaLambda) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (dispatch != null) {
+            metadata.put("dispatch", dispatch);
+        }
+        if (viaLambda) {
+            metadata.put("viaLambda", true);
+        }
+        metadata.put("viaMethodReference", true);
+        return metadata;
     }
 
     private void reportUnresolved(Node callNode, WalkContext ctx) {
@@ -307,13 +488,16 @@ public final class CallGraphBuilder {
         SourceLocation sourceLocation = null;
         Map<String, Object> metadata = null;
         if (attribution.outcome() == AttributionResult.Outcome.SCOPE_INTERNAL) {
-            // synthetic default constructor は自身の AST を持たない ({@code toAst()} が空) ため、
-            // 宣言型の AST 位置へフォールバックする。これにより ensureDefaultConstructorNode と
-            // 同一内容になり、同一 methodId の node がどの経路から生成されても内容が一致する
-            // (GraphAccumulator の first-wins 重複排除で情報が失われない)。
+            // synthetic default constructor / record canonical constructor は自身の AST を持たない
+            // ({@code toAst()} が空、record の場合は compact constructor の有無によらず常に空) ため、
+            // 宣言型の AST 位置へフォールバックする。これにより ensureDefaultConstructorNode /
+            // buildCompactConstructorSymbol と同一内容になり、同一 methodId の node がどの経路から
+            // 生成されても内容が一致する (GraphAccumulator の first-wins 重複排除で情報が失われない)。
+            // record に compact constructor があれば、宣言型そのものより精度の高い compact constructor
+            // の位置を使う (buildCompactConstructorSymbol と揃える)。
             Node ast = resolved.toAst().orElse(null);
             if (ast == null) {
-                ast = resolved.declaringType().toAst().orElse(null);
+                ast = preferCompactConstructorLocation(resolved.declaringType().toAst().orElse(null));
             }
             sourceLocation = ast != null ? sourceLocationOf(ast) : null;
         } else if (attribution.outcome() == AttributionResult.Outcome.LIFTED) {
@@ -322,6 +506,43 @@ public final class CallGraphBuilder {
                     "inherited", true);
         }
         return MethodSymbol.of(methodId, "java", "constructor", qualifiedName, signature, sourceLocation, metadata);
+    }
+
+    /**
+     * {@code typeAst} が record で compact constructor を持つ場合、その位置を優先して返す
+     * (宣言型全体より精度の高い sourceLocation にする)。該当しなければ {@code typeAst} をそのまま返す。
+     */
+    private Node preferCompactConstructorLocation(Node typeAst) {
+        if (typeAst instanceof RecordDeclaration rd) {
+            for (BodyDeclaration<?> member : rd.getMembers()) {
+                if (member instanceof CompactConstructorDeclaration ccd) {
+                    return ccd;
+                }
+            }
+        }
+        return typeAst;
+    }
+
+    /**
+     * record の compact constructor (D11: record の canonical constructor 扱い) の {@link MethodSymbol}
+     * を作る。signature は record component の erasure 型列 (宣言順)。JavaParser の
+     * {@code CompactConstructorDeclaration#resolve()} は未実装のため、record の component 一覧
+     * ({@link RecordDeclaration#getParameters()}) から自前で param 型を求める。
+     */
+    private MethodSymbol buildCompactConstructorSymbol(Node enclosingTypeNode, CompactConstructorDeclaration ccd) {
+        if (!(enclosingTypeNode instanceof RecordDeclaration rd)) {
+            throw new IllegalStateException("compact constructor outside of a record declaration: " + ccd);
+        }
+        String declaringBinaryName = BinaryNames.forTypeLikeNode(enclosingTypeNode);
+        List<String> paramTypes = new ArrayList<>();
+        for (Parameter component : rd.getParameters()) {
+            paramTypes.add(BinaryNames.erasureOf(component.resolve().getType()));
+        }
+        String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
+        String methodId = MethodIds.methodId(signature);
+        String qualifiedName = declaringBinaryName.replace('$', '.') + "." + MethodIds.CONSTRUCTOR_TOKEN;
+        SourceLocation sourceLocation = sourceLocationOf(ccd);
+        return MethodSymbol.of(methodId, "java", "constructor", qualifiedName, signature, sourceLocation, null);
     }
 
     private String ensureStaticInitializerNode(Node enclosingType) {
@@ -398,16 +619,34 @@ public final class CallGraphBuilder {
         return new TypeSite(binaryName, filePath);
     }
 
-    private TypeSite receiverSiteOf(MethodCallExpr mce, WalkContext ctx) {
+    /**
+     * mce の scope (レシーバ式) から帰属型決定に使う {@link TypeSite} を決める。
+     *
+     * <p>D11: scope が空 (無修飾呼び出し) のとき、通常は enclosing class を「参照した型」とみなす
+     * (自クラス呼び出し / 継承 static・instance メソッドの暗黙 this 呼び出し)。ただし static かつ
+     * 宣言型が enclosing class の継承階層に含まれない場合は、無修飾 static import
+     * ({@code import static pkg.Type.member;}) 由来の呼び出しであり、「参照した型」は enclosing class
+     * ではなく宣言型そのものである。そのため receiverSite = declaringSite として扱い、宣言型が
+     * scope 外なら enclosing への誤った引き上げを起こさず出力を省略する。
+     */
+    private TypeSite receiverSiteOf(MethodCallExpr mce, WalkContext ctx, ResolvedMethodDeclaration resolved, TypeSite declaringSite) {
         if (mce.getScope().isEmpty()) {
             Node enclosing = ctx.enclosingTypeNode();
             if (enclosing == null) {
                 return null;
             }
+            if (resolved.isStatic() && !declaringTypeInEnclosingHierarchy(enclosing, resolved.declaringType())) {
+                return declaringSite;
+            }
             return new TypeSite(BinaryNames.forTypeLikeNode(enclosing), filePathOf(enclosing));
         }
+        return typeSiteOfExpression(mce.getScope().get());
+    }
+
+    /** 式を評価した静的型の {@link TypeSite}。解決できなければ {@code null}。 */
+    private TypeSite typeSiteOfExpression(Expression expr) {
         try {
-            ResolvedType receiverType = mce.getScope().get().calculateResolvedType();
+            ResolvedType receiverType = expr.calculateResolvedType();
             if (!receiverType.isReferenceType()) {
                 return null;
             }
@@ -419,6 +658,49 @@ public final class CallGraphBuilder {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * declaringType が enclosingTypeNode 自身または、その継承階層 (supertype / interface) に含まれるか
+     * を判定する。判定不能な場合 (enclosing の型解決失敗 / ancestor 列挙が unresolved symbol で失敗) は、
+     * 従来の「enclosing への引き上げ」挙動を壊さないよう保守的に {@code true} を返す。
+     */
+    private boolean declaringTypeInEnclosingHierarchy(Node enclosingTypeNode, ResolvedReferenceTypeDeclaration declaringType) {
+        String declaringBinaryName = BinaryNames.forResolvedDeclaration(declaringType);
+        String enclosingBinaryName = BinaryNames.forTypeLikeNode(enclosingTypeNode);
+        if (declaringBinaryName.equals(enclosingBinaryName)) {
+            return true;
+        }
+        ResolvedReferenceTypeDeclaration enclosingDecl = resolveTypeLikeNode(enclosingTypeNode);
+        if (enclosingDecl == null) {
+            return true;
+        }
+        try {
+            for (ResolvedReferenceType ancestor : enclosingDecl.getAllAncestors()) {
+                ResolvedReferenceTypeDeclaration ancestorDecl = ancestor.getTypeDeclaration().orElse(null);
+                if (ancestorDecl != null && declaringBinaryName.equals(BinaryNames.forResolvedDeclaration(ancestorDecl))) {
+                    return true;
+                }
+            }
+        } catch (RuntimeException e) {
+            return true;
+        }
+        return false;
+    }
+
+    private ResolvedReferenceTypeDeclaration resolveTypeLikeNode(Node typeLikeNode) {
+        try {
+            if (typeLikeNode instanceof TypeDeclaration<?> td) {
+                return td.resolve();
+            }
+            if (typeLikeNode instanceof ObjectCreationExpr oce) {
+                ResolvedType type = oce.calculateResolvedType();
+                return type.isReferenceType() ? type.asReferenceType().getTypeDeclaration().orElse(null) : null;
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
     }
 
     private String dispatchOf(ResolvedMethodDeclaration resolved) {
@@ -468,7 +750,9 @@ public final class CallGraphBuilder {
     private SourceLocation sourceLocationOf(Node node) {
         return node.getBegin().map(p -> {
             Path filePath = filePathOf(node);
-            String relativePath = filePath != null ? workspaceRoot.relativize(filePath).toString() : "";
+            String relativePath = filePath != null
+                    ? RelativePaths.toRecordPath(workspaceRoot.relativize(filePath).toString())
+                    : "";
             return SourceLocation.of(relativePath, p.line);
         }).orElse(null);
     }
