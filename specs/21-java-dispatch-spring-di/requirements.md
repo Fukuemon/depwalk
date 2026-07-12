@@ -106,7 +106,7 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | --- | -------------------------------------------------------- | -------- | ------------- | -------------------------------------------------- | -------------------------------- |
 | Q1  | SootUpを型階層補完だけに使うか、call graph生成まで使うか | Fukuemon | clarify phase | 決定 (spec D1 参照: 型階層補完のみ)                | Design Doc Q2を継承              |
 | Q2  | 複数dispatch候補を複数edgeで表すかmetadataで表すか       | Fukuemon | clarify phase | 決定 (spec D2 参照: call site 単位の複数候補 edge) | Traversalへの影響を確認          |
-| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 未決                                               | profile / property / conditional |
+| Q3  | Spring条件評価をどこまで静的解決するか                   | Fukuemon | clarify phase | 決定 (spec D3 参照: 条件評価せず検出・記録のみ)    | profile / property / conditional |
 | Q4  | Spring Data等の実行時生成実装をどの抽象度で表すか        | Fukuemon | clarify phase | 未決                                               | 実行時Proxy自体は非対象          |
 
 ## 関連資料
@@ -128,3 +128,4 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | 2026-07-12 | Claude | clarify: Q1をspec index.mdのD1決定 (型階層補完のみ) を参照する形で決定済みへ更新                                                                      |
 | 2026-07-12 | Claude | clarify: Q2をspec index.mdのD2決定 (call site単位の複数候補edge) を参照する形で決定済みへ更新。E2の代替手段も同決定に合わせて確定                     |
 | 2026-07-12 | Claude | clarify: D6決定 (観測はJSONL (metadata/diagnostic) までを#21の責務とし、CLI出力表出は#22へ引き継ぎ) を監査/非機能要件へ反映                           |
+| 2026-07-12 | Claude | clarify: Q3をspec index.mdのD3決定 (条件評価せず検出・記録のみ) を参照する形で決定済みへ更新                                                          |

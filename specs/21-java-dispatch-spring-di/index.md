@@ -139,7 +139,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 | --- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
 | D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない)                            | 解決済み |
 | D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  | A1: call site ごとの複数候補 edge (宣言型 edge 保持 + metadata で解決根拠) | 解決済み |
-| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |                                                                            | 未決     |
+| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  | A: 条件評価しない (条件の検出・記録のみ、候補は常に保持)                   | 解決済み |
 | D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                                            | 未決     |
 | D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                            | 未決     |
 | D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  | A: JSONL metadata + diagnostic まで (CLI 出力表出は #22 へ引き継ぎ)        | 解決済み |
@@ -160,6 +160,12 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
   - 決定日: 2026-07-12
   - 決定者: Fukuemon
 
+- **D3: Spring の条件評価 (profile / property / `@Conditional`) は一切行わない。条件アノテーションの検出と記録のみ行う (案 A)。`@Profile` / `@ConditionalOnProperty` 等の条件アノテーション付き Bean も無条件に候補として列挙する。「条件付きである」事実と条件種別を metadata / diagnostic に記録し、絞り込みの判断材料には使わない。条件付き Bean が候補に含まれる場合、候補 1 件でも「静的に一意」とは扱わず曖昧候補とする (R1/E4 整合)。**
+  - 決定理由: E4 (条件未確定として候補保持、実行環境を推測しない) の既定路線の踏襲。誤判定ゼロで影響追跡として安全側。実装が単純で #21 を小さく保てる。
+  - 将来拡張の余地: active profile をユーザー入力で受け取り限定評価する案 (B) は不採用だが、条件情報を metadata に記録するため、後から絞り込み層を追加する拡張は閉じない (ユースケース具体化後の後続 issue とする)。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
+
 - **D6: 曖昧性・解決根拠の観測は、#21 では Analyzer JSONL の metadata + diagnostic までを責務とする (案 A)。CLI 出力 (Console / JSON) への edge 単位の metadata 表出は #22 (CLI interface spec) の論点として引き継ぐ。**
   - 決定理由: #21 の実装対象が java-analyzer に閉じる。R2「diagnostic または metadata で観測可能」は JSONL レベルで満たせる (曖昧ケースは diagnostic、根拠は metadata)。出力 UX / スキーマの判断を出力仕様の正本である #22 に一元化し、二重設計・衝突を避ける。
   - トレードオフとして受容: #22 完了までは CLI の JSON 出力で候補 edge を機械的にフィルタできない。
@@ -170,7 +176,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1, D2, D6 は解決済み。D3〜D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+- D1, D2, D3, D6 は解決済み。D4, D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
 
 ## 実装対象
 
@@ -218,17 +224,17 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 ### Testing
 
 - [context/testing.md](../../context/testing.md) の Java Analyzer 三層 (Java unit / Go process contract (fake, JVM 不要) / 実 jar E2E) を踏襲する。
-- SootUp / Spring 解析固有の観点は D1〜D4 解決後に追記する。
+- SootUp / Spring 解析固有の観点は D4 解決後に追記する (条件アノテーション検出・記録 (D3) のテストケースは実装分割時に具体化)。
 
 ## Interface 設計
 
 ### UI / API / Event Interface
 
-- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D3 解決済み: Spring 条件評価は行わず、条件アノテーションの検出・記録のみを metadata / diagnostic に追加する。条件付き Bean を含む場合は候補が 1 件でも一意扱いにしない。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
 
 ### Props / Request / Response
 
-- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。D2 により、複数 dispatch 候補は caller → 各実装候補への複数 `callEdge` (宣言型への既存 edge も保持) で表現し、各 edge の metadata に解決根拠 (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`) を付与する。フィールド名の最終形は設計時に確定する。D3〜D4 の候補・曖昧性表現の残る項目は D3〜D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
+- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。D2 により、複数 dispatch 候補は caller → 各実装候補への複数 `callEdge` (宣言型への既存 edge も保持) で表現し、各 edge の metadata に解決根拠 (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`) を付与する。フィールド名の最終形は設計時に確定する。D3 により、`@Profile` / `@ConditionalOnProperty` 等の条件アノテーション付き Bean は評価せず無条件に候補として列挙し、「条件付きである」事実と条件種別を metadata / diagnostic に追加する (絞り込みには使わない、条件付き候補を含む場合は 1 件でも `resolution: unique` にしない)。D4 の候補・曖昧性表現の残る項目は D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
 
 ## Content / Data 設計
 
@@ -238,7 +244,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### コンテンツ配置 / package / route
 
-- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D3〜D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。
+- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。条件アノテーション (`@Profile` / `@ConditionalOnProperty` 等) の検出・記録ロジックも `analyzers/java/` 内で行い、条件評価は実装しない (D3)。
 
 ## Performance / Security 設計
 
@@ -254,12 +260,12 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### エラーケース
 
-| #   | ケース                             | ユーザーへの見せ方                 | リカバリ                              |
-| --- | ---------------------------------- | ---------------------------------- | ------------------------------------- |
-| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続 | 宣言型の edge を保持                  |
-| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力             | 複数候補 edge + 宣言型 edge 保持 (D2) |
-| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力     | JavaParser 結果のみで解析継続         |
-| E4  | 条件付き Bean を静的に確定できない | 条件未確定として候補を保持         | 実行環境を推測しない                  |
+| #   | ケース                             | ユーザーへの見せ方                                                                | リカバリ                                                       |
+| --- | ---------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続                                                | 宣言型の edge を保持                                           |
+| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力                                                            | 複数候補 edge + 宣言型 edge 保持 (D2)                          |
+| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力                                                    | JavaParser 結果のみで解析継続                                  |
+| E4  | 条件付き Bean を静的に確定できない | 条件付きであることと条件種別を metadata / diagnostic に記録し、候補を無条件に列挙 | 条件評価は行わず (D3)、候補 1 件でも一意扱いせず曖昧候補とする |
 
 ### Fallback
 
@@ -362,6 +368,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D1 (SootUp を型階層補完のみに使う) を決定として反映。Gradle マルチモジュール対応を #24 へ切り出し                                               |
 | 2026-07-12 | Claude | clarify: D2 (複数 dispatch 候補は call site ごとの複数候補 edge、案 A1) を決定として反映。付随論点 D6 (曖昧性・解決根拠の CLI 出力での観測可能性) を追加 |
 | 2026-07-12 | Claude | clarify: D6 (観測は Analyzer JSONL の metadata + diagnostic までを #21 の責務とし、CLI 出力表出は #22 へ引き継ぐ、案 A) を決定として反映                 |
+| 2026-07-12 | Claude | clarify: D3 (Spring 条件評価は行わず、条件アノテーションの検出・記録のみ行う、案 A) を決定として反映                                                     |
 
 ## 備考
 
