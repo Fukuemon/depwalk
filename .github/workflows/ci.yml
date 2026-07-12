@@ -58,7 +58,11 @@ jobs:
 
       - name: Dependency boundary gate (core must not depend on analyzers/)
         run: |
-          if go list -deps ./... | grep -E "analyzers/"; then
+          # Scope the grep to this repo's own analyzers/<language> import
+          # path prefix (not a bare "analyzers/" substring) so a
+          # third-party dependency whose import path happens to contain
+          # "analyzers/" isn't misreported as a boundary violation.
+          if go list -deps ./... | grep -E "^github.com/Fukuemon/depwalk/analyzers/"; then
             echo "core must not depend on analyzers/<language>/ packages"
             exit 1
           fi
@@ -120,3 +124,9 @@ jobs:
       - name: Run Go E2E tests
         run: go test ./e2e/... -v
         working-directory: core
+        env:
+          # Fail (not skip) when a prerequisite (JDK 25, the analyzer jar)
+          # is missing, so a broken JDK detection or jar download doesn't
+          # silently turn this job into a no-op green check (see
+          # skipOrFail in core/e2e/java_fixture_test.go).
+          DEPWALK_E2E_REQUIRED: "1"

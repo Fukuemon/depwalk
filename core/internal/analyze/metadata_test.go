@@ -46,6 +46,16 @@ func TestBuildMetadata(t *testing.T) {
 			pairs: []string{"filter=a=b"},
 			want:  protocol.Metadata{"filter": []string{"a=b"}},
 		},
+		{
+			name:  "a value followed by an empty value keeps the existing value",
+			pairs: []string{"classpath=/a.jar", "classpath="},
+			want:  protocol.Metadata{"classpath": []string{"/a.jar"}},
+		},
+		{
+			name:  "an empty value followed by a value appends onto the empty array",
+			pairs: []string{"classpath=", "classpath=/a.jar"},
+			want:  protocol.Metadata{"classpath": []string{"/a.jar"}},
+		},
 	}
 
 	for _, tt := range tests {
