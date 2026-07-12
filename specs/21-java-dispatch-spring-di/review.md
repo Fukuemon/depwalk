@@ -77,3 +77,11 @@ Verdict: NEEDS_WORK → 指摘対応後に再レビュー予定
 1. context への影響テーブルに D1 → context/toolchain.md の反映行を追加 (toolchain.md は「確定範囲は Q2 で詰める」と解決待ちを明記、ADR-0005:70 も toolchain/testing への反映を指示)
 2. (minor) context/testing.md は更新不要の根拠 (既に「サンプル Java/Spring プロジェクト」前提) を 1 行記録
 3. (minor) ADR テーブル D1 行の「sync phase で反映」文言を他行と統一
+
+## Review 2026-07-12 — Phase 5 (track) 再レビュー
+
+Verdict: PASS
+
+- 前回指摘 3 件すべて反映確認 (context/toolchain.md 反映行の追加、testing.md 更新不要根拠の記録、ADR D1 行の文言統一)
+- 上位文書整合 / 未解決論点 / 実装対象 / template 必須節 / EARS: すべて PASS。prompts / 正本境界: N/A
+- 非 blocker: sync phase で context/toolchain.md 更新時に冒頭の「最終更新」日付も同時更新すること (文書メタ情報の同期)
