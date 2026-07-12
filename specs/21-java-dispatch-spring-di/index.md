@@ -142,7 +142,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 | D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |                                                                            | 未決     |
 | D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                                            | 未決     |
 | D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                            | 未決     |
-| D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  |                                                                            | 未決     |
+| D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  | A: JSONL metadata + diagnostic まで (CLI 出力表出は #22 へ引き継ぎ)        | 解決済み |
 
 ## 解決済みの論点
 
@@ -160,11 +160,17 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
   - 決定日: 2026-07-12
   - 決定者: Fukuemon
 
+- **D6: 曖昧性・解決根拠の観測は、#21 では Analyzer JSONL の metadata + diagnostic までを責務とする (案 A)。CLI 出力 (Console / JSON) への edge 単位の metadata 表出は #22 (CLI interface spec) の論点として引き継ぐ。**
+  - 決定理由: #21 の実装対象が java-analyzer に閉じる。R2「diagnostic または metadata で観測可能」は JSONL レベルで満たせる (曖昧ケースは diagnostic、根拠は metadata)。出力 UX / スキーマの判断を出力仕様の正本である #22 に一元化し、二重設計・衝突を避ける。
+  - トレードオフとして受容: #22 完了までは CLI の JSON 出力で候補 edge を機械的にフィルタできない。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
+
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1, D2 は解決済み。D3〜D6 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+- D1, D2, D6 は解決済み。D3〜D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
 
 ## 実装対象
 
@@ -218,7 +224,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### UI / API / Event Interface
 
-- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D6 (曖昧性・解決根拠の CLI 出力での観測可能性) は未決)。
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D6 解決済み: 観測レイヤーの責務境界として、Analyzer JSONL (metadata / diagnostic) までを #21 の責務とし、CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) へ引き継ぐ)。
 
 ### Props / Request / Response
 
@@ -258,6 +264,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 ### Fallback
 
 - 一意に確定できない場合は根拠なく一つへ絞らず、候補と未解決理由を diagnostic / metadata で観測可能にする (ADR-0004 を継承)。
+- 観測レイヤーの責務境界 (D6): Analyzer JSONL (metadata / diagnostic) までを #21 の責務とする。CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) の論点として引き継ぐ。
 
 ## テスト / 評価方針
 
@@ -354,6 +361,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | scaffold 完了、spec-review PASS。非 blocker 指摘 2 件 (feature doc 行の文言ずれ / 「からから」typo) を修正                                               |
 | 2026-07-12 | Claude | clarify: D1 (SootUp を型階層補完のみに使う) を決定として反映。Gradle マルチモジュール対応を #24 へ切り出し                                               |
 | 2026-07-12 | Claude | clarify: D2 (複数 dispatch 候補は call site ごとの複数候補 edge、案 A1) を決定として反映。付随論点 D6 (曖昧性・解決根拠の CLI 出力での観測可能性) を追加 |
+| 2026-07-12 | Claude | clarify: D6 (観測は Analyzer JSONL の metadata + diagnostic までを #21 の責務とし、CLI 出力表出は #22 へ引き継ぐ、案 A) を決定として反映                 |
 
 ## 備考
 

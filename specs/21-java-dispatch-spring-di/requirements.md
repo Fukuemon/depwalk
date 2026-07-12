@@ -98,6 +98,7 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 - 解析結果から、JavaParser / SootUp / Spring DIのどの根拠でedgeが生成されたかを観測可能にする。
 - Issue #9で取得する性能baselineと比較し、追加解析の時間・最大RSSを計測する。
 - CoreのGo jobはJVM / Spring依存を持たない状態を維持する。
+- 観測レイヤーの責務境界 (spec D6): Analyzer JSONL の metadata / diagnostic までを#21の責務とし、CLI出力 (Console / JSON) へのedge単位metadata表出は#22 (CLI interface spec) へ引き継ぐ。
 
 ## 未決事項（論点）
 
@@ -126,3 +127,4 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 | 2026-07-12 | Claude | ADR-0005追随 (起点 / 上位文書参照の旧Phase呼称を統合feature表現へ更新)、E2E受け入れ基準の検証レベル (graph照合基本 / CLI出力照合は#22完了後) を明確化 |
 | 2026-07-12 | Claude | clarify: Q1をspec index.mdのD1決定 (型階層補完のみ) を参照する形で決定済みへ更新                                                                      |
 | 2026-07-12 | Claude | clarify: Q2をspec index.mdのD2決定 (call site単位の複数候補edge) を参照する形で決定済みへ更新。E2の代替手段も同決定に合わせて確定                     |
+| 2026-07-12 | Claude | clarify: D6決定 (観測はJSONL (metadata/diagnostic) までを#21の責務とし、CLI出力表出は#22へ引き継ぎ) を監査/非機能要件へ反映                           |
