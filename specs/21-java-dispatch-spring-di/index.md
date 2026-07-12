@@ -135,13 +135,14 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                           | 決定候補                                        | 決定     |
-| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | -------- |
-| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない) | 解決済み |
-| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  |                                                 | 未決     |
-| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |                                                 | 未決     |
-| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                 | 未決     |
-| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                 | 未決     |
+| #   | 論点                                                                                                           | 決定候補                                                                   | 決定     |
+| --- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
+| D1  | SootUp を型階層補完だけに使うか、call graph 生成まで使うか (requirements Q1 / Design Doc Q2 を継承)            | A: 型階層補完のみ (call graph 生成は委譲しない)                            | 解決済み |
+| D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  | A1: call site ごとの複数候補 edge (宣言型 edge 保持 + metadata で解決根拠) | 解決済み |
+| D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  |                                                                            | 未決     |
+| D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                |                                                                            | 未決     |
+| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                            | 未決     |
+| D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  |                                                                            | 未決     |
 
 ## 解決済みの論点
 
@@ -153,11 +154,17 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
   - 決定日: 2026-07-12
   - 決定者: Fukuemon
 
+- **D2: 複数 dispatch 候補は「call site ごとに caller → 各実装候補への複数 CallEdge」で表す (案 A1)。宣言型 (interface / 基底型) への既存 edge も保持する。各 edge の metadata に解決根拠を付与する (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di` — フィールド名の最終形は設計時に確定する)。**
+  - 決定理由: (1) S4 の測定方法「実装クラスのメソッドが callee として現れること」は graph 上の実 edge を要求し、Core は metadata を解釈しない (R3/S5) ため metadata 内候補配列 (案 B) では Traversal が実装候補に到達できず S4 未達となる。(2) Spring DI の絞り込みは注入点ごと (call site 単位) に決まるため、宣言メソッド→実装メソッドの型ペア単位 edge (案 A2) では「ServiceX では ImplA に確定」という解決成果を表現できない。(3) Traversal Engine は edge を区別しない BFS のため、複数候補 edge は Core / Traversal 変更ゼロで到達性に反映される。(4) Phase 1 の dispatch metadata パターンの延長で、R4 の重複排除も edgeId 単位で単純になる。
+  - トレードオフとして受容: 候補が絞れない場合 edge 数が増える (過大近似が graph に入る)。確定 / 候補の区別は metadata 頼みとなる。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
+
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1 は解決済み。D2〜D5 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
+- D1, D2 は解決済み。D3〜D6 が未決のため、Interface / Routing 設計以降の下流 phase は clarify phase での論点解決を待つ。
 
 ## 実装対象
 
@@ -211,11 +218,11 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### UI / API / Event Interface
 
-- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 の結論待ち)。
+- 該当なし (CLI のみ)。Analyzer Protocol への追加が必要な場合も既存 schema の非破壊的拡張に限る (D1 解決済み: SootUp は call graph 生成まで委譲しないため、SootUp 由来の追加 edge 種別を Protocol へ持ち込む必要はない。D2 解決済み: 複数 dispatch 候補は call site ごとの複数 CallEdge として表現し、宣言型への既存 edge も保持する。D6 (曖昧性・解決根拠の CLI 出力での観測可能性) は未決)。
 
 ### Props / Request / Response
 
-- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。候補・曖昧性表現の具体的な metadata / diagnostic 項目は D2〜D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
+- `analysisRequest` / `methodSymbol` / `callEdge` / `diagnostic` の既存 schema を変更しない前提。D2 により、複数 dispatch 候補は caller → 各実装候補への複数 `callEdge` (宣言型への既存 edge も保持) で表現し、各 edge の metadata に解決根拠 (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`) を付与する。フィールド名の最終形は設計時に確定する。D3〜D4 の候補・曖昧性表現の残る項目は D3〜D4 解決後に確定する。SootUp 由来の型階層情報は edge の正本にはならず、JavaParser 側が生成する call edge の入力 (dispatch 候補解決の補助) としてのみ使う (D1)。
 
 ## Content / Data 設計
 
@@ -225,7 +232,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### コンテンツ配置 / package / route
 
-- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D2〜D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。
+- SootUp / Spring 解析実装は `analyzers/java/` 配下に配置する想定 (具体的な package 構成は D3〜D4 解決後に確定)。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call edge 生成の正本は JavaParser 側に置く (D1)。複数 dispatch 候補の call edge 化・重複排除ロジックも `analyzers/java/` 内で行う (D2)。
 
 ## Performance / Security 設計
 
@@ -241,12 +248,12 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### エラーケース
 
-| #   | ケース                             | ユーザーへの見せ方                 | リカバリ                                    |
-| --- | ---------------------------------- | ---------------------------------- | ------------------------------------------- |
-| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続 | 宣言型の edge を保持                        |
-| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力             | 複数候補 edge または宣言型 edge (D2 で確定) |
-| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力     | JavaParser 結果のみで解析継続               |
-| E4  | 条件付き Bean を静的に確定できない | 条件未確定として候補を保持         | 実行環境を推測しない                        |
+| #   | ケース                             | ユーザーへの見せ方                 | リカバリ                              |
+| --- | ---------------------------------- | ---------------------------------- | ------------------------------------- |
+| E1  | Bean 候補が0件                     | 未解決 diagnostic を出力し解析継続 | 宣言型の edge を保持                  |
+| E2  | Bean 候補が複数件で絞り込めない    | 候補一覧と曖昧性を出力             | 複数候補 edge + 宣言型 edge 保持 (D2) |
+| E3  | bytecode を SootUp が読めない      | 対象と原因を diagnostic へ出力     | JavaParser 結果のみで解析継続         |
+| E4  | 条件付き Bean を静的に確定できない | 条件未確定として候補を保持         | 実行環境を推測しない                  |
 
 ### Fallback
 
@@ -314,9 +321,9 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ### feature doc への影響
 
-| 対象 doc / 節 | 変更内容 | 理由 |
-| ------------- | -------- | ---- |
-|               |          |      |
+| 対象 doc / 節                                                            | 変更内容                                                                                                                                       | 理由                             |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| feature doc (java-analyzer) dispatch 標識 (`callEdge.metadata.dispatch`) | 複数 dispatch 候補は call site ごとの複数 CallEdge (宣言型 edge 保持 + metadata で解決根拠) で表す拡張が確定。sync phase で feature doc へ反映 | source: clarify (spec D2 で決定) |
 
 ### context への影響
 
@@ -326,9 +333,10 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ### ADR の新規 / 更新
 
-| ADR ID   | 変更内容                                                                      | 理由                             |
-| -------- | ----------------------------------------------------------------------------- | -------------------------------- |
-| ADR-0005 | 未決事項だった SootUp の call graph 生成委譲範囲が確定 (型階層補完のみに限定) | source: clarify (spec D1 で決定) |
+| ADR ID   | 変更内容                                                                            | 理由                             |
+| -------- | ----------------------------------------------------------------------------------- | -------------------------------- |
+| ADR-0005 | 未決事項だった SootUp の call graph 生成委譲範囲が確定 (型階層補完のみに限定)       | source: clarify (spec D1 で決定) |
+| ADR-0005 | 未決事項 (候補 edge / 解決根拠 / 曖昧性の Protocol 表現) が確定 — sync phase で反映 | source: clarify (spec D2 で決定) |
 
 ## レビュー
 
@@ -340,11 +348,12 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                                                                   |
-| ---------- | ------ | ---------------------------------------------------------------------------------------------------------- |
-| 2026-07-12 | Claude | requirements.md と上位文書を基に index.md を新規作成 (scaffold)                                            |
-| 2026-07-12 | Claude | scaffold 完了、spec-review PASS。非 blocker 指摘 2 件 (feature doc 行の文言ずれ / 「からから」typo) を修正 |
-| 2026-07-12 | Claude | clarify: D1 (SootUp を型階層補完のみに使う) を決定として反映。Gradle マルチモジュール対応を #24 へ切り出し |
+| 日付       | 変更者 | 変更内容                                                                                                                                                 |
+| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-12 | Claude | requirements.md と上位文書を基に index.md を新規作成 (scaffold)                                                                                          |
+| 2026-07-12 | Claude | scaffold 完了、spec-review PASS。非 blocker 指摘 2 件 (feature doc 行の文言ずれ / 「からから」typo) を修正                                               |
+| 2026-07-12 | Claude | clarify: D1 (SootUp を型階層補完のみに使う) を決定として反映。Gradle マルチモジュール対応を #24 へ切り出し                                               |
+| 2026-07-12 | Claude | clarify: D2 (複数 dispatch 候補は call site ごとの複数候補 edge、案 A1) を決定として反映。付随論点 D6 (曖昧性・解決根拠の CLI 出力での観測可能性) を追加 |
 
 ## 備考
 
