@@ -1,5 +1,9 @@
 name: CI
 
+# NOTE: setup-java / setup-go の重複は現状 2-3 箇所に収まる規模のため
+# composite action 化していない。job が増えて setup 記述が 3 箇所以上に
+# 重複するようになったら .github/actions/ へ composite action として抽出する。
+
 on:
   pull_request:
   push:
@@ -7,9 +11,16 @@ on:
       - main
       - develop
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  go:
-    name: Go (JVM-free)
+  go-quality:
+    name: "Go quality (fmt / vet / build / test)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,6 +30,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: core/go.mod
+
+      # E2E テストは JDK 不在時に自動 skip されるため、この job に JVM は含めない
+      # (JVM が必要な検証は java-analyzer / e2e job が担う)。
 
       - name: Check gofmt
         run: test -z "$(gofmt -l .)"
@@ -50,8 +64,8 @@ jobs:
           fi
         working-directory: core
 
-  java-e2e:
-    name: Java + E2E (JDK 25 / Gradle)
+  java-analyzer:
+    name: "Java Analyzer (unit tests / fat jar)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,14 +78,44 @@ jobs:
           java-version: "25"
           cache: gradle
 
+      - name: Build and test Java Analyzer
+        run: ./gradlew test shadowJar
+        working-directory: analyzers/java
+
+      - name: Upload Java Analyzer fat jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-analyzer-jar
+          path: analyzers/java/build/libs/java-analyzer.jar
+          retention-days: 1
+
+  e2e:
+    name: "E2E (depwalk analyze × real jar)"
+    needs: java-analyzer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: core/go.mod
 
-      - name: Build and test Java Analyzer
-        run: ./gradlew test shadowJar
-        working-directory: analyzers/java
+      - name: Download Java Analyzer fat jar
+        uses: actions/download-artifact@v4
+        with:
+          name: java-analyzer-jar
+          path: analyzers/java/build/libs/
+
+      - name: Assert jar is at expected path
+        run: ls -l analyzers/java/build/libs/java-analyzer.jar
 
       - name: Run Go E2E tests
         run: go test ./e2e/... -v
