@@ -49,3 +49,17 @@ Verdict: PASS
 
 1. requirements.md のスコープに「Gradle マルチモジュール非対応 (#24 切り出し) / 単一 source root 前提」が未反映 → 本 commit で対応
 2. Interface 設計節に clarify 決定の伝播記述が既にあるため、phase 6 (diagram 以降) 着手時に「clarify 継承部分」と「当該 phase 確定部分」の区別に留意
+
+## Review 2026-07-12 — Phase 4 (diagram)
+
+Verdict: PASS
+
+- 図と D1〜D6 / E1〜E4 / 機能仕様の整合: 良好 (D1: SootUp は照会のみ、D2: 複数 CallEdge + 宣言型 edge、D3/E4: 条件は記録のみ、D4/E1: runtime-provided 分岐、E2/E3 分岐、D6: JSONL までが Analyzer 責務 — すべて図に忠実に反映)
+- 推測 (未確定事項) の混入なし。diagram-rules 準拠 (ノード ID / ラベルのクォート / participants 選定)
+- 上位文書整合 / 未解決論点 / 実装対象 / template 必須節 / EARS: すべて PASS
+
+非 blocker 所見 3 件 (実装時の留意点として記録):
+
+1. flowchart の BeanCount 分岐で「条件付き Bean (E4)」が件数分岐と同列の排他分岐に見えるが、実際は件数と直交する属性 (複数件かつ条件付きが起こり得る)。実装分割時に判定順序を明確化する
+2. sequence で diagnostic と callEdge の出力タイミングが二段に読める。実装時に「出力は統合後に一括か逐次か」を確定する
+3. 図に JavaParser / SootUp / Spring の固有名が登場するが、本 feature では設計対象そのものであり Design Doc C4 L2 と同名のため許容
