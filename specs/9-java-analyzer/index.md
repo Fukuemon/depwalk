@@ -762,6 +762,7 @@ flowchart TD
 | 2026-07-12 | Fukuemon | phase: prompts — 実装 prompts 4 件を生成 (P1 並列 2 + P2 直列 2)。#7 (output, PR #20) merge 済みの codebase と突合し、P1_01 の traversal / output 境界表現を明確化。関連資料の #7 状態を closed に更新                                                                    |
 | 2026-07-12 | Fukuemon | spec-review (prompts) 対応 — P2_02 の target を core に改名 (命名規則準拠)。ADR-0004 / ADR-0005 (#21 の境界決定) を整合表・関連資料に登録し、段階導入境界の記述を ADR-0005 (単一後続 feature / 型階層補完先行) に追随                                                     |
 | 2026-07-12 | Fukuemon | spec-review (prompts ②) PASS — phase 10 / 11 をレビュー済に更新し spec を Done へ。#9 Phase1 の実装 prompts 4 件が確定                                                                                                                                                    |
+| 2026-07-12 | Fukuemon | Phase1 実装完了 — P1_01 (7445399) / P1_02 (2a34149) / P2_01 (5b3f783) / P2_02 (d86cfe3) を実装。性能 baseline (10 files / ~500ms / ~122MiB) を feature doc に記録。CI workflow (Go job / Java+E2E job) を追加                                                             |
 
 ## 備考
 
