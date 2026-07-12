@@ -20,8 +20,8 @@
 | 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
 | 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
 | 3   | 上位文書突合                | 完了       | 2026-07-12 | 整合確認済み・矛盾なし (上位文書への反映は sync phase)                                        |
-| 4   | 論点整理                    | 完了       | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)        |
-| 5   | 論点解決                    | 完了       | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                   |
+| 4   | 論点整理                    | レビュー済 | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)        |
+| 5   | 論点解決                    | レビュー済 | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                   |
 | 6   | Interface / Routing 設計    | 未着手     |            | D1/D2 で解決済み (2026-07-12)                                                                 |
 | 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
 | 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                  |
@@ -372,10 +372,11 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                    | 対応                   |
-| ---------- | ------------------------ | ------------------------------------------- | ---------------------- |
-| 2026-07-12 | PASS                     | scaffold: 非 blocker 2 件 (文言ずれ / typo) | 修正済み               |
-| 2026-07-12 | NEEDS_WORK→修正済み      | clarify: stale 記述 8 件 (決定の伝播漏れ)   | 全件修正、再レビューへ |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                               | 対応                                       |
+| ---------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------ |
+| 2026-07-12 | PASS                     | scaffold: 非 blocker 2 件 (文言ずれ / typo)            | 修正済み                                   |
+| 2026-07-12 | NEEDS_WORK→修正済み      | clarify: stale 記述 8 件 (決定の伝播漏れ)              | 全件修正、再レビューへ                     |
+| 2026-07-12 | PASS                     | clarify 再レビュー: 指摘 8 件反映確認、非 blocker 2 件 | requirements スコープ反映 / phase 6 で留意 |
 
 ## 変更履歴
 
@@ -390,6 +391,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D4 (実行時生成実装は宣言メソッド edge のみ + runtime-provided マーカー区別、初期は Spring Data のみ、案 A) を決定として反映                     |
 | 2026-07-12 | Claude | clarify: D5 (性能増分は数値基準を定めず計測・記録を受け入れ基準に、SLO は #22 で確定、案 A) を決定として反映。D1〜D6 全論点解決、clarify phase 完了      |
 | 2026-07-12 | Claude | clarify レビュー指摘 8 件対応 (stale 記述を D1〜D6 決定内容に同期)                                                                                       |
+| 2026-07-12 | Claude | clarify 再レビュー PASS。requirements.md のスコープへ Gradle マルチモジュール非対応 (#24 切り出し) を反映、clarify phase 完了                            |
 
 ## 備考
 

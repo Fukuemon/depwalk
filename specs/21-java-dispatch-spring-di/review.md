@@ -36,3 +36,16 @@ Verdict: NEEDS_WORK → 指摘対応後に再レビュー予定
 6. 備考の appendix 再検討 → 結論を明記
 7. (minor) 上位文書整合の「Design Doc 更新要否: 不要」ラベルの自己矛盾解消
 8. (minor) フェーズ #3 (上位文書突合) の状態整理
+
+## Review 2026-07-12 — Phase 3 (clarify) 再レビュー
+
+Verdict: PASS
+
+- 前回指摘 8 件すべて修正反映を確認 (フェーズ状況備考 / 実装対象 traversal・analyzer-protocol 備考 / User Flow step 4 / appendix 結論 / Design Doc 更新要否ラベル / フェーズ #3 状態)
+- D1〜D6 の決定が Interface 設計 / Content・Data 設計 / Performance / Error・Fallback / Testing / 上位資料からの変更点に整合的に伝播、stale 残存なし
+- 観点別: 上位文書整合 PASS / 未解決論点 PASS (D1〜D6 全解決) / 実装対象明示 PASS / template 必須節 PASS / EARS PASS / prompts・正本境界 N/A
+
+非 blocker 所見:
+
+1. requirements.md のスコープに「Gradle マルチモジュール非対応 (#24 切り出し) / 単一 source root 前提」が未反映 → 本 commit で対応
+2. Interface 設計節に clarify 決定の伝播記述が既にあるため、phase 6 (diagram 以降) 着手時に「clarify 継承部分」と「当該 phase 確定部分」の区別に留意
