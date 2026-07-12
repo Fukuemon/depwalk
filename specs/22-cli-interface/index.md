@@ -117,7 +117,6 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 | #   | 論点                                                                                                                                                                            | 決定候補 | 決定 |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D2  | 探索クエリの CLI 構造 — `analyze` に flag 追加か、サブコマンド分割 (例: `depwalk callers`) か。後方互換の拡張余地の宣言方法                                                     |          | 未決 |
 | D3  | 探索方向 flag の設計 — 名前・値 (caller/callee)・既定値の有無・必須か任意か (探索なし=現行サマリ動作を残すか)                                                                   |          | 未決 |
 | D4  | 深さ上限 flag — 名前・既定値 (無制限 or 有限)・traversal の `MaxDepth *int` / depthLimit cutoff との対応                                                                        |          | 未決 |
 | D5  | 出力形式 flag — 名前・値 (console/json)・既定値。output registry の dot/mermaid を露出するか隠すか                                                                              |          | 未決 |
@@ -132,12 +131,13 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 (`spec-resolve` で確定したものをここに移動する)
 
 - #22 D1: method selector は 1 引数の統合書式 `<qualifiedName>#<メソッド名>[(<引数型リスト>)]` とする。括弧付きで signature 完全指定 (例: `com.example.UserService#findById(java.lang.Long)`)、括弧省略時はメソッド名のみで指定 (例: `com.example.UserService#findById`)。Analyzer の signature 表記 (feature doc java-analyzer の methodId 節) と同一の表記体系。flag 名 / 位置引数かどうかは D2・D3 で確定する。オーバーロード曖昧性は、signature 省略時に同名メソッドが複数一致した場合、候補の完全 signature を一覧表示してエラー終了する (自動選択しない。exit code は D8 で確定)。一致 1 件ならそれを採用する。graph node との照合は node が保持する symbol 情報 (qualifiedName / signature) を走査して行い、Core は methodId の文字列形式 (`java:` prefix 等) に依存しない (Decision Priority 2: 言語非依存)。graph.Node に必要フィールドが不足していれば `graph` package の convert で保持を追加する (core ドメイン内の軽微変更)。理由: methodId 文字列形式への非依存は言語非依存原則と整合し、曖昧時の自動選択をしないことで CI 向けの予測可能性を確保できるため。
+- #22 D2: 探索クエリは `analyze` コマンドへの flag 追加で提供する (サブコマンド分割しない)。形は `depwalk analyze <path> --language java --analyzer-cmd ... --method <selector> --direction <dir> --max-depth <n> --format <fmt>` (各 flag の名前・既定値は D3-D5 で確定)。後方互換: `--method` 省略時は現行のサマリ動作 (件数 1 行 + diagnostics) を維持し、既存 flag (`--analyzer-cmd` / `--language` / `--analyzer-meta`) は変更しない。拡張余地の宣言: 将来の新出力形式は `--format` の値追加で、新しいクエリ種別 (例: パス探索) が必要になった場合はサブコマンド新設でも flag 追加でも拡張できる構造とする (issue 完了条件「後方互換の拡張余地が宣言されている」に対応)。理由: 実装最小・既存動作の後方互換維持・issue の「flag 体系」の表現と一致し、analyzer 起動系 flag の重複定義を避けられるため。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D2-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
+- 設計時の論点 D3-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
 
 ## 実装対象
 
@@ -314,6 +314,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | spec-lifecycle | scaffold レビュー指摘対応 (EARS 記述追加・フェーズ表同期) |
 | 2026-07-12 | spec-lifecycle | scaffold 再レビュー PASS                                  |
 | 2026-07-12 | clarify        | D1 (method selector 書式) を確定                          |
+| 2026-07-12 | clarify        | D2 (CLI 構造: analyze への flag 追加) を確定              |
 
 ## 備考
 
