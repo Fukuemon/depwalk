@@ -23,6 +23,8 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 - metadata passthrough (`--analyzer-meta key=value`) も同様の原則に従う。Core は `analysisRequest.metadata` へ素通しするだけで、key / value の意味 (例: Java の `classpath`) を解釈しない。
 - 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入しない。必要になった時点で ③ の前段として追加できる形にしておく。
 
+**shell-word 分割の字句規則** (2026-07-12 追記。決定内容の変更ではなく、実装済みの字句文法の明文化): 空白 (space / tab / newline) を語の区切りとする。single quote / double quote は語の結合に使え、quote 内の空白は区切りにならない (quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote のみが特別)。quote 外の backslash は直後の 1 文字を escape する。未終端の quote と末尾の backslash は validation error として実行前に拒否する。変数展開・glob 展開・コマンド置換は一切行わない。実装と contract test は `core/internal/analyze` の `SplitCommand` を正本とする。
+
 具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と metadata 合成規則は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を正本とする。決定経緯は [spec #9](../specs/9-java-analyzer/) に残す。
 
 ## 代替案

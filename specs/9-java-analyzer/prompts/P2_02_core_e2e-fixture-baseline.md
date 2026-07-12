@@ -70,7 +70,7 @@
 
 ### ステップ 3: 性能 baseline を計測して記録する
 
-1. fixture プロジェクトに対する実測値を Analyzer の stderr 計測出力から取得する: 解析ファイル数 / 所要時間 / 最大 RSS。
+1. fixture プロジェクトに対する実測値を取得する: 解析ファイル数 / 所要時間は Analyzer の stderr 計測出力から、最大 RSS は Go 親プロセスの `os.ProcessState.SysUsage()` から取得する。
 2. 実測値を `design/features/java-analyzer/DesignDoc_java-analyzer.md` の「性能方針」節に baseline として記入する (数値目標の確定は別作業。baseline の記録までが本 prompt の責務)。
 3. 検証: feature doc の性能節に baseline (計測日 / fixture 規模 / 3 指標) が記録されていることを確認する。
 4. diff レビューを回す。
@@ -151,7 +151,7 @@ spec「テスト / 評価方針 — E2E (実 jar / `testdata/fixtures/java/`)」
 - interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)。
 - パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること。
 - 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと。
-- 計測指標: fixture に対する解析ファイル数 / 所要時間 / 最大 RSS (stderr の計測出力から取得)。未解決 symbol 件数 / パース失敗ファイル数は fixture の既知の期待値と照合する。
+- 計測指標: fixture に対する解析ファイル数 / 所要時間 (Analyzer の stderr 計測出力から取得) と最大 RSS (Go 親プロセスの `os.ProcessState.SysUsage()` から取得)。未解決 symbol 件数 / パース失敗ファイル数は fixture の既知の期待値と照合する。
 
 ## 検証コマンド
 
