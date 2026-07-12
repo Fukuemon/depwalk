@@ -49,3 +49,20 @@ Verdict: NEEDS_WORK
 5. (非ブロッキング) D1 の <qualifiedName> 用語が feature doc の定義と揺れ → <型の binary name> へ統一
 
 総評: D1-D11 は相互矛盾なく上位文書・実装と整合。残りはメタ情報同期のみで修正後 PASS 可能な水準。
+
+## Review 2026-07-12 (clarify phase gate 再レビュー)
+
+Verdict: PASS
+
+- 上位文書整合: PASS — D1-D11 全決定の引用先を実地照合し一致 (D6=feature doc L102 の責務充足、D10=ADR-0003 L24 の範囲内、D8=traversal 正常 status の CLI 層再解釈として理由明記、D4/D5/D11=実装現状と一致)
+- 未解決論点: PASS — 論点テーブル空、D1-D11 解決済み、未確定事項なし、下流節 placeholder (期待どおり)
+- 実装対象明示: PASS — 5 target 一致、変更範囲と D 番号の紐付け・逸脱時手続きが読める
+- template 必須節: PASS — 全 23 節存在、前回指摘のメタ情報同期 3 件を解消確認
+- EARS acceptance: PASS — S1/S2/S3 の観測手段が D8/D9 で裏付け
+- prompts 自己完結性 / 正本境界: N/A — sync 前段として「反映予定」行の準備が整っている
+- 前回指摘 5 件: すべて解消を確認
+
+補足 (非ブロッキング、後続 phase で扱う):
+
+- D5 の「registry 登録だけで CLI 自動露出」には、登録済み Format 列挙 API の output 側公開が必要 → Interface 設計 phase で明示すること
+- specs/21 の参照は #21 merge 後に解決すること

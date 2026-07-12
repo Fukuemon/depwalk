@@ -25,7 +25,7 @@
 | 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |           |
 | 3   | 上位文書突合                | 完了       | 2026-07-12 |           |
 | 4   | 論点整理                    | 完了       | 2026-07-12 |           |
-| 5   | 論点解決                    | 完了       | 2026-07-12 |           |
+| 5   | 論点解決                    | レビュー済 | 2026-07-12 |           |
 | 6   | Interface / Routing 設計    | 未着手     |            |           |
 | 7   | Content / Data 設計         | 未着手     |            |           |
 | 8   | Performance / Security 設計 | 未着手     |            |           |
@@ -311,6 +311,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | NEEDS_WORK               | (scaffold phase) EARS 要件記述が未記入 (S1-S3 から 3 件追加要)、フェーズ表の突合状態未同期 | 対応済 (EARS 追加・フェーズ表同期) |
 | 2026-07-12 | PASS                     | (scaffold 再) 指摘なし (前回指摘対応を確認)                                                | —                                  |
 | 2026-07-12 | NEEDS_WORK               | (clarify phase) メタ情報同期 3 件 + 用語揺れ等 2 件                                        | 対応済 (同 commit)                 |
+| 2026-07-12 | PASS                     | (clarify 再) 指摘なし (前回 5 件の解消を確認)。非ブロッキング補足 2 件は後続 phase で扱う  | —                                  |
 
 ## 変更履歴
 
@@ -332,7 +333,13 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | clarify        | D10 (規約 path による既定解決: 見送り、ADR-0003 無改訂) を確定                      |
 | 2026-07-12 | clarify        | D11 (call edge metadata: JSON のみ透過) を確定。全論点解決、論点整理 phase 完了     |
 | 2026-07-12 | clarify        | clarify レビュー指摘対応 (メタ情報同期・用語統一)                                   |
+| 2026-07-12 | clarify        | clarify 再レビュー PASS (論点整理 phase 完了)                                       |
 
 ## 備考
 
 appendix は取り込まない (CLI ツールであり API / DB / 認可 / 画面 / data-testid のいずれにも該当しない)。
+
+後続 phase への引き継ぎメモ:
+
+- Interface 設計時に output の登録済み Format 列挙 API の公開を明示する (clarify 再レビュー補足)。
+- specs/21 の参照は #21 merge 後に解決する (clarify 再レビュー補足)。
