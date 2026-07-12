@@ -24,7 +24,7 @@
 | 1   | 起票                        | 完了       | 2026-07-12 | issue #22 |
 | 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |           |
 | 3   | 上位文書突合                | 完了       | 2026-07-12 |           |
-| 4   | 論点整理                    | 未着手     |            |           |
+| 4   | 論点整理                    | 進行中     | 2026-07-12 |           |
 | 5   | 論点解決                    | 未着手     |            |           |
 | 6   | Interface / Routing 設計    | 未着手     |            |           |
 | 7   | Content / Data 設計         | 未着手     |            |           |
@@ -117,7 +117,6 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 | #   | 論点                                                                                                                                                                            | 決定候補 | 決定 |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---- |
-| D1  | method selector の CLI 書式 — `protocol.MethodSelector` との対応、FQCN・メソッド名・シグネチャ (オーバーロード曖昧性) の指定方法                                                |          | 未決 |
 | D2  | 探索クエリの CLI 構造 — `analyze` に flag 追加か、サブコマンド分割 (例: `depwalk callers`) か。後方互換の拡張余地の宣言方法                                                     |          | 未決 |
 | D3  | 探索方向 flag の設計 — 名前・値 (caller/callee)・既定値の有無・必須か任意か (探索なし=現行サマリ動作を残すか)                                                                   |          | 未決 |
 | D4  | 深さ上限 flag — 名前・既定値 (無制限 or 有限)・traversal の `MaxDepth *int` / depthLimit cutoff との対応                                                                        |          | 未決 |
@@ -132,13 +131,13 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 (`spec-resolve` で確定したものをここに移動する)
 
-- (なし。scaffold 時点では未解決)
+- #22 D1: method selector は 1 引数の統合書式 `<qualifiedName>#<メソッド名>[(<引数型リスト>)]` とする。括弧付きで signature 完全指定 (例: `com.example.UserService#findById(java.lang.Long)`)、括弧省略時はメソッド名のみで指定 (例: `com.example.UserService#findById`)。Analyzer の signature 表記 (feature doc java-analyzer の methodId 節) と同一の表記体系。flag 名 / 位置引数かどうかは D2・D3 で確定する。オーバーロード曖昧性は、signature 省略時に同名メソッドが複数一致した場合、候補の完全 signature を一覧表示してエラー終了する (自動選択しない。exit code は D8 で確定)。一致 1 件ならそれを採用する。graph node との照合は node が保持する symbol 情報 (qualifiedName / signature) を走査して行い、Core は methodId の文字列形式 (`java:` prefix 等) に依存しない (Decision Priority 2: 言語非依存)。graph.Node に必要フィールドが不足していれば `graph` package の convert で保持を追加する (core ドメイン内の軽微変更)。理由: methodId 文字列形式への非依存は言語非依存原則と整合し、曖昧時の自動選択をしないことで CI 向けの予測可能性を確保できるため。
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- 設計時の論点 D1-D10 はすべて未解決であり、clarify phase で解消する。
+- 設計時の論点 D2-D10 が未解決 (clarify 進行中) であり、clarify phase で解消する。
 
 ## 実装対象
 
@@ -282,15 +281,15 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 ### feature doc への影響
 
-| 対象 doc / 節 | 変更内容 | 理由 |
-| ------------- | -------- | ---- |
-|               |          |      |
+| 対象 doc / 節                | 変更内容                                                                                                                       | 理由                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| (反映先は sync phase で確定) | method selector の CLI 書式・曖昧性解決規則を CLI interface の設計として design 側へ反映予定。状態=未反映 (source: clarify D1) | D1 決定の durable な設計成果のため |
 
 ### context への影響
 
-| 対象 doc / 節 | 変更内容 | 理由 |
-| ------------- | -------- | ---- |
-|               |          |      |
+| 対象 doc / 節                                  | 変更内容                                                | 理由                                        |
+| ---------------------------------------------- | ------------------------------------------------------- | ------------------------------------------- |
+| `context/project.md` Quick Commands 開発起動欄 | flag 体系確定後に更新。状態=未反映 (source: clarify D1) | CLI 起動例が method selector 書式を含むため |
 
 ### ADR の新規 / 更新
 
@@ -314,6 +313,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-12 | spec-lifecycle | scaffold 作成                                             |
 | 2026-07-12 | spec-lifecycle | scaffold レビュー指摘対応 (EARS 記述追加・フェーズ表同期) |
 | 2026-07-12 | spec-lifecycle | scaffold 再レビュー PASS                                  |
+| 2026-07-12 | clarify        | D1 (method selector 書式) を確定                          |
 
 ## 備考
 
