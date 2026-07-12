@@ -20,8 +20,8 @@
 | 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
 | 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
 | 3   | 上位文書突合                | 進行中     | 2026-07-12 | Design Doc / feature doc / ADR-0004 / ADR-0005 / context と整合確認済み。矛盾なし             |
-| 4   | 論点整理                    | 進行中     | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理中 (D1 解決、D2〜D5 は未決)         |
-| 5   | 論点解決                    | 進行中     | 2026-07-12 | D1 (SootUp 型階層補完のみ) を解決済み。D2〜D5 は未決のため継続                                |
+| 4   | 論点整理                    | 完了       | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)        |
+| 5   | 論点解決                    | 完了       | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                   |
 | 6   | Interface / Routing 設計    | 未着手     |            | Q1/Q2 (SootUp 範囲 / 候補表現) の解決待ち                                                     |
 | 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
 | 8   | Performance / Security 設計 | 未着手     |            | 性能 baseline (Issue #9) との比較方針は論点解決後に確定                                       |
@@ -141,7 +141,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 | D2  | 複数 dispatch 候補を複数 edge で表すか metadata で表すか (requirements Q2)。Traversal (Core) への影響を要確認  | A1: call site ごとの複数候補 edge (宣言型 edge 保持 + metadata で解決根拠)          | 解決済み |
 | D3  | Spring 条件評価 (profile / property / conditional) をどこまで静的解決するか (requirements Q3)                  | A: 条件評価しない (条件の検出・記録のみ、候補は常に保持)                            | 解決済み |
 | D4  | Spring Data 等の実行時生成実装をどの抽象度で表すか (requirements Q4)。実行時 Proxy 自体は非対象                | A: 宣言メソッド edge のみ + runtime-provided マーカー区別 (初期は Spring Data のみ) | 解決済み |
-| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) |                                                                                     | 未決     |
+| D5  | SootUp / Spring 解析の追加による解析時間・最大 RSS の増分をどこまで許容するか (Issue #9 baseline との比較基準) | A: 数値基準は定めず計測・記録を受け入れ基準に (SLO は #22 で確定)                   | 解決済み |
 | D6  | 候補 edge の曖昧性・解決根拠を CLI 出力でどう観測可能にするか (D2 の付随論点)                                  | A: JSONL metadata + diagnostic まで (CLI 出力表出は #22 へ引き継ぎ)                 | 解決済み |
 
 ## 解決済みの論点
@@ -179,11 +179,19 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
   - 決定日: 2026-07-12
   - 決定者: Fukuemon
 
+- **D5: SootUp / Spring 解析追加の性能増分について、#21 では数値の合否基準を定めない。「計測と記録」を受け入れ基準とする (案 A)。**
+  - 具体化: #21 の完了条件は「同一 fixture での before/after (解析時間・最大 RSS) を計測し、feature doc の性能節に増分を記録する」まで。合否ライン (SLO) は #22 完了時の数値目標確定と一緒に決める (feature doc の既定路線と整合)。
+  - 決定理由: 現 baseline (10 ファイル / 約 500ms / 約 122MiB) は極小 fixture の下限値で、SootUp の JVM / jar 読み込み固定費が支配的になるため、小 fixture 上の倍率は実プロジェクトを代表しない。根拠のない暫定上限 (案 B) は超過時に基準側を直す議論になり形骸化する。
+  - 代替設計原則: 数値ゲートの代替として、設計原則を機能仕様の Performance 設計に明記する。「SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)」。
+  - トレードオフとして受容: 実装中の性能悪化を機械的に検知するゲートはなく、計測値の妥当性はレビューでの人間判断になる。
+  - 決定日: 2026-07-12
+  - 決定者: Fukuemon
+
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1, D2, D3, D4, D6 は解決済み。D5 のみ未決のため、Interface / Routing 設計以降の下流 phase は D5 の論点解決を待つ。
+- D1〜D6 すべて解決済み。未決論点なし。
 
 ## 実装対象
 
@@ -213,7 +221,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Performance
 
-- Issue #9 で取得した Phase1 baseline (fixture: `testdata/fixtures/java/project`、10 ファイル、約500ms、最大RSS 約122MiB) との比較で、SootUp / Spring 解析追加分の時間・最大 RSS を計測する (D5 で許容基準を確定)。
+- Issue #9 で取得した Phase1 baseline (fixture: `testdata/fixtures/java/project`、10 ファイル、約500ms、最大RSS 約122MiB) との比較で、SootUp / Spring 解析追加分の時間・最大 RSS を計測する。合否ライン (数値基準) は定めず、「計測して feature doc の性能節に増分を記録する」ことを #21 の受け入れ基準とする (D5)。SLO は #22 完了時の数値目標確定と一緒に決める。
+- 設計原則: SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない) (D5)。
 - 数値目標の確定方針は [context/architecture.md](../../context/architecture.md) / feature doc の性能方針を継承する。
 
 ### Routing / URL State
@@ -257,7 +266,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Performance
 
-- D5 (性能予算) の解決後に確定する。
+- D5 解決済み: 数値の合否基準は定めず、同一 fixture での before/after (解析時間・最大 RSS) を計測し feature doc の性能節に増分を記録することを #21 の受け入れ基準とする。SLO (合否ライン) は #22 完了時の数値目標確定と合わせて決める。
+- 設計原則: SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)。
 
 ### Security / Privacy
 
@@ -289,7 +299,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### 計測指標
 
-- 解析時間・最大 RSS (Issue #9 baseline との差分、D5 で許容基準を確定)。
+- 解析時間・最大 RSS (Issue #9 baseline との差分。D5 により合否基準は定めず、計測・記録までを受け入れ基準とする)。
 - 未解決 / 候補件数の diagnostic 出力件数 (観測可能性の担保)。
 
 ## フロー / シーケンス
@@ -377,6 +387,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D6 (観測は Analyzer JSONL の metadata + diagnostic までを #21 の責務とし、CLI 出力表出は #22 へ引き継ぐ、案 A) を決定として反映                 |
 | 2026-07-12 | Claude | clarify: D3 (Spring 条件評価は行わず、条件アノテーションの検出・記録のみ行う、案 A) を決定として反映                                                     |
 | 2026-07-12 | Claude | clarify: D4 (実行時生成実装は宣言メソッド edge のみ + runtime-provided マーカー区別、初期は Spring Data のみ、案 A) を決定として反映                     |
+| 2026-07-12 | Claude | clarify: D5 (性能増分は数値基準を定めず計測・記録を受け入れ基準に、SLO は #22 で確定、案 A) を決定として反映。D1〜D6 全論点解決、clarify phase 完了      |
 
 ## 備考
 
