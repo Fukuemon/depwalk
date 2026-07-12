@@ -63,3 +63,17 @@ Verdict: PASS
 1. flowchart の BeanCount 分岐で「条件付き Bean (E4)」が件数分岐と同列の排他分岐に見えるが、実際は件数と直交する属性 (複数件かつ条件付きが起こり得る)。実装分割時に判定順序を明確化する
 2. sequence で diagnostic と callEdge の出力タイミングが二段に読める。実装時に「出力は統合後に一括か逐次か」を確定する
 3. 図に JavaParser / SootUp / Spring の固有名が登場するが、本 feature では設計対象そのものであり Design Doc C4 L2 と同名のため許容
+
+## Review 2026-07-12 — Phase 5 (track)
+
+Verdict: NEEDS_WORK → 指摘対応後に再レビュー予定
+
+- 上位文書整合: NEEDS_WORK (context への影響テーブルが空 — D1 の context/toolchain.md 反映記録漏れ)
+- 未解決論点 / 実装対象 / template 必須節 / EARS: PASS。prompts / 正本境界: N/A
+- 二重追記: 検出なし (D1 の複数テーブル出現は反映先が異なる正当な多重記録)
+
+指摘 3 件 (対応: 本 commit で修正):
+
+1. context への影響テーブルに D1 → context/toolchain.md の反映行を追加 (toolchain.md は「確定範囲は Q2 で詰める」と解決待ちを明記、ADR-0005:70 も toolchain/testing への反映を指示)
+2. (minor) context/testing.md は更新不要の根拠 (既に「サンプル Java/Spring プロジェクト」前提) を 1 行記録
+3. (minor) ADR テーブル D1 行の「sync phase で反映」文言を他行と統一
