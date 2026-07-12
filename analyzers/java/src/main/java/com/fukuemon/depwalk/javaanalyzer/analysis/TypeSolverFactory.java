@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ClassLoaderTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
@@ -30,12 +31,18 @@ public final class TypeSolverFactory {
     /**
      * @param workspaceRoot 対象プロジェクトの source root ({@link JavaParserTypeSolver} に渡す)
      * @param classpathJars {@code analysisRequest.metadata.classpath} の jar / classes dir path 一覧
+     * @param languageLevel {@link JavaParserTypeSolver} が workspaceRoot 配下の依存ソース (record 等)
+     *                      を読み直す際に使う {@link ParserConfiguration.LanguageLevel} (呼び出し側の
+     *                      メインパーサ設定と一致させる。既定 {@code POPULAR} は record を構文サポート
+     *                      しないため、呼び出し側で明示的に渡す)
      * @throws IOException jar / classes dir の読み込みに失敗した場合 (pre-flight で存在確認済みのため通常は起きない)
      */
-    public static CombinedTypeSolver create(Path workspaceRoot, List<String> classpathJars) throws IOException {
+    public static CombinedTypeSolver create(
+            Path workspaceRoot, List<String> classpathJars, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
-        typeSolver.add(new JavaParserTypeSolver(workspaceRoot));
+        ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
+        typeSolver.add(new JavaParserTypeSolver(workspaceRoot, typeSolverConfig));
         for (String entry : classpathJars) {
             Path path = Path.of(entry);
             if (Files.isDirectory(path)) {

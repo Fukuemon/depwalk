@@ -165,6 +165,34 @@ class MainTest {
                 "stderr must describe the output write failure instead of silently exiting");
     }
 
+    @Test
+    void ioExceptionDuringAnalysisSetupProducesInternalErrorRecordAndNonZeroExit(
+            @TempDir Path workspace, @TempDir Path classpathDir) throws IOException {
+        // pre-flight only checks existence / readability (not zip validity), so a garbage-bytes file
+        // named *.jar passes pre-flight but fails when JarTypeSolver's constructor tries to open it as
+        // a zip during AnalysisRunner's setup (TypeSolverFactory.create).
+        Path corruptJar = classpathDir.resolve("corrupt.jar");
+        Files.write(corruptJar, new byte[] {0x00, 0x01, 0x02, 0x03});
+        Files.writeString(workspace.resolve("Ok.java"), "package com.example; class Ok { }");
+
+        String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
+                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(workspace) + "\","
+                + "\"language\":\"java\",\"metadata\":{\"classpath\":[\"" + jsonPath(corruptJar) + "\"]}}";
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        int exitCode = Main.run(inputStream(request), stdout, stderr);
+
+        assertEquals(1, exitCode);
+        String stdoutContent = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(stdoutContent.contains("\"recordType\":\"error\""),
+                "IOException during analysis setup must still produce an error record: " + stdoutContent);
+        assertTrue(stdoutContent.contains("JAVA_INTERNAL_ERROR"));
+        assertFalse(stderr.toString(StandardCharsets.UTF_8).isBlank(),
+                "stderr should contain exception class name and message");
+    }
+
     private static boolean isDirectoryListable(Path dir) {
         try (var stream = Files.newDirectoryStream(dir)) {
             stream.iterator().hasNext();
