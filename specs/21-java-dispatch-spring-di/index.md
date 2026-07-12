@@ -15,19 +15,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                          |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                             |
-| 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み) |
-| 3   | 上位文書突合                | 完了       | 2026-07-12 | 整合確認済み・矛盾なし (上位文書への反映は sync phase)                                        |
-| 4   | 論点整理                    | レビュー済 | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)        |
-| 5   | 論点解決                    | レビュー済 | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                   |
-| 6   | Interface / Routing 設計    | 未着手     |            | D1/D2 で解決済み (2026-07-12)                                                                 |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                               |
-| 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                  |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                               |
-| 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定          |
-| 11  | レビュー済                  | 未着手     |            |                                                                                               |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                          |
+| --- | --------------------------- | ---------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-11 | requirements.md / GitHub Issue #21 として起票済み                                                             |
+| 2   | 下書き                      | レビュー済 | 2026-07-12 | 本 index.md をテンプレートから新規作成 (scaffold)。spec-review PASS (非 blocker 2 件対応済み)                 |
+| 3   | 上位文書突合                | 完了       | 2026-07-12 | 整合確認済み・矛盾なし (上位文書への反映は sync phase)                                                        |
+| 4   | 論点整理                    | レビュー済 | 2026-07-12 | requirements.md の Q1〜Q4 を継承。clarify phase で対話整理完了 (D1〜D6 すべて解決済み)                        |
+| 5   | 論点解決                    | レビュー済 | 2026-07-12 | D1〜D6 すべて解決済み (D5 は数値基準を定めず計測・記録を受け入れ基準に確定)                                   |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-12 | D1/D2 で解決済み。フロー図 (CLI 起点の解析フロー) / シーケンス図 (dispatch 解決処理) 生成完了 (diagram phase) |
+| 7   | Content / Data 設計         | 未着手     |            |                                                                                                               |
+| 8   | Performance / Security 設計 | 未着手     |            | D5 で確定: 計測・記録まで、SLO は #22 で確定                                                                  |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                               |
+| 10  | 実装分割                    | 未着手     |            | ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み → 統合 E2E) を踏襲予定                          |
+| 11  | レビュー済                  | 未着手     |            |                                                                                                               |
 
 ## 上位文書整合
 
@@ -308,14 +308,77 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Flowchart (ユーザー操作起点)
 
+CLI 実行起点で `depwalk analyze` から Java Analyzer 内部の解析パイプライン全体、E1〜E4 の分岐、JSONL 出力、Core/Traversal/Output への引き渡しまでを描く。D1 (SootUp は型階層照会のみ)、D4 (runtime-provided マーカー判定)、D2 (候補統合・重複排除)、D6 (JSONL までが観測責務) の決定を反映する。
+
 ```mermaid
 flowchart TD
+    Start((開発者が depwalk analyze を実行)) --> CoreStart["Core: Java Analyzer process 起動 (--analyzer-cmd / analysisRequest 送信)"]
+    CoreStart --> JPParse["JavaParser/SymbolSolver: ソース解析・call site 検出・宣言型 edge 生成"]
+    JPParse --> SootUpQuery{"SootUp: 型階層照会 (lazy 構築, D1/D5)"}
+    SootUpQuery -->|"読み込み失敗 (E3)"| E3Diag["diagnostic 出力: 対象と原因"]
+    E3Diag --> JPOnly["JavaParser 結果のみで解析継続"]
+    JPOnly --> SpringMatch
+    SootUpQuery -->|"型階層取得成功"| Candidates["実装候補列挙 (interface/override/実装候補索引)"]
+    Candidates --> SpringMatch["Spring DI: Bean 定義・注入規則と候補を突合"]
+    SpringMatch --> BeanCount{"Bean 候補件数は?"}
+    BeanCount -->|"0件 (E1)"| RuntimeCheck{"既知 runtime-provided マーカー該当? (D4, 初期は Spring Data Repository)"}
+    RuntimeCheck -->|"該当"| RuntimeMark["diagnostic 理由を runtime-provided として記録"]
+    RuntimeCheck -->|"非該当"| Unresolved["未解決 diagnostic を出力"]
+    RuntimeMark --> KeepDeclEdge["宣言型 edge を保持 (疑似実装ノードは合成しない)"]
+    Unresolved --> KeepDeclEdge
+    BeanCount -->|"複数件で絞り込めず (E2)"| Ambiguous["候補一覧と曖昧性を diagnostic に出力"]
+    BeanCount -->|"条件付き Bean を含む (E4)"| Conditional["条件種別を記録し曖昧候補として扱う (D3, 条件評価はしない)"]
+    BeanCount -->|"@Qualifier/@Primary または一意候補で確定"| Unique["選択 Bean を resolution=unique として決定"]
+    KeepDeclEdge --> Merge
+    Ambiguous --> Merge
+    Conditional --> Merge
+    Unique --> Merge
+    Merge["候補統合・重複排除 (D2, call site ごとの複数 CallEdge + 宣言型 edge 保持)"] --> JSONL["JSONL 出力: methodSymbol/callEdge/metadata/diagnostic (D6)"]
+    JSONL --> CoreProcess["Core/Traversal/Output: 既存契約のまま処理 (変更なし)"]
+    CoreProcess --> End((解析結果を変更影響調査に利用))
 ```
 
 ### Sequence
 
+Java Analyzer 内部の dispatch 解決処理 (call site 検出 → SootUp 型階層照会 → Bean 候補突合 → resolution 判定 → metadata/diagnostic 付与) を描く。E1〜E4 は alt 分岐で表現し、D1〜D4/D6 の決定に対応させる。third-party API 呼び出しはないため `Ext` participant は置かない。
+
 ```mermaid
 sequenceDiagram
+    participant Core as Core
+    participant JP as JavaParser/SymbolSolver
+    participant SootUp as SootUp(型階層)
+    participant Spring as SpringDIResolver
+    participant Proto as AnalyzerProtocol(JSONL)
+
+    Core->>JP: analysisRequest (解析対象ソース/classpath)
+    JP->>JP: call site 検出、宣言型 edge 生成
+    JP->>SootUp: 型階層/override/interface実装候補 照会 (lazy, D1/D5)
+    alt SootUp が bytecode を読めない (E3)
+        SootUp-->>JP: 読み込みエラー
+        JP->>Proto: diagnostic 出力 (対象/原因)
+        JP->>JP: JavaParser 結果のみで解析継続
+    else 型階層取得成功
+        SootUp-->>JP: 実装候補一覧 (型階層・override・interface実装候補索引)
+    end
+    JP->>Spring: 実装候補と Bean 定義の突合を依頼
+    Spring->>Spring: Bean 定義収集、条件アノテーション検出 (記録のみ, D3)
+    alt Bean 候補が0件 (E1)
+        Spring-->>JP: 候補なし
+        JP->>JP: 既知 runtime-provided マーカー判定 (Spring Data Repository, D4)
+        JP->>Proto: 未解決 diagnostic、または runtime-provided 理由を出力
+    else Bean 候補が複数件で絞り込めない (E2)
+        Spring-->>JP: 複数候補
+        JP->>Proto: 候補一覧と曖昧性を diagnostic に出力
+    else 条件付き Bean を静的に確定できない (E4)
+        Spring-->>JP: 条件付き候補 (常に候補として保持)
+        JP->>Proto: 条件種別を metadata に記録、候補1件でも曖昧候補として扱う
+    else @Qualifier/@Primary または一意候補で確定
+        Spring-->>JP: 選択された Bean
+        JP->>Proto: resolution=unique として実装メソッドを解決結果に出力
+    end
+    JP->>JP: 候補統合・重複排除 (D2, call site ごとの複数 CallEdge + 宣言型 edge 保持)
+    JP->>Proto: callEdge + metadata(resolution/provenance) + diagnostic を出力 (D6)
+    Proto-->>Core: JSONL (stdout)
 ```
 
 ## 実装分割
@@ -392,6 +455,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-12 | Claude | clarify: D5 (性能増分は数値基準を定めず計測・記録を受け入れ基準に、SLO は #22 で確定、案 A) を決定として反映。D1〜D6 全論点解決、clarify phase 完了      |
 | 2026-07-12 | Claude | clarify レビュー指摘 8 件対応 (stale 記述を D1〜D6 決定内容に同期)                                                                                       |
 | 2026-07-12 | Claude | clarify 再レビュー PASS。requirements.md のスコープへ Gradle マルチモジュール非対応 (#24 切り出し) を反映、clarify phase 完了                            |
+| 2026-07-12 | Claude | diagram: フロー図 (CLI 起点の解析フロー、E1〜E4 分岐込み) とシーケンス図 (Java Analyzer 内部の dispatch 解決処理) を生成、D1〜D6/E1〜E4 に対応付け       |
 
 ## 備考
 
