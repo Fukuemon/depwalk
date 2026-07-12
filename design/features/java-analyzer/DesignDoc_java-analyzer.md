@@ -1,6 +1,6 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-12 / Status: 完了
+> 最終更新: 2026-07-12 / Status: 完了 (#21 sync phase により段階導入・dispatch 標識・性能方針・テスト観点を更新)
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は契約を変更せず Java 側の実装方式を定める。
 
@@ -146,6 +146,8 @@ Phase1 は DI 解決を行わないため、interface / 抽象メソッド呼び
 
 「Spring DI 経由の呼び出し先を実体まで解決できる」(S4) は後続 feature (#21 / ADR-0005) 以降の成功条件であり、Phase1 では宣言型止まりであることが仕様である。
 
+**dispatch 標識の拡張 (#21、決定済み 2026-07-12)**: 複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。各 edge の `metadata` に解決根拠を付与する: `resolution` (`unique` / `ambiguous` 等)、`provenance` (`sootup` / `spring-di` 等)。最終的なフィールド名・値集合は実装時に確定する。本 doc を正本とする (決定経緯: [spec #21 D2](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
+
 ### diagnostic / error code 体系
 
 `JAVA_` prefix + 大文字スネークケースとする。Core は `code` を不透明な文字列として扱うため契約変更は発生しない。
@@ -190,6 +192,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
   fixture 規模が小さい (10 ファイル) ため JVM 起動コストの寄与が大きく、この baseline は「小規模プロジェクトでの下限に近い値」として扱う。数値目標 (SLO) の確定は本 baseline を踏まえた別作業とする。
 
 - **数値目標の確定 (追跡メタデータ)**: 決定者 Fukuemon / 期限 #22 (CLI interface 結合) 完了時。現 baseline は小規模 fixture の floor 値であり、CLI から実プロジェクト規模を計測できるようになった時点でモード別に確定する。
+- **#21 (SootUp / Spring 解析追加分) の受け入れ基準 (決定済み 2026-07-12)**: 数値の合否基準は定めない。同一 fixture での before/after (解析時間・最大 RSS) を計測し、本節へ増分を記録することを #21 の受け入れ基準とする。SLO (合否ライン) は #22 完了時の数値目標確定と合わせて決める。設計原則として、SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)。本 doc を正本とする (決定経緯: [spec #21 D5](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
 
 ### 帰属型の決定規則
 
@@ -220,7 +223,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - 未解決との区別: scope 外呼び出しの省略は「解析できなかった」ではなく「仕様として出力しない」ため、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` は出さない。型解決自体に失敗した場合のみ `diagnostic` とする。
 - protocol 整合: 出力する `callEdge` の caller / callee はいずれも出力済み `methodSymbol` を参照するため、「valid な `callEdge` は解決済み `methodSymbol` を参照する」という契約を満たす。
 
-**Phase1 の既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は後続 feature (#21 / ADR-0005) の担当とする。
+**Phase1 の既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は後続 feature (#21 / ADR-0005) の担当とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは委譲しない (決定経緯: [spec #21 D1](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)、2026-07-12)。本 doc を正本とする。
 
 **node 母集合 (列挙方法)**: `fullGraph` の `methodSymbol` は次の和集合とする。
 
@@ -231,14 +234,19 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
 ### 段階導入
 
-| Phase              | 範囲                                                                                                                                                                                                                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase1             | JavaParser + SymbolSolver による静的呼び出し抽出 (本 doc の確定内容)                                                                                                                                                                                                                                                                         |
-| 後続 feature (#21) | SootUp による型階層 / Interface Dispatch / Override 候補の補完と、Spring Bean / DI 解決による候補絞り込み (S4 の達成)。実装は型階層補完 → Spring 候補絞り込み → 統合 E2E の順に分割する ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。SootUp の call graph 委譲範囲 (Q2) は #21 spec の clarify phase で決定する |
+| Phase              | 範囲                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase1             | JavaParser + SymbolSolver による静的呼び出し抽出 (本 doc の確定内容)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 後続 feature (#21) | SootUp による型階層 / Interface Dispatch / Override 候補の補完と、Spring Bean / DI 解決による候補絞り込み (S4 の達成)。実装は型階層補完 → Spring 候補絞り込み → 統合 E2E の順に分割する ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。**SootUp の統合範囲は決定済み (2026-07-12)**: 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は委譲しない。SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (性能方針節を参照)。 |
 
 Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて確定する呼び出しの完全追跡は初期スコープに含めない ([ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md))。静的に候補を導ける場合は候補と根拠を出力し、確定できない場合は候補・未解決理由を観測可能にする。
 
 > 本 doc 内の「Phase2」「Phase3」という旧呼称は、ADR-0005 (2026-07-11) により後続 feature (#21) に統合された。
+
+**後続 feature (#21) の範囲確定 (決定済み 2026-07-12)**: 本 doc を正本とする (決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
+
+- **Spring 条件アノテーション (D3)**: `@Profile` / `@ConditionalOnProperty` 等の条件アノテーションは条件評価を行わず、検出・記録のみを行う。条件付き Bean も無条件に候補として列挙し、「条件付きである」事実と条件種別を metadata / diagnostic に記録する。条件付き候補を含む場合は候補が 1 件でも `resolution: unique` とはせず曖昧候補として扱う。
+- **実行時生成実装 (D4)**: Spring Data 等の実行時生成実装は宣言メソッドへの edge のみを保持し、疑似実装ノードは合成しない。既知の runtime-provided マーカー (初期は Spring Data `Repository` 型階層のみ) に合致する場合は diagnostic の理由を「未解決」ではなく「runtime-provided」として区別する。他フレームワーク (`@FeignClient` / MyBatis Mapper 等) への拡張は後続とする。
 
 ## 主要シナリオ / フロー
 
@@ -253,6 +261,8 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 ## テスト観点
 
 横断規約は [context/testing.md](../../../context/testing.md)。本 feature は三層 (Java unit / Go fake analyzer / 実 jar E2E) で担保する。
+
+**観測責務の境界 (#21、決定済み 2026-07-12)**: 曖昧性・解決根拠の観測は Analyzer JSONL (`callEdge.metadata` / `diagnostic`) までを本 feature の責務とする。CLI 出力 (Console / JSON) への edge 単位 metadata 表出は #22 (CLI interface spec) が管轄する。本 doc を正本とする (決定経緯: [spec #21 D6](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
 
 **Java unit test (JUnit / `analyzers/java/`)**
 
@@ -275,12 +285,14 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 - interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)
 - パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること
 - 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと
+- **Spring Boot fixture (#21、決定済み 2026-07-12)**: `testdata/fixtures/java/` に単一 source root の Spring Boot fixture を新規作成する (現状 Spring fixture なし)。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 
 ## 上位資料からの変更点
 
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                             |
-| --------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PRD       | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                  |
-| DesignDoc | 追記                              | Java Analyzer feature の正本を本 doc に移す。成功条件 S5 / 設計原則 P4 の測定方法明確化 (2 つ目以降の Analyzer 追加時に Core 無変更) を反映済み  |
-| context   | 追記                              | `context/toolchain.md` / `context/project.md` / `context/testing.md` / `context/architecture.md` / `context/engineering.md` の該当箇所へ反映済み |
-| ADR       | 追記                              | Analyzer 起動コマンド解決の判断を ADR-0003 に記録                                                                                                |
+| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                                                          |
+| --------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD       | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                                                                                                                                               |
+| DesignDoc | 追記                              | Java Analyzer feature の正本を本 doc に移す。成功条件 S5 / 設計原則 P4 の測定方法明確化 (2 つ目以降の Analyzer 追加時に Core 無変更) を反映済み                                                                                                                               |
+| context   | 追記                              | `context/toolchain.md` / `context/project.md` / `context/testing.md` / `context/architecture.md` / `context/engineering.md` の該当箇所へ反映済み                                                                                                                              |
+| ADR       | 追記                              | Analyzer 起動コマンド解決の判断を ADR-0003 に記録                                                                                                                                                                                                                             |
+| spec #21  | 追記                              | sync phase (2026-07-12) で D1〜D6 (SootUp 範囲確定、dispatch 標識拡張、Spring 条件アノテーション、実行時生成実装、性能受け入れ基準、観測責務境界) と Spring Boot fixture 方針を反映。決定経緯は [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
