@@ -45,20 +45,20 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 ## Quick Commands
 
-| やりたいこと            | コマンド                                                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 開発起動                | `depwalk analyze --analyzer-cmd "java -jar analyzers/java/build/libs/<jar>"` (暫定。全 flag 体系は CLI interface spec で確定) |
-| ビルド                  | `cd core && go build ./...`                                                                                                   |
-| Lint / typecheck        | `cd core && go vet ./...`                                                                                                     |
-| Format (適用)           | `cd core && go fmt ./...`                                                                                                     |
-| Format (確認)           | `cd core && test -z "$(gofmt -l .)"`                                                                                          |
-| Unit test               | `cd core && go test ./...`                                                                                                    |
-| Java Analyzer build     | `cd analyzers/java && ./gradlew shadowJar`                                                                                    |
-| Java Analyzer unit test | `cd analyzers/java && ./gradlew test`                                                                                         |
-| E2E                     | Go 側 E2E (要 JDK 25 + fat jar build)。具体引数は CLI interface spec で確定                                                   |
-| 健全性検査              | `lefthook run pre-commit`                                                                                                     |
-| 依存整理                | `cd core && go mod tidy`                                                                                                      |
-| 依存追加                | `cd core && go get <module>@<version>`                                                                                        |
+| やりたいこと            | コマンド                                                                                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 開発起動                | `depwalk analyze <path> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --analyzer-meta classpath=` (依存なしの最小形。依存がある場合は `--analyzer-meta classpath=/path/to/dep.jar` を繰り返し指定する。暫定。全 flag 体系は CLI interface spec で確定) |
+| ビルド                  | `cd core && go build ./...`                                                                                                                                                                                                                                                                     |
+| Lint / typecheck        | `cd core && go vet ./...`                                                                                                                                                                                                                                                                       |
+| Format (適用)           | `cd core && go fmt ./...`                                                                                                                                                                                                                                                                       |
+| Format (確認)           | `cd core && test -z "$(gofmt -l .)"`                                                                                                                                                                                                                                                            |
+| Unit test               | `cd core && go test ./...`                                                                                                                                                                                                                                                                      |
+| Java Analyzer build     | `cd analyzers/java && ./gradlew shadowJar`                                                                                                                                                                                                                                                      |
+| Java Analyzer unit test | `cd analyzers/java && ./gradlew test`                                                                                                                                                                                                                                                           |
+| E2E                     | Go 側 E2E (要 JDK 25 + fat jar build)。具体引数は CLI interface spec で確定                                                                                                                                                                                                                     |
+| 健全性検査              | `lefthook run pre-commit`                                                                                                                                                                                                                                                                       |
+| 依存整理                | `cd core && go mod tidy`                                                                                                                                                                                                                                                                        |
+| 依存追加                | `cd core && go get <module>@<version>`                                                                                                                                                                                                                                                          |
 
 Core の標準 command は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
 Repository-level の make-like wrapper は初期導入しない。

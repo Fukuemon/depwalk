@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-07-11 / Status: Draft
+> 最終更新: 2026-07-12 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -230,19 +230,18 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spec で確定する。
 
-| Phase  | 提供 / 追加                                     | 主技術                     |
-| ------ | ----------------------------------------------- | -------------------------- |
-| Phase1 | Caller 探索 / Callee 探索 / JSON 出力           | JavaParser ベース          |
-| Phase2 | Spring 解析 (Bean 解決 / DI 解決)               | SymbolSolver + Spring 解析 |
-| Phase3 | Interface Dispatch / Override 解決              | SootUp 統合                |
-| Phase4 | グラフ出力 (DOT / Mermaid)                      | Output Engine 拡張         |
-| Phase5 | Multi Language (Kotlin / TypeScript / Vue / Go) | 言語別 Analyzer 追加       |
+| Phase              | 提供 / 追加                                                                                                                                                                     | 主技術                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Phase1             | Caller 探索 / Callee 探索 / JSON 出力                                                                                                                                           | JavaParser ベース                   |
+| 後続 feature (#21) | 型階層補完 (SootUp) → Spring 絞り込みの順で Interface Dispatch / Override 解決と Spring Bean / DI 解決を実装 ([ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md)) | SootUp + SymbolSolver + Spring 解析 |
+| Phase4             | グラフ出力 (DOT / Mermaid)                                                                                                                                                      | Output Engine 拡張                  |
+| Phase5             | Multi Language (Kotlin / TypeScript / Vue / Go)                                                                                                                                 | 言語別 Analyzer 追加                |
 
 ### Open Questions (未決事項)
 
-| #   | 論点                                                                  | 決定者   | 期限          | 状態                                                                                                                                         |
-| --- | --------------------------------------------------------------------- | -------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)) |
-| Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | Phase3 着手前 | 未決                                                                                                                                         |
-| Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/output/DesignDoc_output.md) / [spec #7](../specs/7-output/))                                                |
-| Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/traversal/DesignDoc_traversal.md) / [spec #6](../specs/6-traversal/))                                       |
+| #   | 論点                                                                  | 決定者   | 期限                   | 状態                                                                                                                                         |
+| --- | --------------------------------------------------------------------- | -------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時          | 解決済み ([feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)) |
+| Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | #21 spec の clarify 前 | 未決                                                                                                                                         |
+| Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時          | 解決済み ([feature doc](features/output/DesignDoc_output.md) / [spec #7](../specs/7-output/))                                                |
+| Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時          | 解決済み ([feature doc](features/traversal/DesignDoc_traversal.md) / [spec #6](../specs/6-traversal/))                                       |

@@ -19,7 +19,7 @@ Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言�
 
 Phase1 の対象は Java/Spring Boot であり、Java Analyzer は `analyzer-protocol` の SPI / JSONL スキーマを実装する最初の言語別 Analyzer である。Core 側は Protocol parser / validator (`core/internal/protocol`) と Analyzer process 起動 (`core/internal/analyzer`) を実装済みで、契約の受け側は揃っている。本 feature は、その契約に対して JSONL を出力する Java 側の実装方式 (build 基盤、起動契約、型解決、正規化規則、帰属型決定、段階導入) を確定する。
 
-本 feature が関わる成功条件は Design Doc の S1 / S2 (caller / callee 探索の網羅性 — graph の入力を供給する)、S4 (Spring DI 経由の呼び出し先解決、Phase2 以降)、S5 (Analyzer 追加時に Core を変更しない) である。Phase1 では JavaParser ベースの静的呼び出し抽出を達成し、DI 解決 (Phase2) と Interface Dispatch / Override 解決 (Phase3, SootUp) は段階導入とする。
+本 feature が関わる成功条件は Design Doc の S1 / S2 (caller / callee 探索の網羅性 — graph の入力を供給する)、S4 (Spring DI 経由の呼び出し先解決、Phase2 以降)、S5 (2 つ目以降の言語 Analyzer 追加時に Core 無変更) である。Phase1 では JavaParser ベースの静的呼び出し抽出を達成し、DI 解決 (Phase2) と Interface Dispatch / Override 解決 (Phase3, SootUp) は段階導入とする。
 
 ## スコープ
 
@@ -64,6 +64,7 @@ metadata passthrough も同様の言語非依存原則に従う。Core は `--an
 - 値は常に JSON 配列に積む。1 回だけ指定した場合も要素 1 の配列になる (`--analyzer-meta classpath=/a.jar` → `{"classpath": ["/a.jar"]}`)。
 - 同一 key の繰り返しは、指定順に配列へ追加する。
 - 値が空文字列の場合、その key を空配列として登録する (`--analyzer-meta classpath=` → `{"classpath": []}`)。
+- 同一 key の繰り返しと空値 (`key=`) が混在する場合: 空値指定はその key を (未登録の場合のみ) 空配列として登録する。既登録の値をリセットしない。よって `classpath=/a.jar` → `classpath=` は `["/a.jar"]`、`classpath=` → `classpath=/a.jar` も `["/a.jar"]`。
 - 分割は最初の `=` で行う (value 側に `=` を含んでよい)。`=` を含まない指定は validation error として実行前に拒否する。
 
 Java 固有の `metadata` key:
@@ -98,7 +99,7 @@ pre-flight 検査 (classpath key の有無 / 指定 jar の存在・読み取り
 
 - `entrypoints` が未指定または空配列の場合は、`analysisMode` の値によらず scope 全体の call graph 生成要求として扱う。
 - node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は「帰属型の決定規則」節を正本とする。
-- caller 探索 (S1) の入力としては `reachableFromEntrypoints` は不完全であるため、caller 方向の問い合わせでは Core が `fullGraph` を選ぶ責務を持つ。`reachableFromEntrypoints` は callee 方向の調査で出力量を削るための最適化と位置づける。
+- caller 探索 (S1) の入力としては `reachableFromEntrypoints` は不完全であるため、caller 方向の問い合わせでは Core が `fullGraph` を選ぶ責務を持つ (Core 側の実装は #22 CLI interface spec へ引き継ぐ。本 doc は Java Analyzer 側の意味論の正本であり、Core の振る舞いは参照)。`reachableFromEntrypoints` は callee 方向の調査で出力量を削るための最適化と位置づける。
 
 ### 正規化規則 (methodId / signature)
 
@@ -116,7 +117,7 @@ pre-flight 検査 (classpath key の有無 / 指定 jar の存在・読み取り
 
 Java の overload 解決は erasure ベースであり、erasure だけで overload の区別に十分であるため generics を保持する必要はない。`methodId` を hash しないのは、JSONL がデバッグ容易性のために選ばれた性質と一貫させるためであり、決定性は文字列生成規則が決定的であることで満たす。
 
-匿名クラスのメソッドは、宣言型を JavaParser のソース出現順で採番した binary name (`com.example.Outer$1`) とし、通常のメソッドと同じ規則で `signature` / `methodId` を作る。lambda は独立 node にしないため専用の ID を持たない。
+匿名クラスのメソッドは、宣言型を直近の enclosing class ごとに 1 始まりのソース出現順で採番した binary name (`com.example.Outer$1`、JVM binary name 互換) とし、通常のメソッドと同じ規則で `signature` / `methodId` を作る。ローカルクラスは `Outer$1Local` 形式 (n は同名ローカルクラスの enclosing class 内出現順)。lambda は独立 node にしないため専用の ID を持たない。
 
 ### symbolKind の割り当て
 
@@ -168,9 +169,13 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
 ### 性能方針
 
-- **streaming 出力**: `methodSymbol` / `callEdge` を逐次 stdout へ flush し、Analyzer 側にグラフ全体をメモリ保持しない。
-- **AST の逐次破棄**: 解析済みファイルの AST を保持し続けない。保持するのは SymbolSolver の型解決キャッシュと、`callEdge` 出力に必要な最小限の情報に限る。
+- **モード別の streaming 方針**: `reachableFromEntrypoints` は entrypoints からの到達判定に解析完了までの adjacency 全体が必要であり、streaming と両立しない。このためモードごとに挙動を分ける。
+  - `fullGraph`: ファイル単位で `methodSymbol` / `callEdge` を逐次 stdout へ flush し、解析済みファイルの中間状態 (AST 等) を保持しない。出力済み `methodId` 集合の保持は許容する。
+  - `reachableFromEntrypoints`: 到達判定のため、解析完了まで adjacency (呼び出し関係) を保持したうえで到達集合を確定し、その後に出力する二段階処理を **モード別の例外** として許容する。
+  - `diagnostic` は両モードとも検出時に即時 flush する (中間保持しない)。
+- **AST の逐次破棄**: 解析済みファイルの AST を保持し続けない。保持するのは SymbolSolver の型解決キャッシュと、`callEdge` 出力に必要な最小限の情報 (`fullGraph` は逐次 flush 用、`reachableFromEntrypoints` は到達判定用の adjacency) に限る。
 - **計測の観測性**: 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol record としては出さない)。
+- **メモリ特性の扱い**: 上記の通り `fullGraph` と `reachableFromEntrypoints` はメモリ特性 (adjacency 保持の有無) が異なるため、baseline / 将来の数値目標はモード別に扱う。
 - **数値目標**: 未定。Phase1 実装時に fixture プロジェクトの実測値 (ファイル数 / 所要時間 / 最大 RSS) を baseline として記録し、その後に本 doc へ確定値を記録する。現時点は方式のみを Phase1 の必須仕様として確定し、数値目標は実測 baseline 取得後に本 doc へ追記する。
 - **baseline 実測値 (計測日 2026-07-12)**: `testdata/fixtures/java/project` (Java ソース 10 ファイル、うち 1 ファイルは意図的にパース不能) を `core/e2e` (`TestJavaAnalyzerFixtureE2E/PerformanceBaseline`) から実 jar (`analyzers/java/build/libs/java-analyzer.jar`, JDK 25 / Eclipse Temurin 25.0.3+9, Apple Silicon darwin/arm64) で解析した実測値。
 
@@ -181,6 +186,8 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
   | 最大 RSS       | 約 128,008,192 bytes (約 122 MiB)           | `os.ProcessState.SysUsage()` (`syscall.Rusage.Maxrss`, darwin は byte 単位) |
 
   fixture 規模が小さい (10 ファイル) ため JVM 起動コストの寄与が大きく、この baseline は「小規模プロジェクトでの下限に近い値」として扱う。数値目標 (SLO) の確定は本 baseline を踏まえた別作業とする。
+
+- **数値目標の確定 (追跡メタデータ)**: 決定者 Fukuemon / 期限 #22 (CLI interface 結合) 完了時。現 baseline は小規模 fixture の floor 値であり、CLI から実プロジェクト規模を計測できるようになった時点でモード別に確定する。
 
 ### 帰属型の決定規則
 
@@ -262,7 +269,7 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 
 **E2E (実 jar / `testdata/fixtures/java/`)**
 
-- 既知の caller / callee 集合と `depwalk analyze` の出力の照合 (S1 / S2)
+- 既知の caller / callee 集合と解析結果 graph の照合 (S1 / S2 の入力層)。CLI 出力レベルの照合は CLI interface spec (#22) 完了後に完成する
 - interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)
 - パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること
 - 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと

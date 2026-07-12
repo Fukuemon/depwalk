@@ -17,7 +17,7 @@
 
 ## チケット情報
 
-- 起点: Issue #9 のPhase 2 / Phase 3を後続Issueへ分割
+- 起点: Issue #9 のPhase 2 / Phase 3 (旧呼称) を [ADR-0005](../../adr/0005-adopt-sootup-and-spring-di-resolution.md) により単一feature (#21) に統合
 - チケットID: #21
 - トラッカー: GitHub
 - URL: https://github.com/Fukuemon/depwalk/issues/21
@@ -82,7 +82,7 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 - IF 複数の実装候補が残る場合、Java Analyzerは解析を失敗させず、候補と曖昧性をdiagnosticまたはmetadataに出力する。
 - IF sourceから必要な型階層を取得できず依存jarに情報がある場合、Java AnalyzerはSootUpで補完してdispatchを解決する。
 - IF Reflection、実行時Proxyまたは実行時条件がなければ確定できない場合、Java Analyzerは推測で一意に確定せず未解決理由を出力する。
-- WHEN Spring Boot E2E fixtureを解析したとき、既知のcaller / callee集合とCLI出力が一致する。
+- WHEN Spring Boot E2E fixtureを解析したとき、既知のcaller / callee集合と一致する。検証はgraph上の既知caller / callee集合との照合を基本とし、CLI出力レベルの照合はCLI interface spec (#22) 完了後に完成する (#22 完了を前提条件とする)。
 
 ## 例外シナリオ
 
@@ -110,7 +110,7 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 
 ## 関連資料
 
-- `design/DesignDoc.md` の成功条件S4、Java Analyzer責務、Phase 2 / Phase 3
+- `design/DesignDoc.md` の成功条件S4、Java Analyzer責務、後続feature (#21) の段階導入境界 ([ADR-0005](../../adr/0005-adopt-sootup-and-spring-di-resolution.md))
 - `design/features/java-analyzer/DesignDoc_java-analyzer.md` の段階導入と既知の制約
 - `specs/9-java-analyzer/` のPhase 1設計・実装記録
 - `adr/0004-defer-runtime-call-tracing.md` の静的解析とRuntime Traceの境界
@@ -118,8 +118,9 @@ Issue #9 のPhase 1では、JavaParserベースの静的解析によりinterface
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                |
-| ---------- | ------ | ------------------------------------------------------- |
-| 2026-07-11 | Codex  | Issue起票用draftを作成                                  |
-| 2026-07-11 | Codex  | 動的解析の非採用とSootUp / Spring DI採用のADRを関連付け |
-| 2026-07-11 | Codex  | GitHub Issue #21を起票しメタ情報を同期                  |
+| 日付       | 変更者 | 変更内容                                                                                                                                              |
+| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-11 | Codex  | Issue起票用draftを作成                                                                                                                                |
+| 2026-07-11 | Codex  | 動的解析の非採用とSootUp / Spring DI採用のADRを関連付け                                                                                               |
+| 2026-07-11 | Codex  | GitHub Issue #21を起票しメタ情報を同期                                                                                                                |
+| 2026-07-12 | Claude | ADR-0005追随 (起点 / 上位文書参照の旧Phase呼称を統合feature表現へ更新)、E2E受け入れ基準の検証レベル (graph照合基本 / CLI出力照合は#22完了後) を明確化 |
