@@ -1,0 +1,22 @@
+package com.fukuemon.depwalk.javaanalyzer.io;
+
+import java.io.PrintStream;
+
+/**
+ * 計測サマリ (解析ファイル数 / 所要時間 / 未解決件数) を stderr へ出力する。
+ * protocol record ではないため JSONL ではなく human-readable な 1 行で出力する。
+ */
+public final class MetricsReporter {
+
+    private MetricsReporter() {
+    }
+
+    public static void report(PrintStream err, MetricsSummary summary) {
+        err.printf(
+                "analyzedFiles=%d durationMs=%d unresolvedSymbols=%d%n",
+                summary.analyzedFileCount(),
+                summary.durationMillis(),
+                summary.unresolvedCount());
+        err.flush();
+    }
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "code": "JAVA_PARSE_ERROR",
+    "description": "BrokenSyntax.java is intentionally unparseable; the Analyzer must report this diagnostic and keep analyzing the rest of the fixture project (partial analysis continuation)."
+  },
+  {
+    "code": "JAVA_UNRESOLVED_SYMBOL",
+    "description": "UnresolvedCaller.triggerUnresolved() calls a method that does not exist on java.lang.Object; the Analyzer must report this diagnostic while still resolving UnresolvedCaller.resolvedCall() in the same file."
+  }
+]

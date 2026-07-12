@@ -11,7 +11,7 @@ Core の test framework は Go 標準の `testing` とする。
 
 | 種別              | 配置                                                              | 主担当範囲                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ----------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)                                                                                                                                                                                                                                                                                                                                                                 |
+| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)。Java Analyzer 側は `analyzers/java/` で JUnit を用いる (三層構成は下記「Java Analyzer 三層」参照)                                                                                                                                                                                                   |
 | Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠                                                                                                                                                                                                                                                                                                    |
 | E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3)。S1/S2 は Traversal Engine 層の到達集合照合 ([feature doc](../design/features/traversal/DesignDoc_traversal.md) が正本) と CLI 出力照合の 2 層からなり、CLI 出力レベルの完成は CLI interface spec 完了後。S3 も同様に Output Engine 層の照合 ([feature doc](../design/features/output/DesignDoc_output.md) が正本。unit / golden) と CLI 出力照合の 2 層からなる |
 
@@ -24,6 +24,19 @@ Core の test framework は Go 標準の `testing` とする。
 - Golden fixture は `testdata/` 配下に置く。repo root の `testdata/` に加え、Go 慣習の **package-local `testdata/`** (例: `core/internal/output/testdata/golden/`) も可とする (単一 package に閉じる golden は package-local を優先する)。
 - `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
 - E2E の具体 CLI 引数、env 変数、対象選択は後続の CLI interface spec で確定する。
+
+### Java Analyzer 三層
+
+Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実 jar E2E の三層でテストする。判断根拠と feature 固有観点の正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
+
+| 層                     | 配置                                                          | JVM 要否               |
+| ---------------------- | ------------------------------------------------------------- | ---------------------- |
+| Java unit test (JUnit) | `analyzers/java/`                                             | 要 (Java job)          |
+| Go process contract    | `core/internal/analyzer` + fake analyzer                      | **不要** (fake で代替) |
+| E2E (実 jar)           | `testdata/fixtures/java/` のサンプル Java/Spring プロジェクト | 要 (JDK 25 + jar)      |
+
+- Go 側の unit / contract test は fake analyzer (任意の実行可能ファイル) で回せるため、CI の Go job に JVM を要求しない。
+- E2E だけが JDK 25 + build 済み fat jar を要求する。CI は「Go job (JVM 不要)」と「Java + E2E job (JDK 25 / Gradle build)」に分ける。
 
 ## テスト構造
 
@@ -68,4 +81,4 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 ## 横断テスト方針
 
 - リリース判定には最低限 S1 (caller) / S2 (callee) / S3 (各出力形式) の E2E 照合を含める。
-- 新 Analyzer 追加時は Protocol contract test の通過を必須とする (S5: Core 無変更の担保)。
+- **2 つ目以降**の Analyzer 追加時は Protocol contract test の通過を必須とする (S5: Core 無変更の担保。初号機導入時の言語非依存な初回配線は対象外)。
