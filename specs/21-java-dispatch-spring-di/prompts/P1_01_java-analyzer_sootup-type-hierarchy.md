@@ -31,22 +31,24 @@
 
 ### ステップ 0: ブランチ準備
 
-ブランチ命名と base branch は `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` に従う。
+本 feature は P1〜P3 を同一 `feature/21` branch と同一 PR で直列実行する。prompt ごとに branch / PR を作り直さない。
 
-1. 最新の base branch を取得
-2. 作業ブランチを作成
-3. PR / MR テンプレートを確認し、完了条件を description に転記する
-4. Draft PR / MR を作成して push する
+1. 現在の branch が `feature/21` であることを確認する
+2. 作業ツリーが clean であることを確認する
+3. 既存 Draft PR があれば流用し、なければ `develop` 向けに作成する
+4. 本 prompt の完了条件を PR description に追記する
 
 ### ステップ 1: SootUp 依存の追加と lazy view 構築
 
-1. `analyzers/java/build.gradle.kts` の `dependencies` ブロックに SootUp の依存を追加する (バージョンは Maven Central で当時の最新安定版を確認し、`## 不明点ハンドリング` に従って選定理由を記録する)。
+1. `analyzers/java/build.gradle.kts` の `dependencies` に `org.soot-oss:sootup.core:2.0.0`、`org.soot-oss:sootup.java.core:2.0.0`、`org.soot-oss:sootup.java.bytecode.frontend:2.0.0` を追加する。`sootup.callgraph` は追加しない。2.0.0 は設計時点の Maven Central 安定版で、bytecode の `AnalysisInputLocation` / `View` に必要な最小 module に固定済みのため、実装時に別 artifact/version を選び直さない。
 2. `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/sootup/` パッケージを新設し、SootUp の `View` (型階層照会の入口) を lazy に構築するコンポーネントを実装する。eager な全クラス読み込みはしない (D5 の設計原則)。
-3. 照会対象は次の 3 種を含める: (a) 解析対象ソースの依存 jar (`classpath` metadata 由来)、(b) 解析対象プロジェクト自身のコンパイル済み `.class` (D7、Lombok 生成コンストラクタ解決のため)、(c) 既存の source 解析結果 (JavaParser/SymbolSolver との連携)。
-4. コンパイル済み `.class` が見つからない場合 (未ビルドプロジェクト) は fatal にせず、ステップ 3 の E3 diagnostic 経路へ委譲する設計にする (推測で自動ビルドを実行しない)。
-5. `context/project.md` の Quick Commands (`cd analyzers/java && ./gradlew shadowJar`) でビルドが通ることを確認する。
-6. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す。
-7. 指摘を対応してから次へ。
+3. 照会対象は次の 3 種を含める: (a) `analysisRequest.metadata.classpath` の依存 jar、(b) 同じ `classpath` に指定された解析対象プロジェクトの classes output directory、(c) 既存の source 解析結果 (JavaParser/SymbolSolver との連携)。新しい metadata key は追加しない。
+4. classes output directory から source の binary name と一致する `.class` を引き、依存 classes directory と自プロジェクト classes directory を path 名で推測しない。
+5. 明示された classpath entry が存在しない、または読めない場合は既存 pre-flight の `JAVA_MISSING_JAR` fatal を維持する。自動ビルドは実行しない。
+6. 自プロジェクトの classes directory が classpath に指定されず source に対応する bytecode を取得できない場合は、ステップ 3 の E3 diagnostic 経路へ委譲する。
+7. `context/project.md` の Quick Commands (`cd analyzers/java && ./gradlew shadowJar`) でビルドが通ることを確認する。
+8. diff レビュー (`spec-review` または repo の標準レビュー手段) を回す。
+9. 指摘を対応してから次へ。
 
 ### ステップ 2: Interface Dispatch / Override 候補の索引化
 
@@ -60,9 +62,9 @@
 
 ### ステップ 3: bytecode 読み込み失敗時の diagnostic (E3)
 
-1. SootUp が bytecode を読めない場合 (依存 jar 欠落、未ビルドプロジェクト等) に、対象と原因を `diagnostic` として出力し、JavaParser 結果のみで解析を継続するフォールバック経路を実装する。
+1. pre-flight を通過した class file を SootUp が解釈・索引化できない場合、または自プロジェクトの classes directory が classpath に指定されず source に対応する bytecode を取得できない場合に、対象と原因を `diagnostic` として出力し、JavaParser 結果のみで解析を継続する。明示された classpath entry の欠落・読み取り不能はこの経路に入れず、既存 `JAVA_MISSING_JAR` fatal とする。
 2. `JavaDiagnosticCode` (`analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/JavaDiagnosticCode.java`) に、この分岐用の新規 code `JAVA_SOOTUP_UNAVAILABLE` (severity: `warning`。既存 code の命名パターン `JAVA_<SCREAMING_SNAKE>` に合わせる) を追加する。この code は `design/features/java-analyzer/DesignDoc_java-analyzer.md` の「diagnostic / error code 体系」表 (正本) にも反映が必要な durable な情報のため、この doc への追記は phase: sync として扱う。
-3. テストを先に書く (TDD): bytecode 読み込み不能な fixture (存在しない jar path 等) で diagnostic が出力され、解析全体は失敗しないことを検証する。
+3. テストを先に書く (TDD): (a) 存在しない classpath entry は `JAVA_MISSING_JAR` で fatal、(b) 有効な entry 内の解釈不能 class file は `JAVA_SOOTUP_UNAVAILABLE` で継続、(c) 自プロジェクト classes directory 未指定では同 diagnostic を出して JavaParser 結果で継続、の 3 ケースを検証する。
 4. `cd analyzers/java && ./gradlew test` を実行する。
 5. diff レビューを回し、指摘を対応してから次へ。
 
@@ -84,6 +86,7 @@
   - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/attribution/` (既存、参照のみ)
   - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/JavaDiagnosticCode.java` (新規 code 追加)
   - `analyzers/java/src/test/resources/fixtures/` (新規 fixture 追加)
+  - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight/PreflightValidator.java` (既存 fatal 契約を変更していないことの確認)
 
 ## 前提条件
 
@@ -123,11 +126,11 @@ spec (`specs/21-java-dispatch-spring-di/index.md`) より抜粋:
 >
 > **D7 (解決済み)**: Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) が生成するコンストラクタは、SootUp の bytecode 型階層照会対象に自プロジェクトのコンパイル済み class を含めることで解決する。理由: Lombok はコンパイル時にコンストラクタをバイトコードへ実体化するため、SootUp の照会対象に自プロジェクトのコンパイル済み class を含めれば、JavaParser (source-level) からは見えないコンストラクタも解決できる。
 >
-> **前提制約 (D7 付随)**: 解析対象プロジェクトは解析時点でコンパイル済み (`.class` 生成済み) であることを前提とする。ソースのみ・未ビルド状態のプロジェクトでは、Lombok 生成コンストラクタの解決精度が下がる制約を受け入れる (E3 の一般規則でカバーする)。
+> **入力契約 (D7 付随)**: 解析対象プロジェクトの classes output directory は既存 `analysisRequest.metadata.classpath` に追加する。明示 entry の欠落・読み取り不能は既存 `JAVA_MISSING_JAR` fatal。classes directory 未指定または pre-flight 通過後の SootUp 解釈失敗だけを E3 で継続する。
 >
 > **D5 の設計原則**: SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)。
 >
-> **E3 (エラーケース)**: SootUp が bytecode を読めない → 対象と原因を diagnostic へ出力し、JavaParser 結果のみで解析継続する。
+> **E3 (エラーケース)**: pre-flight 通過後に SootUp が class file を解釈・索引化できない、または自プロジェクト bytecode が classpath にない → `JAVA_SOOTUP_UNAVAILABLE` を出し JavaParser 結果のみで解析継続する。
 >
 > **スコープ (やること)**: Interface Dispatch、継承、override、interface default method の解決 / SootUp による bytecode・依存 jar の型階層・dispatch 情報の補完。
 
@@ -146,12 +149,12 @@ spec の `### Testing` より抜粋:
 
 ## 完了条件
 
-- [ ] ステップ 0 でブランチと Draft PR / MR を作成した
-- [ ] SootUp 依存を `build.gradle.kts` に追加した (バージョン選定理由を記録)
+- [ ] ステップ 0 で `feature/21` と既存 Draft PR の状態を確認した
+- [ ] SootUp 2.0.0 の固定済み3 moduleを `build.gradle.kts` に追加し、`sootup.callgraph` を追加していない
 - [ ] SootUp の view 構築が lazy であり、自プロジェクトのコンパイル済み class を含む 3 種の照会対象 (依存 jar / 自プロジェクト class / JavaParser 連携) を実装した
 - [ ] Interface Dispatch / Override 候補の索引化を実装し、call graph 生成は行っていないことを確認した
 - [ ] Lombok 生成コンストラクタが解決できることをテストで確認した
-- [ ] SootUp が bytecode を読めない場合の diagnostic 出力 (新規 `JavaDiagnosticCode`) を実装し、テストで確認した
+- [ ] `JAVA_MISSING_JAR` fatal を維持し、E3 の限定条件だけで `JAVA_SOOTUP_UNAVAILABLE` を出すことをテストで確認した
 - [ ] 全ステップを順序通りに実行した
 - [ ] 各ステップで diff レビューを実施し、指摘を対応した
 - [ ] `## 検証コマンド` がすべてパスする

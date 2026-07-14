@@ -1,6 +1,6 @@
 # Feature 設計: Analyzer Protocol / SPI
 
-> 最終更新: 2026-07-14 / Status: 完了 (2026-07-14 追加 sync で `metadata` の Core 内 opaque passthrough 保持 (D9) を追記)
+> 最終更新: 2026-07-14 / Status: 完了 (2026-07-14 追加 sync で `callEdge.metadata` の Core 内 opaque passthrough と `methodSymbol.metadata` の境界を追記)
 
 Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯と issue 単位の作業記録は [spec #8](../../../specs/8-analyzer-protocol/) を参照する。
 
@@ -12,7 +12,7 @@ Analyzer SPI、JSONL Communication Protocol、Model schema の durable な featu
 | 関連 DesignDoc | [Communication Protocol](../../DesignDoc.md#communication-protocol)、[モジュール責務](../../DesignDoc.md#モジュール責務)、[設計原則](../../DesignDoc.md#設計原則-design-principles)                                                       |
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[infrastructure](../../../context/infrastructure.md)                                                |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)                                                                                                                                                                              |
-| 関連 spec      | [specs/8-analyzer-protocol](../../../specs/8-analyzer-protocol/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/) (D9: gap の発見)、[specs/22-cli-interface](../../../specs/22-cli-interface/) (D11: 実装) |
+| 関連 spec      | [specs/8-analyzer-protocol](../../../specs/8-analyzer-protocol/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/) (D9: gap の発見)、[Issue #22](https://github.com/Fukuemon/depwalk/issues/22) (D11: 実装) |
 | 対象モジュール | `analyzer-protocol`                                                                                                                                                                                                                       |
 
 ## 背景・要件解釈
@@ -108,7 +108,9 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み `methodSymbol` を参照する。未解決 symbol は `diagnostic` として表現する。
 
-**`metadata` の Core 内保持 (決定済み 2026-07-14)**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、破棄してよいという意味ではない。Core の内部表現 (`graph.Edge` / `graph.Symbol`) は `methodSymbol.metadata` / `callEdge.metadata` を意味解釈しない opaque passthrough として保持する (`AnalysisRequest.metadata` と同じパターン)。後続の出力層 (CLI 表出は #22 が管轄) がこの値を利用できるようにするための前提条件であり、Core の言語非依存性 (S5) には抵触しない。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。実装は [spec #22 D11](../../../specs/22-cli-interface/index.md#解決済みの論点) が担う (`graph.Edge`/`output.EdgeView` への追加)。
+**`metadata` の Core 内保持 (決定済み 2026-07-14)**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。#21 が解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。実装は [Issue #22](https://github.com/Fukuemon/depwalk/issues/22) の D11 が担う。
+
+`methodSymbol.metadata` は Analyzer Protocol record として受理するが、現行 Core の `graph.Symbol` は保持しない。#21 は `resolution` / `provenance` を `callEdge.metadata` だけに載せ、新しい `methodSymbol.metadata` の利用や Core/CLI での表出を受け入れ条件に含めないため、この既存 gap は #21 の blocker ではない。また #22 D11 の委譲対象にも含めない。将来 `methodSymbol.metadata` の Core/CLI 利用者を追加する issue で、`graph.Symbol` への opaque passthrough を別途設計する。
 
 #### `SourceLocation`
 
@@ -220,10 +222,10 @@ Handshake / capability negotiation は Phase1 では採用しない。
 
 ## 上位資料からの変更点
 
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                                                                                                               |
-| --------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PRD       | 継承                              | 統合 Design Doc の S5 / P1-P4 を具体化する。                                                                                                                                                                                                                                                                                       |
-| DesignDoc | 追記                              | Analyzer Protocol / SPI feature の正本を本 doc に移す。                                                                                                                                                                                                                                                                            |
-| context   | 追記                              | protocol contract test の横断観点を `context/testing.md` に反映する。                                                                                                                                                                                                                                                              |
-| ADR       | 追記                              | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。                                                                                                                                                                                                                                                      |
-| spec #21  | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正 (D9): `metadata` は Core が意味解釈しないが、opaque passthrough として保持する旨を明記。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)、実装は [spec #22 D11](../../../specs/22-cli-interface/index.md#解決済みの論点) が担う |
+| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                                                                                                                          |
+| --------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD       | 継承                              | 統合 Design Doc の S5 / P1-P4 を具体化する。                                                                                                                                                                                                                                                                                                  |
+| DesignDoc | 追記                              | Analyzer Protocol / SPI feature の正本を本 doc に移す。                                                                                                                                                                                                                                                                                       |
+| context   | 追記                              | protocol contract test の横断観点を `context/testing.md` に反映する。                                                                                                                                                                                                                                                                         |
+| ADR       | 追記                              | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。                                                                                                                                                                                                                                                                 |
+| spec #21  | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正 (D9): #21 が利用する `callEdge.metadata` は #22 D11 が opaque passthrough として保持する。`methodSymbol.metadata` の既存 gap は #21/#22 D11 の対象外で、将来の利用者追加時に別途設計する。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
