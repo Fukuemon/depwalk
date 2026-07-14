@@ -86,7 +86,7 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserService#invokeToString()".equals(e.get("callerMethodId"))),
                 "java.lang.Object#toString() is excluded by default and must not produce an edge: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty(), "excluded-package omission must not raise a diagnostic");
+        assertNoUnresolvedDiagnostic(ran, "excluded-package omission must not raise an unresolved diagnostic");
     }
 
     @Test
@@ -95,7 +95,7 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserRepository#invokeExternalDirect(com.example.lib.ExternalRepo)".equals(e.get("callerMethodId"))),
                 "receiver type out of scope must not produce an edge: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external omission must not raise an unresolved diagnostic");
     }
 
     @Test
@@ -143,7 +143,7 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserService#constructScopeExternal()".equals(e.get("callerMethodId"))),
                 "constructor calls are never lifted, out-of-scope new must be omitted: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external constructor omission must not raise an unresolved diagnostic");
     }
 
     /**
@@ -161,7 +161,7 @@ class AttributionTest {
         assertFalse(ran.byType("methodSymbol").stream().anyMatch(n ->
                         "java:com.example.lib.StaticUtils#util()".equals(n.get("methodId"))),
                 "out-of-scope static import callee must not be emitted as a node either: " + ran.byType("methodSymbol"));
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external static import must not raise an unresolved diagnostic");
     }
 
     /**
@@ -175,6 +175,11 @@ class AttributionTest {
         assertTrue(hasEdge(edges,
                 "java:com.example.UserService#invokeScopeInternalStaticImport()",
                 "java:com.example.MathUtils#square()"));
+    }
+
+    private static void assertNoUnresolvedDiagnostic(AnalysisTestSupport.Ran ran, String message) {
+        assertFalse(ran.byType("diagnostic").stream()
+                .anyMatch(diagnostic -> "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))), message);
     }
 
     /**

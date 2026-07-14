@@ -14,7 +14,10 @@ public enum JavaDiagnosticCode {
     JAVA_PARSE_ERROR("partialFailure"),
 
     /** {@code entrypoints} の method selector に一致する method が見つからない。 */
-    JAVA_ENTRYPOINT_NOT_FOUND("warning");
+    JAVA_ENTRYPOINT_NOT_FOUND("warning"),
+
+    /** SootUp が project bytecode を取得・索引化できず、JavaParser の宣言 edge のみで継続した。 */
+    JAVA_SOOTUP_UNAVAILABLE("warning");
 
     private final String severity;
 
