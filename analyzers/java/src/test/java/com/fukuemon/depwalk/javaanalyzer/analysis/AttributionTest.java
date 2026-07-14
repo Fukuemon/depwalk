@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D7 / D11: 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、
+ * 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、
  * 除外 package (既定値 / liftExcludePackages による置き換え、segment 単位 prefix 一致)、
  * this / super / static / new の各形。
  *
@@ -147,7 +147,7 @@ class AttributionTest {
     }
 
     /**
-     * D11 (無修飾 static import): {@code import static com.example.lib.StaticUtils.util; util();}
+     * 無修飾 static import ({@code import static com.example.lib.StaticUtils.util; util();})
      * は「参照した型」= 宣言型 (StaticUtils) そのものであり、enclosing class (UserService) へは
      * 引き上げない。宣言型・参照型ともに scope 外のため出力しない (diagnostic も出さない)。
      */
@@ -165,7 +165,7 @@ class AttributionTest {
     }
 
     /**
-     * D11 (無修飾 static import, scope 内): 宣言型 (MathUtils) が scope 内であれば、通常の
+     * 無修飾 static import でも宣言型 (MathUtils) が scope 内であれば、通常の
      * 「宣言サイトが scope 内」規則により、そのまま宣言型へ帰属する (enclosing への引き上げは
      * 発生しない、そもそも発生させる必要がない)。
      */
@@ -183,7 +183,7 @@ class AttributionTest {
     }
 
     /**
-     * D11: 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
+     * 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
      * static メンバ) の場合は、従来どおり enclosing class への引き上げを維持する (static import 由来
      * ではなく、通常の継承メンバ参照であるため)。
      */

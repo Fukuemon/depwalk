@@ -34,10 +34,20 @@ public enum JavaDiagnosticCode {
         this.severity = severity;
     }
 
+    /**
+     * Analyzer Protocol に出力する diagnostic code を返す。
+     *
+     * @return enum 定数名と同じ安定した code
+     */
     public String code() {
         return name();
     }
 
+    /**
+     * diagnostic の既定 severity を返す。
+     *
+     * @return {@code info}、{@code warning}、{@code partialFailure} のいずれか
+     */
     public String severity() {
         return severity;
     }

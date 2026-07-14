@@ -1,54 +1,58 @@
 package com.example;
 
-@org.springframework.stereotype.Component
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+@Component
 class ConstructorConsumer {
     ConstructorConsumer(NamedService service) {
     }
 }
 
-@org.springframework.stereotype.Component
+@Component
 class FieldConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     NamedService service;
 }
 
-@org.springframework.stereotype.Component
+@Component
 class SetterConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     void setService(NamedService service) {
     }
 }
 
-@org.springframework.stereotype.Component
+@Component
 class SelectionConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("beanQualifier")
+    @Autowired
+    @Qualifier("beanQualifier")
     QualifierContract byQualifier;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("qualifiedByName")
+    @Autowired
+    @Qualifier("qualifiedByName")
     QualifierContract byBeanName;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("factoryAlias")
+    @Autowired
+    @Qualifier("factoryAlias")
     QualifierContract byAlias;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("missing")
+    @Autowired
+    @Qualifier("missing")
     QualifierContract qualifierMissing;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     PrimaryContract primarySelected;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     MultiPrimaryContract multiplePrimary;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     PlainContract unspecifiedMultiple;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     ConditionalContract conditionalOnly;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     ConditionalPrimaryContract conditionalWithPrimary;
 }

@@ -33,6 +33,9 @@ public final class PreflightValidator {
     }
 
     /**
+     * 解析要求と classpath metadata を検査し、下流が安全に使える型付き入力へ変換する。
+     *
+     * @param request Core から受信した解析要求
      * @return 型検証済みの入力値 ({@link Validated})
      * @throws AnalyzerFatalException {@code JAVA_INVALID_REQUEST} / {@code JAVA_MISSING_CLASSPATH} /
      *                                 {@code JAVA_MISSING_JAR} のいずれか
@@ -69,7 +72,7 @@ public final class PreflightValidator {
 
     /**
      * {@code workspaceRoot} が null / 空 / 存在しない / directory でない場合は {@code JAVA_INVALID_REQUEST}
-     * で fatal とする (M4)。
+     * で fatal とする。
      */
     private static void validateWorkspaceRoot(String workspaceRoot) throws AnalyzerFatalException {
         if (workspaceRoot == null || workspaceRoot.isBlank()) {
@@ -92,7 +95,7 @@ public final class PreflightValidator {
 
     /**
      * {@code liftExcludePackages} は key 不在なら既定値 (呼び出し側で処理)。指定時は文字列配列でなければ
-     * {@code JAVA_INVALID_REQUEST} で fatal とする (M5)。空配列は「除外なし」として正当。
+     * {@code JAVA_INVALID_REQUEST} で fatal とする。空配列は「除外なし」として正当。
      */
     private static void validateLiftExcludePackages(Map<String, Object> metadata) throws AnalyzerFatalException {
         if (!metadata.containsKey(METADATA_LIFT_EXCLUDE_PACKAGES)) {

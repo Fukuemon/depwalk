@@ -32,25 +32,57 @@ import java.util.stream.Stream;
  */
 public final class SootUpTypeHierarchyIndex {
 
+    /**
+     * bytecode 上で実在するメソッドまたは constructor の識別情報。
+     *
+     * @param declaringType メソッドを実際に宣言する型の binary name
+     * @param methodName メソッド名。constructor は {@code <init>}
+     * @param parameterTypes erasure 済み引数型の binary name 配列
+     */
     public record MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
+        /** 引数型配列を防御的コピーして候補を生成する。 */
         public MethodCandidate {
             parameterTypes = List.copyOf(parameterTypes);
         }
     }
 
+    /**
+     * 型階層問い合わせの結果。問い合わせ自体の成否と候補0件を区別する。
+     *
+     * @param candidates 決定的順序に並べた実装候補。候補がなければ空
+     * @param unavailableReason classpath または class file を利用できなかった理由。正常なら {@code null}
+     */
     public record Resolution(List<MethodCandidate> candidates, String unavailableReason) {
+        /** 候補配列を防御的コピーして問い合わせ結果を生成する。 */
         public Resolution {
             candidates = List.copyOf(candidates);
         }
 
+        /**
+         * 正常に完了した問い合わせ結果を生成する。
+         *
+         * @param candidates 発見した候補。候補0件も正常な結果として許容する
+         * @return 利用可能な問い合わせ結果
+         */
         public static Resolution available(List<MethodCandidate> candidates) {
             return new Resolution(candidates, null);
         }
 
+        /**
+         * classpath または bytecode を利用できなかった問い合わせ結果を生成する。
+         *
+         * @param reason 利用不能になった具体的な理由
+         * @return 候補を持たない利用不能結果
+         */
         public static Resolution unavailable(String reason) {
             return new Resolution(List.of(), reason);
         }
 
+        /**
+         * 問い合わせが正常に完了したかを返す。
+         *
+         * @return 候補件数にかかわらず正常に照会できた場合は {@code true}
+         */
         public boolean isAvailable() {
             return unavailableReason == null;
         }
@@ -73,6 +105,12 @@ public final class SootUpTypeHierarchyIndex {
         this.classpath = List.copyOf(classpath);
     }
 
+    /**
+     * classpath entry を正規化し、遅延初期化される型階層索引を生成する。
+     *
+     * @param classpath 依存 jar と project classes directory の path
+     * @return まだ bytecode を読み込んでいない型階層索引
+     */
     public static SootUpTypeHierarchyIndex fromClasspath(List<String> classpath) {
         return new SootUpTypeHierarchyIndex(classpath.stream()
                 .map(Path::of)
@@ -80,18 +118,43 @@ public final class SootUpTypeHierarchyIndex {
                 .toList());
     }
 
-    /** interface / abstract / virtual declaration に対する concrete implementation method を返す。 */
+    /**
+     * 宣言メソッドに対する具象実装候補を型階層から返す。
+     *
+     * @param declaringType interface、abstract class、または基底 class の binary name
+     * @param methodName 宣言メソッド名
+     * @param parameterTypes erasure 済み引数型の binary name 配列
+     * @return 具象 subtype の実装候補、または bytecode を利用できなかった理由
+     */
     public Resolution resolveMethod(String declaringType, String methodName, List<String> parameterTypes) {
         MethodKey key = new MethodKey(declaringType, methodName, parameterTypes);
         return methodCache.computeIfAbsent(key, this::resolveMethodUncached);
     }
 
-    /** source に現れない Lombok 等の生成 constructor を bytecode から返す。 */
+    /**
+     * 指定 class の constructor を bytecode から返す。
+     *
+     * <p>Lombok などが生成し source に現れない constructor も、コンパイル済み class に存在すれば
+     * 候補へ含める。
+     *
+     * @param declaringType constructor を持つ class の binary name
+     * @return constructor 候補、または bytecode を利用できなかった理由
+     */
     public Resolution resolveConstructors(String declaringType) {
         return constructorCache.computeIfAbsent(declaringType, this::resolveConstructorsUncached);
     }
 
-    /** Spring Bean の concrete receiver で実際に選ばれる method (継承/default method 含む) を返す。 */
+    /**
+     * 具象 receiver から呼ばれる実効メソッドを返す。
+     *
+     * <p>receiver 自身、superclass、implemented interface の順に検索し、継承メソッドと interface
+     * default method を含めて実際の宣言元を特定する。
+     *
+     * @param implementationType 具象 receiver の binary name
+     * @param methodName 呼び出すメソッド名
+     * @param parameterTypes erasure 済み引数型の binary name 配列
+     * @return 実効メソッド1件、候補なし、または bytecode を利用できなかった理由
+     */
     public Resolution resolveImplementationMethod(
             String implementationType,
             String methodName,

@@ -8,13 +8,25 @@ import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
  */
 public final class AnalyzerFatalException extends Exception {
 
+    /** protocol の error record に設定する code。 */
     private final JavaErrorCode errorCode;
 
+    /**
+     * fatal error code と説明を持つ例外を生成する。
+     *
+     * @param errorCode protocol に出力する fatal error code
+     * @param message 人間向けのエラー説明
+     */
     public AnalyzerFatalException(JavaErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
 
+    /**
+     * protocol に出力する fatal error code を返す。
+     *
+     * @return この例外の error code
+     */
     public JavaErrorCode errorCode() {
         return errorCode;
     }

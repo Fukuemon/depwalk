@@ -16,6 +16,9 @@ public final class RelativePaths {
     /**
      * 相対 path 文字列を {@code /} 区切りへ正規化する (Windows の {@code \} 区切りを吸収する。
      * {@code /} 区切り入力はそのまま)。
+     *
+     * @param rawRelativePath OS 固有 separator を含み得る相対 path
+     * @return protocol record に格納できる {@code /} 区切り path
      */
     public static String toRecordPath(String rawRelativePath) {
         return rawRelativePath.replace('\\', '/');

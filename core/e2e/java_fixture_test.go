@@ -124,8 +124,8 @@ func javaMajorVersion(out string) int {
 
 // findAnalyzerJar locates the Java Analyzer fat jar built by `cd
 // analyzers/java && ./gradlew shadowJar`. It skips the test when the jar is
-// missing rather than building it itself: building the jar is P2_01's
-// concern (a Gradle build step), not something a Go test should trigger.
+// missing rather than building it itself: producing the jar is an explicit
+// Gradle build prerequisite and must not be an implicit side effect of a Go test.
 func findAnalyzerJar(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "analyzers", "java", "build", "libs", "java-analyzer.jar"))
@@ -231,7 +231,7 @@ func assertDiagnosticCode(t *testing.T, diagnostics []protocol.Diagnostic, code 
 // This test goes one layer below analyze.Run (using analyzer.Runner
 // directly) instead of asserting against analyze.Run's Result: Result.Graph
 // does not carry callEdge.metadata (graph.Edge has no Metadata field, since
-// the Traversal Engine does not need it in Phase 1), but this test needs to
+// the current Traversal Engine graph model does not need it), but this test needs to
 // see callEdge.metadata.dispatch and .viaLambda. Going one layer down keeps
 // the assertions at the protocol record level without reimplementing any
 // analyze/protocol logic — it reuses analyze.BuildMetadata for the

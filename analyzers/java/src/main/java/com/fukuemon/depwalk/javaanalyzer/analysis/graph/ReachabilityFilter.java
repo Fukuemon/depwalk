@@ -22,9 +22,23 @@ public final class ReachabilityFilter {
     private ReachabilityFilter() {
     }
 
+    /**
+     * entrypoint から到達可能な部分 graph と未一致 selector。
+     *
+     * @param nodes 到達可能な method symbol
+     * @param edges 両端が到達可能な call edge
+     * @param unmatchedSelectors node に一致しなかった entrypoint の表示文字列
+     */
     public record Result(List<MethodSymbol> nodes, List<CallEdge> edges, List<String> unmatchedSelectors) {
     }
 
+    /**
+     * entrypoint selector を node に照合し、callee 方向の到達可能部分 graph を返す。
+     *
+     * @param accumulator 解析対象全体の node と edge
+     * @param entrypoints 到達可能性探索の開始 selector
+     * @return 到達可能 node・edge と未一致 selector
+     */
     public static Result apply(GraphAccumulator accumulator, List<MethodSelector> entrypoints) {
         Map<String, MethodSymbol> allNodes = accumulator.nodesByMethodId();
         List<CallEdge> allEdges = accumulator.edges();

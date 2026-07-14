@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * M1 / D9: {@code fullGraph} は record をファイル単位で逐次 flush し、母集合全体の解析完了を待たない。
+ * {@code fullGraph} は record をファイル単位で逐次 flush し、母集合全体の解析完了を待たない。
  * {@code A.java} (declaration のみ) / {@code B.java} (unresolved call を含む) / {@code C.java}
  * (declaration のみ) を {@code ScopeFiles} の決定的順序 (path 昇順、A → B → C) で解析したとき、
  * B の {@code JAVA_UNRESOLVED_SYMBOL} diagnostic は B 自身の解析直後に flush されるため、

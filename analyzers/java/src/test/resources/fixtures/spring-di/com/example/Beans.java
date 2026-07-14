@@ -1,6 +1,18 @@
 package com.example;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Controller;
+import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.function.Supplier;
 
 interface NamedService {
 }
@@ -9,100 +21,100 @@ interface NamedService {
 class URLService implements NamedService {
 }
 
-@org.springframework.stereotype.Service("explicitService")
+@Service("explicitService")
 class ExplicitService implements NamedService {
 }
 
 interface QualifierContract {
 }
 
-@org.springframework.stereotype.Component("qualifiedByName")
+@Component("qualifiedByName")
 class NameQualifiedService implements QualifierContract {
 }
 
-@org.springframework.stereotype.Repository("qualifiedByValue")
-@org.springframework.beans.factory.annotation.Qualifier("beanQualifier")
+@Repository("qualifiedByValue")
+@Qualifier("beanQualifier")
 class ValueQualifiedService implements QualifierContract {
 }
 
 interface PrimaryContract {
 }
 
-@org.springframework.stereotype.Service
+@Service
 class PrimaryDefault implements PrimaryContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Primary
+@Service
+@Primary
 class PrimarySelected implements PrimaryContract {
 }
 
 interface MultiPrimaryContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Primary
+@Service
+@Primary
 class MultiPrimaryOne implements MultiPrimaryContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Primary
+@Service
+@Primary
 class MultiPrimaryTwo implements MultiPrimaryContract {
 }
 
 interface PlainContract {
 }
 
-@org.springframework.stereotype.Controller
+@Controller
 class PlainOne implements PlainContract {
 }
 
-@org.springframework.web.bind.annotation.RestController
+@RestController
 class PlainTwo implements PlainContract {
 }
 
 interface ConditionalContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Profile("prod")
+@Service
+@Profile("prod")
 class ConditionalOnly implements ConditionalContract {
 }
 
 interface ConditionalPrimaryContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Primary
+@Service
+@Primary
 class ConditionalPrimary implements ConditionalPrimaryContract {
 }
 
-@org.springframework.stereotype.Service
-@org.springframework.context.annotation.Profile("test")
+@Service
+@Profile("test")
 class ConditionalAlternative implements ConditionalPrimaryContract {
 }
 
-@org.springframework.context.annotation.Configuration
+@Configuration
 class FactoryConfig {
-    @org.springframework.context.annotation.Bean(name = {"factoryService", "factoryAlias"})
-    @org.springframework.beans.factory.annotation.Qualifier("factoryQualifier")
+    @Bean(name = {"factoryService", "factoryAlias"})
+    @Qualifier("factoryQualifier")
     QualifierContract factoryService() {
         return new NameQualifiedService();
     }
 
-    @org.springframework.context.annotation.Bean
+    @Bean
     NamedService defaultFactory() {
         return null;
     }
 
-    @org.springframework.context.annotation.Bean("conditionalFactory")
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "feature.enabled")
+    @Bean("conditionalFactory")
+    @ConditionalOnProperty(name = "feature.enabled")
     PlainContract conditionalFactory() {
         return null;
     }
 
-    @org.springframework.context.annotation.Bean
-    java.util.function.Supplier<QualifierContract> lambdaFactory() {
+    @Bean
+    Supplier<QualifierContract> lambdaFactory() {
         return () -> {
             return new NameQualifiedService();
         };

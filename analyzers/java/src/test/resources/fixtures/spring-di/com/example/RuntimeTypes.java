@@ -1,9 +1,13 @@
 package com.example;
 
-interface SpringDataRepo extends org.springframework.data.repository.Repository<Object, Long> {
+import org.apache.ibatis.annotations.Mapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.Repository;
+
+interface SpringDataRepo extends Repository<Object, Long> {
 }
 
-@org.apache.ibatis.annotations.Mapper
+@Mapper
 interface MyBatisRepo {
 }
 
@@ -11,12 +15,12 @@ interface PlainRepo {
 }
 
 class RuntimeConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     SpringDataRepo springDataRepo;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     MyBatisRepo myBatisRepo;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     PlainRepo plainRepo;
 }

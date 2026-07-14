@@ -32,6 +32,11 @@ public final class Main {
     private Main() {
     }
 
+    /**
+     * process の標準入出力を使って Analyzer を実行し、終了コードを process へ反映する。
+     *
+     * @param args command-line 引数。現在は使用しない
+     */
     public static void main(String[] args) {
         int exitCode = run(System.in, System.out, System.err);
         System.exit(exitCode);
@@ -39,6 +44,11 @@ public final class Main {
 
     /**
      * テスト容易性のため exit code を返す形にし、{@link System#exit(int)} を呼ばない実行本体。
+     *
+     * @param in analysis request JSON を1件受け取る入力
+     * @param out protocol JSONL record の出力先
+     * @param err metrics と process-level error の出力先
+     * @return 成功なら {@code 0}、fatal error なら非ゼロ
      */
     public static int run(InputStream in, OutputStream out, OutputStream err) {
         Instant start = Instant.now();
@@ -72,19 +82,19 @@ public final class Main {
                 MetricsReporter.report(errStream, summary);
                 return 0;
             } catch (RuntimeException e) {
-                // H1: 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
+                // 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
                 // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
                 return reportInternalError(writer, errStream, e);
             } catch (IOException e) {
                 // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
                 // pre-flight をすり抜けた読み取り失敗) も RuntimeException と同様に継続不能な内部エラーと
                 // して扱い、best-effort で JAVA_INTERNAL_ERROR record を書く。writer.write 自体が失敗する
-                // ケース (M2, stdout が壊れている) は reportInternalError 内で個別に catch し、その場合は
+                // ケース (stdout が壊れている等) は reportInternalError 内で個別に catch し、その場合は
                 // stderr のメッセージのみが残る。
                 return reportInternalError(writer, errStream, e);
             }
         } catch (IOException e) {
-            // M2: record の書き出し自体が失敗した場合 (stdout が壊れている等)。無言で 1 を返さず、
+            // record の書き出し自体が失敗した場合 (stdout が壊れている等)。無言で 1 を返さず、
             // stderr へ理由を残す。
             errStream.println("failed to write analyzer output: " + e.getClass().getName() + ": " + e.getMessage());
             return 1;
