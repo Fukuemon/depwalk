@@ -103,7 +103,7 @@ final class SpringAnnotations {
     static String fqn(AnnotationExpr annotation) {
         try {
             return annotation.resolve().getQualifiedName();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
             String writtenName = annotation.getNameAsString();
             if (writtenName.contains(".")) {
                 return writtenName;

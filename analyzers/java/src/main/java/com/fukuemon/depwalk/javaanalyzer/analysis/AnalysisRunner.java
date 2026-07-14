@@ -35,12 +35,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Java Analyzer 解析本体のオーケストレーション。P1_02 の scaffold (request 受領 / pre-flight /
- * {@link RecordWriter}) の上に、AST 解析・型解決・帰属型決定・record 生成を実装する。
+ * 検証済みの解析要求を受け取り、Java の解析から protocol record 出力までをオーケストレーションする。
  *
- * <p>性能方針 (design doc 「性能方針」/ D9): AST はファイル単位で逐次破棄する (保持するのは
+ * <p>source file の列挙、AST 解析、型解決、Spring DI 索引化、呼び出し先候補の統合、帰属型決定、
+ * 到達可能性フィルタ、{@link RecordWriter} への出力を1回の実行として調停する。
+ *
+ * <p>AST はファイル単位で逐次破棄する (保持するのは
  * SymbolSolver の型解決キャッシュと、node/edge/diagnostic の最小限の集計 = {@link GraphAccumulator})。
- * record の書き出しはモードによって挙動が異なる (M1):
+ * record の書き出しはモードによって次のように異なる:
  * <ul>
  *   <li>{@code fullGraph} (既定 / {@code reachableFromEntrypoints} かつ entrypoints 空の場合を含む):
  *       ファイル単位の解析が終わるごとに、その時点で新たに確定した node / edge / diagnostic を
@@ -60,12 +62,23 @@ public final class AnalysisRunner {
     private AnalysisRunner() {
     }
 
+    /**
+     * 1回の Analyzer 実行で集計した処理件数。
+     *
+     * @param analyzedFileCount AST 解析と graph 生成を完了した source file 数
+     * @param unresolvedCount call edge または DI 候補を解決できなかった件数
+     */
     public record RunStats(long analyzedFileCount, long unresolvedCount) {
     }
 
     /**
-     * @param classpath pre-flight ({@code PreflightValidator#validate}) で型検証済みの
-     *                  jar / classes dir path 一覧。raw metadata をここで再 cast しない。
+     * 解析要求を実行し、method symbol、call edge、diagnostic を writer へ出力する。
+     *
+     * @param request workspace、解析 mode、entrypoint、metadata を含む検証済み解析要求
+     * @param classpath 解析開始前に検証済みの jar / classes dir path 一覧
+     * @param writer JSONL protocol record の出力先
+     * @return 解析したファイル数と未解決件数
+     * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      */
     public static RunStats run(AnalysisRequest request, List<String> classpath, RecordWriter writer) throws IOException {
         Path workspaceRoot = Path.of(request.workspaceRoot()).toAbsolutePath().normalize();
@@ -103,7 +116,7 @@ public final class AnalysisRunner {
                 }
             } catch (IOException | ParseProblemException ignored) {
                 // second pass の既存 JAVA_PARSE_ERROR 経路で 1 回だけ診断する。
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 accumulator.incrementUnresolved();
                 accumulator.addDiagnostic(Diagnostic.of(
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),

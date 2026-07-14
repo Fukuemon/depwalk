@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * M6: metadata 契約は classpath entry として「依存 jar」だけでなく「classes dir (コンパイル済み
+ * metadata 契約は classpath entry として「依存 jar」だけでなく「classes dir (コンパイル済み
  * .class ファイルの directory)」も許容する。{@link javax.tools.JavaCompiler} で小さなクラスを
  * classes dir へコンパイルし、{@link com.fukuemon.depwalk.javaanalyzer.analysis.TypeSolverFactory}
  * がそれを解決できることを確認する。
@@ -29,11 +29,23 @@ class ClassesDirTypeSolverTest {
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/classesdirtypesolver");
 
     @Test
-    void declarationInClassesDirectoryIsLiftedToScopeInternalSubtype(@TempDir Path classesDir) throws Exception {
-        compileExternalLib(classesDir);
+    void declarationInClassesDirectoryCanLoadDependencyFromAnotherClasspathEntry(@TempDir Path tempDir) throws Exception {
+        Path dependencyClasses = tempDir.resolve("dependency-classes");
+        Path libraryClasses = tempDir.resolve("library-classes");
+        Files.createDirectories(dependencyClasses);
+        Files.createDirectories(libraryClasses);
+        compileBaseLib(dependencyClasses);
+        compileExternalLib(libraryClasses, dependencyClasses);
 
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
-                FIXTURE, AnalysisTestSupport.classpathMetadata(classesDir.toString()), null, null, null, null);
+                FIXTURE,
+                AnalysisTestSupport.classpathMetadata(
+                        libraryClasses.toString(),
+                        dependencyClasses.toString()),
+                null,
+                null,
+                null,
+                null);
 
         assertEquals(0, ran.exitCode());
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -52,20 +64,69 @@ class ClassesDirTypeSolverTest {
         assertEquals(Boolean.TRUE, metadata.get("inherited"));
     }
 
-    private static void compileExternalLib(Path classesDir) throws IOException {
+    @Test
+    void missingTransitiveDependencyProducesDiagnosticWithoutTerminatingAnalysis(@TempDir Path tempDir) throws Exception {
+        Path dependencyClasses = tempDir.resolve("dependency-classes");
+        Path libraryClasses = tempDir.resolve("library-classes");
+        Files.createDirectories(dependencyClasses);
+        Files.createDirectories(libraryClasses);
+        compileBaseLib(dependencyClasses);
+        compileExternalLib(libraryClasses, dependencyClasses);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                FIXTURE,
+                AnalysisTestSupport.classpathMetadata(libraryClasses.toString()),
+                null,
+                null,
+                null,
+                null);
+
+        assertEquals(0, ran.exitCode(), ran.stderr());
+        assertTrue(ran.byType("diagnostic").stream()
+                .anyMatch(record -> "JAVA_UNRESOLVED_SYMBOL".equals(record.get("code"))),
+                "missing transitive classes must be reported as an unresolved symbol");
+    }
+
+    private static void compileBaseLib(Path classesDir) throws IOException {
+        compile(
+                classesDir,
+                List.of(),
+                "com/example/base/BaseLib.java",
+                "package com.example.base;\n\npublic class BaseLib {}\n");
+    }
+
+    private static void compileExternalLib(Path classesDir, Path dependencyClasses) throws IOException {
+        compile(
+                classesDir,
+                List.of(dependencyClasses),
+                "com/example/lib/ExternalLib.java",
+                "package com.example.lib;\n\n"
+                        + "import com.example.base.BaseLib;\n\n"
+                        + "public class ExternalLib extends BaseLib {\n"
+                        + "    public void ping() {}\n"
+                        + "}\n");
+    }
+
+    private static void compile(
+            Path classesDir,
+            List<Path> classpath,
+            String relativeSourcePath,
+            String source) throws IOException {
         Path srcDir = Files.createTempDirectory("classesdirtypesolver-src");
-        Path pkgDir = srcDir.resolve("com/example/lib");
-        Files.createDirectories(pkgDir);
-        Path javaFile = pkgDir.resolve("ExternalLib.java");
-        Files.writeString(javaFile, "package com.example.lib;\n\npublic class ExternalLib {\n    public void ping() {}\n}\n");
+        Path javaFile = srcDir.resolve(relativeSourcePath);
+        Files.createDirectories(javaFile.getParent());
+        Files.writeString(javaFile, source);
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8)) {
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, List.of(classesDir.toFile()));
+            if (!classpath.isEmpty()) {
+                fileManager.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).toList());
+            }
             Iterable<? extends JavaFileObject> units = fileManager.getJavaFileObjectsFromPaths(List.of(javaFile));
             boolean ok = compiler.getTask(null, fileManager, null, null, null, units).call();
             if (!ok) {
-                throw new IllegalStateException("failed to compile fixture ExternalLib.java for classes dir test");
+                throw new IllegalStateException("failed to compile classes dir fixture: " + relativeSourcePath);
             }
         }
     }

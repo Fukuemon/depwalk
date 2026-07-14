@@ -66,6 +66,16 @@ public final class CallGraphBuilder {
     private final SourceMethodIndex sourceMethodIndex;
     private final Map<String, SpringDiIndex.InjectionResolution> springResolutionByReceiver;
 
+    /**
+     * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
+     *
+     * @param workspaceRoot source location を相対化する workspace root
+     * @param attributionResolver scope 内外と帰属型を決定する resolver
+     * @param accumulator method symbol、call edge、diagnostic の出力先
+     * @param sootUpIndex bytecode 型階層から実装候補を得る索引
+     * @param sourceMethodIndex 候補メソッドの source location を補完する索引
+     * @param springResult Spring Bean と注入点の解決結果
+     */
     public CallGraphBuilder(
             Path workspaceRoot,
             AttributionResolver attributionResolver,
@@ -87,6 +97,11 @@ public final class CallGraphBuilder {
         }
     }
 
+    /**
+     * 1つの compilation unit を走査し、発見した node、edge、diagnostic を accumulator へ追加する。
+     *
+     * @param cu 解析対象の compilation unit。呼び出し後に参照は保持しない
+     */
     public void process(CompilationUnit cu) {
         walk(cu, new WalkContext(null, List.of(), false));
     }
@@ -115,7 +130,7 @@ public final class CallGraphBuilder {
             try {
                 ResolvedMethodDeclaration resolved = md.resolve();
                 symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(md, "failed to resolve method declaration: " + md.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -129,7 +144,7 @@ public final class CallGraphBuilder {
             try {
                 ResolvedConstructorDeclaration resolved = cd.resolve();
                 symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -146,7 +161,7 @@ public final class CallGraphBuilder {
             MethodSymbol symbol;
             try {
                 symbol = buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(ccd, "failed to resolve compact constructor declaration: " + ccd.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -239,7 +254,7 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mce, ctx);
             return;
         }
@@ -267,7 +282,7 @@ public final class CallGraphBuilder {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = oce.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(oce, ctx);
             return;
         }
@@ -278,7 +293,7 @@ public final class CallGraphBuilder {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = ecis.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(ecis, ctx);
             return;
         }
@@ -305,9 +320,9 @@ public final class CallGraphBuilder {
     private static final String METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER = "new";
 
     /**
-     * D6 の lambda 既定 (囲みメソッドへ帰属 + {@code viaLambda: true}) と同じ原則を method reference
+     * lambda と同じ囲みメソッドへの帰属規則を method reference
      * ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) に適用する。囲みメソッドを caller、
-     * 参照先メソッド (D11 の帰属規則適用) を callee とする {@code callEdge} を出力し、
+     * 通常の帰属規則を適用した参照先メソッドを callee とする {@code callEdge} を出力し、
      * {@code metadata.viaMethodReference: true} で標識する (Core は metadata を解釈しないため契約変更なし)。
      */
     private void processMethodReference(MethodReferenceExpr mre, WalkContext ctx) {
@@ -319,7 +334,7 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mre.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
             return;
         }
@@ -344,8 +359,8 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * constructor reference ({@code Foo::new}) の扱い。D11 の {@code new} 規則 (constructor は継承され
-     * ないため引き上げは発生しない) をそのまま適用し、scope 外なら出力しない。{@code JavaParser} は
+     * constructor reference ({@code Foo::new}) の扱い。constructor は継承されないため帰属型の
+     * 引き上げを行わず、scope 外なら出力しない。{@code JavaParser} は
      * constructor reference の {@code resolve()} を未実装 ({@code UnsupportedOperationException}) と
      * しているため、参照先型の constructor 一覧から候補を自前で選ぶ (単一候補ならそれを使い、複数候補
      * のときは呼び出し先の関数型インタフェースの SAM 引数数で絞り込む)。
@@ -363,7 +378,7 @@ public final class CallGraphBuilder {
                 reportUnresolved(mre, ctx);
                 return;
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
             return;
         }
@@ -435,7 +450,7 @@ public final class CallGraphBuilder {
                     return methodUsage.getNoParams();
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return -1;
         }
         return -1;
@@ -466,7 +481,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗 (H2)。呼び出し式側の
+     * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗。呼び出し式側の
      * {@link #reportUnresolved(Node, WalkContext)} と異なり、宣言そのものが対象のため
      * {@code relatedMethodId} は付けない。その宣言だけ skip し、解析全体は継続する。
      */
@@ -551,7 +566,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * record の compact constructor (D11: record の canonical constructor 扱い) の {@link MethodSymbol}
+     * record の compact constructor を canonical constructor として扱い、その {@link MethodSymbol}
      * を作る。signature は record component の erasure 型列 (宣言順)。JavaParser の
      * {@code CompactConstructorDeclaration#resolve()} は未実装のため、record の component 一覧
      * ({@link RecordDeclaration#getParameters()}) から自前で param 型を求める。
@@ -601,7 +616,7 @@ public final class CallGraphBuilder {
                 List<String> paramTypes = paramBinaryNames(cd.resolve());
                 String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
                 ids.add(MethodIds.methodId(signature));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
             }
         }
@@ -649,7 +664,7 @@ public final class CallGraphBuilder {
     /**
      * mce の scope (レシーバ式) から帰属型決定に使う {@link TypeSite} を決める。
      *
-     * <p>D11: scope が空 (無修飾呼び出し) のとき、通常は enclosing class を「参照した型」とみなす
+     * <p>scope が空 (無修飾呼び出し) のとき、通常は enclosing class を「参照した型」とみなす
      * (自クラス呼び出し / 継承 static・instance メソッドの暗黙 this 呼び出し)。ただし static かつ
      * 宣言型が enclosing class の継承階層に含まれない場合は、無修飾 static import
      * ({@code import static pkg.Type.member;}) 由来の呼び出しであり、「参照した型」は enclosing class
@@ -682,7 +697,7 @@ public final class CallGraphBuilder {
                 return null;
             }
             return typeSiteOf(decl);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return null;
         }
     }
@@ -709,7 +724,7 @@ public final class CallGraphBuilder {
                     return true;
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return true;
         }
         return false;
@@ -724,7 +739,7 @@ public final class CallGraphBuilder {
                 ResolvedType type = oce.calculateResolvedType();
                 return type.isReferenceType() ? type.asReferenceType().getTypeDeclaration().orElse(null) : null;
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return null;
         }
         return null;
@@ -754,7 +769,7 @@ public final class CallGraphBuilder {
         }
     }
 
-    /** P1/P2 の候補を call site 単位で統合し、宣言型 edge とは別の実装候補 edge を追加する。 */
+    /** 型階層と Spring DI の候補を call site 単位で統合し、宣言型 edge とは別に実装候補 edge を追加する。 */
     private void emitDispatchCandidateEdges(
             ResolvedMethodDeclaration resolved,
             String dispatch,
@@ -862,7 +877,7 @@ public final class CallGraphBuilder {
                 if (name.resolve().isVariable()) {
                     return null;
                 }
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | LinkageError ignored) {
                 return null;
             }
             return name.getNameAsString();
@@ -896,7 +911,7 @@ public final class CallGraphBuilder {
             Node ast = declaration.toAst().orElse(null);
             int declarationLine = ast != null && ast.getBegin().isPresent() ? ast.getBegin().get().line : -1;
             return declarationLine != injection.sourceLine();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return true;
         }
     }
