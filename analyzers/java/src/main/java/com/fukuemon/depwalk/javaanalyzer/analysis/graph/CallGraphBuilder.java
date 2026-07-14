@@ -7,6 +7,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
+import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
@@ -55,11 +56,17 @@ public final class CallGraphBuilder {
     private final Path workspaceRoot;
     private final AttributionResolver attributionResolver;
     private final GraphAccumulator accumulator;
+    private final SootUpTypeHierarchyIndex sootUpIndex;
 
-    public CallGraphBuilder(Path workspaceRoot, AttributionResolver attributionResolver, GraphAccumulator accumulator) {
+    public CallGraphBuilder(
+            Path workspaceRoot,
+            AttributionResolver attributionResolver,
+            GraphAccumulator accumulator,
+            SootUpTypeHierarchyIndex sootUpIndex) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
+        this.sootUpIndex = sootUpIndex;
     }
 
     public void process(CompilationUnit cu) {
@@ -230,6 +237,7 @@ public final class CallGraphBuilder {
         accumulator.addNode(calleeSymbol);
 
         String dispatch = dispatchOf(resolved);
+        indexDispatchCandidates(resolved, dispatch, mce, ctx);
         Map<String, Object> metadata = edgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mce);
         for (String callerId : ctx.callerMethodIds()) {
@@ -309,6 +317,7 @@ public final class CallGraphBuilder {
         accumulator.addNode(calleeSymbol);
 
         String dispatch = dispatchOf(resolved);
+        indexDispatchCandidates(resolved, dispatch, mre, ctx);
         Map<String, Object> metadata = methodReferenceEdgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mre);
         for (String callerId : ctx.callerMethodIds()) {
@@ -714,6 +723,36 @@ public final class CallGraphBuilder {
             return "abstract";
         }
         return "virtual";
+    }
+
+    /**
+     * P1 では SootUp の候補を run-local cache に索引するだけで edge 化しない。候補を使った edge の
+     * 統合は P3 の責務とし、ここでは E3 のみを既存 JavaParser edge と併記する。
+     */
+    private void indexDispatchCandidates(
+            ResolvedMethodDeclaration resolved,
+            String dispatch,
+            Node callNode,
+            WalkContext ctx) {
+        if ("static".equals(dispatch)) {
+            return;
+        }
+        String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
+        SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveMethod(
+                declaringType,
+                resolved.getName(),
+                paramBinaryNames(resolved));
+        if (resolution.isAvailable()) {
+            return;
+        }
+        String relatedMethodId = ctx.callerMethodIds().isEmpty() ? null : ctx.callerMethodIds().get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_SOOTUP_UNAVAILABLE.severity(),
+                JavaDiagnosticCode.JAVA_SOOTUP_UNAVAILABLE.code(),
+                resolution.unavailableReason(),
+                sourceLocationOf(callNode),
+                relatedMethodId,
+                Map.of("targetType", declaringType)));
     }
 
     private Map<String, Object> edgeMetadata(String dispatch, boolean viaLambda) {

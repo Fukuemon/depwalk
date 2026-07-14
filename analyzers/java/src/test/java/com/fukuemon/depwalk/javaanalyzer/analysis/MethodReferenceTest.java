@@ -84,6 +84,8 @@ class MethodReferenceTest {
         assertFalse(edges.stream().anyMatch(e ->
                         "java:com.example.Widgets#invokeScopeExternalReference()".equals(e.get("callerMethodId"))),
                 "scope-external method reference (java.util.UUID#toString, excluded package) must not be emitted: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertFalse(ran.byType("diagnostic").stream()
+                .anyMatch(diagnostic -> "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))),
+                "scope-external omission must not raise an unresolved diagnostic");
     }
 }

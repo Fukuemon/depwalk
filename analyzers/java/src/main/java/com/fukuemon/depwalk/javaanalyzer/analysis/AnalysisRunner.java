@@ -8,6 +8,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.scope.ScopeFiles;
+import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 import com.fukuemon.depwalk.javaanalyzer.protocol.CallEdge;
@@ -83,7 +84,9 @@ public final class AnalysisRunner {
         LiftExcludePackages liftExcludePackages = LiftExcludePackages.fromMetadata(request.metadata());
         AttributionResolver attributionResolver = new AttributionResolver(scopeFileSet, liftExcludePackages);
         GraphAccumulator accumulator = new GraphAccumulator();
-        CallGraphBuilder builder = new CallGraphBuilder(workspaceRoot, attributionResolver, accumulator);
+        SootUpTypeHierarchyIndex sootUpIndex = SootUpTypeHierarchyIndex.fromClasspath(classpath);
+        CallGraphBuilder builder = new CallGraphBuilder(
+                workspaceRoot, attributionResolver, accumulator, sootUpIndex);
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
 
