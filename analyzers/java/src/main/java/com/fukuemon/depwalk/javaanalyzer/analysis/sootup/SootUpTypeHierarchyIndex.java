@@ -64,6 +64,7 @@ public final class SootUpTypeHierarchyIndex {
 
     private final List<Path> classpath;
     private final Map<MethodKey, Resolution> methodCache = new LinkedHashMap<>();
+    private final Map<MethodKey, Resolution> implementationMethodCache = new LinkedHashMap<>();
     private final Map<String, Resolution> constructorCache = new LinkedHashMap<>();
     private JavaView view;
     private TypeHierarchy hierarchy;
@@ -88,6 +89,15 @@ public final class SootUpTypeHierarchyIndex {
     /** source に現れない Lombok 等の生成 constructor を bytecode から返す。 */
     public Resolution resolveConstructors(String declaringType) {
         return constructorCache.computeIfAbsent(declaringType, this::resolveConstructorsUncached);
+    }
+
+    /** Spring Bean の concrete receiver で実際に選ばれる method (継承/default method 含む) を返す。 */
+    public Resolution resolveImplementationMethod(
+            String implementationType,
+            String methodName,
+            List<String> parameterTypes) {
+        MethodKey key = new MethodKey(implementationType, methodName, parameterTypes);
+        return implementationMethodCache.computeIfAbsent(key, this::resolveImplementationMethodUncached);
     }
 
     boolean isInitialized() {
@@ -150,12 +160,38 @@ public final class SootUpTypeHierarchyIndex {
         }
     }
 
+    private Resolution resolveImplementationMethodUncached(MethodKey key) {
+        try {
+            ClassType receiverType = view().getIdentifierFactory().getClassType(key.declaringType());
+            if (view().getClass(receiverType).isEmpty()) {
+                return unavailable(key.declaringType(), "class was not found in the supplied classpath");
+            }
+            return findEffectiveMethod(receiverType, key)
+                    .map(candidate -> Resolution.available(List.of(candidate)))
+                    .orElseGet(() -> Resolution.available(List.of()));
+        } catch (RuntimeException e) {
+            return unavailable(key.declaringType(), describe(e));
+        }
+    }
+
     private Optional<MethodCandidate> findEffectiveMethod(ClassType receiverType, MethodKey key) {
         List<ClassType> lookupOrder = new ArrayList<>();
         lookupOrder.add(receiverType);
         hierarchy().superClassesOf(receiverType).forEach(lookupOrder::add);
         for (ClassType ownerType : lookupOrder) {
             Optional<JavaSootClass> owner = view().getClass(ownerType);
+            if (owner.isEmpty()) {
+                continue;
+            }
+            Optional<JavaSootMethod> match = owner.get().getMethodsByName(key.methodName()).stream()
+                    .filter(method -> method.isConcrete() && parameterTypesOf(method).equals(key.parameterTypes()))
+                    .findFirst();
+            if (match.isPresent()) {
+                return match.map(this::toCandidate);
+            }
+        }
+        for (ClassType interfaceType : hierarchy().implementedInterfacesOf(receiverType).toList()) {
+            Optional<JavaSootClass> owner = view().getClass(interfaceType);
             if (owner.isEmpty()) {
                 continue;
             }

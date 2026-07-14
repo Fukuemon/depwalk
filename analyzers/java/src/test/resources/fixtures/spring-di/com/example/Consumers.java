@@ -1,21 +1,25 @@
 package com.example;
 
+@org.springframework.stereotype.Component
 class ConstructorConsumer {
     ConstructorConsumer(NamedService service) {
     }
 }
 
+@org.springframework.stereotype.Component
 class FieldConsumer {
     @org.springframework.beans.factory.annotation.Autowired
     NamedService service;
 }
 
+@org.springframework.stereotype.Component
 class SetterConsumer {
     @org.springframework.beans.factory.annotation.Autowired
     void setService(NamedService service) {
     }
 }
 
+@org.springframework.stereotype.Component
 class SelectionConsumer {
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.beans.factory.annotation.Qualifier("beanQualifier")

@@ -1,6 +1,6 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-14 / Status: 完了 (#21 sync phase により段階導入・dispatch 標識・Spring DI 選択規則・classpath 入力契約・性能方針・テスト観点を更新)
+> 最終更新: 2026-07-15 / Status: 完了 (#21 実装・実測により SootUp / Spring DI 解決、Spring fixture、性能増分を更新)
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は契約を変更せず Java 側の実装方式を定める。
 
@@ -228,6 +228,16 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - **数値目標の確定 (追跡メタデータ)**: 決定者 Fukuemon / 期限 #22 (CLI interface 結合) 完了時。現 baseline は小規模 fixture の floor 値であり、CLI から実プロジェクト規模を計測できるようになった時点でモード別に確定する。
 - **#21 (SootUp / Spring 解析追加分) の受け入れ基準 (決定済み 2026-07-12)**: 数値の合否基準は定めない。同一 fixture での before/after (解析時間・最大 RSS) を計測し、本節へ増分を記録することを #21 の受け入れ基準とする。SLO (合否ライン) は #22 完了時の数値目標確定と合わせて決める。設計原則として、SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)。本 doc を正本とする (決定経緯: [spec #21 D5](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
 
+- **#21 実装後の実測値 (計測日 2026-07-15)**: Issue #9 baseline と同じ `testdata/fixtures/java/project` を、実装後の実 jar で 1 回解析した。計測環境は JDK 25 / Eclipse Temurin 25.0.3+9、macOS 14.6.1、Apple Silicon darwin/arm64。実行コマンドは `DEPWALK_E2E_REQUIRED=1 go test ./e2e -run 'TestJavaAnalyzerFixtureE2E/PerformanceBaseline' -count=1 -v`。数値は合否判定に使わず、D5 の増分記録として扱う。
+
+  | 指標           | Issue #9 baseline              | #21 実装後        | 増分                                      |
+  | -------------- | ------------------------------ | ----------------- | ----------------------------------------- |
+  | 解析ファイル数 | 10                             | 10                | 0                                         |
+  | 所要時間       | 約 500〜521ms                  | 1,891ms           | 約 +1,370〜1,391ms                        |
+  | 最大 RSS       | 128,008,192 bytes (約 122 MiB) | 138,166,272 bytes | +10,158,080 bytes (約 +9.7 MiB、約 +7.9%) |
+
+  所要時間には JVM 起動、Spring DI / 候補 method 用 first pass、SootUp 型階層索引化が含まれる。fixture が 10 ファイルと小さいため、この 1 回の値だけから実プロジェクト規模の傾向や SLO を決定しない。SLO は既定どおり #22 完了時に、実プロジェクト規模の複数回計測を入力として確定する。
+
 ### 帰属型の決定規則
 
 帰属型 (メソッドが属する型) は「宣言型を優先し、宣言が scope 外のときだけレシーバの静的型へ引き上げる」。
@@ -344,7 +354,7 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 - interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)
 - パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること
 - 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと
-- **Spring Boot fixture (#21、決定済み 2026-07-12)**: `testdata/fixtures/java/` に単一 source root の Spring Boot fixture を新規作成する (現状 Spring fixture なし)。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
+- **Spring Boot fixture (#21、2026-07-15 追加済み)**: `testdata/fixtures/java/spring-project/` に単一 source root の Spring fixture を配置した。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 - **Lombok / MyBatis Mapper 拡張 (#21、決定済み 2026-07-14)**: 上記 fixture に、コンストラクタを明示せず Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) で生成するクラス (D7) と、MyBatis `@Mapper` インターフェース (D8) を含める。前者は自プロジェクトのコンパイル済み class を通じた constructor injection 解決を、後者は runtime-provided マーカー検出を検証する。決定経緯: [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 - **fixture build / classpath 契約 (#21、決定済み 2026-07-14)**: `testdata/fixtures/java/spring-project/` は独立した Gradle project とし、repository の `analyzers/java/gradlew -p` で build する。fixture の `build.gradle.kts` は Java toolchain 25、`options.release=21`、Spring Boot Autoconfigure 4.1.0、Spring Data Commons 4.1.0、MyBatis 3.5.19、Lombok 1.18.46 を固定する。`writeDepwalkClasspath` task が `build/classes/java/main` と `runtimeClasspath` の jar を絶対 path・辞書順・1 行 1 entry で `build/depwalk-classpath.txt` へ書き、Go E2E は全行を `analysisRequest.metadata.classpath` に渡す。Lombok の生成 constructor は `classes` task 後の `.class` で検証する。
 
@@ -359,3 +369,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #21  | 追記                              | sync phase (2026-07-12) で D1〜D6 (SootUp 範囲確定、dispatch 標識拡張、Spring 条件アノテーション、実行時生成実装、性能受け入れ基準、観測責務境界) と Spring Boot fixture 方針を反映。決定経緯は [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)                                                                                                                            |
 | spec #21  | 追記                              | 追加 sync phase (2026-07-14、clarify 再オープン分) で D7 (Lombok 生成コンストラクタは SootUp の自プロジェクト bytecode 照会で解決、解析対象はビルド済みが前提) / D8 (runtime-provided マーカーに MyBatis `@Mapper` を追加) を反映。決定経緯は [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
 | spec #21  | 追記                              | 実装前レビュー対応 (2026-07-14) で classpath の classes directory 入力契約、E3 と fatal pre-flight の境界、metadata key/value、Spring Bean 名・Qualifier・Primary 選択規則、dispatch/DI 解決フローを確定                                                                                                                                                                                                 |
+| spec #21  | 追記                              | 実装・実測 (2026-07-15) で Spring fixture の配置完了と、Issue #9 と同一 fixture による所要時間・最大 RSS の増分を性能方針へ記録                                                                                                                                                                                                                                                                          |
