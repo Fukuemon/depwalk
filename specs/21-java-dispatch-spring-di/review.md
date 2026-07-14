@@ -215,3 +215,48 @@ Verdict: PASS
 - 内容面 (D9 の委譲判断、実装対象表・実装タスク案・prompts の復元、feature doc の二階建て参照) はいずれも前回ラウンドで PASS 済みで変更なし。
 
 指摘: なし。D9 (案 B、#22 D11 へ委譲) を最終確定。フェーズ10・11 をレビュー済/完了として最終化する。
+
+## Review 2026-07-14 — fresh-context 実装前監査
+
+Verdict: NEEDS_WORK → 指摘対応後に再レビュー予定
+
+- 上位文書整合: NEEDS_WORK — P1 の classpath 欠落時 fallback が、feature doc の明示 classpath entry pre-flight fatal 契約と衝突していた。
+- 未解決論点 / prompts 自己完結性: NEEDS_WORK — 自プロジェクト classes directory の入力経路、`callEdge.metadata` の key/value、Spring の Bean 名・`@Qualifier`・`@Primary` 選択規則が実装可能な粒度まで確定していなかった。
+- 実装対象明示: NEEDS_WORK — spec の `core: ×` と P3 の Go E2E 追加が不一致だった。
+- 検証契約 / メタ情報 / 正本境界: NEEDS_WORK — 強制 E2E の具体コマンド、実装前 status、durable な dispatch/DI フローの feature doc 反映が不足していた。
+- #22 D11 への Core metadata passthrough 委譲は妥当であり、変更不要。
+
+対応:
+
+1. 明示 classpath entry の欠落・読取不能は `JAVA_MISSING_JAR` fatal、自プロジェクト classes directory 未指定または pre-flight 後の SootUp 解釈失敗だけを `JAVA_SOOTUP_UNAVAILABLE` fallback として分離した。
+2. classes directory は既存 `analysisRequest.metadata.classpath` で渡すこと、metadata の型・値、Bean 選択順序を feature doc と prompts に確定値として反映した。
+3. `core/e2e` は test-only 変更として実装対象表・P3 を統一し、強制 E2E コマンドと同一 `feature/21` branch での直列実装を明記した。
+4. durable な dispatch/DI フローを feature doc へハンドオフし、spec の図を決定時スナップショットへ降格した。
+
+## Review 2026-07-14 — fresh-context 実装前再監査
+
+Verdict: NEEDS_WORK → 指摘対応後に再レビュー予定
+
+- 上位文書整合: NEEDS_WORK — java-analyzer feature doc の「やらないこと」に Phase2/3 実装と SootUp 範囲決定が残り、後段の #21 正本仕様と衝突していた。
+- requirements 同期: NEEDS_WORK — #22 を graph E2E の前提とする古い受け入れ基準、未着手の要求フェーズ、D7〜D9 の欠落が残っていた。
+- prompts 自己完結性: NEEDS_WORK — Spring fixture の build、compiled classes、依存 jar、classpath manifest の生成・投入方法と、SootUp artifact/version が未確定だった。
+- cross-spec 境界: NEEDS_WORK — #22 D11 は `callEdge.metadata` だけを扱い `methodSymbol.metadata` を対象外としているのに、#21/analyzer-protocol は両方を委譲したように記述していた。
+
+対応:
+
+1. feature doc の scope を #21 の実装・決定済み範囲へ更新し、SootUp 2.0.0 の最小3 moduleを固定した。
+2. requirements のフェーズ、E3、#22 非依存 graph E2E、D7〜D9 を最終 spec と同期した。
+3. standalone Gradle fixture、固定依存、Java 21 bytecode、`writeDepwalkClasspath`、Go E2E への classpath 投入契約を P3 と正本へ追加した。
+4. #22 D11 への委譲を `callEdge.metadata` だけに限定し、`methodSymbol.metadata` の既存 gap は #21/#22 D11 の対象外と明記した。
+
+## Review 2026-07-14 — fresh-context 実装前最終再レビュー
+
+Verdict: PASS
+
+- 上位文書整合 / requirements 同期: PASS — feature scope、D7〜D9、#22 非依存 graph E2E が同期済み。
+- 未解決論点 / 実装対象: PASS — D1〜D9 は解決済み。production code は java-analyzer、Core は `core/e2e` の test code のみ。
+- E3 / Spring / metadata: PASS — fatal/fallback、Bean 選択、edge metadata の型・値が確定済み。
+- prompts 自己完結性: PASS — SootUp 2.0.0 の座標、standalone fixture build、classes/runtime classpath manifest、全検証コマンドが明示済み。
+- cross-spec / 正本境界: PASS — #22 D11 へは `callEdge.metadata` だけを委譲し、`methodSymbol.metadata` は対象外。durable flow は feature doc を正本として参照。
+
+指摘: なし。実装を安全に開始できる。

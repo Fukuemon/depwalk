@@ -31,17 +31,16 @@
 
 ### ステップ 0: ブランチ準備
 
-ブランチ命名と base branch は `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` に従う。P2 の完了を前提にする。
+P1/P2 と同じ `feature/21` branch / PR を継続利用する。P2 の完了を前提にし、prompt ごとに branch / PR を作り直さない。
 
-1. 最新の base branch (P2 完了後の状態) を取得
-2. 作業ブランチを作成
-3. PR / MR テンプレートを確認し、完了条件を description に転記する
-4. Draft PR / MR を作成して push する
+1. 現在の branch が `feature/21` であることを確認する
+2. P1/P2 の完了条件とテストが満たされていることを確認する
+3. 既存 Draft PR の description に本 prompt の完了条件を追記する
 
 ### ステップ 1: 候補統合・重複排除と CallEdge 生成 (D2)
 
 1. P1 (SootUp 型階層照会) と P2 (Spring DI 中間結果) の出力を統合し、call site ごとに caller → 各実装候補への複数 `CallEdge` を生成するロジックを `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/CallGraphBuilder.java` (既存) と連携させて実装する。宣言型 (interface / 基底型) への既存 edge も保持する。
-2. 各 edge の `metadata` に解決根拠 (`resolution: unique / ambiguous`、`provenance: sootup / spring-di` 等) を付与する。フィールド名は既存の `CallEdge.metadata` (`Map<String, Object>`) にそのまま追加する形とし、`CallEdge` record 自体のフィールド構成は変更しない (非破壊、S5)。
+2. 各実装候補 edge の `metadata` に `resolution` (`unique` / `ambiguous`) と `provenance` (重複なし・辞書順の `sootup` / `spring-di` 配列) を付与する。条件付き候補では `conditional: true` と条件アノテーション FQN の辞書順配列 `conditionTypes` も付与する。宣言型 edge の既存 metadata は変更しない。
 3. edgeId 単位で重複排除を行う。
 4. テストを先に書く (TDD)。複数候補が edge として出力されること、宣言型 edge が保持されることを検証する fixture を追加する。
 5. `cd analyzers/java && ./gradlew test` を実行する。
@@ -63,17 +62,21 @@
 
 ### ステップ 3: Spring Boot fixture の新規作成
 
-1. `analyzers/java/src/test/resources/fixtures/` (または既存の E2E fixture 配置規約に従う場所) に、単一 source root の Spring Boot fixture を新規作成する。
-2. 次を含める: DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data `Repository`、MyBatis `@Mapper` インターフェース (D8)、Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) でコンストラクタを生成するクラス (D7)。
-3. fixture 内の既知の caller / callee 集合を、E2E テストの期待値として整理する。
-4. diff レビューを回し、指摘を対応してから次へ。
+1. `testdata/fixtures/java/spring-project/` に単一 source root の独立 Gradle project (`settings.gradle.kts` / `build.gradle.kts` / `src/main/java`) を新規作成する。Java unit 用の最小 fixture は `analyzers/java/src/test/resources/fixtures/` に置き、実 jar E2E fixture と混在させない。
+2. fixture の `build.gradle.kts` は Java plugin、Maven Central、Java toolchain 25、`JavaCompile.options.release=21` を設定する。依存は `org.springframework.boot:spring-boot-autoconfigure:4.1.0`、`org.springframework.data:spring-data-commons:4.1.0`、`org.mybatis:mybatis:3.5.19`、`compileOnly` / `annotationProcessor` の `org.projectlombok:lombok:1.18.46` に固定する。
+3. `writeDepwalkClasspath` task を定義し、`sourceSets.main.output.classesDirs` と `configurations.runtimeClasspath` の実在 path を絶対 path・重複なし・辞書順・1 行 1 entry で `build/depwalk-classpath.txt` に書く。task は `classes` に依存させる。Lombok jar は compile-only のため manifest に含めず、生成済み constructor は classes directory の `.class` から読む。
+4. fixture に DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data `Repository`、MyBatis `@Mapper` インターフェース (D8)、Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) でコンストラクタを生成するクラス (D7) を含める。
+5. `analyzers/java/gradlew -p testdata/fixtures/java/spring-project clean classes writeDepwalkClasspath` を repo root から実行し、`build/classes/java/main` と全 runtime jar が manifest に存在すること、Lombok 生成 constructor が `.class` に存在することを確認する。
+6. fixture 内の既知の caller / callee 集合を、E2E テストの期待値として整理する。
+7. diff レビューを回し、指摘を対応してから次へ。
 
 ### ステップ 4: 統合 E2E テスト
 
-1. Go 側の実 jar E2E (`context/testing.md` の三層テストのうち実 jar E2E 層) に、ステップ 3 の fixture を使った統合テストを追加する。既知の caller / callee 集合と解析結果 graph が一致することを検証する。
-2. CLI 出力レベルの照合は行わない (#22 完了後に完成する前提、本 prompt では graph レベルの照合までとする)。Core が `callEdge.metadata`/`methodSymbol.metadata` を内部保持するようにする改修は #22 D11 が担う (`specs/22-cli-interface/index.md#解決済みの論点`)。本 prompt はそれに依存せず、Analyzer が出力する JSONL 上で `metadata` が正しい内容であることまでを検証範囲とする (D6 の責務境界どおり)。
-3. `context/project.md` の Quick Commands に従い、Go 側 E2E を実行する (要 JDK 25 + fat jar build)。
-4. diff レビューを回し、指摘を対応してから次へ。
+1. Go 側の実 jar E2E (`context/testing.md` の三層テストのうち実 jar E2E 層) に、ステップ 3 の fixture を使った統合テストを追加する。テストは `build/depwalk-classpath.txt` を読み、各行を順に `analysisRequest.metadata.classpath` へ設定して、workspace/source root を `testdata/fixtures/java/spring-project` に向ける。manifest 不在・空・entry 不在は setup failure とする。
+2. `core/e2e` の test code を追加する。本番 Core code は変更しない。
+3. CLI 出力レベルの照合は行わない。Core の metadata passthrough と CLI JSON 表出は [Issue #22](https://github.com/Fukuemon/depwalk/issues/22) の D11 が担う。本 prompt は #22 に依存せず、Analyzer JSONL の metadata と graph 上の caller / callee 集合を検証する。
+4. `(cd analyzers/java && ./gradlew shadowJar) && analyzers/java/gradlew -p testdata/fixtures/java/spring-project clean classes writeDepwalkClasspath && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)` を repo root から実行する。
+5. diff レビューを回し、指摘を対応してから次へ。
 
 ### ステップ 5: 性能計測・記録 (D5)
 
@@ -96,15 +99,16 @@
   - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/CallGraphBuilder.java` (既存、統合ロジックを追加)
   - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol/CallEdge.java` / `Diagnostic.java` (既存 record、フィールド構成は変更しない)
   - `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/JavaDiagnosticCode.java` (新規 code 追加)
-  - `analyzers/java/src/test/resources/fixtures/` (Spring Boot fixture 新規作成)
-  - `testdata/fixtures/java/` (E2E fixture 配置規約に従う場合はこちらも確認)
+  - `analyzers/java/src/test/resources/fixtures/` (Java unit 用の最小 fixture)
+  - `testdata/fixtures/java/spring-project/` (実 jar E2E fixture)
+  - `core/e2e/` (test code のみ追加。本番 Core code は変更しない)
   - `design/features/java-analyzer/DesignDoc_java-analyzer.md` (性能方針節、計測結果の記録先)
 
 ## 前提条件
 
 - 完了しているべき phase / 依存 prompt: `P1_01_java-analyzer_sootup-type-hierarchy.md`、`P2_01_java-analyzer_spring-di-resolution.md`
-- 完了後に着手可能になる後続 prompt: なし (本 feature の実装分割における最終 phase)。ただし CLI / Core レベルでの metadata 生存確認は #22 D11 の実装後に #22 側で検証される (cross-spec、#21 の prompt には含めない)
-- 必要な repo 状態: P1 / P2 のブランチがマージ済み、または両ブランチをベースにした状態であること。JDK 25 + Java Analyzer fat jar のビルドが可能な環境であること (E2E 実行に必要)
+- 完了後に着手可能になる後続 prompt: なし。CLI / Core レベルの metadata 生存確認は #22 D11 の実装後に #22 側で検証するが、#21 の完了条件ではない
+- 必要な repo 状態: 同じ `feature/21` branch 上で P1 / P2 の変更とテストが完了していること。JDK 25 + Java Analyzer fat jar のビルドが可能な環境であること (E2E 実行に必要)
 
 ## 不明点ハンドリング
 
@@ -128,13 +132,13 @@
 - CLI 引数の完全仕様確定 (#22 の管轄)
 - Analyzer Protocol の破壊的変更 (`CallEdge` / `Diagnostic` の既存フィールド構成は変更しない)
 - 性能の数値合否判定 (SLO 確定は #22)
-- Core / Traversal / Output の変更
+- Core / Traversal / Output の本番 code 変更 (`core/e2e` の test code 追加は実装範囲)
 
 ## 設計仕様
 
 spec (`specs/21-java-dispatch-spring-di/index.md`) より抜粋:
 
-> **D2 (解決済み)**: 複数 dispatch 候補は「call site ごとに caller → 各実装候補への複数 CallEdge」で表す。宣言型への既存 edge も保持する。各 edge の metadata に解決根拠を付与する。Traversal Engine は edge を区別しない BFS のため、複数候補 edge は Core / Traversal 変更ゼロで到達性に反映される。
+> **D2 (解決済み)**: 複数 dispatch 候補は call site ごとの複数 CallEdge とする。実装候補 edge の metadata は `resolution` (`unique` / `ambiguous`)、`provenance` (重複なし・辞書順の `sootup` / `spring-di` 配列)、必要に応じて `conditional` / `conditionTypes` を持つ。宣言型 edge の既存 metadata は変更しない。
 >
 > **D6 (解決済み)**: 曖昧性・解決根拠の観測は、#21 では Analyzer JSONL の metadata + diagnostic までを責務とする。CLI 出力への edge 単位の metadata 表出は #22 の論点として引き継ぐ。
 >
@@ -160,16 +164,17 @@ spec の `### Testing` より抜粋 (Java unit / Go process contract / 実 jar E
 - Java unit test: `cd analyzers/java && ./gradlew test`
 - Go unit test: `cd core && go test ./...`
 - Lint / typecheck (Go): `cd core && go vet ./...`
-- E2E: Go 側 E2E (JDK 25 + fat jar build 必須。具体引数は `context/project.md` の Quick Commands に従う)
+- E2E: `(cd analyzers/java && ./gradlew shadowJar) && analyzers/java/gradlew -p testdata/fixtures/java/spring-project clean classes writeDepwalkClasspath && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)`
 - 健全性検査: `lefthook run pre-commit`
 
 ## 完了条件
 
-- [ ] ステップ 0 でブランチと Draft PR / MR を作成した
+- [ ] ステップ 0 で P1/P2 と同じ `feature/21` / Draft PR を継続していることを確認した
 - [ ] P1/P2 の出力を統合し、call site ごとの複数 CallEdge + 宣言型 edge 保持を実装した (D2)
 - [ ] `CallEdge.metadata` / `Diagnostic` へ解決根拠を非破壊で追加した (`CallEdge` / `Diagnostic` の record フィールド構成は変更していない)
 - [ ] E1/E2/E4 の diagnostic 出力を実装した
 - [ ] Spring Boot fixture (Lombok / MyBatis Mapper を含む) を新規作成した
+- [ ] fixture を固定依存で build し、classes directory と runtime jar を `build/depwalk-classpath.txt` 経由で `analysisRequest.metadata.classpath` に渡した
 - [ ] 統合 E2E テストで既知の caller / callee 集合と graph が一致することを確認した
 - [ ] 性能計測 (解析時間・最大 RSS) を実施し、記録した (feature doc への反映は phase: track / sync へ引き継ぎ)
 - [ ] 全ステップを順序通りに実行した

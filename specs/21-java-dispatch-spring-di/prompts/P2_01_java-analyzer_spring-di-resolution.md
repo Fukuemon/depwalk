@@ -31,21 +31,22 @@
 
 ### ステップ 0: ブランチ準備
 
-ブランチ命名と base branch は `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` に従う。P1 の完了 (マージ済み、または P1 ブランチをベースにする) を前提にする。
+P1 と同じ `feature/21` branch / PR を継続利用する。P1 の完了を前提にし、prompt ごとに branch / PR を作り直さない。
 
-1. 最新の base branch (P1 完了後の状態) を取得
-2. 作業ブランチを作成
-3. PR / MR テンプレートを確認し、完了条件を description に転記する
-4. Draft PR / MR を作成して push する
+1. 現在の branch が `feature/21` であることを確認する
+2. P1 の完了条件とテストが満たされていることを確認する
+3. 既存 Draft PR の description に本 prompt の完了条件を追記する
 
 ### ステップ 1: Spring stereotype / `@Bean` による Bean 候補の収集
 
 1. `analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring/` パッケージを新設する。
 2. Spring stereotype アノテーション (`@Component` / `@Service` / `@Repository` / `@Controller` / `@RestController` 等) と `@Configuration` クラス内の `@Bean` メソッドから Bean 定義を収集するコンポーネントを実装する。
 3. アノテーションの判定は **完全修飾名 (FQN) の文字列一致** で行う (`org.springframework.stereotype.Service` 等)。Spring 本体を実行時依存として追加しない (Analyzer は Spring アプリケーションを実行しない、静的検出のみ)。
-4. テストを先に書く (TDD)。stereotype と `@Bean` それぞれの fixture を追加する。
-5. `cd analyzers/java && ./gradlew test` を実行する。
-6. diff レビューを回し、指摘を対応してから次へ。
+4. Bean 名を次で導出する: stereotype class は annotation `value` が非空ならその値、未指定なら simple class name に `java.beans.Introspector.decapitalize` と同じ規則を適用する。`@Bean` method は `name` / `value` の全要素を Bean 名・alias として保持し、未指定なら method name を Bean 名とする。
+5. Bean class または `@Bean` method に直接付与された `@Qualifier("value")` を qualifier value として保持する。custom qualifier meta-annotation は本 prompt の対象外とする。
+6. テストを先に書く (TDD)。stereotype の明示名・既定名、`@Bean` の明示名・alias・既定名を含む fixture を追加する。
+7. `cd analyzers/java && ./gradlew test` を実行する。
+8. diff レビューを回し、指摘を対応してから次へ。
 
 ### ステップ 2: DI 注入解決 (constructor / field / setter)
 
@@ -57,11 +58,14 @@
 
 ### ステップ 3: `@Qualifier` / `@Primary` による Bean 選択と曖昧候補の扱い (D2 の入力生成)
 
-1. 注入点の Bean 候補が複数件のとき、`@Qualifier` または `@Primary` で一意に絞り込めるかを判定するロジックを実装する。
-2. 一意に確定した場合は `resolution: unique`、複数件のまま絞れない場合は `resolution: ambiguous` を表す中間結果 (候補リスト + 解決根拠) を生成する。この中間結果は P3 が `callEdge.metadata` へ変換する入力となる (本 prompt では Protocol record への変換は行わない)。
-3. テストを先に書く (TDD)。`@Qualifier` で一意に決まるケース、`@Primary` で一意に決まるケース、どちらもなく複数候補が残るケースの fixture を追加する。
-4. `cd analyzers/java && ./gradlew test` を実行する。
-5. diff レビューを回し、指摘を対応してから次へ。
+1. 注入型へ代入可能な候補を列挙する。
+2. 注入点に直接の `@Qualifier("value")` がある場合は、Bean 側 qualifier value、Bean 名、alias のいずれかが `value` と一致する候補だけを残す。custom qualifier meta-annotation、generics qualifier、`@Resource` は対象外とする。
+3. 残った候補が 1 件なら `resolution: unique` とする。候補が複数件なら、`@Primary` がちょうど 1 件の場合だけその候補を `unique` とする。`@Primary` が 0 件または複数件なら全候補を保持して `resolution: ambiguous` とする。候補 0 件は unresolved とする。
+4. 条件付き候補を含む場合は、上記で 1 件に絞れても `ambiguous` とする (D3/E4)。
+5. 中間結果は候補リスト、`resolution`、候補ごとの provenance、条件種別を持ち、P3 が `callEdge.metadata` へ変換する。本 prompt では Protocol record へ変換しない。
+6. テストを先に書く (TDD)。Qualifier の qualifier value / Bean 名 / alias 一致、Qualifier 不一致 0 件、Primary 1 件、Primary 複数件、指定なし複数候補を検証する。
+7. `cd analyzers/java && ./gradlew test` を実行する。
+8. diff レビューを回し、指摘を対応してから次へ。
 
 ### ステップ 4: Spring 条件アノテーションの検出・記録 (D3、評価はしない)
 
@@ -101,7 +105,7 @@
 
 - 完了しているべき phase / 依存 prompt: `P1_01_java-analyzer_sootup-type-hierarchy.md` (SootUp 型階層照会が完了していること)
 - 完了後に着手可能になる後続 prompt: `P3_01_java-analyzer_candidate-merge-fixture-e2e.md`
-- 必要な repo 状態: P1 のブランチがマージ済み、または P1 ブランチをベースにした状態であること
+- 必要な repo 状態: 同じ `feature/21` branch 上で P1 の変更とテストが完了していること
 
 ## 不明点ハンドリング
 
@@ -131,7 +135,7 @@
 
 spec (`specs/21-java-dispatch-spring-di/index.md`) より抜粋:
 
-> **D2 (解決済み)**: 複数 dispatch 候補は「call site ごとに caller → 各実装候補への複数 CallEdge」で表す。宣言型 (interface / 基底型) への既存 edge も保持する。各 edge の metadata に解決根拠を付与する (例: `resolution: unique / ambiguous`、`provenance: sootup / spring-di`)。※本 prompt では中間結果の生成までを扱い、実際の CallEdge 生成は P3。
+> **D2 (解決済み)**: 複数 dispatch 候補は call site ごとの複数 CallEdge とする。実装候補 edge の metadata は `resolution` (`unique` / `ambiguous`)、`provenance` (重複なし・辞書順の `sootup` / `spring-di` 配列)、必要に応じて `conditional` / `conditionTypes` を持つ。本 prompt はこの値へ変換可能な中間結果までを生成し、CallEdge 化は P3 が担う。
 >
 > **D3 (解決済み)**: Spring の条件評価 (profile / property / `@Conditional`) は一切行わない。条件アノテーションの検出と記録のみ行う。条件付き Bean も無条件に候補として列挙する。「条件付きである」事実と条件種別を metadata / diagnostic に記録し、絞り込みの判断材料には使わない。条件付き Bean が候補に含まれる場合、候補 1 件でも「静的に一意」とは扱わず曖昧候補とする。
 >
@@ -164,10 +168,10 @@ spec の `### Testing` より抜粋:
 
 ## 完了条件
 
-- [ ] ステップ 0 でブランチと Draft PR / MR を作成した
+- [ ] ステップ 0 で P1 と同じ `feature/21` / Draft PR を継続していることを確認した
 - [ ] Spring stereotype / `@Bean` による Bean 候補収集を実装した (FQN 文字列一致、Spring 本体への実行時依存なし)
 - [ ] constructor (Lombok 生成含む) / field / setter injection の解決を実装した
-- [ ] `@Qualifier` / `@Primary` による一意解決と、曖昧候補判定を実装した
+- [ ] Bean 名・alias・qualifier value の導出と、`@Qualifier` → `@Primary` の順序、複数 Primary の曖昧判定を実装した
 - [ ] Spring 条件アノテーションの検出・記録 (評価はしない) を実装し、条件付き候補が 1 件でも `unique` にならないことを確認した
 - [ ] runtime-provided マーカー判定 (Spring Data `Repository` + MyBatis `@Mapper`) を実装した
 - [ ] 全ステップを順序通りに実行した
