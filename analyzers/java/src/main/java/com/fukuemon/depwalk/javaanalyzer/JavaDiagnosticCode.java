@@ -17,7 +17,16 @@ public enum JavaDiagnosticCode {
     JAVA_ENTRYPOINT_NOT_FOUND("warning"),
 
     /** SootUp が project bytecode を取得・索引化できず、JavaParser の宣言 edge のみで継続した。 */
-    JAVA_SOOTUP_UNAVAILABLE("warning");
+    JAVA_SOOTUP_UNAVAILABLE("warning"),
+
+    /** Spring Data / MyBatis が実行時に実装を提供するため意図的に解決しない。 */
+    JAVA_RUNTIME_PROVIDED("info"),
+
+    /** Qualifier / Primary 適用後も複数の Bean 候補が残った。 */
+    JAVA_AMBIGUOUS_CANDIDATE("warning"),
+
+    /** 条件付き Bean の実行時条件を評価せず候補として保持した。 */
+    JAVA_CONDITIONAL_BEAN("info");
 
     private final String severity;
 

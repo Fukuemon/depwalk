@@ -6,9 +6,12 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.LiftExcludePackage
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
+import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.scope.ScopeFiles;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiagnosticEmitter;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 import com.fukuemon.depwalk.javaanalyzer.protocol.CallEdge;
@@ -83,10 +86,45 @@ public final class AnalysisRunner {
 
         LiftExcludePackages liftExcludePackages = LiftExcludePackages.fromMetadata(request.metadata());
         AttributionResolver attributionResolver = new AttributionResolver(scopeFileSet, liftExcludePackages);
-        GraphAccumulator accumulator = new GraphAccumulator();
         SootUpTypeHierarchyIndex sootUpIndex = SootUpTypeHierarchyIndex.fromClasspath(classpath);
+        SpringDiIndex springDiIndex = SpringDiIndex.create(sootUpIndex);
+        SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
+        GraphAccumulator accumulator = new GraphAccumulator();
+
+        // Spring Bean/注入点と候補 method の source location は compact な first-pass index に落とす。
+        // CompilationUnit は各 iteration で破棄し、fullGraph の AST 逐次破棄契約を維持する。
+        for (Path file : scopeFileList) {
+            try {
+                ParseResult<CompilationUnit> result = parser.parse(file);
+                if (result.isSuccessful() && result.getResult().isPresent()) {
+                    CompilationUnit unit = result.getResult().get();
+                    springDiIndex.accept(unit);
+                    sourceMethodIndex.accept(unit);
+                }
+            } catch (IOException | ParseProblemException ignored) {
+                // second pass の既存 JAVA_PARSE_ERROR 経路で 1 回だけ診断する。
+            } catch (RuntimeException e) {
+                accumulator.incrementUnresolved();
+                accumulator.addDiagnostic(Diagnostic.of(
+                        JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
+                        JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
+                        "failed to index Spring DI metadata: " + e.getMessage(),
+                        com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation.of(
+                                RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString()), 1),
+                        null,
+                        null));
+            }
+        }
+        SpringDiIndex.Result springResult = springDiIndex.build();
+
+        SpringDiagnosticEmitter.emit(springResult, workspaceRoot, accumulator);
         CallGraphBuilder builder = new CallGraphBuilder(
-                workspaceRoot, attributionResolver, accumulator, sootUpIndex);
+                workspaceRoot,
+                attributionResolver,
+                accumulator,
+                sootUpIndex,
+                sourceMethodIndex,
+                springResult);
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
 

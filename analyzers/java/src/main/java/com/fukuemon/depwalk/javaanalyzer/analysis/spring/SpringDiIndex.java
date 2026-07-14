@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.spring;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
@@ -10,6 +11,9 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.LambdaExpr;
+import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
 
@@ -20,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -48,6 +53,7 @@ public final class SpringDiIndex {
 
     public record BeanDefinition(
             String beanType,
+            String implementationType,
             List<String> names,
             List<String> qualifiers,
             boolean primary,
@@ -69,6 +75,7 @@ public final class SpringDiIndex {
             String injectedType,
             String qualifier,
             boolean bytecodeGenerated,
+            String sourcePath,
             int sourceLine) {
     }
 
@@ -103,7 +110,6 @@ public final class SpringDiIndex {
     }
 
     private record TypeInfo(
-            ClassOrInterfaceDeclaration declaration,
             Set<String> assignableTypes,
             Set<String> annotationTypes) {
     }
@@ -129,12 +135,13 @@ public final class SpringDiIndex {
         for (ClassOrInterfaceDeclaration type : types) {
             String binaryName = BinaryNames.forTypeLikeNode(type);
             typeInfoByBinaryName.put(binaryName, new TypeInfo(
-                    type,
                     assignableTypesOf(type),
                     annotationTypesOf(type)));
         }
-        beanEntries.addAll(collectBeans(types));
-        injectionPoints.addAll(collectInjections(types));
+        List<BeanEntry> collectedBeans = collectBeans(types);
+        List<InjectionPoint> collectedInjections = collectInjections(types);
+        beanEntries.addAll(collectedBeans);
+        injectionPoints.addAll(collectedInjections);
     }
 
     public Result build() {
@@ -189,6 +196,7 @@ public final class SpringDiIndex {
         String qualifier = SpringAnnotations.qualifier(type);
         BeanDefinition definition = new BeanDefinition(
                 beanType,
+                beanType,
                 names,
                 qualifier == null ? List.of() : List.of(qualifier),
                 SpringAnnotations.has(type, SpringAnnotations.PRIMARY),
@@ -209,9 +217,11 @@ public final class SpringDiIndex {
         }
         ResolvedType returnType = method.getType().resolve();
         String beanType = BinaryNames.erasureOf(returnType);
+        String implementationType = factoryImplementationType(method).orElse(beanType);
         String qualifier = SpringAnnotations.qualifier(method);
         BeanDefinition definition = new BeanDefinition(
                 beanType,
+                implementationType,
                 names,
                 qualifier == null ? List.of() : List.of(qualifier),
                 SpringAnnotations.has(method, SpringAnnotations.PRIMARY),
@@ -220,6 +230,34 @@ public final class SpringDiIndex {
                 BinaryNames.forTypeLikeNode(configuration),
                 method.getNameAsString());
         return new BeanEntry(definition, assignableTypesOf(returnType));
+    }
+
+    private static Optional<String> factoryImplementationType(MethodDeclaration method) {
+        Set<String> returnedTypes = new LinkedHashSet<>();
+        for (ReturnStmt returnStmt : method.findAll(ReturnStmt.class)) {
+            if (!isDirectMethodReturn(returnStmt, method) || returnStmt.getExpression().isEmpty()) {
+                continue;
+            }
+            if (returnStmt.getExpression().get() instanceof ObjectCreationExpr creation) {
+                try {
+                    returnedTypes.add(BinaryNames.erasureOf(creation.calculateResolvedType()));
+                } catch (RuntimeException ignored) {
+                    // 動的・未解決 factory は宣言戻り値のまま扱い、実装型を推測しない。
+                }
+            }
+        }
+        return returnedTypes.size() == 1 ? Optional.of(returnedTypes.iterator().next()) : Optional.empty();
+    }
+
+    private static boolean isDirectMethodReturn(ReturnStmt returnStmt, MethodDeclaration method) {
+        Node current = returnStmt.getParentNode().orElse(null);
+        while (current != null && current != method) {
+            if (current instanceof LambdaExpr || current instanceof MethodDeclaration) {
+                return false;
+            }
+            current = current.getParentNode().orElse(null);
+        }
+        return current == method;
     }
 
     private List<InjectionPoint> collectInjections(List<ClassOrInterfaceDeclaration> types) {
@@ -239,10 +277,11 @@ public final class SpringDiIndex {
             ClassOrInterfaceDeclaration type,
             List<InjectionPoint> injections) {
         List<ConstructorDeclaration> constructors = type.getConstructors();
+        boolean stereotypeBean = SpringAnnotations.findAny(type, SpringAnnotations.STEREOTYPES) != null;
         List<ConstructorDeclaration> selected = constructors.stream()
                 .filter(constructor -> SpringAnnotations.has(constructor, SpringAnnotations.AUTOWIRED))
                 .toList();
-        if (selected.isEmpty() && constructors.size() == 1) {
+        if (selected.isEmpty() && constructors.size() == 1 && stereotypeBean) {
             selected = constructors;
         }
         for (ConstructorDeclaration constructor : selected) {
@@ -257,7 +296,7 @@ public final class SpringDiIndex {
                         lineOf(parameter)));
             }
         }
-        if (constructors.isEmpty()) {
+        if (constructors.isEmpty() && stereotypeBean) {
             collectBytecodeConstructorInjections(type, injections);
         }
     }
@@ -369,6 +408,7 @@ public final class SpringDiIndex {
                 BinaryNames.erasureOf(injectedType),
                 qualifier,
                 bytecodeGenerated,
+                sourcePathOf(owner),
                 sourceLine);
     }
 
@@ -479,5 +519,12 @@ public final class SpringDiIndex {
 
     private static int lineOf(com.github.javaparser.ast.Node node) {
         return node.getBegin().map(position -> position.line).orElse(0);
+    }
+
+    private static String sourcePathOf(com.github.javaparser.ast.Node node) {
+        return node.findCompilationUnit()
+                .flatMap(CompilationUnit::getStorage)
+                .map(storage -> storage.getPath().toAbsolutePath().normalize().toString())
+                .orElse(null);
     }
 }

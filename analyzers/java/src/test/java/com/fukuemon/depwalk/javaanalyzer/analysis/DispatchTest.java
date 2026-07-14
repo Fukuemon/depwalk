@@ -74,7 +74,7 @@ class DispatchTest {
     }
 
     @Test
-    void indexesCompiledProjectClassesWithoutEmittingCandidateEdgesInP1() throws Exception {
+    void emitsIndexedProjectCandidateEdgesAfterP3Integration() throws Exception {
         Path classesDir = tempDir.resolve("classes");
         Files.createDirectories(classesDir);
         int javacExit = ToolProvider.getSystemJavaCompiler().run(
@@ -98,7 +98,7 @@ class DispatchTest {
 
         assertFalse(ran.byType("diagnostic").stream()
                 .anyMatch(record -> "JAVA_SOOTUP_UNAVAILABLE".equals(record.get("code"))));
-        assertFalse(ran.byType("callEdge").stream().anyMatch(edge ->
+        assertTrue(ran.byType("callEdge").stream().anyMatch(edge ->
                 "java:com.example.Shapes#callInterface(com.example.Shapes$Shape)".equals(edge.get("callerMethodId"))
                         && "java:com.example.Shapes$Circle#area()".equals(edge.get("calleeMethodId"))));
     }

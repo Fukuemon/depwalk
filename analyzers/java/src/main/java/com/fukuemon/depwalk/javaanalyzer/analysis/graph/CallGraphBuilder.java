@@ -8,6 +8,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
@@ -25,9 +26,11 @@ import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.LambdaExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
+import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.MethodUsage;
@@ -41,8 +44,11 @@ import com.github.javaparser.resolution.types.ResolvedType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * AST を 1 ファイルずつ走査し、declared method / constructor / static initializer の
@@ -57,16 +63,28 @@ public final class CallGraphBuilder {
     private final AttributionResolver attributionResolver;
     private final GraphAccumulator accumulator;
     private final SootUpTypeHierarchyIndex sootUpIndex;
+    private final SourceMethodIndex sourceMethodIndex;
+    private final Map<String, SpringDiIndex.InjectionResolution> springResolutionByReceiver;
 
     public CallGraphBuilder(
             Path workspaceRoot,
             AttributionResolver attributionResolver,
             GraphAccumulator accumulator,
-            SootUpTypeHierarchyIndex sootUpIndex) {
+            SootUpTypeHierarchyIndex sootUpIndex,
+            SourceMethodIndex sourceMethodIndex,
+            SpringDiIndex.Result springResult) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
+        this.sourceMethodIndex = sourceMethodIndex;
+        this.springResolutionByReceiver = new LinkedHashMap<>();
+        for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
+            SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();
+            springResolutionByReceiver.putIfAbsent(
+                    springReceiverKey(injection.ownerType(), injection.targetName()),
+                    resolution);
+        }
     }
 
     public void process(CompilationUnit cu) {
@@ -237,12 +255,12 @@ public final class CallGraphBuilder {
         accumulator.addNode(calleeSymbol);
 
         String dispatch = dispatchOf(resolved);
-        indexDispatchCandidates(resolved, dispatch, mce, ctx);
         Map<String, Object> metadata = edgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mce);
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        emitDispatchCandidateEdges(resolved, dispatch, mce, ctx, callSite, calleeSymbol.methodId());
     }
 
     private void processObjectCreation(ObjectCreationExpr oce, WalkContext ctx) {
@@ -317,12 +335,12 @@ public final class CallGraphBuilder {
         accumulator.addNode(calleeSymbol);
 
         String dispatch = dispatchOf(resolved);
-        indexDispatchCandidates(resolved, dispatch, mre, ctx);
         Map<String, Object> metadata = methodReferenceEdgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mre);
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        emitDispatchCandidateEdges(resolved, dispatch, mre, ctx, callSite, calleeSymbol.methodId());
     }
 
     /**
@@ -725,26 +743,197 @@ public final class CallGraphBuilder {
         return "virtual";
     }
 
-    /**
-     * P1 では SootUp の候補を run-local cache に索引するだけで edge 化しない。候補を使った edge の
-     * 統合は P3 の責務とし、ここでは E3 のみを既存 JavaParser edge と併記する。
-     */
-    private void indexDispatchCandidates(
+    private static final class CandidateEdgeInfo {
+        private final SootUpTypeHierarchyIndex.MethodCandidate method;
+        private final Set<String> provenance = new TreeSet<>();
+        private final Set<String> conditionTypes = new TreeSet<>();
+        private boolean ambiguous;
+
+        private CandidateEdgeInfo(SootUpTypeHierarchyIndex.MethodCandidate method) {
+            this.method = method;
+        }
+    }
+
+    /** P1/P2 の候補を call site 単位で統合し、宣言型 edge とは別の実装候補 edge を追加する。 */
+    private void emitDispatchCandidateEdges(
             ResolvedMethodDeclaration resolved,
             String dispatch,
             Node callNode,
-            WalkContext ctx) {
+            WalkContext ctx,
+            SourceLocation callSite,
+            String declarationMethodId) {
         if ("static".equals(dispatch)) {
             return;
         }
         String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
-        SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveMethod(
+        List<String> parameterTypes = paramBinaryNames(resolved);
+        SootUpTypeHierarchyIndex.Resolution sootResolution = sootUpIndex.resolveMethod(
                 declaringType,
                 resolved.getName(),
-                paramBinaryNames(resolved));
-        if (resolution.isAvailable()) {
+                parameterTypes);
+        if (!sootResolution.isAvailable()) {
+            reportSootUnavailable(sootResolution, declaringType, callNode, ctx);
             return;
         }
+
+        Map<String, CandidateEdgeInfo> merged = new LinkedHashMap<>();
+        Set<String> sootCandidateKeys = new LinkedHashSet<>();
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : sootResolution.candidates()) {
+            sootCandidateKeys.add(candidateKey(candidate));
+        }
+
+        SpringDiIndex.InjectionResolution springResolution = springResolutionFor(callNode, ctx);
+        if (springResolution == null) {
+            boolean ambiguous = sootResolution.candidates().size() != 1;
+            for (SootUpTypeHierarchyIndex.MethodCandidate candidate : sootResolution.candidates()) {
+                CandidateEdgeInfo info = merged.computeIfAbsent(candidateKey(candidate), key -> new CandidateEdgeInfo(candidate));
+                info.provenance.add("sootup");
+                info.ambiguous = ambiguous;
+            }
+        } else if (springResolution.status() == SpringDiIndex.ResolutionStatus.UNIQUE
+                || springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS) {
+            boolean ambiguous = springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS;
+            for (SpringDiIndex.BeanCandidate beanCandidate : springResolution.candidates()) {
+                SootUpTypeHierarchyIndex.Resolution implementation = sootUpIndex.resolveImplementationMethod(
+                        beanCandidate.bean().implementationType(),
+                        resolved.getName(),
+                        parameterTypes);
+                if (!implementation.isAvailable()) {
+                    reportSootUnavailable(implementation, beanCandidate.bean().implementationType(), callNode, ctx);
+                    continue;
+                }
+                for (SootUpTypeHierarchyIndex.MethodCandidate candidate : implementation.candidates()) {
+                    CandidateEdgeInfo info = merged.computeIfAbsent(
+                            candidateKey(candidate), key -> new CandidateEdgeInfo(candidate));
+                    info.provenance.addAll(beanCandidate.provenance());
+                    if (sootCandidateKeys.contains(candidateKey(candidate))) {
+                        info.provenance.add("sootup");
+                    }
+                    info.conditionTypes.addAll(beanCandidate.bean().conditionTypes());
+                    info.ambiguous |= ambiguous;
+                }
+            }
+        }
+
+        for (CandidateEdgeInfo info : merged.values()) {
+            MethodSymbol candidateSymbol = buildCandidateMethodSymbol(info.method);
+            if (declarationMethodId.equals(candidateSymbol.methodId())) {
+                continue;
+            }
+            accumulator.addNode(candidateSymbol);
+            Map<String, Object> metadata = candidateEdgeMetadata(info);
+            for (String callerId : ctx.callerMethodIds()) {
+                accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
+            }
+        }
+    }
+
+    private SpringDiIndex.InjectionResolution springResolutionFor(Node callNode, WalkContext ctx) {
+        if (ctx.enclosingTypeNode() == null) {
+            return null;
+        }
+        String receiverName = receiverNameOf(callNode);
+        if (receiverName == null) {
+            return null;
+        }
+        String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
+        SpringDiIndex.InjectionResolution resolution =
+                springResolutionByReceiver.get(springReceiverKey(ownerType, receiverName));
+        if (resolution != null && isUnrelatedParameter(callNode, resolution.injectionPoint())) {
+            return null;
+        }
+        return resolution;
+    }
+
+    private static String receiverNameOf(Node callNode) {
+        Expression scope;
+        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
+            scope = methodCall.getScope().get();
+        } else if (callNode instanceof MethodReferenceExpr methodReference) {
+            scope = methodReference.getScope();
+        } else {
+            return null;
+        }
+        while (scope.isEnclosedExpr()) {
+            scope = scope.asEnclosedExpr().getInner();
+        }
+        if (scope instanceof NameExpr name) {
+            try {
+                if (name.resolve().isVariable()) {
+                    return null;
+                }
+            } catch (RuntimeException ignored) {
+                return null;
+            }
+            return name.getNameAsString();
+        }
+        if (scope instanceof FieldAccessExpr field) {
+            return field.getNameAsString();
+        }
+        return null;
+    }
+
+    private static boolean isUnrelatedParameter(Node callNode, SpringDiIndex.InjectionPoint injection) {
+        Expression scope;
+        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
+            scope = methodCall.getScope().get();
+        } else if (callNode instanceof MethodReferenceExpr methodReference) {
+            scope = methodReference.getScope();
+        } else {
+            return false;
+        }
+        while (scope.isEnclosedExpr()) {
+            scope = scope.asEnclosedExpr().getInner();
+        }
+        if (!(scope instanceof NameExpr name)) {
+            return false;
+        }
+        try {
+            var declaration = name.resolve();
+            if (!declaration.isParameter()) {
+                return false;
+            }
+            Node ast = declaration.toAst().orElse(null);
+            int declarationLine = ast != null && ast.getBegin().isPresent() ? ast.getBegin().get().line : -1;
+            return declarationLine != injection.sourceLine();
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
+    private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return sourceMethodIndex.find(candidate).orElseGet(() -> {
+            String signature = MethodIds.signature(
+                    candidate.declaringType(),
+                    candidate.methodName(),
+                    candidate.parameterTypes());
+            return MethodSymbol.of(
+                    MethodIds.methodId(signature),
+                    "java",
+                    "method",
+                    candidate.declaringType().replace('$', '.') + "." + candidate.methodName(),
+                    signature,
+                    null,
+                    null);
+        });
+    }
+
+    private static Map<String, Object> candidateEdgeMetadata(CandidateEdgeInfo info) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("resolution", info.ambiguous ? "ambiguous" : "unique");
+        metadata.put("provenance", List.copyOf(info.provenance));
+        if (!info.conditionTypes.isEmpty()) {
+            metadata.put("conditional", true);
+            metadata.put("conditionTypes", List.copyOf(info.conditionTypes));
+        }
+        return metadata;
+    }
+
+    private void reportSootUnavailable(
+            SootUpTypeHierarchyIndex.Resolution resolution,
+            String targetType,
+            Node callNode,
+            WalkContext ctx) {
         String relatedMethodId = ctx.callerMethodIds().isEmpty() ? null : ctx.callerMethodIds().get(0);
         accumulator.addDiagnostic(Diagnostic.of(
                 JavaDiagnosticCode.JAVA_SOOTUP_UNAVAILABLE.severity(),
@@ -752,7 +941,15 @@ public final class CallGraphBuilder {
                 resolution.unavailableReason(),
                 sourceLocationOf(callNode),
                 relatedMethodId,
-                Map.of("targetType", declaringType)));
+                Map.of("targetType", targetType)));
+    }
+
+    private static String candidateKey(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return MethodIds.signature(candidate.declaringType(), candidate.methodName(), candidate.parameterTypes());
+    }
+
+    private static String springReceiverKey(String ownerType, String targetName) {
+        return ownerType + "\u0000" + targetName;
     }
 
     private Map<String, Object> edgeMetadata(String dispatch, boolean viaLambda) {

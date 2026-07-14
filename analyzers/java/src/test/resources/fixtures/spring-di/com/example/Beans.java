@@ -87,7 +87,7 @@ class FactoryConfig {
     @org.springframework.context.annotation.Bean(name = {"factoryService", "factoryAlias"})
     @org.springframework.beans.factory.annotation.Qualifier("factoryQualifier")
     QualifierContract factoryService() {
-        return null;
+        return new NameQualifiedService();
     }
 
     @org.springframework.context.annotation.Bean
@@ -99,5 +99,12 @@ class FactoryConfig {
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "feature.enabled")
     PlainContract conditionalFactory() {
         return null;
+    }
+
+    @org.springframework.context.annotation.Bean
+    java.util.function.Supplier<QualifierContract> lambdaFactory() {
+        return () -> {
+            return new NameQualifiedService();
+        };
     }
 }

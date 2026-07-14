@@ -65,6 +65,7 @@ class SpringDiIndexTest {
                 .orElseThrow();
         assertEquals(List.of("factoryService", "factoryAlias"), factory.names());
         assertEquals(List.of("factoryQualifier"), factory.qualifiers());
+        assertEquals("com.example.NameQualifiedService", factory.implementationType());
 
         SpringDiIndex.BeanDefinition defaultFactory = result.beans().stream()
                 .filter(bean -> bean.names().contains("defaultFactory"))
@@ -79,6 +80,12 @@ class SpringDiIndexTest {
         assertEquals(
                 List.of("org.springframework.boot.autoconfigure.condition.ConditionalOnProperty"),
                 conditionalFactory.conditionTypes());
+
+        SpringDiIndex.BeanDefinition lambdaFactory = result.beans().stream()
+                .filter(bean -> bean.names().contains("lambdaFactory"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("java.util.function.Supplier", lambdaFactory.implementationType());
     }
 
     @Test
@@ -186,6 +193,7 @@ class SpringDiIndexTest {
                 lombokJar,
                 "-d",
                 classesDir.toString(),
+                FIXTURE.resolve("org/springframework/stereotype/Component.java").toString(),
                 FIXTURE.resolve("com/example/LombokContract.java").toString(),
                 FIXTURE.resolve("com/example/LombokConsumer.java").toString(),
                 FIXTURE.resolve("com/example/LombokAllArgsConsumer.java").toString());

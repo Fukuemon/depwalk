@@ -101,6 +101,26 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    void resolvesEffectiveMethodForConcreteSpringBeanIncludingInterfaceDefault() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution override =
+                index.resolveImplementationMethod("com.example.ConcreteChild", "execute", List.of());
+        SootUpTypeHierarchyIndex.Resolution defaultMethod =
+                index.resolveImplementationMethod("com.example.DefaultShapeImpl", "draw", List.of());
+
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.ConcreteChild", "execute", List.of())),
+                override.candidates());
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.DefaultShape", "draw", List.of())),
+                defaultMethod.candidates());
+    }
+
+    @Test
     void returnsUnavailableInsteadOfThrowingWhenProjectClassIsAbsent() {
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of());
 

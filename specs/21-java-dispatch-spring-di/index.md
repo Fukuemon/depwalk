@@ -7,7 +7,7 @@
 - Issue: `#21`
 - ステータス: `設計完了（実装着手可）`
 - 作成日: 2026-07-12
-- 更新日: 2026-07-14
+- 更新日: 2026-07-15
 - Branch: `feature/21`
 - Owner: Fukuemon
 
@@ -465,6 +465,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | feature doc (java-analyzer) 段階導入 (D7 行)                                           | フェーズ7-9 クローズレビュー指摘対応: D7 で SootUp の照会対象に追加される自プロジェクトのコンパイル済み class も、既存の解析対象ソース・依存 jar と同様に読み取り専用として扱う旨を追記 (spec の Security/Privacy 節が「ハンドオフ対象外」と誤って断定していたため訂正)     | source: track (spec-review 指摘対応)              | 反映済 (2026-07-14) |
 | feature doc (java-analyzer) 段階導入 (後続 feature (#21) の範囲)                       | 既知の runtime-provided マーカーの初期対応を Spring Data `Repository` 型階層のみから MyBatis `@Mapper` インターフェースを含む対象へ拡大。「他フレームワーク (`@FeignClient` / MyBatis Mapper 等) への拡張は後続とする」の記述を、MyBatis Mapper については #21 内対応へ更新 | source: clarify (spec D8 で決定)                  | 反映済 (2026-07-14) |
 | feature doc (java-analyzer) classpath / dispatch / Spring DI / diagnostic / flow       | classes directory 入力、E3/fatal 境界、metadata key/value、Bean 名・Qualifier・Primary 選択規則、diagnostic code 4 件、dispatch/DI 解決フローを確定                                                                                                                         | source: fresh-context 実装前レビュー指摘対応      | 反映済 (2026-07-14) |
+| feature doc (java-analyzer) 性能方針 / E2E fixture 実装状況                            | Issue #9 と同じ 10-file fixture で #21 実装後の所要時間・最大 RSS を再計測し、baseline との差分・計測環境・SLO 非判定の境界を記録。Spring fixture の配置完了状態も同期                                                                                                      | source: P3 実装・実測                             | 反映済 (2026-07-15) |
 | feature doc (analyzer-protocol) `methodSymbol`/`callEdge` の `metadata` フィールド説明 | #21 が利用する `callEdge.metadata` は #22 D11 で opaque passthrough として保持する。`methodSymbol.metadata` の既存 gap は #21/#22 D11 の対象外で、将来利用者を追加する issue で扱う境界を明記 (D9)                                                                          | source: clarify (spec D9 で決定)                  | 反映済 (2026-07-14) |
 
 ### context への影響
@@ -545,6 +546,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-14 | Codex  | fresh-context 実装前レビューの NEEDS_WORK に対応。#22 D11 への委譲は維持し、#21 の classpath/E3、metadata、Spring Bean 選択、test-only core scope、E2E command、branch 運用、正本フローを具体化                                                                                                                                                                                                                                                                                     |
 | 2026-07-14 | Codex  | fresh-context 再監査の NEEDS_WORK に対応。feature doc scope と requirements を同期し、Spring fixture の再現可能な Gradle build/classpath manifest、SootUp 2.0.0 の最小 module、#22 D11 は callEdge metadata のみという委譲境界を確定                                                                                                                                                                                                                                                |
 | 2026-07-14 | Codex  | fresh-context 最終再レビュー PASS。PhaseStatus #10をレビュー済、#11を完了、ステータスを「設計完了（実装着手可）」へ同期                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-07-15 | Codex  | P1〜P3 を順次実装。P3 の性能計測結果と Spring fixture 配置完了を feature doc へ sync し、「上位資料からの変更点」の反映状態を更新                                                                                                                                                                                                                                                                                                                                                   |
 
 ## 備考
 
