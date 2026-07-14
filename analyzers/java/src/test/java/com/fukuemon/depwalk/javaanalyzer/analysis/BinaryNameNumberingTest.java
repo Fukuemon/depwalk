@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * M3 / D5: 匿名クラス / ローカルクラスの binary name 採番を JVM (javac) 互換にする。
+ * 匿名クラス / ローカルクラスの binary name 採番が JVM (javac) と互換であることを検証する。
  * <ul>
  *   <li>匿名クラス: 直近の enclosing class ごとに 1 始まりのソース出現順
  *       ({@code Outer$Nested} 内の最初の匿名クラスは、{@code Outer} 直下に先行する匿名クラスが

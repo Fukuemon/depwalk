@@ -1,7 +1,10 @@
 package com.example;
 
-@lombok.RequiredArgsConstructor
-@org.springframework.stereotype.Component
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+@RequiredArgsConstructor
+@Component
 class LombokConsumer {
     private final LombokContract lombokService;
 }

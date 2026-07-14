@@ -1,10 +1,15 @@
 package com.example;
 
-interface UserRepository extends org.springframework.data.repository.Repository<Object, Long> {
+import org.apache.ibatis.annotations.Mapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.Repository;
+import org.springframework.stereotype.Component;
+
+interface UserRepository extends Repository<Object, Long> {
     void find();
 }
 
-@org.apache.ibatis.annotations.Mapper
+@Mapper
 interface UserMapper {
     void map();
 }
@@ -13,15 +18,15 @@ interface MissingService {
     void missing();
 }
 
-@org.springframework.stereotype.Component
+@Component
 class RuntimeConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     UserRepository repository;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     UserMapper mapper;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     MissingService missingService;
 
     void invokeRuntimeTypes() {

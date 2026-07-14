@@ -4,8 +4,9 @@ import java.util.Map;
 
 /**
  * 継続可能な問題や部分解析情報。
- * diagnostic code の生成 (JAVA_UNRESOLVED_SYMBOL 等) は P2_01 の責務であり、本 record は出力 schema
- * のみを定義する。
+ *
+ * <p>解析処理が生成した warning や部分失敗を Core へ渡す Analyzer Protocol record であり、
+ * 本型は出力 schema のみを定義する。個々の diagnostic code と severity は検出側が決定する。
  *
  * @param schemaVersion   Protocol version
  * @param recordType      {@code diagnostic}
@@ -28,6 +29,17 @@ public record Diagnostic(
 
     public static final String RECORD_TYPE = "diagnostic";
 
+    /**
+     * 現在の schema version と record type を設定した diagnostic を生成する。
+     *
+     * @param severity 問題の重大度
+     * @param code 安定した diagnostic code
+     * @param message 人間向けの説明
+     * @param sourceLocation 発生位置。特定できなければ {@code null}
+     * @param relatedMethodId 関連 method ID。該当しなければ {@code null}
+     * @param metadata 候補型や条件種別などの追加情報
+     * @return protocol 出力可能な diagnostic
+     */
     public static Diagnostic of(
             String severity,
             String code,

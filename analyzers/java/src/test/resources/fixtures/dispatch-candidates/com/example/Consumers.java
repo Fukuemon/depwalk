@@ -1,8 +1,13 @@
 package com.example;
 
-@org.springframework.stereotype.Component
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+@Component
 class PrimaryConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     PaymentService payment;
 
     void checkout() {
@@ -14,10 +19,10 @@ class PrimaryConsumer {
     }
 }
 
-@org.springframework.stereotype.Component
+@Component
 class QualifierConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("stripe")
+    @Autowired
+    @Qualifier("stripe")
     PaymentService payment;
 
     void checkout() {
@@ -25,9 +30,9 @@ class QualifierConsumer {
     }
 }
 
-@org.springframework.stereotype.Component
+@Component
 class AmbiguousConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     AuditService auditService;
 
     void runAudit() {
@@ -35,9 +40,9 @@ class AmbiguousConsumer {
     }
 }
 
-@org.springframework.stereotype.Component
+@Component
 class ConditionalConsumer {
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     NotificationService notificationService;
 
     void notifyCustomer() {
@@ -45,8 +50,8 @@ class ConditionalConsumer {
     }
 }
 
-@org.springframework.stereotype.Component
-@lombok.RequiredArgsConstructor
+@Component
+@RequiredArgsConstructor
 class LombokConsumer {
     private final PaymentService payment;
 

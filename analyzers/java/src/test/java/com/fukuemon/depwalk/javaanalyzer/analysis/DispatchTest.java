@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D7: {@code callEdge.metadata.dispatch} の値 (static / virtual / interface / abstract)。
+ * {@code callEdge.metadata.dispatch} の値 (static / virtual / interface / abstract) を検証する。
  */
 class DispatchTest {
 

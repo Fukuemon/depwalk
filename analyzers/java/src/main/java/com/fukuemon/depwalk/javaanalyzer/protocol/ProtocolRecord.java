@@ -6,7 +6,17 @@ package com.fukuemon.depwalk.javaanalyzer.protocol;
  */
 public sealed interface ProtocolRecord permits MethodSymbol, CallEdge, Diagnostic, ErrorRecord {
 
+    /**
+     * record が準拠する schema version を返す。
+     *
+     * @return Analyzer Protocol schema version
+     */
     String schemaVersion();
 
+    /**
+     * JSONL record の種別を返す。
+     *
+     * @return record 種別を識別する安定文字列
+     */
     String recordType();
 }

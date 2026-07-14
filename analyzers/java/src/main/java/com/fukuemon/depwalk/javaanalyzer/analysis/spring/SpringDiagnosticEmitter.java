@@ -13,12 +13,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** P2 の中間結果を既存 {@link Diagnostic} schema へ非破壊で変換する。 */
+/**
+ * Spring の注入解決結果を Analyzer Protocol の診断 record へ変換する。
+ *
+ * <p>未解決、複数候補、条件付き候補、実行時生成実装をそれぞれ既定の診断コードへ対応付ける。
+ * 一意に解決できた注入点は診断を生成しない。候補型や条件種別は diagnostic metadata に格納し、
+ * {@link SpringDiIndex.Result} 自体は変更しない。
+ */
 public final class SpringDiagnosticEmitter {
 
     private SpringDiagnosticEmitter() {
     }
 
+    /**
+     * すべての注入解決結果を診断へ変換し、解析実行中の accumulator に追加する。
+     *
+     * @param result Spring Bean と注入点の解決結果
+     * @param workspaceRoot source location を相対 path にする基準 workspace
+     * @param accumulator 診断と未解決件数を蓄積する解析単位の accumulator
+     */
     public static void emit(
             SpringDiIndex.Result result,
             Path workspaceRoot,
