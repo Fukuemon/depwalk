@@ -11,8 +11,13 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.AssignExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.LambdaExpr;
+import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
@@ -104,6 +109,7 @@ public final class SpringDiIndex {
      * @param ownerType 注入先 class の binary name
      * @param kind constructor、field、setter の別
      * @param targetName 注入対象の parameter または field 名
+     * @param receiverNames 呼び出しレシーバーとして同じ注入を指すparameter名と代入先field名
      * @param injectedType 注入される型の binary name
      * @param qualifier 注入点に指定された qualifier。未指定なら {@code null}
      * @param bytecodeGenerated source にない生成 constructor から検出したか
@@ -114,11 +120,16 @@ public final class SpringDiIndex {
             String ownerType,
             InjectionKind kind,
             String targetName,
+            List<String> receiverNames,
             String injectedType,
             String qualifier,
             boolean bytecodeGenerated,
             String sourcePath,
             int sourceLine) {
+        /** receiver name 配列を防御的コピーして注入点を生成する。 */
+        public InjectionPoint {
+            receiverNames = List.copyOf(receiverNames);
+        }
     }
 
     /**
@@ -381,6 +392,7 @@ public final class SpringDiIndex {
                         type,
                         InjectionKind.CONSTRUCTOR,
                         parameter.getNameAsString(),
+                        receiverNamesOf(constructor, parameter),
                         parameter.getType().resolve(),
                         SpringAnnotations.qualifier(parameter),
                         false,
@@ -477,6 +489,7 @@ public final class SpringDiIndex {
                     type,
                     InjectionKind.SETTER,
                     parameter.getNameAsString(),
+                    receiverNamesOf(method, parameter),
                     parameter.getType().resolve(),
                     qualifier,
                     false,
@@ -492,15 +505,101 @@ public final class SpringDiIndex {
             String qualifier,
             boolean bytecodeGenerated,
             int sourceLine) {
+        return injectionPoint(
+                owner,
+                kind,
+                targetName,
+                List.of(targetName),
+                injectedType,
+                qualifier,
+                bytecodeGenerated,
+                sourceLine);
+    }
+
+    private InjectionPoint injectionPoint(
+            ClassOrInterfaceDeclaration owner,
+            InjectionKind kind,
+            String targetName,
+            List<String> receiverNames,
+            ResolvedType injectedType,
+            String qualifier,
+            boolean bytecodeGenerated,
+            int sourceLine) {
         return new InjectionPoint(
                 BinaryNames.forTypeLikeNode(owner),
                 kind,
                 targetName,
+                receiverNames,
                 BinaryNames.erasureOf(injectedType),
                 qualifier,
                 bytecodeGenerated,
                 sourcePathOf(owner),
                 sourceLine);
+    }
+
+    /**
+     * constructor または setter の注入parameterについて、parameter自身と
+     * {@code this.field = parameter} 形式で代入されるfieldを同じ呼び出しレシーバーとして収集する。
+     * nested callable 内の代入は別スコープなので対象外とする。
+     *
+     * @param callable 注入parameterを宣言するconstructorまたはmethod
+     * @param parameter 注入対象parameter
+     * @return parameter名を先頭に、代入先field名をsource順で重複なく並べた一覧
+     */
+    private static List<String> receiverNamesOf(Node callable, Parameter parameter) {
+        Set<String> names = new LinkedHashSet<>();
+        names.add(parameter.getNameAsString());
+        for (AssignExpr assignment : callable.findAll(AssignExpr.class)) {
+            if (!belongsToCallable(assignment, callable)
+                    || !refersToParameter(assignment.getValue(), parameter)) {
+                continue;
+            }
+            assignedFieldName(assignment.getTarget()).ifPresent(names::add);
+        }
+        return List.copyOf(names);
+    }
+
+    private static boolean belongsToCallable(Node node, Node callable) {
+        Node current = node.getParentNode().orElse(null);
+        while (current != null && current != callable) {
+            if (current instanceof ConstructorDeclaration || current instanceof MethodDeclaration || current instanceof LambdaExpr) {
+                return false;
+            }
+            current = current.getParentNode().orElse(null);
+        }
+        return current == callable;
+    }
+
+    private static boolean refersToParameter(Expression expression, Parameter parameter) {
+        while (expression.isEnclosedExpr()) {
+            expression = expression.asEnclosedExpr().getInner();
+        }
+        if (!(expression instanceof NameExpr name)
+                || !name.getNameAsString().equals(parameter.getNameAsString())) {
+            return false;
+        }
+        try {
+            return name.resolve().toAst().map(parameter::equals).orElse(false);
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    private static Optional<String> assignedFieldName(Expression expression) {
+        while (expression.isEnclosedExpr()) {
+            expression = expression.asEnclosedExpr().getInner();
+        }
+        if (expression instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
+            return Optional.of(field.getNameAsString());
+        }
+        if (expression instanceof NameExpr name) {
+            try {
+                return name.resolve().isField() ? Optional.of(name.getNameAsString()) : Optional.empty();
+            } catch (RuntimeException | LinkageError ignored) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
     }
 
     private InjectionResolution resolve(InjectionPoint injection, List<BeanEntry> beanEntries) {

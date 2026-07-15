@@ -65,3 +65,30 @@ class DispatchOnlyConsumer {
         service.audit();
     }
 }
+
+@Component
+class RenamedConstructorConsumer {
+    private final PaymentService payment;
+
+    RenamedConstructorConsumer(PaymentService injectedService) {
+        this.payment = injectedService;
+    }
+
+    void checkout() {
+        this.payment.pay();
+    }
+}
+
+class PaymentHolder {
+    PaymentService payment;
+}
+
+@Component
+class ForeignFieldConsumer {
+    @Autowired
+    PaymentService payment;
+
+    void checkoutOther(PaymentHolder other) {
+        other.payment.pay();
+    }
+}

@@ -33,6 +33,7 @@ import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.SuperExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
@@ -92,9 +93,11 @@ public final class CallGraphBuilder {
         this.springResolutionByReceiver = new LinkedHashMap<>();
         for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
             SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();
-            springResolutionByReceiver.putIfAbsent(
-                    springReceiverKey(injection.ownerType(), injection.targetName()),
-                    resolution);
+            for (String receiverName : injection.receiverNames()) {
+                springResolutionByReceiver.putIfAbsent(
+                        springReceiverKey(injection.ownerType(), receiverName),
+                        resolution);
+            }
         }
     }
 
@@ -891,15 +894,15 @@ public final class CallGraphBuilder {
         }
         if (scope instanceof NameExpr name) {
             try {
-                if (name.resolve().isVariable()) {
-                    return null;
-                }
+                var declaration = name.resolve();
+                return declaration.isField() || declaration.isParameter()
+                        ? name.getNameAsString()
+                        : null;
             } catch (RuntimeException | LinkageError ignored) {
                 return null;
             }
-            return name.getNameAsString();
         }
-        if (scope instanceof FieldAccessExpr field) {
+        if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
             return field.getNameAsString();
         }
         return null;
