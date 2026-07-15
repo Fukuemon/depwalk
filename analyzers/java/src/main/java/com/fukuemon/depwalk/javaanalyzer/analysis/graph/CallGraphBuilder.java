@@ -706,14 +706,24 @@ public final class CallGraphBuilder {
         return typeSiteOfExpression(mce.getScope().get());
     }
 
-    /** 式を評価した静的型の {@link TypeSite}。解決できなければ {@code null}。 */
+    /**
+     * 式を評価した静的型の {@link TypeSite} を返す。
+     *
+     * <p>型変数や wildcard は、そのままでは reference type 宣言を取得できないため erasure を使う。
+     * たとえば {@code T extends ChildService} の receiver は {@code ChildService} として扱い、
+     * 上限境界に含まれない実装を dispatch 候補へ混入させない。解決できなければ {@code null} を返す。
+     *
+     * @param expr 静的 receiver 型を取得する式
+     * @return 静的型の所在情報。型解決または erasure に失敗した場合は {@code null}
+     */
     private TypeSite typeSiteOfExpression(Expression expr) {
         try {
-            ResolvedType receiverType = expr.calculateResolvedType();
-            if (!receiverType.isReferenceType()) {
+            ResolvedType erasedReceiverType = expr.calculateResolvedType().erasure();
+            if (!erasedReceiverType.isReferenceType()) {
                 return null;
             }
-            ResolvedReferenceTypeDeclaration decl = receiverType.asReferenceType().getTypeDeclaration().orElse(null);
+            ResolvedReferenceTypeDeclaration decl =
+                    erasedReceiverType.asReferenceType().getTypeDeclaration().orElse(null);
             if (decl == null) {
                 return null;
             }

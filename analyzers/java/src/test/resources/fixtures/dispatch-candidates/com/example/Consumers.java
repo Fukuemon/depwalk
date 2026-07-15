@@ -68,6 +68,10 @@ class DispatchOnlyConsumer {
     void runChild(ChildDispatchService service) {
         service.invoke();
     }
+
+    <T extends ChildDispatchService> void runGenericChild(T service) {
+        service.invoke();
+    }
 }
 
 @Component
