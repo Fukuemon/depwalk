@@ -109,3 +109,13 @@ class SameNamedSetterParametersConsumer {
         service.audit();
     }
 }
+
+@Component
+class UnresolvedBeanConsumer {
+    @Autowired
+    NonBeanService service;
+
+    void execute() {
+        service.execute();
+    }
+}

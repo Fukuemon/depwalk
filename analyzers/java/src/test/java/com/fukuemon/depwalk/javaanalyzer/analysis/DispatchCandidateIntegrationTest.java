@@ -196,6 +196,17 @@ class DispatchCandidateIntegrationTest {
                 "interface");
     }
 
+    @Test
+    void fallsBackToSootCandidatesForUnresolvedSpringInjection() {
+        String caller = "java:com.example.UnresolvedBeanConsumer#execute()";
+        for (String callee : List.of(
+                "java:com.example.NonBeanOne#execute()",
+                "java:com.example.NonBeanTwo#execute()")) {
+            Map<String, Object> edge = assertEdge(caller, callee, null);
+            assertCandidateMetadata(edge, "ambiguous", List.of("sootup"));
+        }
+    }
+
     private Map<String, Object> assertEdge(String caller, String callee, String dispatch) {
         Map<String, Object> edge = ran.byType("callEdge").stream()
                 .filter(record -> caller.equals(record.get("callerMethodId")) && callee.equals(record.get("calleeMethodId")))

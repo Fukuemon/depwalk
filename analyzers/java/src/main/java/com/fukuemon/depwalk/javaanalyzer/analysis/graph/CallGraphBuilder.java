@@ -822,13 +822,9 @@ public final class CallGraphBuilder {
         }
 
         SpringDiIndex.InjectionResolution springResolution = springResolutionFor(callNode, ctx);
-        if (springResolution == null) {
-            boolean ambiguous = sootResolution.candidates().size() != 1;
-            for (SootUpTypeHierarchyIndex.MethodCandidate candidate : sootResolution.candidates()) {
-                CandidateEdgeInfo info = merged.computeIfAbsent(candidateKey(candidate), key -> new CandidateEdgeInfo(candidate));
-                info.provenance.add("sootup");
-                info.ambiguous = ambiguous;
-            }
+        if (springResolution == null
+                || springResolution.status() == SpringDiIndex.ResolutionStatus.UNRESOLVED) {
+            addSootCandidates(merged, sootResolution.candidates());
         } else if (springResolution.status() == SpringDiIndex.ResolutionStatus.UNIQUE
                 || springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS) {
             boolean ambiguous = springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS;
@@ -864,6 +860,19 @@ public final class CallGraphBuilder {
             for (String callerId : ctx.callerMethodIds()) {
                 accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
             }
+        }
+    }
+
+    private static void addSootCandidates(
+            Map<String, CandidateEdgeInfo> merged,
+            List<SootUpTypeHierarchyIndex.MethodCandidate> candidates) {
+        boolean ambiguous = candidates.size() != 1;
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
+            CandidateEdgeInfo info = merged.computeIfAbsent(
+                    candidateKey(candidate),
+                    key -> new CandidateEdgeInfo(candidate));
+            info.provenance.add("sootup");
+            info.ambiguous = ambiguous;
         }
     }
 
