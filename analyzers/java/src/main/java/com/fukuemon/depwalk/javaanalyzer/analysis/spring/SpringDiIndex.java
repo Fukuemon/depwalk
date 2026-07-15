@@ -278,7 +278,9 @@ public final class SpringDiIndex {
             if (stereotype != null && !type.isInterface() && !type.isAbstract()) {
                 beans.add(stereotypeBean(type, stereotype));
             }
-            if (SpringAnnotations.has(type, SpringAnnotations.CONFIGURATION)) {
+            boolean beanMethodContainer = SpringAnnotations.has(type, SpringAnnotations.CONFIGURATION)
+                    || (stereotype != null && !type.isInterface() && !type.isAbstract());
+            if (beanMethodContainer) {
                 for (MethodDeclaration method : type.getMethods()) {
                     AnnotationExpr beanAnnotation = SpringAnnotations.find(method, SpringAnnotations.BEAN);
                     if (beanAnnotation != null) {

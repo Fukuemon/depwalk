@@ -146,3 +146,18 @@ class ConditionalFactoryConfig {
         return null;
     }
 }
+
+interface LiteFactoryContract {
+}
+
+class LiteFactoryService implements LiteFactoryContract {
+}
+
+@Service
+@Profile("lite-profile")
+class LiteFactoryComponent {
+    @Bean
+    LiteFactoryContract liteFactoryBean() {
+        return new LiteFactoryService();
+    }
+}
