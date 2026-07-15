@@ -19,19 +19,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                              |
-| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-12 | issue #22                                                                                                         |
-| 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |                                                                                                                   |
-| 3   | 上位文書突合                | 完了       | 2026-07-12 |                                                                                                                   |
-| 4   | 論点整理                    | 完了       | 2026-07-12 |                                                                                                                   |
-| 5   | 論点解決                    | レビュー済 | 2026-07-15 | D11 を拡張 (graph.Symbol/output.NodeView への Metadata 透過を追加)。develop rebase 後の再検証で再オープンし再確定 |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                                                                                                   |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                   |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                   |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                   |
-| 10  | 実装分割                    | 未着手     |            |                                                                                                                   |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                                   |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                                                          |
+| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-12 | issue #22                                                                                                                                                                                     |
+| 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |                                                                                                                                                                                               |
+| 3   | 上位文書突合                | 完了       | 2026-07-12 |                                                                                                                                                                                               |
+| 4   | 論点整理                    | 完了       | 2026-07-12 |                                                                                                                                                                                               |
+| 5   | 論点解決                    | レビュー済 | 2026-07-15 | D11 を拡張 (graph.Symbol/output.NodeView への Metadata 透過を追加)。develop rebase 後の再検証で再オープンし再確定                                                                             |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-15 | CLI flag 体系表・exit code 配線・Request/Response 変換・D11 拡張の Node 側 JSON スキーマ影響を記述。1周目レビュー NEEDS_WORK (feature doc analyzer-protocol との矛盾) 対応後、再レビュー PASS |
+| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                                                               |
+| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                                                               |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                               |
+| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                               |
+| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                               |
 
 ## 上位文書整合
 
@@ -175,7 +175,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Routing / URL State
 
-(clarify 以降で記述)
+CLI ツールのため URL routing は存在しない。相当する概念は「コマンド構造」であり、D2 で確定済み: 探索クエリはサブコマンドを新設せず `analyze` コマンドへの flag 追加で提供する (`depwalk analyze <path> --language java --analyzer-cmd ... --method <selector> --direction <dir> --max-depth <n> --format <fmt>`)。`--method` 省略時は現行のサマリ動作 (件数 1 行 + diagnostics) を維持し既存 flag は変更しない。将来の新しいクエリ種別 (例: パス探索) はサブコマンド新設でも flag 追加でも拡張できる (D2 の拡張余地宣言)。
 
 ### Content / Assets
 
@@ -193,11 +193,33 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### UI / API / Event Interface
 
-(clarify 以降で記述)
+**CLI flag 体系 (`depwalk analyze [path]` への追加、D2)**:
+
+| flag          | 型                         | 既定値                       | 説明                                                                                    | 決定 |
+| ------------- | -------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- | ---- |
+| `--method`    | string                     | (未指定なら現行のサマリ動作) | method selector `<型の binary name>#<メソッド名>[(<引数型リスト>)]`                     | D1   |
+| `--direction` | string (`caller`/`callee`) | `caller`                     | 探索方向 (`graph.Direction` に対応)                                                     | D3   |
+| `--max-depth` | int (非負)                 | 無制限 (`nil`)               | 深さ上限 (`traversal.Request.MaxDepth`)。0 = 起点のみ                                   | D4   |
+| `--format`    | string                     | `console`                    | 出力形式。値域は output registry に登録済みの formatter のみ (現時点: `console`/`json`) | D5   |
+
+既存 flag (`--analyzer-cmd` / `--language` / `--analyzer-meta`、ADR-0003 正本) は変更しない。
+
+**`--format` の許容値検証 (D5 拡張、本 phase で確定)**: CLI 層は許可値をハードコードせず、`output` package に既存の (現状 unexported) `registeredFormats() []string` を **`output.RegisteredFormats() []string` として公開 API 化** し、CLI がこれを参照して (a) 検証、(b) 未登録値のエラーメッセージでの一覧表示、の両方に使う。これにより Phase 4 で formatter 実装 + registry 登録を追加するだけで CLI 側は無変更のまま新形式が有効になる (D5 の「拡張余地の宣言」を実装レベルで担保する)。備考にあった引き継ぎメモ (output の登録済み Format 列挙 API の公開) はこの決定で解消する。
+
+**exit code (D8 の実装配線)**: `os.Exit` を Cobra の既定 (`RunE` のエラーを常に exit 1 にする挙動) に委ねず、CLI 層でエラー種別を判別して 0/1/2 を返す。判別対象は traversal の `Status`(`StatusStartNotFound` → exit 2)、flag 値域エラー・method selector 曖昧性 (D1) → exit 2、Analyzer 起動失敗・protocol 違反・出力書き込み失敗 → exit 1、それ以外の探索成功 (結果空・depthLimit cutoff 含む) → exit 0。
+
+**E2E からの観測点 (D9)**: 上記 flag パースと exit code 制御は `os/exec` によるバイナリ起動 E2E (D9) の直接の検証対象になる。
 
 ### Props / Request / Response
 
-(clarify 以降で記述)
+**CLI → Core 内部変換の配線**:
+
+1. method selector (`--method`) の照合: graph 構築後、`graph.Graph` の全 `Node.Symbol` (`QualifiedName`/`Signature`) を走査してマッチする node を探す (D1・D7)。一致 0 件は traversal の `StatusStartNotFound` 相当として exit 2、複数一致 (signature 省略時のオーバーロード) は候補一覧を stderr に出し exit 2、1 件一致ならその `Node.ID` を `traversal.Request.StartID` に使う。
+2. `traversal.Request` の組み立て: `StartID` (上記照合結果) / `Direction` (`--direction` を `graph.Direction` にマップ) / `MaxDepth` (`--max-depth`、未指定は `nil`)。`Order` は指定せず既定 (`OrderBFS`) のまま (観測可能な `Result` に影響しないため CLI に露出しない)。
+3. `traversal.Traverse(graph, request)` → `traversal.Result` (Status/Nodes/Depths/Edges/Cycles)。
+4. `output.Write(w, format, output.Input{Graph: graph, Result: result, Request: request})` で Console/JSON へ出力する。`output.Input`/`View`/`NodeView`/`EdgeView`/`CutoffView` は既存 (#7) の型をそのまま使う。
+
+**D11 拡張に伴う Response スキーマへの影響 (Node 側公開 API、本 phase で明示)**: `output.NodeView` に `Metadata protocol.Metadata`(`map[string]any`、`omitempty`) を追加する (Edge 側の `EdgeView.Metadata` と対称)。これにより JSON 出力の `nodes[]` 各要素に、Analyzer が `methodSymbol.metadata` へ設定した値 (例: `declaringType`/`inherited`、spec #9 D11 起源) が omitempty で透過される。これは JSON スキーマの後方互換な追加 (新規 optional フィールド) であり、既存の `nodes[].id`/`qualifiedName`/`signature`/`source`/`minDepth` は変更しない。console フォーマッタは D11 本文の方針を踏襲し、metadata の人間向け表現は見送る (将来 phase で検討)。備考にあった引き継ぎメモ (D11 拡張の Node 側公開 API への影響明示) はこの記述で解消する。
 
 ## Content / Data 設計
 
@@ -289,11 +311,12 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 ### feature doc への影響
 
-| 対象 doc / 節                | 変更内容                                                                                                                                                                                                                                                                                                                                                 | 理由                                                                                    |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| (反映先は sync phase で確定) | method selector の CLI 書式・曖昧性解決規則を CLI interface の設計として design 側へ反映予定。状態=未反映 (source: clarify D1)                                                                                                                                                                                                                           | D1 決定の durable な設計成果のため                                                      |
-| (反映先は sync phase で確定) | graph.Edge / output.EdgeView への Metadata 透過追加と JSON edge の metadata フィールドを design 側へ反映予定。状態=未反映 (source: clarify D11)                                                                                                                                                                                                          | D11 決定の durable な設計成果のため                                                     |
-| (反映先は sync phase で確定) | graph.Symbol / output.NodeView への Metadata 透過追加と JSON node の metadata フィールドを design 側へ反映予定。あわせて `specs/21-java-dispatch-spring-di/index.md` D9 の「methodSymbol.metadata は両 issue 対象外」を override した経緯も feature doc (analyzer-protocol) 側の境界記述に反映が必要。状態=未反映 (source: clarify D11 拡張、2026-07-15) | D11 拡張決定の durable な設計成果のため、かつ #21 側 feature doc 記述との整合維持のため |
+| 対象 doc / 節                                                                                       | 変更内容                                                                                                                                                                                                                 | 理由                                                                                                              |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| (反映先は sync phase で確定)                                                                        | method selector の CLI 書式・曖昧性解決規則を CLI interface の設計として design 側へ反映予定。状態=未反映 (source: clarify D1)                                                                                           | D1 決定の durable な設計成果のため                                                                                |
+| (反映先は sync phase で確定)                                                                        | graph.Edge / output.EdgeView への Metadata 透過追加と JSON edge の metadata フィールドを design 側へ反映予定。状態=未反映 (source: clarify D11)                                                                          | D11 決定の durable な設計成果のため                                                                               |
+| `design/features/output/DesignDoc_output.md` (`NodeView` 節)                                        | graph.Symbol / output.NodeView への Metadata 透過追加と JSON node の `metadata` フィールドを design 側へ反映予定。状態=未反映 (source: clarify D11 拡張、2026-07-15)                                                     | D11 拡張決定の durable な設計成果のため                                                                           |
+| `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (`methodSymbol.metadata` 境界節) | `specs/21-java-dispatch-spring-di/index.md` D9 の「methodSymbol.metadata は両 issue 対象外」を override した経緯を境界記述に反映。状態=反映済 (2026-07-15、phase 6 レビュー指摘対応で先行実施。source: clarify D11 拡張) | フレッシュコンテキストレビューで #21 由来の durable 記述との矛盾が検出されたため、sync phase を待たず先行して解消 |
 
 ### context への影響
 
@@ -311,14 +334,16 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                                                                                                                                                                             | 対応                                     |
-| ---------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| 2026-07-12 | NEEDS_WORK               | (scaffold phase) EARS 要件記述が未記入 (S1-S3 から 3 件追加要)、フェーズ表の突合状態未同期                                                                                                                                                                                                           | 対応済 (EARS 追加・フェーズ表同期)       |
-| 2026-07-12 | PASS                     | (scaffold 再) 指摘なし (前回指摘対応を確認)                                                                                                                                                                                                                                                          | —                                        |
-| 2026-07-12 | NEEDS_WORK               | (clarify phase) メタ情報同期 3 件 + 用語揺れ等 2 件                                                                                                                                                                                                                                                  | 対応済 (同 commit)                       |
-| 2026-07-12 | PASS                     | (clarify 再) 指摘なし (前回 5 件の解消を確認)。非ブロッキング補足 2 件は後続 phase で扱う                                                                                                                                                                                                            | —                                        |
-| 2026-07-15 | NEEDS_WORK               | (D11 拡張分 clarify 再オープン) 内容面 (D11 拡張の事実整合性・cross-spec override・実装対象・EARS・上位文書整合) に矛盾なし。ただしメタ情報同期 2 件: (1) 本表に 2026-07-15 分のレビュー記録がないままフェーズ表が「レビュー済」を自称、(2) #21 index.md フェーズ5 備考が D9 override 前の要約のまま | 対応済 (フェーズ表・#21 フェーズ表 同期) |
-| 2026-07-15 | PASS                     | (D11 拡張分 再レビュー) 前回指摘 2 件の解消を確認、新たな不整合なし                                                                                                                                                                                                                                  | —                                        |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 対応                                                                                                                    |
+| ---------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-12 | NEEDS_WORK               | (scaffold phase) EARS 要件記述が未記入 (S1-S3 から 3 件追加要)、フェーズ表の突合状態未同期                                                                                                                                                                                                                                                                                                                                                                        | 対応済 (EARS 追加・フェーズ表同期)                                                                                      |
+| 2026-07-12 | PASS                     | (scaffold 再) 指摘なし (前回指摘対応を確認)                                                                                                                                                                                                                                                                                                                                                                                                                       | —                                                                                                                       |
+| 2026-07-12 | NEEDS_WORK               | (clarify phase) メタ情報同期 3 件 + 用語揺れ等 2 件                                                                                                                                                                                                                                                                                                                                                                                                               | 対応済 (同 commit)                                                                                                      |
+| 2026-07-12 | PASS                     | (clarify 再) 指摘なし (前回 5 件の解消を確認)。非ブロッキング補足 2 件は後続 phase で扱う                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                       |
+| 2026-07-15 | NEEDS_WORK               | (D11 拡張分 clarify 再オープン) 内容面 (D11 拡張の事実整合性・cross-spec override・実装対象・EARS・上位文書整合) に矛盾なし。ただしメタ情報同期 2 件: (1) 本表に 2026-07-15 分のレビュー記録がないままフェーズ表が「レビュー済」を自称、(2) #21 index.md フェーズ5 備考が D9 override 前の要約のまま                                                                                                                                                              | 対応済 (フェーズ表・#21 フェーズ表 同期)                                                                                |
+| 2026-07-15 | PASS                     | (D11 拡張分 再レビュー) 前回指摘 2 件の解消を確認、新たな不整合なし                                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                       |
+| 2026-07-15 | NEEDS_WORK               | (phase 6 Interface/Routing 設計) CLI flag 体系・exit code・Request/Response 変換・`output.RegisteredFormats()` 提案は D1-D11 と実装コードに整合。ただし `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:113,231` (durable 正本、2026-07-14 sync 済み) が「methodSymbol.metadata は #21/#22 双方の対象外」という override 前の記述のままで、本 spec の D11 拡張と矛盾。フェーズ6を「完了」としているが備考は「レビュー待ち」で状態と実態が不一致 | 対応済 (feature doc 2 箇所を override 後の内容へ先行更新、#21 index.md:470 の反映済み行も同期、フェーズ6を進行中に修正) |
+| 2026-07-15 | PASS                     | (phase 6 再レビュー) 前回指摘 3 件 (feature doc override 反映・フェーズ6状態不一致・#21 反映済み行同期) すべて解消を確認、新たな不整合なし。#21 index.md の変更履歴に今回の再同期を追記すべきという非ブロッキング補足あり                                                                                                                                                                                                                                         | 対応済 (#21 変更履歴に追記)                                                                                             |
 
 ## 変更履歴
 
@@ -344,6 +369,9 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-14 | Claude         | #21 (`specs/21-java-dispatch-spring-di/`) の D9 で D11 の前提 (Core が metadata を破棄する) を code level (`core/internal/graph/convert.go`) で独立に裏付け。D11 に追記注記を追加: `graph.Symbol`/`methodSymbol.metadata` 側は D11 の対象外であることを明記し、次 phase (Interface/Routing 設計) での検討事項として記録。関連資料の #21 参照を merge 状況の最新化に合わせて更新                                                                                                                                                                                                                                                                                                                    |
 | 2026-07-15 | Claude         | `feature/22` を `origin/develop` (#21 PR #25 マージ済み) へ rebase。rebase 後の再検証で 2026-07-14 の追記注記が誤りだったと判明: `methodSymbol.metadata.declaringType`/`inherited` は spec #9 D11 (帰属型の決定規則) 起源で Analyzer が既に出力しており、`specs/21-java-dispatch-spring-di/index.md` D9 (2026-07-14、レビュー PASS 済み) は「`methodSymbol.metadata` 側は #21/#22 双方の対象外、将来の別 issue へ」と既に確定していた。ユーザー判断によりこの切り分けを override し、D11 を拡張して `graph.Symbol`/`output.NodeView` への Metadata 透過も本 spec のスコープに含めることを確定 (#21 index.md D9 にも override の追記を反映)。実装対象表・feature doc 影響・関連資料・メタ情報を同期 |
 | 2026-07-15 | Claude         | D11 拡張分 clarify 再オープンの spec-review 指摘対応 (NEEDS_WORK 2 件): 本表の 2026-07-15 レビュー記録追加、`specs/21-java-dispatch-spring-di/index.md` フェーズ5備考を D9 override 後の内容に同期                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-07-15 | Claude         | phase 6 (Interface / Routing 設計): CLI flag 体系表 (D1-D5)・`--format` 検証用の `output.RegisteredFormats()` 公開 API 化 (D5 拡張)・exit code 配線 (D8)・CLI→traversal.Request→output.Write の変換手順・D11 拡張に伴う `output.NodeView.Metadata` の後方互換追加を記述。機能仕様の Routing/URL State (D2 のコマンド構造) も記入。備考の引き継ぎメモ 2 件を解消。レビュー待ち                                                                                                                                                                                                                                                                                                                      |
+| 2026-07-15 | Claude         | phase 6 spec-review 指摘対応 (NEEDS_WORK 1件): `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (durable 正本、L3/L113/L231) が override 前の「methodSymbol.metadata は #21/#22 双方の対象外」のままだった矛盾を解消 (override 後の内容へ更新)。`specs/21-java-dispatch-spring-di/index.md` の対応する反映済み行も同期。フェーズ6の状態を「完了」から「進行中」に修正 (レビュー未了のため)                                                                                                                                                                                                                                                                                       |
+| 2026-07-15 | Claude         | phase 6 再レビュー PASS。フェーズ6を「レビュー済」に更新、`specs/21-java-dispatch-spring-di/index.md` の変更履歴に今回の再同期を追記 (非ブロッキング補足対応)。論点整理〜Interface/Routing 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## 備考
 
@@ -351,6 +379,10 @@ appendix は取り込まない (CLI ツールであり API / DB / 認可 / 画�
 
 後続 phase への引き継ぎメモ:
 
-- Interface 設計時に output の登録済み Format 列挙 API の公開を明示する (clarify 再レビュー補足)。
+- ~~Interface 設計時に output の登録済み Format 列挙 API の公開を明示する (clarify 再レビュー補足)。~~ → phase 6 (Interface / Routing 設計) で `output.RegisteredFormats()` の公開 API 化として解消済み (2026-07-15)。
 - specs/21 の参照は #21 merge 後に解決する (clarify 再レビュー補足) → 2026-07-15 develop rebase で解消済み (#21 は PR #25 でマージ済み)。
-- Interface 設計時に `graph.Symbol`/`output.NodeView` の Metadata フィールド追加が Node 側の公開 API (JSON スキーマ) に与える影響も合わせて明示する (D11 拡張、2026-07-15)。
+- ~~Interface 設計時に `graph.Symbol`/`output.NodeView` の Metadata フィールド追加が Node 側の公開 API (JSON スキーマ) に与える影響も合わせて明示する (D11 拡張、2026-07-15)。~~ → phase 6 の「Props / Request / Response」節で `output.NodeView.Metadata` の後方互換な追加として明示済み (2026-07-15)。
+
+phase 7 (Content/Data 設計) への引き継ぎメモ:
+
+- Content / Data 設計節では「CLI のみで永続ストアなし」の該当なし判断を明示する想定 (#21 index.md の同種判断を踏襲)。

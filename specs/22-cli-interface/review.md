@@ -88,3 +88,26 @@ Verdict: NEEDS_WORK
 ### 補足 (非ブロッキング)
 
 - `design/DesignDoc_java-analyzer.md:336` は現状 edge 側の CLI 表出境界のみ言及。sync phase で node 側 (`graph.Symbol`/`methodSymbol.metadata`) の境界記述追加を忘れないこと。
+
+## Review 2026-07-15 14:30 (phase 6 Interface/Routing 設計)
+
+Verdict: NEEDS_WORK
+
+- 上位文書整合: NEEDS_WORK — `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:113,231` (durable 正本、#21 の 2026-07-14 sync で反映済み) が「`methodSymbol.metadata` は #21/#22 D11 双方の対象外」という override 前の記述のまま残っており、`specs/22-cli-interface/index.md:139-142` の D11 拡張 (2026-07-15、#21 D9 を override) と矛盾していた。sync phase を待たず二重正本状態が生じていた。
+- 未解決論点: PASS — 論点テーブル空、下流節は D1-D11 の決定を参照するのみで未決前提の記述なし
+- 実装対象明示: PASS — target 名・責務境界とも `context/project.md` と一致
+- template 必須節: PASS — 全節存在
+- 正本境界: NEEDS_WORK — 同一 durable 事実について design (analyzer-protocol feature doc) が古い内容を、spec (#22) が新しい決定を独立に保持する二重正本状態
+- 指摘: (1) feature doc (analyzer-protocol) の override 未反映、(2) フェーズ6状態「完了」と備考「レビュー待ち」の不一致
+- 内容面 (CLI flag 体系・exit code・Request/Response 変換・`output.RegisteredFormats()` 提案) は D1-D11・実装コードと矛盾なし
+
+対応: `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (L3/L113/L231) と `specs/21-java-dispatch-spring-di/index.md:470` を override 後の内容へ更新、フェーズ6状態を「進行中」に修正。
+
+## Review 2026-07-15 (phase 6 再レビュー)
+
+Verdict: PASS
+
+- 前回指摘 3 件 (feature doc override 反映・フェーズ6状態不一致・#21 反映済み行同期) すべて解消を確認
+- 3 文書 (spec #22 / spec #21 / feature doc analyzer-protocol) が同一の override 事実を矛盾なく記述していることをクロスチェックで確認
+- 新たな不整合なし
+- 補足 (非ブロッキング、対応済み): #21 index.md の変更履歴に今回の再同期を追記
