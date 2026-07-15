@@ -121,6 +121,9 @@ jobs:
       - name: Assert jar is at expected path
         run: ls -l analyzers/java/build/libs/java-analyzer.jar
 
+      - name: Build Spring fixture classpath
+        run: ./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project writeDepwalkClasspath
+
       - name: Run Go E2E tests
         run: go test ./e2e/... -v
         working-directory: core
