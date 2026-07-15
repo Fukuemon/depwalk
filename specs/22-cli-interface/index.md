@@ -19,19 +19,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                                                          |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-12 | issue #22                                                                                                                                                                                     |
-| 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |                                                                                                                                                                                               |
-| 3   | 上位文書突合                | 完了       | 2026-07-12 |                                                                                                                                                                                               |
-| 4   | 論点整理                    | 完了       | 2026-07-12 |                                                                                                                                                                                               |
-| 5   | 論点解決                    | レビュー済 | 2026-07-15 | D11 を拡張 (graph.Symbol/output.NodeView への Metadata 透過を追加)。develop rebase 後の再検証で再オープンし再確定                                                                             |
-| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-15 | CLI flag 体系表・exit code 配線・Request/Response 変換・D11 拡張の Node 側 JSON スキーマ影響を記述。1周目レビュー NEEDS_WORK (feature doc analyzer-protocol との矛盾) 対応後、再レビュー PASS |
-| 7   | Content / Data 設計         | レビュー済 | 2026-07-15 | 永続ストアなし・package 配置方針を記述。CLI のため Content/Assets・UI Reuse は該当なし。レビュー PASS (1周目)                                                                                 |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                                                               |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                               |
-| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                               |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                               |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                                                                                                                                                        |
+| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-12 | issue #22                                                                                                                                                                                                                   |
+| 2   | 下書き (scaffold)           | レビュー済 | 2026-07-12 |                                                                                                                                                                                                                             |
+| 3   | 上位文書突合                | 完了       | 2026-07-12 |                                                                                                                                                                                                                             |
+| 4   | 論点整理                    | 完了       | 2026-07-12 |                                                                                                                                                                                                                             |
+| 5   | 論点解決                    | レビュー済 | 2026-07-15 | D11 を拡張 (graph.Symbol/output.NodeView への Metadata 透過を追加)。develop rebase 後の再検証で再オープンし再確定                                                                                                           |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-15 | CLI flag 体系表・exit code 配線・Request/Response 変換・D11 拡張の Node 側 JSON スキーマ影響を記述。1周目レビュー NEEDS_WORK (feature doc analyzer-protocol との矛盾) 対応後、再レビュー PASS                               |
+| 7   | Content / Data 設計         | レビュー済 | 2026-07-15 | 永続ストアなし・package 配置方針を記述。CLI のため Content/Assets・UI Reuse は該当なし。レビュー PASS (1周目)                                                                                                               |
+| 8   | Performance / Security 設計 | レビュー済 | 2026-07-15 | Performance (SLO 確定は実装フェーズへ委譲する方針)・Security/Privacy (既存読み取り専用方針の継承)・Error/Fallback (エラーケース 7件、D8 exit code に対応) を記述。1周目 NEEDS_WORK (状態表記不一致) 対応後、再レビュー PASS |
+| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                                                             |
+| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                                                             |
+| 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                                                             |
 
 ## 上位文書整合
 
@@ -171,7 +171,8 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Performance
 
-(clarify 以降で記述)
+- CLI 層の追加 (method selector 照合・`traversal.Traverse`・`output.Write` 呼び出し) は既存実装 (#6/#7) の呼び出しに留まり、探索方向による解析コスト分岐もない (D6 常時 fullGraph)。数値目標の詳細は `## Performance / Security 設計 > Performance` を参照。
+- feature doc `java-analyzer` 性能方針節が #22 完了時の SLO 数値目標確定を前提としているため、実装フェーズ (D9 の E2E 整備と合わせて) で実プロジェクト相当 fixture の計測を行い feature doc へ確定値を記録する。
 
 ### Routing / URL State
 
@@ -238,23 +239,35 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ### Performance
 
-(clarify 以降で記述)
+- D6 により探索方向 (`--direction`) に関わらず Core は常に fullGraph で解析するため、CLI 追加による解析コスト自体の増加はない (#9/#21 の既存 baseline から変化しない)。CLI 層で新たに発生するコストは (a) method selector (D1) の graph node 走査 (全 node を 1 回線形走査、graph 構築後の追加オーバーヘッド)、(b) `traversal.Traverse` (#6 実装済み、BFS/DFS で到達集合を計算)、(c) `output.Write` (#7 実装済み) の 3 点のみで、いずれも既存実装の呼び出しであり新規の計算量オーダーを導入しない。
+- **SLO 数値目標の確定 (feature doc `java-analyzer` 性能方針節からの引き継ぎ)**: `design/features/java-analyzer/DesignDoc_java-analyzer.md` の性能方針節 (#9 D9 / #21 D5) は「SLO (合否ライン) は #22 完了時の数値目標確定と合わせて決める」としている。本 spec ではこの確定作業を実装フェーズ (D9 の E2E 追加) に委ねる: 実プロジェクト相当の fixture による複数回計測 (解析時間・最大 RSS) を D9 の E2E 整備と合わせて行い、確定した数値目標は `design/features/java-analyzer/DesignDoc_java-analyzer.md` の性能方針節へ追記する (sync phase で反映)。本 spec の設計時点では具体的な数値を定めず、計測方法 (既存 baseline と同一 fixture・同一計測項目) と記録先のみを確定する。
+- 深さ上限 (`--max-depth`、D4) は出力サイズを制限するのみで、`traversal.Traverse` 自体の計算量 (到達可能な全 node への BFS/DFS) には影響しない (traversal 内部で全域を辿った上で depth でフィルタする既存実装、#6 で確定済み)。
 
 ### Security / Privacy
 
-(clarify 以降で記述)
+- 解析対象ソース・依存 jar/classes は読み取り専用として扱う (既存方針の継承、`context/architecture.md` の State Boundary。#21 index.md の同種記述と整合)。CLI 層の追加 (flag 追加・method selector 照合・traversal/output 呼び出し) はいずれも読み取り専用の既存データ (graph) 上の処理であり、新たな書き込み・実行系の攻撃面を追加しない。
+- D9 で追加する E2E は `os/exec` で depwalk バイナリを実プロセス起動するが、これはテスト実行時のみの構成でありプロダクションの攻撃面には影響しない。
+- CLI 引数 (method selector・flag 値) は文字列としてのみ扱われ、シェル経由の実行やファイルパス解釈には使わない (D1 の照合は graph node の symbol 情報との文字列比較のみ)。
 
 ## Error / Fallback 設計
 
 ### エラーケース
 
-| #   | ケース               | ユーザーへの見せ方 | リカバリ |
-| --- | -------------------- | ------------------ | -------- |
-| 1   | (clarify 以降で記述) |                    |          |
+| #   | ケース                                                                        | ユーザーへの見せ方                                                                                              | リカバリ                                                                      |
+| --- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | `--direction` / `--format` に許容値以外を指定                                 | 許容値一覧を添えて stderr にエラー表示 (D3/D5)                                                                  | exit 2 (入力エラー、D8)。利用者が値を修正して再実行                           |
+| 2   | `--max-depth` に負の整数を指定                                                | エラーメッセージを stderr に表示 (D4)                                                                           | exit 2 (入力エラー、D8)。利用者が値を修正して再実行                           |
+| 3   | method selector が signature 省略でオーバーロード曖昧 (複数 node に一致)      | 候補の完全 signature 一覧を stderr に表示 (D1)                                                                  | exit 2 (入力エラー、D8)。利用者が signature を補って再実行                    |
+| 4   | method selector が graph 上のどの node にも一致しない                         | 対象が見つからない旨を stderr に表示 (traversal の `StatusStartNotFound` を CLI 層で入力エラーとして再解釈、D8) | exit 2 (入力エラー、D8)。利用者が selector の typo や対象メソッドの存在を確認 |
+| 5   | Analyzer 起動失敗・protocol 違反 (既存 `analyze.Run` のエラー)                | 既存の diagnostic / error 表示を維持 (変更なし)                                                                 | exit 1 (実行時エラー、D8)                                                     |
+| 6   | 出力書き込み失敗 (`output.Write` がエラーを返す、例: stdout への書き込み不可) | エラーメッセージを stderr に表示                                                                                | exit 1 (実行時エラー、D8)                                                     |
+| 7   | 探索は成功したが結果が空、または `--max-depth` で打ち切り (cutoff) が発生     | 結果 (空集合、または cutoff 注釈付き) を指定形式で stdout に出力 (#7 output の View 仕様どおり)                 | exit 0 (成功、D8)。エラーではなく正常系として扱う                             |
 
 ### Fallback
 
-(clarify 以降で記述)
+- 曖昧性 (method selector のオーバーロード曖昧、D1) や打ち切り (depth cutoff、D4) は、根拠なく一つに絞ったり暗黙に切り捨てたりせず、候補一覧や cutoff 注釈として利用者に明示する (ADR-0004 の観測可能性原則を継承)。
+- エラーメッセージ・候補一覧・diagnostic は stderr、探索結果のみ stdout に出力し、S3 (JSON の機械パース性) を保護する (D8)。
+- Analyzer 側の call edge / method symbol の metadata (`resolution`/`provenance`/`declaringType`/`inherited` 等) は Core が意味解釈せず observability chain (Analyzer JSONL → Core → CLI 出力) をそのまま通す (D11/D11 拡張)。曖昧性の解決自体は Analyzer 側 (#21) の責務であり、CLI 層は解決結果を透過するのみでフォールバック判断を行わない。
 
 ## テスト / 評価方針
 
@@ -348,6 +361,9 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-15 | NEEDS_WORK               | (phase 6 Interface/Routing 設計) CLI flag 体系・exit code・Request/Response 変換・`output.RegisteredFormats()` 提案は D1-D11 と実装コードに整合。ただし `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:113,231` (durable 正本、2026-07-14 sync 済み) が「methodSymbol.metadata は #21/#22 双方の対象外」という override 前の記述のままで、本 spec の D11 拡張と矛盾。フェーズ6を「完了」としているが備考は「レビュー待ち」で状態と実態が不一致 | 対応済 (feature doc 2 箇所を override 後の内容へ先行更新、#21 index.md:470 の反映済み行も同期、フェーズ6を進行中に修正) |
 | 2026-07-15 | PASS                     | (phase 6 再レビュー) 前回指摘 3 件 (feature doc override 反映・フェーズ6状態不一致・#21 反映済み行同期) すべて解消を確認、新たな不整合なし。#21 index.md の変更履歴に今回の再同期を追記すべきという非ブロッキング補足あり                                                                                                                                                                                                                                         | 対応済 (#21 変更履歴に追記)                                                                                             |
 | 2026-07-15 | PASS                     | (phase 7 Content/Data 設計) 「該当なし」判断・package 配置方針が D1-D11・実装コード・context/architecture.md の package boundary と矛盾なし。指摘なし                                                                                                                                                                                                                                                                                                             | —                                                                                                                       |
+| 2026-07-15 | NEEDS_WORK               | (phase 8 Performance/Security 設計) Performance の SLO 委譲・Security/Privacy・Error ケーステーブルの exit code 整合はいずれも矛盾なし。ただしフェーズ8の状態が「完了」で備考は「レビュー待ち」となっており、フェーズ6で既に自己是正した同一パターンの不一致が再発                                                                                                                                                                                                | 対応済 (フェーズ8を「進行中」に修正)                                                                                    |
+| 2026-07-15 | NEEDS_WORK               | (phase 8 再レビュー) フェーズ8の状態修正自体は解消したが、`## 変更履歴` に修正を記録する行がなく、フェーズ6の同種修正時の運用 (変更履歴にも記録) から外れていた                                                                                                                                                                                                                                                                                                   | 対応済 (変更履歴に追記)                                                                                                 |
+| 2026-07-15 | PASS                     | (phase 8 再レビュー3回目) 変更履歴への記録漏れが解消され、フェーズ表・レビュー表・変更履歴の3節が矛盾なく整合していることを確認。新たな不整合なし                                                                                                                                                                                                                                                                                                                 | —                                                                                                                       |
 
 ## 変更履歴
 
@@ -378,6 +394,9 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-15 | Claude         | phase 6 再レビュー PASS。フェーズ6を「レビュー済」に更新、`specs/21-java-dispatch-spring-di/index.md` の変更履歴に今回の再同期を追記 (非ブロッキング補足対応)。論点整理〜Interface/Routing 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-07-15 | Claude         | phase 7 (Content / Data 設計): 永続ストアなし (Core プロセス内メモリのみ) を明記、`core/internal/cli`/`core/internal/analyze`/`core/internal/graph`/`core/internal/output`/`core/e2e` への配置方針 (既存 package 構成を変更しない) を記述。機能仕様の Content/Assets・UI Reuse を「該当なし」で記入。備考の引き継ぎメモを解消。レビュー待ち                                                                                                                                                                                                                                                                                                                                                        |
 | 2026-07-15 | Claude         | phase 7 spec-review PASS (指摘なし)。フェーズ7を「レビュー済」に更新。Content/Data 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-07-15 | Claude         | phase 8 (Performance / Security 設計): Performance (SLO 数値目標確定を実装フェーズ・feature doc sync へ委譲する方針)・Security/Privacy (既存読み取り専用方針の継承)・Error/Fallback (エラーケース7件、D1/D3/D4/D8/traversal StatusStartNotFound に対応)を記述。機能仕様の Performance にも要点を反映。レビュー待ち                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-07-15 | Claude         | phase 8 spec-review 指摘対応 (NEEDS_WORK 1件、状態表記不一致): フェーズ8の状態を「完了」から「進行中」に修正 (レビュー未了のため、フェーズ6と同じ運用に統一)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-07-15 | Claude         | phase 8 再レビュー PASS (3回目)。フェーズ8を「レビュー済」に更新。Performance/Security 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 備考
 
