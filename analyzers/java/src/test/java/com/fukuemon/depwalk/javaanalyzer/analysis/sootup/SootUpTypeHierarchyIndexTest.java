@@ -101,6 +101,24 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    void limitsCandidatesToImplementationsOfTheStaticReceiverType() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
+                "com.example.RootRenderer",
+                "com.example.NarrowRenderer",
+                "render",
+                List.of());
+
+        assertTrue(resolution.isAvailable(), resolution.unavailableReason());
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.NarrowRendererImpl", "render", List.of())),
+                resolution.candidates());
+    }
+
+    @Test
     void resolvesEffectiveMethodForConcreteSpringBeanIncludingInterfaceDefault() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));

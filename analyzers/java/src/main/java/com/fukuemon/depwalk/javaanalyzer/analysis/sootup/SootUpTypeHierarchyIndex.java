@@ -95,8 +95,23 @@ public final class SootUpTypeHierarchyIndex {
         }
     }
 
+    private record DispatchKey(
+            String declaringType,
+            String receiverType,
+            String methodName,
+            List<String> parameterTypes) {
+        private DispatchKey {
+            parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        private MethodKey methodKey() {
+            return new MethodKey(declaringType, methodName, parameterTypes);
+        }
+    }
+
     private final List<Path> classpath;
     private final Map<MethodKey, Resolution> methodCache = new LinkedHashMap<>();
+    private final Map<DispatchKey, Resolution> receiverMethodCache = new LinkedHashMap<>();
     private final Map<MethodKey, Resolution> implementationMethodCache = new LinkedHashMap<>();
     private final Map<String, Resolution> constructorCache = new LinkedHashMap<>();
     private JavaView view;
@@ -130,6 +145,29 @@ public final class SootUpTypeHierarchyIndex {
     public Resolution resolveMethod(String declaringType, String methodName, List<String> parameterTypes) {
         MethodKey key = new MethodKey(declaringType, methodName, parameterTypes);
         return methodCache.computeIfAbsent(key, this::resolveMethodUncached);
+    }
+
+    /**
+     * 宣言メソッドに対する実装候補を、call siteで観測した静的receiver型のsubtypeに限定して返す。
+     * 親interfaceから継承したメソッドを子interface型で呼ぶ場合に、子interfaceを実装しない
+     * 親interfaceだけの実装を候補へ混入させないため、宣言型と探索起点を別々に受け取る。
+     *
+     * @param declaringType 解決済みメソッドを宣言する型のbinary name
+     * @param receiverType call siteにおけるreceiverの静的型のbinary name
+     * @param methodName 宣言メソッド名
+     * @param parameterTypes erasure済み引数型のbinary name配列
+     * @return receiver型から到達可能な具象実装候補、またはbytecodeを利用できなかった理由
+     */
+    public Resolution resolveMethod(
+            String declaringType,
+            String receiverType,
+            String methodName,
+            List<String> parameterTypes) {
+        if (declaringType.equals(receiverType)) {
+            return resolveMethod(declaringType, methodName, parameterTypes);
+        }
+        DispatchKey key = new DispatchKey(declaringType, receiverType, methodName, parameterTypes);
+        return receiverMethodCache.computeIfAbsent(key, this::resolveReceiverMethodUncached);
     }
 
     /**
@@ -217,6 +255,42 @@ public final class SootUpTypeHierarchyIndex {
                     .sorted(candidateComparator())
                     .toList();
             return Resolution.available(constructors);
+        });
+    }
+
+    private Resolution resolveReceiverMethodUncached(DispatchKey key) {
+        return guardQuery(key.receiverType(), () -> {
+            MethodKey methodKey = key.methodKey();
+            ClassType declaredType = view().getIdentifierFactory().getClassType(key.declaringType());
+            Optional<JavaSootClass> declaredClass = view().getClass(declaredType);
+            if (declaredClass.isEmpty()) {
+                return unavailable(key.declaringType(), "class was not found in the supplied classpath");
+            }
+            Optional<JavaSootMethod> declaredMethod = findDeclaredMethod(declaredClass.get(), methodKey);
+            if (declaredMethod.isEmpty()) {
+                return unavailable(key.declaringType(), "method was not found in the matching class file");
+            }
+            if (declaredMethod.get().isPrivate() || declaredMethod.get().isFinal()) {
+                return Resolution.available(List.of());
+            }
+
+            ClassType receiverType = view().getIdentifierFactory().getClassType(key.receiverType());
+            Optional<JavaSootClass> receiverClass = view().getClass(receiverType);
+            if (receiverClass.isEmpty()) {
+                return unavailable(key.receiverType(), "class was not found in the supplied classpath");
+            }
+            Stream<ClassType> receiverCandidates = receiverClass.get().isInterface()
+                    ? hierarchy().implementersOf(receiverType)
+                    : Stream.concat(
+                            receiverClass.get().isConcrete() ? Stream.of(receiverType) : Stream.empty(),
+                            hierarchy().subclassesOf(receiverType));
+            Map<String, MethodCandidate> candidates = new LinkedHashMap<>();
+            receiverCandidates
+                    .filter(type -> view().getClass(type).map(JavaSootClass::isConcrete).orElse(false))
+                    .sorted(Comparator.comparing(ClassType::getFullyQualifiedName))
+                    .forEach(type -> findEffectiveMethod(type, methodKey).ifPresent(candidate ->
+                            candidates.putIfAbsent(candidateKey(candidate), candidate)));
+            return Resolution.available(candidates.values().stream().sorted(candidateComparator()).toList());
         });
     }
 
