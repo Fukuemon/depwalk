@@ -120,3 +120,16 @@ class FactoryConfig {
         };
     }
 }
+
+interface ConfigurationConditionalContract {
+}
+
+@Configuration
+@Profile("config-profile")
+class ConditionalFactoryConfig {
+    @Bean
+    @ConditionalOnProperty(name = "configuration.feature.enabled")
+    ConfigurationConditionalContract configurationConditionalFactory() {
+        return null;
+    }
+}

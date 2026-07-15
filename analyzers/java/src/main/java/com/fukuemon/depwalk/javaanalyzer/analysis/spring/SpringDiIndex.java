@@ -327,11 +327,28 @@ public final class SpringDiIndex {
                 names,
                 qualifier == null ? List.of() : List.of(qualifier),
                 SpringAnnotations.has(method, SpringAnnotations.PRIMARY),
-                SpringAnnotations.conditionTypes(method),
+                factoryConditionTypes(configuration, method),
                 BeanKind.FACTORY_METHOD,
                 BinaryNames.forTypeLikeNode(configuration),
                 method.getNameAsString());
         return new BeanEntry(definition, assignableTypesOf(returnType));
+    }
+
+    /**
+     * configuration class と factory method の両方に宣言された条件annotationを統合する。
+     * class側の条件は配下の全Beanへ適用されるため、methodに直接付いた条件だけを保持すると
+     * 実行時に存在しない可能性があるBeanを一意候補と誤判定する。
+     *
+     * @param configuration factory methodを宣言するconfiguration class
+     * @param method Beanを生成するfactory method
+     * @return 条件annotationのFQNを重複なく辞書順に並べた一覧
+     */
+    private static List<String> factoryConditionTypes(
+            ClassOrInterfaceDeclaration configuration,
+            MethodDeclaration method) {
+        Set<String> conditions = new LinkedHashSet<>(SpringAnnotations.conditionTypes(configuration));
+        conditions.addAll(SpringAnnotations.conditionTypes(method));
+        return conditions.stream().sorted().toList();
     }
 
     private static Optional<String> factoryImplementationType(MethodDeclaration method) {
