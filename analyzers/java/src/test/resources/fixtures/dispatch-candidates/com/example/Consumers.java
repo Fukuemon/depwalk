@@ -76,6 +76,7 @@ class DispatchOnlyConsumer {
     <T extends IntersectionDispatchA & IntersectionDispatchB> void runIntersection(T service) {
         service.invoke();
     }
+
 }
 
 @Component

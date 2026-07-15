@@ -80,8 +80,11 @@ class SootUpTypeHierarchyIndexTest {
 
         assertTrue(resolution.isAvailable(), resolution.unavailableReason());
         assertEquals(
-                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
-                        "com.example.DefaultShape", "draw", List.of())),
+                List.of(
+                        new SootUpTypeHierarchyIndex.MethodCandidate(
+                                "com.example.AbstractChildDefaultShapeImpl", "draw", List.of()),
+                        new SootUpTypeHierarchyIndex.MethodCandidate(
+                                "com.example.DefaultShape", "draw", List.of())),
                 resolution.candidates());
     }
 
@@ -110,12 +113,63 @@ class SootUpTypeHierarchyIndexTest {
 
         SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
                 "com.example.DefaultShape",
-                "com.example.AbstractChildDefaultShape",
+                "com.example.UnimplementedAbstractChildDefaultShape",
                 "draw",
                 List.of());
 
         assertTrue(resolution.isAvailable(), resolution.unavailableReason());
         assertEquals(List.of(), resolution.candidates());
+    }
+
+    @Test
+    void resolvesConcreteOverrideAfterChildInterfaceRedeclaresDefaultAsAbstract() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
+                "com.example.DefaultShape",
+                "com.example.AbstractChildDefaultShape",
+                "draw",
+                List.of());
+
+        assertTrue(resolution.isAvailable(), resolution.unavailableReason());
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.AbstractChildDefaultShapeImpl", "draw", List.of())),
+                resolution.candidates());
+    }
+
+    @Test
+    void intersectsConcreteReceiversBeforeResolvingInheritedMethods() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
+                "com.example.IntersectionRendererA",
+                List.of("com.example.IntersectionRendererA", "com.example.IntersectionRendererB"),
+                "render",
+                List.of());
+
+        assertTrue(resolution.isAvailable(), resolution.unavailableReason());
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.IntersectionRendererBoth", "render", List.of())),
+                resolution.candidates());
+    }
+
+    @Test
+    void failsClosedWhenAnIntersectionBoundaryIsMissingFromClasspath() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
+                "com.example.IntersectionRendererA",
+                List.of("com.example.IntersectionRendererA", "com.example.MissingMarker"),
+                "render",
+                List.of());
+
+        assertFalse(resolution.isAvailable());
+        assertTrue(resolution.unavailableReason().contains("com.example.MissingMarker"));
     }
 
     @Test

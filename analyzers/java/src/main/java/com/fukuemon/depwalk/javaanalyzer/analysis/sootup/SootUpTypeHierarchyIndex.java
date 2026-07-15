@@ -173,6 +173,7 @@ public final class SootUpTypeHierarchyIndex {
     /**
      * 宣言メソッドに対する実装候補を、receiverが満たすすべての上限型の積集合に限定して返す。
      * {@code T extends A & B} のような交差境界で、先頭境界だけを実装する型が候補へ混入することを防ぐ。
+     * いずれかの境界をclasspathから解決できない場合は、境界を無視して誤候補を返さず利用不能とする。
      *
      * @param declaringType 解決済みメソッドを宣言する型のbinary name
      * @param receiverTypes call siteのreceiverが同時に満たす静的型のbinary name配列
@@ -185,26 +186,53 @@ public final class SootUpTypeHierarchyIndex {
             List<String> receiverTypes,
             String methodName,
             List<String> parameterTypes) {
-        Map<String, MethodCandidate> intersection = null;
-        for (String receiverType : receiverTypes.stream().distinct().toList()) {
-            Resolution resolution = resolveMethod(declaringType, receiverType, methodName, parameterTypes);
-            if (!resolution.isAvailable()) {
-                return resolution;
+        return guardQuery(declaringType, () -> {
+            MethodKey methodKey = new MethodKey(declaringType, methodName, parameterTypes);
+            ClassType declaredType = view().getIdentifierFactory().getClassType(declaringType);
+            Optional<JavaSootClass> declaredClass = view().getClass(declaredType);
+            if (declaredClass.isEmpty()) {
+                return unavailable(declaringType, "class was not found in the supplied classpath");
             }
+            Optional<JavaSootMethod> declaredMethod = findDeclaredMethod(declaredClass.get(), methodKey);
+            if (declaredMethod.isEmpty()) {
+                return unavailable(declaringType, "method was not found in the matching class file");
+            }
+            if (declaredMethod.get().isPrivate() || declaredMethod.get().isFinal()) {
+                return Resolution.available(List.of());
+            }
+
+            Map<String, ClassType> receiverIntersection = null;
+            for (String receiverName : receiverTypes.stream().distinct().toList()) {
+                ClassType receiverType = view().getIdentifierFactory().getClassType(receiverName);
+                Optional<JavaSootClass> receiverClass = view().getClass(receiverType);
+                if (receiverClass.isEmpty()) {
+                    return unavailable(receiverName, "class was not found in the supplied classpath");
+                }
+                Stream<ClassType> receiverCandidates = receiverClass.get().isInterface()
+                        ? hierarchy().implementersOf(receiverType)
+                        : Stream.concat(
+                                receiverClass.get().isConcrete() ? Stream.of(receiverType) : Stream.empty(),
+                                hierarchy().subclassesOf(receiverType));
+                Map<String, ClassType> concreteReceivers = new LinkedHashMap<>();
+                receiverCandidates
+                        .filter(type -> view().getClass(type).map(JavaSootClass::isConcrete).orElse(false))
+                        .forEach(type -> concreteReceivers.put(type.getFullyQualifiedName(), type));
+                if (receiverIntersection == null) {
+                    receiverIntersection = concreteReceivers;
+                } else {
+                    receiverIntersection.keySet().retainAll(concreteReceivers.keySet());
+                }
+            }
+
             Map<String, MethodCandidate> candidates = new LinkedHashMap<>();
-            for (MethodCandidate candidate : resolution.candidates()) {
-                candidates.put(candidateKey(candidate), candidate);
+            if (receiverIntersection != null) {
+                receiverIntersection.values().stream()
+                        .sorted(Comparator.comparing(ClassType::getFullyQualifiedName))
+                        .forEach(type -> findEffectiveMethod(type, methodKey).ifPresent(candidate ->
+                                candidates.putIfAbsent(candidateKey(candidate), candidate)));
             }
-            if (intersection == null) {
-                intersection = candidates;
-            } else {
-                intersection.keySet().retainAll(candidates.keySet());
-            }
-        }
-        if (intersection == null) {
-            return Resolution.available(List.of());
-        }
-        return Resolution.available(intersection.values().stream().sorted(candidateComparator()).toList());
+            return Resolution.available(candidates.values().stream().sorted(candidateComparator()).toList());
+        });
     }
 
     /**

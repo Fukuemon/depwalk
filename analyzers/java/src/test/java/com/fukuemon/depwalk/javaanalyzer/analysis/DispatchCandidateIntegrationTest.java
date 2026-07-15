@@ -121,6 +121,9 @@ class DispatchCandidateIntegrationTest {
         assertFalse(hasEdge(
                 intersectionCaller,
                 "java:com.example.IntersectionDispatchAOnly#invoke()"));
+        assertFalse(hasEdge(
+                intersectionCaller,
+                "java:com.example.SharedIntersectionDispatchBase#invoke()"));
 
         String shadowedCaller = "java:com.example.PrimaryConsumer#checkoutWithShadowedParameter(com.example.PaymentService)";
         for (String callee : List.of(

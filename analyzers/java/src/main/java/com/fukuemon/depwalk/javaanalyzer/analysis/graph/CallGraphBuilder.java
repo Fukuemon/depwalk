@@ -1027,24 +1027,49 @@ public final class CallGraphBuilder {
         }
         try {
             ResolvedType receiverType = scope.calculateResolvedType();
-            List<ResolvedType> bounds;
-            if (receiverType.isTypeVariable()) {
-                bounds = receiverType.asTypeVariable().asTypeParameter().getBounds().stream()
-                        .filter(bound -> bound.isExtends())
-                        .map(bound -> bound.getType())
-                        .toList();
-            } else if (receiverType instanceof ResolvedIntersectionType intersectionType) {
-                bounds = intersectionType.getElements();
-            } else {
-                return List.of(fallback);
-            }
-            List<String> constraints = bounds.stream()
-                    .map(BinaryNames::erasureOf)
-                    .distinct()
-                    .toList();
-            return constraints.isEmpty() ? List.of(fallback) : constraints;
+            LinkedHashSet<String> constraints = new LinkedHashSet<>();
+            collectReceiverTypeConstraints(receiverType, constraints, new LinkedHashSet<>());
+            return constraints.isEmpty() ? List.of(fallback) : List.copyOf(constraints);
         } catch (RuntimeException | LinkageError e) {
             return List.of(fallback);
+        }
+    }
+
+    /**
+     * 型変数・intersection・上限wildcardを再帰展開し、最終的なreference型境界を収集する。
+     * 間接境界 ({@code T extends U}, {@code U extends A & B}) でもAとBの両方を保持する。
+     *
+     * @param type 展開するreceiver型または境界型
+     * @param constraints 収集先のbinary name集合
+     * @param visiting 展開中の型変数名。循環参照を停止する
+     */
+    private static void collectReceiverTypeConstraints(
+            ResolvedType type,
+            Set<String> constraints,
+            Set<String> visiting) {
+        if (type.isTypeVariable()) {
+            String variableName = type.asTypeVariable().qualifiedName();
+            if (!visiting.add(variableName)) {
+                return;
+            }
+            type.asTypeVariable().asTypeParameter().getBounds().stream()
+                    .filter(bound -> bound.isExtends())
+                    .forEach(bound -> collectReceiverTypeConstraints(bound.getType(), constraints, visiting));
+            visiting.remove(variableName);
+            return;
+        }
+        if (type instanceof ResolvedIntersectionType intersectionType) {
+            intersectionType.getElements()
+                    .forEach(element -> collectReceiverTypeConstraints(element, constraints, visiting));
+            return;
+        }
+        if (type.isWildcard() && type.asWildcard().isExtends()) {
+            collectReceiverTypeConstraints(type.asWildcard().getBoundedType(), constraints, visiting);
+            return;
+        }
+        ResolvedType erased = type.erasure();
+        if (erased.isReferenceType()) {
+            constraints.add(BinaryNames.erasureOf(erased));
         }
     }
 

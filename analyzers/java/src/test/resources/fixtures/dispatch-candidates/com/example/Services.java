@@ -98,6 +98,17 @@ class IntersectionDispatchBoth implements IntersectionDispatchA, IntersectionDis
     }
 }
 
+class SharedIntersectionDispatchBase {
+    public void invoke() {
+    }
+}
+
+class SharedIntersectionDispatchAOnly extends SharedIntersectionDispatchBase implements IntersectionDispatchA {
+}
+
+class SharedIntersectionDispatchBOnly extends SharedIntersectionDispatchBase implements IntersectionDispatchB {
+}
+
 class ParentOnlyDispatchImplementation implements ParentDispatchService {
     public void invoke() {
     }
