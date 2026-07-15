@@ -86,6 +86,24 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    void keepsInheritedDefaultMethodWhenReceiverIsAChildInterface() throws Exception {
+        Path classesDir = compileFixture("sootup-dispatch", false);
+        SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
+
+        SootUpTypeHierarchyIndex.Resolution resolution = index.resolveMethod(
+                "com.example.DefaultShape",
+                "com.example.ChildDefaultShape",
+                "draw",
+                List.of());
+
+        assertTrue(resolution.isAvailable(), resolution.unavailableReason());
+        assertEquals(
+                List.of(new SootUpTypeHierarchyIndex.MethodCandidate(
+                        "com.example.DefaultShape", "draw", List.of())),
+                resolution.candidates());
+    }
+
+    @Test
     void indexesOverrideOfConcreteBaseMethod() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
