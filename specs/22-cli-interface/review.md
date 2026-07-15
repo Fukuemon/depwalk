@@ -66,3 +66,25 @@ Verdict: PASS
 
 - D5 の「registry 登録だけで CLI 自動露出」には、登録済み Format 列挙 API の output 側公開が必要 → Interface 設計 phase で明示すること
 - specs/21 の参照は #21 merge 後に解決すること
+
+## Review 2026-07-15 12:00 (D11 拡張分 clarify 再オープン、develop rebase 後)
+
+Verdict: NEEDS_WORK
+
+### 観点別評価
+
+- 上位文書整合: PASS — D11 拡張本文の実装コード上の前提 (`core/internal/graph/convert.go:6-25` が Metadata をコピーしていないこと、`graph/graph.go:26-44` の Symbol/Edge に Metadata フィールドが無いこと、`CallGraphBuilder.java:534-541,567-571` が LIFTED 時に declaringType/inherited を実際に metadata へ設定していること) はすべて実コードと一致。feature doc (`DesignDoc_java-analyzer.md:265`)・context (`testing.md:16,20`) とも整合。
+- 未解決論点: PASS — 論点テーブル空、未確定事項なし、下流節は placeholder のまま
+- 実装対象明示: PASS — target 名が `context/project.md:68` と一致、D11 拡張の責務変更 (core/output を Edge/Symbol 双方に拡大) が明記
+- template 必須節: NEEDS_WORK — (1) `index.md:28` フェーズ5が「レビュー済」を自称する一方、本レビュー記録が `## レビュー` 表に無かった、(2) `specs/21-java-dispatch-spring-di/index.md:24` フェーズ5備考が D9 override (`:218`, `:552`) 前の要約のまま同期されていなかった
+- EARS acceptance: PASS — S1-S3 とも観測可能な記述
+- prompts 自己完結性 / 正本境界: N/A (phase 10 未着手 / sync phase 未実行)
+
+### 指摘
+
+1. `index.md:28` / `## レビュー` 表 — 本レビュー結果を追記してからフェーズ状態を確定させること → 対応済み (本レビュー行を追記)
+2. `specs/21-java-dispatch-spring-di/index.md:24` — フェーズ5備考を D9 override 後の内容に同期すること → 対応済み
+
+### 補足 (非ブロッキング)
+
+- `design/DesignDoc_java-analyzer.md:336` は現状 edge 側の CLI 表出境界のみ言及。sync phase で node 側 (`graph.Symbol`/`methodSymbol.metadata`) の境界記述追加を忘れないこと。
