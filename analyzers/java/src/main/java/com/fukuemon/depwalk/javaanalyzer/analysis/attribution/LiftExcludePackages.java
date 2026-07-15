@@ -10,7 +10,7 @@ import java.util.Map;
  * 判定は宣言型の binary name に対する {@code .} 区切り segment 単位の prefix 一致。
  *
  * <p>{@code liftExcludePackages} の型検証 (List か、要素が String か) は
- * {@link com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator} が解析開始前に行う (M5)。
+ * {@link com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator} が解析開始前に行う。
  * 本クラスは検証済みの入力を受け取る前提で、型不正時のフォールバックは持たない。
  */
 public final class LiftExcludePackages {
@@ -24,6 +24,12 @@ public final class LiftExcludePackages {
         this.prefixes = prefixes;
     }
 
+    /**
+     * 解析要求 metadata から引き上げ除外 package を構築する。
+     *
+     * @param metadata 検証済みの analysis request metadata
+     * @return metadata に指定があればその値、なければ既定 package を使う規則
+     */
     public static LiftExcludePackages fromMetadata(Map<String, Object> metadata) {
         if (metadata == null || !metadata.containsKey(METADATA_KEY)) {
             return new LiftExcludePackages(DEFAULT_PREFIXES);
@@ -33,7 +39,12 @@ public final class LiftExcludePackages {
         return new LiftExcludePackages(values);
     }
 
-    /** 宣言型の binary name が除外 package に属するか (segment 単位 prefix 一致)。 */
+    /**
+     * 宣言型の binary name が除外 package に属するかを segment 単位の prefix 一致で判定する。
+     *
+     * @param declaringTypeBinaryName 判定対象の宣言型 binary name
+     * @return 引き上げ対象外なら {@code true}
+     */
     public boolean excludes(String declaringTypeBinaryName) {
         for (String prefix : prefixes) {
             if (declaringTypeBinaryName.equals(prefix) || declaringTypeBinaryName.startsWith(prefix + ".")) {

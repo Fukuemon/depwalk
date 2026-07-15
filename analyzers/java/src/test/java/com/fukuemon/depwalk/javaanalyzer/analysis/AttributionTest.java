@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D7 / D11: 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、
+ * 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、
  * 除外 package (既定値 / liftExcludePackages による置き換え、segment 単位 prefix 一致)、
  * this / super / static / new の各形。
  *
@@ -86,7 +86,7 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserService#invokeToString()".equals(e.get("callerMethodId"))),
                 "java.lang.Object#toString() is excluded by default and must not produce an edge: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty(), "excluded-package omission must not raise a diagnostic");
+        assertNoUnresolvedDiagnostic(ran, "excluded-package omission must not raise an unresolved diagnostic");
     }
 
     @Test
@@ -95,7 +95,7 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserRepository#invokeExternalDirect(com.example.lib.ExternalRepo)".equals(e.get("callerMethodId"))),
                 "receiver type out of scope must not produce an edge: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external omission must not raise an unresolved diagnostic");
     }
 
     @Test
@@ -143,11 +143,11 @@ class AttributionTest {
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserService#constructScopeExternal()".equals(e.get("callerMethodId"))),
                 "constructor calls are never lifted, out-of-scope new must be omitted: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external constructor omission must not raise an unresolved diagnostic");
     }
 
     /**
-     * D11 (無修飾 static import): {@code import static com.example.lib.StaticUtils.util; util();}
+     * 無修飾 static import ({@code import static com.example.lib.StaticUtils.util; util();})
      * は「参照した型」= 宣言型 (StaticUtils) そのものであり、enclosing class (UserService) へは
      * 引き上げない。宣言型・参照型ともに scope 外のため出力しない (diagnostic も出さない)。
      */
@@ -161,11 +161,11 @@ class AttributionTest {
         assertFalse(ran.byType("methodSymbol").stream().anyMatch(n ->
                         "java:com.example.lib.StaticUtils#util()".equals(n.get("methodId"))),
                 "out-of-scope static import callee must not be emitted as a node either: " + ran.byType("methodSymbol"));
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertNoUnresolvedDiagnostic(ran, "scope-external static import must not raise an unresolved diagnostic");
     }
 
     /**
-     * D11 (無修飾 static import, scope 内): 宣言型 (MathUtils) が scope 内であれば、通常の
+     * 無修飾 static import でも宣言型 (MathUtils) が scope 内であれば、通常の
      * 「宣言サイトが scope 内」規則により、そのまま宣言型へ帰属する (enclosing への引き上げは
      * 発生しない、そもそも発生させる必要がない)。
      */
@@ -177,8 +177,13 @@ class AttributionTest {
                 "java:com.example.MathUtils#square()"));
     }
 
+    private static void assertNoUnresolvedDiagnostic(AnalysisTestSupport.Ran ran, String message) {
+        assertFalse(ran.byType("diagnostic").stream()
+                .anyMatch(diagnostic -> "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))), message);
+    }
+
     /**
-     * D11: 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
+     * 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
      * static メンバ) の場合は、従来どおり enclosing class への引き上げを維持する (static import 由来
      * ではなく、通常の継承メンバ参照であるため)。
      */

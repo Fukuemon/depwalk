@@ -32,6 +32,15 @@ Java Analyzerへ次の二つを一つの後続featureとして段階導入する
 
 一意に解決できない場合は候補を保持し、根拠なく一つへ確定しない。候補edge、解決根拠、曖昧性のProtocol上の表現は後続specで既存schemaとの整合を確認して決定する。
 
+### 状態追記 (spec #21 clarify phase での確定、2026-07-12)
+
+上記決定時点で未決だった 2 点が spec #21 の clarify phase で確定した。決定内容自体は変更しない、状態の追記として記録する。
+
+1. **call graph 生成の委譲範囲**: SootUpは型階層・override・interface実装候補の索引としてのみ使用し、call graph生成までは委譲しない (spec #21 D1)。
+2. **候補edge / 解決根拠 / 曖昧性のProtocol表現**: call siteごとにcaller→各実装候補への複数`CallEdge`を出力し、宣言型への既存edgeも保持する。各edgeの`metadata`に解決根拠 (`resolution` / `provenance` 等) を付与する (spec #21 D2)。
+
+詳細な決定理由は [spec #21](../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) と [feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を参照する。
+
 Spring DIとInterface Dispatch / SootUpは別Issueに分けず、一つのfeature Issueで設計する。SpringのBean選択は型階層から得る実装候補に依存し、両者でsymbol正規化、edge重複排除、曖昧性表現、E2E fixtureを共有するためである。実装promptは型階層補完、Spring候補絞り込み、統合E2Eの順に分割する。
 
 ## 代替案
@@ -66,8 +75,8 @@ Spring DIとInterface Dispatch / SootUpは別Issueに分けず、一つのfeatur
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。Issue #9の後続specでSootUp適用範囲、候補表現、Spring条件評価、性能上限を決定する。
-- context / AI 向け設定更新要否: 要。設計確定後にJava Analyzer feature doc、toolchain、testingへ依存・テスト・性能契約を反映する。
+- spec 更新要否: 要。Issue #9の後続spec (#21) でSootUp適用範囲、候補表現、Spring条件評価、性能上限を決定した (2026-07-12 sync phaseで反映済み)。
+- context / AI 向け設定更新要否: 要。spec #21の決定を踏まえ、Java Analyzer feature doc、toolchainへ依存・テスト・性能契約を反映済み (2026-07-12)。
 
 ## 関連ドキュメント / チケット
 
@@ -75,3 +84,4 @@ Spring DIとInterface Dispatch / SootUpは別Issueに分けず、一つのfeatur
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): 段階導入、dispatchの既知の制約
 - [adr/0004-defer-runtime-call-tracing.md](0004-defer-runtime-call-tracing.md): 動的呼び出しの完全追跡との境界
 - [specs/9-java-analyzer](../specs/9-java-analyzer/): Phase 1の設計と実装分割
+- [specs/21-java-dispatch-spring-di](../specs/21-java-dispatch-spring-di/): SootUp統合範囲・dispatch候補表現・Spring条件評価・性能受け入れ基準の決定記録 (D1〜D6)

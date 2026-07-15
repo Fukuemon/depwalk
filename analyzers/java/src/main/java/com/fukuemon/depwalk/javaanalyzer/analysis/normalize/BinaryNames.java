@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * D5 正規化規則 (型名 = JVM binary name / generics erasure / 配列・varargs) の実装。
+ * 型名を JVM binary name、generics erasure、配列・varargs の規則で正規化する。
  *
  * <p>JavaParser の {@code ResolvedReferenceTypeDeclaration#getQualifiedName()} は匿名クラスに対して
  * 呼び出しごとに異なるランダム UUID を返す (非決定的、実測で確認済み)。本クラスはこれに依存せず、
@@ -21,14 +21,15 @@ import java.util.List;
  * (JDK reflection / jar 由来で AST を持たない) 宣言のみ、シンボルソルバの
  * {@code getPackageName()} / {@code getClassName()} にフォールバックする。
  *
- * <p>匿名クラス / ローカルクラスの採番は javac の JVM binary name 規則と互換 (M3、javac 実測で確認):
+ * <p>匿名クラス / ローカルクラスの採番は javac の JVM binary name 規則と互換である
+ * (javac の出力で確認済み):
  * <ul>
  *   <li>匿名クラス: 直近の enclosing class ごとに 1 始まりのソース出現順 ({@code Outer$Nested} 内の
  *       最初の匿名クラスは、{@code Outer} 直下に先行する匿名クラスがあっても {@code Outer$Nested$1})。</li>
  *   <li>ローカルクラス: {@code Outer$<n><Name>} 形式 (例: {@code Outer$1Local})。n は同名ローカル
  *       クラスの enclosing class 内出現順。匿名クラスの採番とは独立したカウンタ。</li>
  * </ul>
- * 採番はソース内容のみに依存するため、同じソースなら常に同じ名前になる (D5 の決定性要件)。
+ * 採番はソース内容のみに依存するため、同じソースなら常に同じ名前になる。
  */
 public final class BinaryNames {
 
@@ -37,6 +38,10 @@ public final class BinaryNames {
 
     /**
      * 型宣言 (named type or 匿名クラスの {@link ObjectCreationExpr}) の JVM binary name を計算する。
+     *
+     * @param typeLikeNode named type declaration または匿名クラスを持つ object creation
+     * @return package 名と nested class segment を含む JVM binary name
+     * @throws IllegalArgumentException compilation unit または型宣言を特定できない場合
      */
     public static String forTypeLikeNode(Node typeLikeNode) {
         CompilationUnit cu = typeLikeNode.findCompilationUnit()
@@ -78,6 +83,9 @@ public final class BinaryNames {
      * 解決済み参照型宣言の binary name。AST を持つ場合 ({@code toAst()} が非空) は
      * {@link #forTypeLikeNode(Node)} に委譲し、AST を持たない場合 (JDK reflection / jar 由来) は
      * シンボルソルバの qualified name を binary 表記 ({@code $} 区切り) に変換する。
+     *
+     * @param decl JavaParser が型解決した参照型宣言
+     * @return nested class を {@code $} で区切った JVM binary name
      */
     public static String forResolvedDeclaration(ResolvedReferenceTypeDeclaration decl) {
         Node ast = decl.toAst().orElse(null);
@@ -90,7 +98,10 @@ public final class BinaryNames {
     }
 
     /**
-     * D5: generics erasure + 配列/varargs 正規化を適用した binary 表記を返す。
+     * generics erasure と配列・varargs 正規化を適用した binary 表記を返す。
+     *
+     * @param type JavaParser が型解決した型
+     * @return erasure 済み JVM binary name。配列は component type に {@code []} を付ける
      */
     public static String erasureOf(ResolvedType type) {
         ResolvedType erased = type.erasure();

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D6: symbolKind の割り当て (インスタンス初期化子 / フィールド初期化子の constructor への畳み込み、
+ * symbolKind の割り当て (インスタンス初期化子 / フィールド初期化子の constructor への畳み込み、
  * lambda 内呼び出しの囲みメソッド帰属 + viaLambda: true)。
  */
 class SymbolKindTest {

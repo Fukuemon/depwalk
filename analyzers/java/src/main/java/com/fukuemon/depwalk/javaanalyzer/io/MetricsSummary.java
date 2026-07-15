@@ -2,7 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.io;
 
 /**
  * stderr へ出力する計測サマリ。protocol record ではない (analyzer-protocol の対象外)。
- * 値の集計は P2_01 の責務であり、本 prompt では枠のみを用意する。
+ * 解析 runner が実行中に集計したファイル数、所要時間、未解決件数を process 終了時に報告する。
  *
  * @param analyzedFileCount   解析したファイル数
  * @param durationMillis      解析に要した時間 (ミリ秒)

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * H2: 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}、{@code constructorCallerIdsFor} 含む) の
+ * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}、{@code constructorCallerIdsFor} 含む) の
  * 解決失敗は、その宣言だけを skip して {@code JAVA_UNRESOLVED_SYMBOL} (warning) を出し、解析全体は
  * 継続する (exit 0、他の宣言 / edge は出力される)。
  */

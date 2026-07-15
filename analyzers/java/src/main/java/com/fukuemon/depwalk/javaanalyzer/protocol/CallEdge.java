@@ -4,7 +4,9 @@ import java.util.Map;
 
 /**
  * 解決済み caller / callee の呼び出し関係。
- * AST 解析・型解決による生成は P2_01 の責務であり、本 record は出力 schema のみを定義する。
+ *
+ * <p>AST 解析、型解決、bytecode 型階層、dependency injection 解決で得た呼び出しを Core へ渡す
+ * Analyzer Protocol record であり、本型は出力 schema のみを定義する。
  *
  * @param schemaVersion   Protocol version
  * @param recordType      {@code callEdge}
@@ -25,6 +27,16 @@ public record CallEdge(
 
     public static final String RECORD_TYPE = "callEdge";
 
+    /**
+     * 現在の schema version と record type を設定した call edge を生成する。
+     *
+     * @param edgeId Analyzer 内で一意な edge ID
+     * @param callerMethodId 呼び出し元 method ID
+     * @param calleeMethodId 呼び出し先 method ID
+     * @param callSite 呼び出し位置。取得できなければ {@code null}
+     * @param metadata dispatch や候補解決根拠。追加情報がなければ {@code null}
+     * @return protocol 出力可能な call edge
+     */
     public static CallEdge of(
             String edgeId,
             String callerMethodId,

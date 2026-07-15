@@ -17,11 +17,12 @@ import java.util.List;
 
 /**
  * 型解決 (design/features/java-analyzer/DesignDoc_java-analyzer.md 「型解決」) の 3 TypeSolver を構成する。
- * classpath は pre-flight 済み (P1_02) であり、jar / classes dir の存在・読み取り可否はここでは再検査
+ * classpath は解析開始前に検証済みであり、jar / classes dir の存在・読み取り可否はここでは再検査
  * しない。metadata 契約上、classpath の各 entry は「依存 jar」または「classes dir (コンパイル済み
- * .class ファイルの directory)」のいずれも許容するため (M6)、entry が directory の場合は
- * {@link ClassLoaderTypeSolver} ({@link URLClassLoader} 経由) を、jar (通常ファイル) の場合は
- * {@link JarTypeSolver} を使う。
+ * .class ファイルの directory)」のいずれも許容する。jar は {@link JarTypeSolver} で直接読み、
+ * classes directory は全 classpath entry を共有する {@link URLClassLoader} 経由の
+ * {@link ClassLoaderTypeSolver} で読む。共有 classloader により、ある module の class が別 module
+ * または依存 jar の型を参照していても JVM の class loading が途中で失敗しない。
  */
 public final class TypeSolverFactory {
 
@@ -29,12 +30,15 @@ public final class TypeSolverFactory {
     }
 
     /**
+     * workspace source と検証済み classpath を検索する合成 TypeSolver を生成する。
+     *
      * @param workspaceRoot 対象プロジェクトの source root ({@link JavaParserTypeSolver} に渡す)
      * @param classpathJars {@code analysisRequest.metadata.classpath} の jar / classes dir path 一覧
      * @param languageLevel {@link JavaParserTypeSolver} が workspaceRoot 配下の依存ソース (record 等)
      *                      を読み直す際に使う {@link ParserConfiguration.LanguageLevel} (呼び出し側の
      *                      メインパーサ設定と一致させる。既定 {@code POPULAR} は record を構文サポート
      *                      しないため、呼び出し側で明示的に渡す)
+     * @return reflection、source、jar、classes directory を合成した TypeSolver
      * @throws IOException jar / classes dir の読み込みに失敗した場合 (pre-flight で存在確認済みのため通常は起きない)
      */
     public static CombinedTypeSolver create(
@@ -43,25 +47,31 @@ public final class TypeSolverFactory {
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
         typeSolver.add(new JavaParserTypeSolver(workspaceRoot, typeSolverConfig));
-        for (String entry : classpathJars) {
-            Path path = Path.of(entry);
-            if (Files.isDirectory(path)) {
-                typeSolver.add(classesDirTypeSolver(path));
-            } else {
+        List<Path> entries = classpathJars.stream()
+                .map(Path::of)
+                .map(path -> path.toAbsolutePath().normalize())
+                .toList();
+        for (Path entry : entries) {
+            if (!Files.isDirectory(entry)) {
                 typeSolver.add(new JarTypeSolver(entry));
             }
+        }
+        if (entries.stream().anyMatch(Files::isDirectory)) {
+            typeSolver.add(classpathTypeSolver(entries));
         }
         return typeSolver;
     }
 
-    private static ClassLoaderTypeSolver classesDirTypeSolver(Path classesDir) throws IOException {
-        URL url;
-        try {
-            url = classesDir.toUri().toURL();
-        } catch (MalformedURLException e) {
-            throw new IOException("failed to resolve classes directory URL: " + classesDir, e);
+    private static ClassLoaderTypeSolver classpathTypeSolver(List<Path> entries) throws IOException {
+        URL[] urls = new URL[entries.size()];
+        for (int i = 0; i < entries.size(); i++) {
+            try {
+                urls[i] = entries.get(i).toUri().toURL();
+            } catch (MalformedURLException e) {
+                throw new IOException("failed to resolve classpath entry URL: " + entries.get(i), e);
+            }
         }
-        URLClassLoader classLoader = new URLClassLoader(new URL[] {url}, TypeSolverFactory.class.getClassLoader());
+        URLClassLoader classLoader = new URLClassLoader(urls, TypeSolverFactory.class.getClassLoader());
         return new ClassLoaderTypeSolver(classLoader);
     }
 }

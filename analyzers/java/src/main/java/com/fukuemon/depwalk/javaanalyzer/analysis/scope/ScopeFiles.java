@@ -30,6 +30,12 @@ public final class ScopeFiles {
      * glob との照合は {@link #toMatchablePath(String)} で {@code /} 区切りへ正規化した相対 path に
      * 対して行う (Windows の {@code \} 区切りでも {@code com/example/**} 形式の glob が機能する。
      * macOS / Linux の挙動は不変)。
+     *
+     * @param workspaceRoot 列挙の起点 directory
+     * @param include 対象に含める相対 path glob。未指定または空なら全 Java source
+     * @param exclude 対象外にする相対 path glob。未指定または空なら除外なし
+     * @return 絶対・正規化済み path を辞書順に並べた Java source 一覧
+     * @throws UncheckedIOException workspace の走査に失敗した場合
      */
     public static List<Path> enumerate(Path workspaceRoot, List<String> include, List<String> exclude) {
         List<PathMatcher> includeMatchers = toMatchers(include);
@@ -63,7 +69,12 @@ public final class ScopeFiles {
         return Path.of(RelativePaths.toRecordPath(rawRelativePath));
     }
 
-    /** {@link #enumerate} の結果を membership check 用の正規化済み {@link Set} に変換する。 */
+    /**
+     * {@link #enumerate(Path, List, List)} の結果を membership check 用 set に変換する。
+     *
+     * @param scopeFiles scope に含まれる source file path
+     * @return 絶対・正規化済み path の挿入順 set
+     */
     public static Set<Path> toMembershipSet(List<Path> scopeFiles) {
         Set<Path> set = new LinkedHashSet<>();
         for (Path p : scopeFiles) {
