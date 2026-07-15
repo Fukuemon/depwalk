@@ -98,6 +98,15 @@ class SpringDiIndexTest {
                         "org.springframework.boot.autoconfigure.condition.ConditionalOnProperty",
                         "org.springframework.context.annotation.Profile"),
                 configurationConditionalFactory.conditionTypes());
+
+        SpringDiIndex.BeanDefinition liteFactory = result.beans().stream()
+                .filter(bean -> bean.names().contains("liteFactoryBean"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("com.example.LiteFactoryService", liteFactory.implementationType());
+        assertEquals(
+                List.of("org.springframework.context.annotation.Profile"),
+                liteFactory.conditionTypes());
     }
 
     @Test
