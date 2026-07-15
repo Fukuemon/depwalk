@@ -72,6 +72,10 @@ class DispatchOnlyConsumer {
     <T extends ChildDispatchService> void runGenericChild(T service) {
         service.invoke();
     }
+
+    <T extends IntersectionDispatchA & IntersectionDispatchB> void runIntersection(T service) {
+        service.invoke();
+    }
 }
 
 @Component

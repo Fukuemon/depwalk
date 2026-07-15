@@ -171,6 +171,43 @@ public final class SootUpTypeHierarchyIndex {
     }
 
     /**
+     * 宣言メソッドに対する実装候補を、receiverが満たすすべての上限型の積集合に限定して返す。
+     * {@code T extends A & B} のような交差境界で、先頭境界だけを実装する型が候補へ混入することを防ぐ。
+     *
+     * @param declaringType 解決済みメソッドを宣言する型のbinary name
+     * @param receiverTypes call siteのreceiverが同時に満たす静的型のbinary name配列
+     * @param methodName 宣言メソッド名
+     * @param parameterTypes erasure済み引数型のbinary name配列
+     * @return 全receiver型から到達可能な候補の積集合、またはbytecodeを利用できなかった理由
+     */
+    public Resolution resolveMethod(
+            String declaringType,
+            List<String> receiverTypes,
+            String methodName,
+            List<String> parameterTypes) {
+        Map<String, MethodCandidate> intersection = null;
+        for (String receiverType : receiverTypes.stream().distinct().toList()) {
+            Resolution resolution = resolveMethod(declaringType, receiverType, methodName, parameterTypes);
+            if (!resolution.isAvailable()) {
+                return resolution;
+            }
+            Map<String, MethodCandidate> candidates = new LinkedHashMap<>();
+            for (MethodCandidate candidate : resolution.candidates()) {
+                candidates.put(candidateKey(candidate), candidate);
+            }
+            if (intersection == null) {
+                intersection = candidates;
+            } else {
+                intersection.keySet().retainAll(candidates.keySet());
+            }
+        }
+        if (intersection == null) {
+            return Resolution.available(List.of());
+        }
+        return Resolution.available(intersection.values().stream().sorted(candidateComparator()).toList());
+    }
+
+    /**
      * 指定 class の constructor を bytecode から返す。
      *
      * <p>Lombok などが生成し source に現れない constructor も、コンパイル済み class に存在すれば

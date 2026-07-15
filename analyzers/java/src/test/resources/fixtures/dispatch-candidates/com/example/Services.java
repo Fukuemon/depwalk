@@ -79,6 +79,25 @@ class ChildDispatchImplementation implements ChildDispatchService {
     }
 }
 
+interface IntersectionDispatchA {
+    void invoke();
+}
+
+interface IntersectionDispatchB {
+}
+
+class IntersectionDispatchAOnly implements IntersectionDispatchA {
+    @Override
+    public void invoke() {
+    }
+}
+
+class IntersectionDispatchBoth implements IntersectionDispatchA, IntersectionDispatchB {
+    @Override
+    public void invoke() {
+    }
+}
+
 class ParentOnlyDispatchImplementation implements ParentDispatchService {
     public void invoke() {
     }
