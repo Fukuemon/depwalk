@@ -40,6 +40,7 @@ import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclarat
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
 
@@ -66,7 +67,7 @@ public final class CallGraphBuilder {
     private final GraphAccumulator accumulator;
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final SourceMethodIndex sourceMethodIndex;
-    private final Map<String, SpringDiIndex.InjectionResolution> springResolutionByReceiver;
+    private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
 
     /**
      * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
@@ -90,13 +91,15 @@ public final class CallGraphBuilder {
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
         this.sourceMethodIndex = sourceMethodIndex;
-        this.springResolutionByReceiver = new LinkedHashMap<>();
+        this.springResolutionsByReceiver = new LinkedHashMap<>();
         for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
             SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();
             for (String receiverName : injection.receiverNames()) {
-                springResolutionByReceiver.putIfAbsent(
-                        springReceiverKey(injection.ownerType(), receiverName),
-                        resolution);
+                springResolutionsByReceiver
+                        .computeIfAbsent(
+                                springReceiverKey(injection.ownerType(), receiverName),
+                                ignored -> new ArrayList<>())
+                        .add(resolution);
             }
         }
     }
@@ -889,21 +892,14 @@ public final class CallGraphBuilder {
             return null;
         }
         String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
-        SpringDiIndex.InjectionResolution resolution =
-                springResolutionByReceiver.get(springReceiverKey(ownerType, receiverName));
-        if (resolution != null && isUnrelatedParameter(callNode, resolution.injectionPoint())) {
-            return null;
-        }
-        return resolution;
+        List<SpringDiIndex.InjectionResolution> resolutions =
+                springResolutionsByReceiver.get(springReceiverKey(ownerType, receiverName));
+        return selectSpringResolution(callNode, receiverName, resolutions);
     }
 
     private static String receiverNameOf(Node callNode) {
-        Expression scope;
-        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
-            scope = methodCall.getScope().get();
-        } else if (callNode instanceof MethodReferenceExpr methodReference) {
-            scope = methodReference.getScope();
-        } else {
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
             return null;
         }
         while (scope.isEnclosedExpr()) {
@@ -925,32 +921,71 @@ public final class CallGraphBuilder {
         return null;
     }
 
-    private static boolean isUnrelatedParameter(Node callNode, SpringDiIndex.InjectionPoint injection) {
-        Expression scope;
-        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
-            scope = methodCall.getScope().get();
-        } else if (callNode instanceof MethodReferenceExpr methodReference) {
-            scope = methodReference.getScope();
-        } else {
-            return false;
+    /**
+     * 同じownerとreceiver名を共有する注入点から、call siteが参照する宣言に対応する1件を選ぶ。
+     * parameterはsource上の宣言行で区別し、fieldは直接field injectionをconstructor／setter経由の
+     * aliasより優先する。1件に決められない場合は誤ったDI候補を使わず、型階層解決へ委ねる。
+     */
+    private static SpringDiIndex.InjectionResolution selectSpringResolution(
+            Node callNode,
+            String receiverName,
+            List<SpringDiIndex.InjectionResolution> resolutions) {
+        if (resolutions == null || resolutions.isEmpty()) {
+            return null;
+        }
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
+            return null;
         }
         while (scope.isEnclosedExpr()) {
             scope = scope.asEnclosedExpr().getInner();
         }
-        if (!(scope instanceof NameExpr name)) {
-            return false;
-        }
+        ResolvedValueDeclaration declaration;
         try {
-            var declaration = name.resolve();
-            if (!declaration.isParameter()) {
-                return false;
+            if (scope instanceof NameExpr name) {
+                declaration = name.resolve();
+            } else if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
+                declaration = field.resolve();
+            } else {
+                return null;
             }
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+
+        if (declaration.isParameter()) {
             Node ast = declaration.toAst().orElse(null);
             int declarationLine = ast != null && ast.getBegin().isPresent() ? ast.getBegin().get().line : -1;
-            return declarationLine != injection.sourceLine();
-        } catch (RuntimeException | LinkageError e) {
-            return true;
+            return uniqueResolution(resolutions.stream()
+                    .filter(resolution -> resolution.injectionPoint().sourceLine() == declarationLine)
+                    .toList());
         }
+        if (!declaration.isField()) {
+            return null;
+        }
+        List<SpringDiIndex.InjectionResolution> directFields = resolutions.stream()
+                .filter(resolution -> resolution.injectionPoint().kind() == SpringDiIndex.InjectionKind.FIELD)
+                .filter(resolution -> receiverName.equals(resolution.injectionPoint().targetName()))
+                .toList();
+        if (!directFields.isEmpty()) {
+            return uniqueResolution(directFields);
+        }
+        return uniqueResolution(resolutions);
+    }
+
+    private static SpringDiIndex.InjectionResolution uniqueResolution(
+            List<SpringDiIndex.InjectionResolution> resolutions) {
+        return resolutions.size() == 1 ? resolutions.get(0) : null;
+    }
+
+    private static Expression callScopeOf(Node callNode) {
+        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
+            return methodCall.getScope().get();
+        }
+        if (callNode instanceof MethodReferenceExpr methodReference) {
+            return methodReference.getScope();
+        }
+        return null;
     }
 
     private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {

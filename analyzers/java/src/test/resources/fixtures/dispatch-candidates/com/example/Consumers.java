@@ -96,3 +96,16 @@ class ForeignFieldConsumer {
         other.payment.pay();
     }
 }
+
+@Component
+class SameNamedSetterParametersConsumer {
+    @Autowired
+    void setPayment(PaymentService service) {
+        service.pay();
+    }
+
+    @Autowired
+    void setAudit(AuditService service) {
+        service.audit();
+    }
+}

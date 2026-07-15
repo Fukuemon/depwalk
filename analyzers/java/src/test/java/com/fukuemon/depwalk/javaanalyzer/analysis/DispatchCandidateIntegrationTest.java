@@ -130,6 +130,25 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    void distinguishesSameNamedParametersByTheirDeclarations() {
+        String paymentCaller = "java:com.example.SameNamedSetterParametersConsumer#setPayment(com.example.PaymentService)";
+        Map<String, Object> payment = assertEdge(
+                paymentCaller,
+                "java:com.example.PaypalPayment#pay()",
+                null);
+        assertCandidateMetadata(payment, "unique", List.of("sootup", "spring-di"));
+        assertFalse(hasEdge(paymentCaller, "java:com.example.StripePayment#pay()"));
+
+        String auditCaller = "java:com.example.SameNamedSetterParametersConsumer#setAudit(com.example.AuditService)";
+        for (String callee : List.of(
+                "java:com.example.AuditOne#audit()",
+                "java:com.example.AuditTwo#audit()")) {
+            Map<String, Object> edge = assertEdge(auditCaller, callee, null);
+            assertCandidateMetadata(edge, "ambiguous", List.of("sootup", "spring-di"));
+        }
+    }
+
+    @Test
     void marksConditionalCandidateAndEmitsConditionalDiagnostic() {
         Map<String, Object> edge = assertEdge(
                 "java:com.example.ConditionalConsumer#notifyCustomer()",
