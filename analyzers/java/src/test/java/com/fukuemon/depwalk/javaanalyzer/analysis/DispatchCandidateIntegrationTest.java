@@ -111,6 +111,17 @@ class DispatchCandidateIntegrationTest {
                 genericChildCaller,
                 "java:com.example.ParentOnlyDispatchImplementation#invoke()"));
 
+        String intersectionCaller =
+                "java:com.example.DispatchOnlyConsumer#runIntersection(com.example.IntersectionDispatchA)";
+        Map<String, Object> intersectionEdge = assertEdge(
+                intersectionCaller,
+                "java:com.example.IntersectionDispatchBoth#invoke()",
+                null);
+        assertCandidateMetadata(intersectionEdge, "unique", List.of("sootup"));
+        assertFalse(hasEdge(
+                intersectionCaller,
+                "java:com.example.IntersectionDispatchAOnly#invoke()"));
+
         String shadowedCaller = "java:com.example.PrimaryConsumer#checkoutWithShadowedParameter(com.example.PaymentService)";
         for (String callee : List.of(
                 "java:com.example.PaypalPayment#pay()",

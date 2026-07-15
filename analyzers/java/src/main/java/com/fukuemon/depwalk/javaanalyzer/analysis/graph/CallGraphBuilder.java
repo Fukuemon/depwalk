@@ -42,6 +42,7 @@ import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclarati
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
+import com.github.javaparser.resolution.types.ResolvedIntersectionType;
 import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.nio.file.Path;
@@ -815,9 +816,10 @@ public final class CallGraphBuilder {
         String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
         List<String> parameterTypes = paramBinaryNames(resolved);
         String receiverType = receiverSite == null ? declaringType : receiverSite.binaryName();
+        List<String> receiverTypes = receiverTypeConstraints(callNode, receiverType);
         SootUpTypeHierarchyIndex.Resolution sootResolution = sootUpIndex.resolveMethod(
                 declaringType,
-                receiverType,
+                receiverTypes,
                 resolved.getName(),
                 parameterTypes);
         if (!sootResolution.isAvailable()) {
@@ -1005,6 +1007,45 @@ public final class CallGraphBuilder {
             return methodReference.getScope();
         }
         return null;
+    }
+
+    /**
+     * call siteのreceiverが同時に満たす静的型を返す。
+     *
+     * <p>通常のreference typeはfallbackの1型だけを返す。型変数またはintersection typeでは
+     * 全extends境界を返し、SootUp側で候補の積集合を取れるようにする。型解決に失敗した場合も
+     * erasure済みfallbackを保持する。
+     *
+     * @param callNode method callまたはmethod reference
+     * @param fallback erasureから得たreceiver型
+     * @return receiverが同時に満たす型の重複なし配列
+     */
+    private static List<String> receiverTypeConstraints(Node callNode, String fallback) {
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
+            return List.of(fallback);
+        }
+        try {
+            ResolvedType receiverType = scope.calculateResolvedType();
+            List<ResolvedType> bounds;
+            if (receiverType.isTypeVariable()) {
+                bounds = receiverType.asTypeVariable().asTypeParameter().getBounds().stream()
+                        .filter(bound -> bound.isExtends())
+                        .map(bound -> bound.getType())
+                        .toList();
+            } else if (receiverType instanceof ResolvedIntersectionType intersectionType) {
+                bounds = intersectionType.getElements();
+            } else {
+                return List.of(fallback);
+            }
+            List<String> constraints = bounds.stream()
+                    .map(BinaryNames::erasureOf)
+                    .distinct()
+                    .toList();
+            return constraints.isEmpty() ? List.of(fallback) : constraints;
+        } catch (RuntimeException | LinkageError e) {
+            return List.of(fallback);
+        }
     }
 
     private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
