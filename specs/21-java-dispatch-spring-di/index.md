@@ -5,7 +5,7 @@
 ## メタ情報
 
 - Issue: `#21`
-- ステータス: `設計完了（実装着手可）`
+- ステータス: `実装完了（PRレビュー中）`
 - 作成日: 2026-07-12
 - 更新日: 2026-07-15
 - Branch: `feature/21`
@@ -547,6 +547,7 @@ ADR-0005 の実装 prompt 順序 (型階層補完 → Spring 候補絞り込み 
 | 2026-07-14 | Codex  | fresh-context 再監査の NEEDS_WORK に対応。feature doc scope と requirements を同期し、Spring fixture の再現可能な Gradle build/classpath manifest、SootUp 2.0.0 の最小 module、#22 D11 は callEdge metadata のみという委譲境界を確定                                                                                                                                                                                                                                                |
 | 2026-07-14 | Codex  | fresh-context 最終再レビュー PASS。PhaseStatus #10をレビュー済、#11を完了、ステータスを「設計完了（実装着手可）」へ同期                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-07-15 | Codex  | P1〜P3 を順次実装。P3 の性能計測結果と Spring fixture 配置完了を feature doc へ sync し、「上位資料からの変更点」の反映状態を更新                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-07-15 | Codex  | PRレビュー指摘を反映。dispatch候補の静的receiver型限定、同名DI receiverの宣言単位解決、未解決DIのSootUp fallback、条件付きPrimary規則、CI／E2E手順を実装・検証し、ステータスを「実装完了（PRレビュー中）」へ更新                                                                                                                                                                                                                                                                    |
 
 ## 備考
 
