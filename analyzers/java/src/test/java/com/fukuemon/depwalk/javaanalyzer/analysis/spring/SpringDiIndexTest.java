@@ -7,12 +7,14 @@ import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import lombok.RequiredArgsConstructor;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.tools.ToolProvider;
+import java.io.ByteArrayOutputStream;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -27,12 +29,12 @@ class SpringDiIndexTest {
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/spring-di");
 
     @TempDir
-    Path tempDir;
+    static Path tempDir;
 
-    private SpringDiIndex.Result result;
+    private static SpringDiIndex.Result result;
 
-    @BeforeEach
-    void analyzeFixture() throws Exception {
+    @BeforeAll
+    static void analyzeFixture() throws Exception {
         Path classesDir = compileLombokFixture();
         ParserConfiguration.LanguageLevel languageLevel = ParserConfiguration.LanguageLevel.JAVA_25;
         var typeSolver = TypeSolverFactory.create(FIXTURE, List.of(classesDir.toString()), languageLevel);
@@ -195,14 +197,15 @@ class SpringDiIndexTest {
         assertEquals(List.of("spring-di"), resolution.candidates().get(0).provenance());
     }
 
-    private Path compileLombokFixture() throws Exception {
+    private static Path compileLombokFixture() throws Exception {
         Path classesDir = tempDir.resolve("classes");
         Files.createDirectories(classesDir);
         String lombokJar = lombokJar();
+        ByteArrayOutputStream compilerOutput = new ByteArrayOutputStream();
         int exit = ToolProvider.getSystemJavaCompiler().run(
                 null,
-                null,
-                null,
+                compilerOutput,
+                compilerOutput,
                 "--release",
                 "21",
                 "-parameters",
@@ -216,7 +219,7 @@ class SpringDiIndexTest {
                 FIXTURE.resolve("com/example/LombokContract.java").toString(),
                 FIXTURE.resolve("com/example/LombokConsumer.java").toString(),
                 FIXTURE.resolve("com/example/LombokAllArgsConsumer.java").toString());
-        assertEquals(0, exit);
+        assertEquals(0, exit, compilerOutput.toString(StandardCharsets.UTF_8));
         return classesDir;
     }
 
