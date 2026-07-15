@@ -97,6 +97,26 @@ class DispatchCandidateIntegrationTest {
             Map<String, Object> edge = assertEdge(shadowedCaller, callee, null);
             assertCandidateMetadata(edge, "ambiguous", List.of("sootup"));
         }
+
+        String foreignFieldCaller = "java:com.example.ForeignFieldConsumer#checkoutOther(com.example.PaymentHolder)";
+        for (String callee : List.of(
+                "java:com.example.PaypalPayment#pay()",
+                "java:com.example.StripePayment#pay()")) {
+            Map<String, Object> edge = assertEdge(foreignFieldCaller, callee, null);
+            assertCandidateMetadata(edge, "ambiguous", List.of("sootup"));
+        }
+    }
+
+    @Test
+    void mapsConstructorParameterToItsAssignedFieldReceiver() {
+        Map<String, Object> edge = assertEdge(
+                "java:com.example.RenamedConstructorConsumer#checkout()",
+                "java:com.example.PaypalPayment#pay()",
+                null);
+        assertCandidateMetadata(edge, "unique", List.of("sootup", "spring-di"));
+        assertFalse(hasEdge(
+                "java:com.example.RenamedConstructorConsumer#checkout()",
+                "java:com.example.StripePayment#pay()"));
     }
 
     @Test
