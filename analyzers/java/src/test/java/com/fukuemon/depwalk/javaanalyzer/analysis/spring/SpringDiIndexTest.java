@@ -86,6 +86,16 @@ class SpringDiIndexTest {
                 .findFirst()
                 .orElseThrow();
         assertEquals("java.util.function.Supplier", lambdaFactory.implementationType());
+
+        SpringDiIndex.BeanDefinition configurationConditionalFactory = result.beans().stream()
+                .filter(bean -> bean.names().contains("configurationConditionalFactory"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(
+                List.of(
+                        "org.springframework.boot.autoconfigure.condition.ConditionalOnProperty",
+                        "org.springframework.context.annotation.Profile"),
+                configurationConditionalFactory.conditionTypes());
     }
 
     @Test
