@@ -155,6 +155,18 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    void mapsSetterParameterToItsAssignedFieldReceiver() {
+        Map<String, Object> edge = assertEdge(
+                "java:com.example.RenamedSetterConsumer#checkout()",
+                "java:com.example.PaypalPayment#pay()",
+                null);
+        assertCandidateMetadata(edge, "unique", List.of("sootup", "spring-di"));
+        assertFalse(hasEdge(
+                "java:com.example.RenamedSetterConsumer#checkout()",
+                "java:com.example.StripePayment#pay()"));
+    }
+
+    @Test
     void distinguishesSameNamedParametersByTheirDeclarations() {
         String paymentCaller = "java:com.example.SameNamedSetterParametersConsumer#setPayment(com.example.PaymentService)";
         Map<String, Object> payment = assertEdge(
