@@ -84,6 +84,25 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 				callee,
 				"ambiguous", []string{"sootup", "spring-di"})
 		}
+
+		assertSpringCandidateCallees(t, edges,
+			"java:com.example.springfixture.LombokCheckoutService#checkout()",
+			[]string{"java:com.example.springfixture.PaypalPayment#pay()"})
+		assertSpringCandidateCallees(t, edges,
+			"java:com.example.springfixture.FieldCheckoutService#checkout()",
+			[]string{"java:com.example.springfixture.StripePayment#pay()"})
+		assertSpringCandidateCallees(t, edges,
+			"java:com.example.springfixture.SetterCheckoutService#checkout()",
+			[]string{"java:com.example.springfixture.PaypalPayment#pay()"})
+		assertSpringCandidateCallees(t, edges,
+			"java:com.example.springfixture.ConfiguredCheckoutService#checkout()",
+			[]string{"java:com.example.springfixture.StripePayment#pay()"})
+		assertSpringCandidateCallees(t, edges,
+			"java:com.example.springfixture.AuditRunner#run()",
+			[]string{
+				"java:com.example.springfixture.DatabaseAuditService#audit()",
+				"java:com.example.springfixture.FileAuditService#audit()",
+			})
 	})
 
 	t.Run("ConditionalMetadata", func(t *testing.T) {
@@ -200,5 +219,30 @@ func assertSpringCandidateEdge(
 	}
 	if strings.Join(provenance, "\x00") != strings.Join(wantProvenance, "\x00") {
 		t.Errorf("provenance for %s -> %s = %v, want %v", caller, callee, provenance, wantProvenance)
+	}
+}
+
+func assertSpringCandidateCallees(
+	t *testing.T,
+	edges []protocol.CallEdge,
+	caller string,
+	want []string,
+) {
+	t.Helper()
+	var got []string
+	for _, edge := range edges {
+		if edge.CallerMethodID != caller {
+			continue
+		}
+		if _, ok := metadataString(edge.Metadata, "resolution"); !ok {
+			continue
+		}
+		got = append(got, edge.CalleeMethodID)
+	}
+	sort.Strings(got)
+	want = append([]string(nil), want...)
+	sort.Strings(want)
+	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Errorf("candidate callees for %s = %v, want %v", caller, got, want)
 	}
 }
