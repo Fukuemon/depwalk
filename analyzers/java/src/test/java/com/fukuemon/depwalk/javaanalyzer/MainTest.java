@@ -110,7 +110,7 @@ class MainTest {
 
     @Test
     void runtimeExceptionDuringAnalysisProducesInternalErrorRecordAndNonZeroExit(@TempDir Path workspace) throws IOException {
-        // H1: pre-flight (M4) now validates workspaceRoot up front, so a nonexistent workspaceRoot
+        // Pre-flight validates workspaceRoot up front, so a nonexistent workspaceRoot
         // is rejected there (JAVA_INVALID_REQUEST) rather than reaching the analysis phase. To still
         // exercise an uncaught RuntimeException surviving from *inside* AnalysisRunner (e.g. an
         // UncheckedIOException from file enumeration), make workspaceRoot pass pre-flight (it exists

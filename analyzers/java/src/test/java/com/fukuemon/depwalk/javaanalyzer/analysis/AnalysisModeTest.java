@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D4: {@code fullGraph} / {@code reachableFromEntrypoints} の node 母集合 (宣言列挙 ∪ call site 由来、
+ * {@code fullGraph} / {@code reachableFromEntrypoints} の node 母集合 (宣言列挙 ∪ call site 由来、
  * entrypoints 空は analysisMode によらず全体扱い)。
  */
 class AnalysisModeTest {

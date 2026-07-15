@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D8: diagnostic の code / severity と、解析が継続すること (パース不能ファイルを飛ばして
+ * diagnostic の code / severity と、解析が継続すること (パース不能ファイルを飛ばして
  * 他ファイルの解析を続ける / 未解決 symbol があっても他の callEdge は出力する)。
  */
 class DiagnosticsTest {

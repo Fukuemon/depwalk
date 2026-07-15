@@ -12,9 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * method reference ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) の call graph 化。
- * D6 の lambda 既定 (囲みメソッドへ帰属 + {@code viaLambda: true}) と同じ原則を適用し、
- * {@code callEdge.metadata.viaMethodReference: true} で標識する。constructor reference (D11 の
- * {@code new} 規則) と scope 外参照の省略も確認する。
+ * lambda と同じく囲みメソッドへ帰属させ、{@code callEdge.metadata.viaMethodReference: true} で
+ * 標識する。constructor reference は通常の object creation と同じ帰属規則を適用し、scope 外参照を
+ * 出力しないことも確認する。
  */
 class MethodReferenceTest {
 
@@ -84,6 +84,8 @@ class MethodReferenceTest {
         assertFalse(edges.stream().anyMatch(e ->
                         "java:com.example.Widgets#invokeScopeExternalReference()".equals(e.get("callerMethodId"))),
                 "scope-external method reference (java.util.UUID#toString, excluded package) must not be emitted: " + edges);
-        assertTrue(ran.byType("diagnostic").isEmpty());
+        assertFalse(ran.byType("diagnostic").stream()
+                .anyMatch(diagnostic -> "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))),
+                "scope-external omission must not raise an unresolved diagnostic");
     }
 }

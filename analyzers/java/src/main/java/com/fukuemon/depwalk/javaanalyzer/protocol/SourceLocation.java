@@ -17,6 +17,13 @@ public record SourceLocation(
         Integer endLine,
         Integer endColumn) {
 
+    /**
+     * 行番号だけが既知の source location を生成する。
+     *
+     * @param path workspace root からの相対 path
+     * @param startLine 1-based の開始行
+     * @return column と終了位置を持たない source location
+     */
     public static SourceLocation of(String path, int startLine) {
         return new SourceLocation(path, startLine, null, null, null);
     }

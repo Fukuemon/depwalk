@@ -10,11 +10,11 @@ import java.util.Map;
  * protocol の正本は analyzer-protocol feature doc / ADR-0001 であり、本 record はそれに準拠する
  * 受信側 DTO である (schema はここで定義・変更しない)。
  *
- * @param schemaVersion Protocol version (Phase1 は {@code "1"})
+ * @param schemaVersion Analyzer Protocol の schema version。現在は {@code "1"}
  * @param recordType    {@code analysisRequest}
  * @param requestId     解析要求を識別する ID
  * @param workspaceRoot 解析対象 repository root
- * @param language      対象言語 (Phase1 は {@code java})
+ * @param language      対象言語。Java Analyzer では {@code java}
  * @param include       workspaceRoot からの相対 path glob 配列 (任意)
  * @param exclude       workspaceRoot からの相対除外 path glob 配列 (任意)
  * @param entrypoints   起点 method selector 配列 (任意)

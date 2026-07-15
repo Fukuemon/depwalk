@@ -7,6 +7,8 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
+import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
@@ -24,24 +26,33 @@ import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.LambdaExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
+import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.SuperExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
+import com.github.javaparser.resolution.types.ResolvedIntersectionType;
 import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * AST を 1 ファイルずつ走査し、declared method / constructor / static initializer の
@@ -55,13 +66,50 @@ public final class CallGraphBuilder {
     private final Path workspaceRoot;
     private final AttributionResolver attributionResolver;
     private final GraphAccumulator accumulator;
+    private final SootUpTypeHierarchyIndex sootUpIndex;
+    private final SourceMethodIndex sourceMethodIndex;
+    private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
 
-    public CallGraphBuilder(Path workspaceRoot, AttributionResolver attributionResolver, GraphAccumulator accumulator) {
+    /**
+     * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
+     *
+     * @param workspaceRoot source location を相対化する workspace root
+     * @param attributionResolver scope 内外と帰属型を決定する resolver
+     * @param accumulator method symbol、call edge、diagnostic の出力先
+     * @param sootUpIndex bytecode 型階層から実装候補を得る索引
+     * @param sourceMethodIndex 候補メソッドの source location を補完する索引
+     * @param springResult Spring Bean と注入点の解決結果
+     */
+    public CallGraphBuilder(
+            Path workspaceRoot,
+            AttributionResolver attributionResolver,
+            GraphAccumulator accumulator,
+            SootUpTypeHierarchyIndex sootUpIndex,
+            SourceMethodIndex sourceMethodIndex,
+            SpringDiIndex.Result springResult) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
+        this.sootUpIndex = sootUpIndex;
+        this.sourceMethodIndex = sourceMethodIndex;
+        this.springResolutionsByReceiver = new LinkedHashMap<>();
+        for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
+            SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();
+            for (String receiverName : injection.receiverNames()) {
+                springResolutionsByReceiver
+                        .computeIfAbsent(
+                                springReceiverKey(injection.ownerType(), receiverName),
+                                ignored -> new ArrayList<>())
+                        .add(resolution);
+            }
+        }
     }
 
+    /**
+     * 1つの compilation unit を走査し、発見した node、edge、diagnostic を accumulator へ追加する。
+     *
+     * @param cu 解析対象の compilation unit。呼び出し後に参照は保持しない
+     */
     public void process(CompilationUnit cu) {
         walk(cu, new WalkContext(null, List.of(), false));
     }
@@ -90,7 +138,7 @@ public final class CallGraphBuilder {
             try {
                 ResolvedMethodDeclaration resolved = md.resolve();
                 symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(md, "failed to resolve method declaration: " + md.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -104,7 +152,7 @@ public final class CallGraphBuilder {
             try {
                 ResolvedConstructorDeclaration resolved = cd.resolve();
                 symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -121,7 +169,7 @@ public final class CallGraphBuilder {
             MethodSymbol symbol;
             try {
                 symbol = buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(ccd, "failed to resolve compact constructor declaration: " + ccd.getNameAsString());
                 recurseChildren(node, ctx.withCaller(List.of()));
                 return;
@@ -214,7 +262,7 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mce, ctx);
             return;
         }
@@ -235,13 +283,21 @@ public final class CallGraphBuilder {
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        emitDispatchCandidateEdges(
+                resolved,
+                dispatch,
+                receiverSite,
+                mce,
+                ctx,
+                callSite,
+                calleeSymbol.methodId());
     }
 
     private void processObjectCreation(ObjectCreationExpr oce, WalkContext ctx) {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = oce.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(oce, ctx);
             return;
         }
@@ -252,7 +308,7 @@ public final class CallGraphBuilder {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = ecis.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(ecis, ctx);
             return;
         }
@@ -279,9 +335,9 @@ public final class CallGraphBuilder {
     private static final String METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER = "new";
 
     /**
-     * D6 の lambda 既定 (囲みメソッドへ帰属 + {@code viaLambda: true}) と同じ原則を method reference
+     * lambda と同じ囲みメソッドへの帰属規則を method reference
      * ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) に適用する。囲みメソッドを caller、
-     * 参照先メソッド (D11 の帰属規則適用) を callee とする {@code callEdge} を出力し、
+     * 通常の帰属規則を適用した参照先メソッドを callee とする {@code callEdge} を出力し、
      * {@code metadata.viaMethodReference: true} で標識する (Core は metadata を解釈しないため契約変更なし)。
      */
     private void processMethodReference(MethodReferenceExpr mre, WalkContext ctx) {
@@ -293,7 +349,7 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mre.resolve();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
             return;
         }
@@ -314,11 +370,19 @@ public final class CallGraphBuilder {
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        emitDispatchCandidateEdges(
+                resolved,
+                dispatch,
+                receiverSite,
+                mre,
+                ctx,
+                callSite,
+                calleeSymbol.methodId());
     }
 
     /**
-     * constructor reference ({@code Foo::new}) の扱い。D11 の {@code new} 規則 (constructor は継承され
-     * ないため引き上げは発生しない) をそのまま適用し、scope 外なら出力しない。{@code JavaParser} は
+     * constructor reference ({@code Foo::new}) の扱い。constructor は継承されないため帰属型の
+     * 引き上げを行わず、scope 外なら出力しない。{@code JavaParser} は
      * constructor reference の {@code resolve()} を未実装 ({@code UnsupportedOperationException}) と
      * しているため、参照先型の constructor 一覧から候補を自前で選ぶ (単一候補ならそれを使い、複数候補
      * のときは呼び出し先の関数型インタフェースの SAM 引数数で絞り込む)。
@@ -336,7 +400,7 @@ public final class CallGraphBuilder {
                 reportUnresolved(mre, ctx);
                 return;
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
             return;
         }
@@ -408,7 +472,7 @@ public final class CallGraphBuilder {
                     return methodUsage.getNoParams();
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return -1;
         }
         return -1;
@@ -439,7 +503,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗 (H2)。呼び出し式側の
+     * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗。呼び出し式側の
      * {@link #reportUnresolved(Node, WalkContext)} と異なり、宣言そのものが対象のため
      * {@code relatedMethodId} は付けない。その宣言だけ skip し、解析全体は継続する。
      */
@@ -524,7 +588,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * record の compact constructor (D11: record の canonical constructor 扱い) の {@link MethodSymbol}
+     * record の compact constructor を canonical constructor として扱い、その {@link MethodSymbol}
      * を作る。signature は record component の erasure 型列 (宣言順)。JavaParser の
      * {@code CompactConstructorDeclaration#resolve()} は未実装のため、record の component 一覧
      * ({@link RecordDeclaration#getParameters()}) から自前で param 型を求める。
@@ -574,7 +638,7 @@ public final class CallGraphBuilder {
                 List<String> paramTypes = paramBinaryNames(cd.resolve());
                 String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
                 ids.add(MethodIds.methodId(signature));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
             }
         }
@@ -622,7 +686,7 @@ public final class CallGraphBuilder {
     /**
      * mce の scope (レシーバ式) から帰属型決定に使う {@link TypeSite} を決める。
      *
-     * <p>D11: scope が空 (無修飾呼び出し) のとき、通常は enclosing class を「参照した型」とみなす
+     * <p>scope が空 (無修飾呼び出し) のとき、通常は enclosing class を「参照した型」とみなす
      * (自クラス呼び出し / 継承 static・instance メソッドの暗黙 this 呼び出し)。ただし static かつ
      * 宣言型が enclosing class の継承階層に含まれない場合は、無修飾 static import
      * ({@code import static pkg.Type.member;}) 由来の呼び出しであり、「参照した型」は enclosing class
@@ -643,19 +707,29 @@ public final class CallGraphBuilder {
         return typeSiteOfExpression(mce.getScope().get());
     }
 
-    /** 式を評価した静的型の {@link TypeSite}。解決できなければ {@code null}。 */
+    /**
+     * 式を評価した静的型の {@link TypeSite} を返す。
+     *
+     * <p>型変数や wildcard は、そのままでは reference type 宣言を取得できないため erasure を使う。
+     * たとえば {@code T extends ChildService} の receiver は {@code ChildService} として扱い、
+     * 上限境界に含まれない実装を dispatch 候補へ混入させない。解決できなければ {@code null} を返す。
+     *
+     * @param expr 静的 receiver 型を取得する式
+     * @return 静的型の所在情報。型解決または erasure に失敗した場合は {@code null}
+     */
     private TypeSite typeSiteOfExpression(Expression expr) {
         try {
-            ResolvedType receiverType = expr.calculateResolvedType();
-            if (!receiverType.isReferenceType()) {
+            ResolvedType erasedReceiverType = expr.calculateResolvedType().erasure();
+            if (!erasedReceiverType.isReferenceType()) {
                 return null;
             }
-            ResolvedReferenceTypeDeclaration decl = receiverType.asReferenceType().getTypeDeclaration().orElse(null);
+            ResolvedReferenceTypeDeclaration decl =
+                    erasedReceiverType.asReferenceType().getTypeDeclaration().orElse(null);
             if (decl == null) {
                 return null;
             }
             return typeSiteOf(decl);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return null;
         }
     }
@@ -682,7 +756,7 @@ public final class CallGraphBuilder {
                     return true;
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return true;
         }
         return false;
@@ -697,7 +771,7 @@ public final class CallGraphBuilder {
                 ResolvedType type = oce.calculateResolvedType();
                 return type.isReferenceType() ? type.asReferenceType().getTypeDeclaration().orElse(null) : null;
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return null;
         }
         return null;
@@ -714,6 +788,340 @@ public final class CallGraphBuilder {
             return "abstract";
         }
         return "virtual";
+    }
+
+    private static final class CandidateEdgeInfo {
+        private final SootUpTypeHierarchyIndex.MethodCandidate method;
+        private final Set<String> provenance = new TreeSet<>();
+        private final Set<String> conditionTypes = new TreeSet<>();
+        private boolean ambiguous;
+
+        private CandidateEdgeInfo(SootUpTypeHierarchyIndex.MethodCandidate method) {
+            this.method = method;
+        }
+    }
+
+    /** 型階層と Spring DI の候補を call site 単位で統合し、宣言型 edge とは別に実装候補 edge を追加する。 */
+    private void emitDispatchCandidateEdges(
+            ResolvedMethodDeclaration resolved,
+            String dispatch,
+            TypeSite receiverSite,
+            Node callNode,
+            WalkContext ctx,
+            SourceLocation callSite,
+            String declarationMethodId) {
+        if ("static".equals(dispatch) || isExplicitSuperDispatch(callNode)) {
+            return;
+        }
+        String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
+        List<String> parameterTypes = paramBinaryNames(resolved);
+        String receiverType = receiverSite == null ? declaringType : receiverSite.binaryName();
+        List<String> receiverTypes = receiverTypeConstraints(callNode, receiverType);
+        SootUpTypeHierarchyIndex.Resolution sootResolution = sootUpIndex.resolveMethod(
+                declaringType,
+                receiverTypes,
+                resolved.getName(),
+                parameterTypes);
+        if (!sootResolution.isAvailable()) {
+            reportSootUnavailable(sootResolution, declaringType, callNode, ctx);
+            return;
+        }
+
+        Map<String, CandidateEdgeInfo> merged = new LinkedHashMap<>();
+        Set<String> sootCandidateKeys = new LinkedHashSet<>();
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : sootResolution.candidates()) {
+            sootCandidateKeys.add(candidateKey(candidate));
+        }
+
+        SpringDiIndex.InjectionResolution springResolution = springResolutionFor(callNode, ctx);
+        if (springResolution == null
+                || springResolution.status() == SpringDiIndex.ResolutionStatus.UNRESOLVED) {
+            addSootCandidates(merged, sootResolution.candidates());
+        } else if (springResolution.status() == SpringDiIndex.ResolutionStatus.UNIQUE
+                || springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS) {
+            boolean ambiguous = springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS;
+            for (SpringDiIndex.BeanCandidate beanCandidate : springResolution.candidates()) {
+                SootUpTypeHierarchyIndex.Resolution implementation = sootUpIndex.resolveImplementationMethod(
+                        beanCandidate.bean().implementationType(),
+                        resolved.getName(),
+                        parameterTypes);
+                if (!implementation.isAvailable()) {
+                    reportSootUnavailable(implementation, beanCandidate.bean().implementationType(), callNode, ctx);
+                    continue;
+                }
+                for (SootUpTypeHierarchyIndex.MethodCandidate candidate : implementation.candidates()) {
+                    CandidateEdgeInfo info = merged.computeIfAbsent(
+                            candidateKey(candidate), key -> new CandidateEdgeInfo(candidate));
+                    info.provenance.addAll(beanCandidate.provenance());
+                    if (sootCandidateKeys.contains(candidateKey(candidate))) {
+                        info.provenance.add("sootup");
+                    }
+                    info.conditionTypes.addAll(beanCandidate.bean().conditionTypes());
+                    info.ambiguous |= ambiguous;
+                }
+            }
+        }
+
+        for (CandidateEdgeInfo info : merged.values()) {
+            MethodSymbol candidateSymbol = buildCandidateMethodSymbol(info.method);
+            if (declarationMethodId.equals(candidateSymbol.methodId())) {
+                continue;
+            }
+            accumulator.addNode(candidateSymbol);
+            Map<String, Object> metadata = candidateEdgeMetadata(info);
+            for (String callerId : ctx.callerMethodIds()) {
+                accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
+            }
+        }
+    }
+
+    private static void addSootCandidates(
+            Map<String, CandidateEdgeInfo> merged,
+            List<SootUpTypeHierarchyIndex.MethodCandidate> candidates) {
+        boolean ambiguous = candidates.size() != 1;
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
+            CandidateEdgeInfo info = merged.computeIfAbsent(
+                    candidateKey(candidate),
+                    key -> new CandidateEdgeInfo(candidate));
+            info.provenance.add("sootup");
+            info.ambiguous = ambiguous;
+        }
+    }
+
+    /**
+     * {@code super.method()} と {@code super::method} は JVM の {@code invokespecial} に相当し、
+     * 実行時のレシーバー型によるオーバーライド選択を行わない。そのため宣言先への通常 edge は保持しつつ、
+     * 型階層由来の実装候補 edge だけを生成対象外とする。
+     *
+     * @param callNode 候補 edge を検討しているメソッド呼び出しまたはメソッド参照
+     * @return 明示的な {@code super} 呼び出し・参照なら {@code true}
+     */
+    private static boolean isExplicitSuperDispatch(Node callNode) {
+        if (callNode instanceof MethodCallExpr methodCall) {
+            return methodCall.getScope().filter(SuperExpr.class::isInstance).isPresent();
+        }
+        return callNode instanceof MethodReferenceExpr methodReference
+                && methodReference.getScope() instanceof SuperExpr;
+    }
+
+    private SpringDiIndex.InjectionResolution springResolutionFor(Node callNode, WalkContext ctx) {
+        if (ctx.enclosingTypeNode() == null) {
+            return null;
+        }
+        String receiverName = receiverNameOf(callNode);
+        if (receiverName == null) {
+            return null;
+        }
+        String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
+        List<SpringDiIndex.InjectionResolution> resolutions =
+                springResolutionsByReceiver.get(springReceiverKey(ownerType, receiverName));
+        return selectSpringResolution(callNode, receiverName, resolutions);
+    }
+
+    private static String receiverNameOf(Node callNode) {
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
+            return null;
+        }
+        while (scope.isEnclosedExpr()) {
+            scope = scope.asEnclosedExpr().getInner();
+        }
+        if (scope instanceof NameExpr name) {
+            try {
+                var declaration = name.resolve();
+                return declaration.isField() || declaration.isParameter()
+                        ? name.getNameAsString()
+                        : null;
+            } catch (RuntimeException | LinkageError ignored) {
+                return null;
+            }
+        }
+        if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
+            return field.getNameAsString();
+        }
+        return null;
+    }
+
+    /**
+     * 同じownerとreceiver名を共有する注入点から、call siteが参照する宣言に対応する1件を選ぶ。
+     * parameterはsource上の宣言行で区別し、fieldは直接field injectionをconstructor／setter経由の
+     * aliasより優先する。1件に決められない場合は誤ったDI候補を使わず、型階層解決へ委ねる。
+     */
+    private static SpringDiIndex.InjectionResolution selectSpringResolution(
+            Node callNode,
+            String receiverName,
+            List<SpringDiIndex.InjectionResolution> resolutions) {
+        if (resolutions == null || resolutions.isEmpty()) {
+            return null;
+        }
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
+            return null;
+        }
+        while (scope.isEnclosedExpr()) {
+            scope = scope.asEnclosedExpr().getInner();
+        }
+        ResolvedValueDeclaration declaration;
+        try {
+            if (scope instanceof NameExpr name) {
+                declaration = name.resolve();
+            } else if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
+                declaration = field.resolve();
+            } else {
+                return null;
+            }
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+
+        if (declaration.isParameter()) {
+            Node ast = declaration.toAst().orElse(null);
+            int declarationLine = ast != null && ast.getBegin().isPresent() ? ast.getBegin().get().line : -1;
+            return uniqueResolution(resolutions.stream()
+                    .filter(resolution -> resolution.injectionPoint().sourceLine() == declarationLine)
+                    .toList());
+        }
+        if (!declaration.isField()) {
+            return null;
+        }
+        List<SpringDiIndex.InjectionResolution> directFields = resolutions.stream()
+                .filter(resolution -> resolution.injectionPoint().kind() == SpringDiIndex.InjectionKind.FIELD)
+                .filter(resolution -> receiverName.equals(resolution.injectionPoint().targetName()))
+                .toList();
+        if (!directFields.isEmpty()) {
+            return uniqueResolution(directFields);
+        }
+        return uniqueResolution(resolutions);
+    }
+
+    private static SpringDiIndex.InjectionResolution uniqueResolution(
+            List<SpringDiIndex.InjectionResolution> resolutions) {
+        return resolutions.size() == 1 ? resolutions.get(0) : null;
+    }
+
+    private static Expression callScopeOf(Node callNode) {
+        if (callNode instanceof MethodCallExpr methodCall && methodCall.getScope().isPresent()) {
+            return methodCall.getScope().get();
+        }
+        if (callNode instanceof MethodReferenceExpr methodReference) {
+            return methodReference.getScope();
+        }
+        return null;
+    }
+
+    /**
+     * call siteのreceiverが同時に満たす静的型を返す。
+     *
+     * <p>通常のreference typeはfallbackの1型だけを返す。型変数またはintersection typeでは
+     * 全extends境界を返し、SootUp側で候補の積集合を取れるようにする。型解決に失敗した場合も
+     * erasure済みfallbackを保持する。
+     *
+     * @param callNode method callまたはmethod reference
+     * @param fallback erasureから得たreceiver型
+     * @return receiverが同時に満たす型の重複なし配列
+     */
+    private static List<String> receiverTypeConstraints(Node callNode, String fallback) {
+        Expression scope = callScopeOf(callNode);
+        if (scope == null) {
+            return List.of(fallback);
+        }
+        try {
+            ResolvedType receiverType = scope.calculateResolvedType();
+            LinkedHashSet<String> constraints = new LinkedHashSet<>();
+            collectReceiverTypeConstraints(receiverType, constraints, new LinkedHashSet<>());
+            return constraints.isEmpty() ? List.of(fallback) : List.copyOf(constraints);
+        } catch (RuntimeException | LinkageError e) {
+            return List.of(fallback);
+        }
+    }
+
+    /**
+     * 型変数・intersection・上限wildcardを再帰展開し、最終的なreference型境界を収集する。
+     * 間接境界 ({@code T extends U}, {@code U extends A & B}) でもAとBの両方を保持する。
+     *
+     * @param type 展開するreceiver型または境界型
+     * @param constraints 収集先のbinary name集合
+     * @param visiting 展開中の型変数名。循環参照を停止する
+     */
+    private static void collectReceiverTypeConstraints(
+            ResolvedType type,
+            Set<String> constraints,
+            Set<String> visiting) {
+        if (type.isTypeVariable()) {
+            String variableName = type.asTypeVariable().qualifiedName();
+            if (!visiting.add(variableName)) {
+                return;
+            }
+            type.asTypeVariable().asTypeParameter().getBounds().stream()
+                    .filter(bound -> bound.isExtends())
+                    .forEach(bound -> collectReceiverTypeConstraints(bound.getType(), constraints, visiting));
+            visiting.remove(variableName);
+            return;
+        }
+        if (type instanceof ResolvedIntersectionType intersectionType) {
+            intersectionType.getElements()
+                    .forEach(element -> collectReceiverTypeConstraints(element, constraints, visiting));
+            return;
+        }
+        if (type.isWildcard() && type.asWildcard().isExtends()) {
+            collectReceiverTypeConstraints(type.asWildcard().getBoundedType(), constraints, visiting);
+            return;
+        }
+        ResolvedType erased = type.erasure();
+        if (erased.isReferenceType()) {
+            constraints.add(BinaryNames.erasureOf(erased));
+        }
+    }
+
+    private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return sourceMethodIndex.find(candidate).orElseGet(() -> {
+            String signature = MethodIds.signature(
+                    candidate.declaringType(),
+                    candidate.methodName(),
+                    candidate.parameterTypes());
+            return MethodSymbol.of(
+                    MethodIds.methodId(signature),
+                    "java",
+                    "method",
+                    candidate.declaringType().replace('$', '.') + "." + candidate.methodName(),
+                    signature,
+                    null,
+                    null);
+        });
+    }
+
+    private static Map<String, Object> candidateEdgeMetadata(CandidateEdgeInfo info) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("resolution", info.ambiguous ? "ambiguous" : "unique");
+        metadata.put("provenance", List.copyOf(info.provenance));
+        if (!info.conditionTypes.isEmpty()) {
+            metadata.put("conditional", true);
+            metadata.put("conditionTypes", List.copyOf(info.conditionTypes));
+        }
+        return metadata;
+    }
+
+    private void reportSootUnavailable(
+            SootUpTypeHierarchyIndex.Resolution resolution,
+            String targetType,
+            Node callNode,
+            WalkContext ctx) {
+        String relatedMethodId = ctx.callerMethodIds().isEmpty() ? null : ctx.callerMethodIds().get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_SOOTUP_UNAVAILABLE.severity(),
+                JavaDiagnosticCode.JAVA_SOOTUP_UNAVAILABLE.code(),
+                resolution.unavailableReason(),
+                sourceLocationOf(callNode),
+                relatedMethodId,
+                Map.of("targetType", targetType)));
+    }
+
+    private static String candidateKey(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return MethodIds.signature(candidate.declaringType(), candidate.methodName(), candidate.parameterTypes());
+    }
+
+    private static String springReceiverKey(String ownerType, String targetName) {
+        return ownerType + "\u0000" + targetName;
     }
 
     private Map<String, Object> edgeMetadata(String dispatch, boolean viaLambda) {

@@ -1,19 +1,19 @@
 # Feature 設計: Analyzer Protocol / SPI
 
-> 最終更新: 2026-06-15 / Status: 完了
+> 最終更新: 2026-07-14 / Status: 完了 (2026-07-14 追加 sync で `callEdge.metadata` の Core 内 opaque passthrough と `methodSymbol.metadata` の境界を追記)
 
 Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯と issue 単位の作業記録は [spec #8](../../../specs/8-analyzer-protocol/) を参照する。
 
 ## メタ
 
-| 項目           | 値 |
-| -------------- | -- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#why--what) |
-| 関連 DesignDoc | [Communication Protocol](../../DesignDoc.md#communication-protocol)、[モジュール責務](../../DesignDoc.md#モジュール責務)、[設計原則](../../DesignDoc.md#設計原則-design-principles) |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[infrastructure](../../../context/infrastructure.md) |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) |
-| 関連 spec      | [specs/8-analyzer-protocol](../../../specs/8-analyzer-protocol/) |
-| 対象モジュール | `analyzer-protocol` |
+| 項目           | 値                                                                                                                                                                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#why--what)                                                                                                                                                                  |
+| 関連 DesignDoc | [Communication Protocol](../../DesignDoc.md#communication-protocol)、[モジュール責務](../../DesignDoc.md#モジュール責務)、[設計原則](../../DesignDoc.md#設計原則-design-principles)                                                       |
+| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[infrastructure](../../../context/infrastructure.md)                                                |
+| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)                                                                                                                                                                              |
+| 関連 spec      | [specs/8-analyzer-protocol](../../../specs/8-analyzer-protocol/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/) (D9: gap の発見)、[Issue #22](https://github.com/Fukuemon/depwalk/issues/22) (D11: 実装) |
+| 対象モジュール | `analyzer-protocol`                                                                                                                                                                                                                       |
 
 ## 背景・要件解釈
 
@@ -50,18 +50,18 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 `analysisRequest` は Core が Analyzer process 起動後に stdin へ 1 件だけ送信する解析要求である。送信後、Core は stdin を close する。
 
-| field | 必須/任意 | 説明 |
-| ----- | --------- | ---- |
-| `schemaVersion` | 必須 | Protocol version。Phase1 は `"1"` |
-| `recordType` | 必須 | `analysisRequest` |
-| `requestId` | 必須 | 解析要求を識別する ID |
-| `workspaceRoot` | 必須 | 解析対象 repository root |
-| `language` | 必須 | 対象言語。Phase1 は `java` |
-| `include` | 任意 | `workspaceRoot` からの相対 path glob 配列 |
-| `exclude` | 任意 | `workspaceRoot` からの相対除外 path glob 配列 |
-| `entrypoints` | 任意 | 起点 method selector 配列 |
-| `analysisMode` | 任意 | `fullGraph` または `reachableFromEntrypoints`。未指定時は `fullGraph` |
-| `metadata` | 任意 | 言語固有または Analyzer 固有の hint。Core の共通処理は依存しない |
+| field           | 必須/任意 | 説明                                                                  |
+| --------------- | --------- | --------------------------------------------------------------------- |
+| `schemaVersion` | 必須      | Protocol version。Phase1 は `"1"`                                     |
+| `recordType`    | 必須      | `analysisRequest`                                                     |
+| `requestId`     | 必須      | 解析要求を識別する ID                                                 |
+| `workspaceRoot` | 必須      | 解析対象 repository root                                              |
+| `language`      | 必須      | 対象言語。Phase1 は `java`                                            |
+| `include`       | 任意      | `workspaceRoot` からの相対 path glob 配列                             |
+| `exclude`       | 任意      | `workspaceRoot` からの相対除外 path glob 配列                         |
+| `entrypoints`   | 任意      | 起点 method selector 配列                                             |
+| `analysisMode`  | 任意      | `fullGraph` または `reachableFromEntrypoints`。未指定時は `fullGraph` |
+| `metadata`      | 任意      | 言語固有または Analyzer 固有の hint。Core の共通処理は依存しない      |
 
 `include` / `exclude` は `workspaceRoot` からの相対 path glob とする。path separator は `/` に正規化し、絶対 path、空文字、`..` を含む path は schema 不準拠として扱う。対応する glob は `*`、`?`、`**` とする。
 
@@ -69,56 +69,60 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 #### Analyzer -> Core
 
-| record | Core 対応 | 出現条件 / 説明 |
-| ------ | --------- | --------------- |
-| `methodSymbol` | 必須 | graph node として扱う method / constructor / function が検出された場合 |
-| `callEdge` | 必須 | 解決済み caller / callee の呼び出し関係が検出された場合 |
-| `diagnostic` | 必須 | 未解決 symbol、部分解析、警告、非致命的エラーがある場合 |
-| `error` | 必須 | 致命的エラー時。出力後、Analyzer は非ゼロ終了する |
+| record         | Core 対応 | 出現条件 / 説明                                                        |
+| -------------- | --------- | ---------------------------------------------------------------------- |
+| `methodSymbol` | 必須      | graph node として扱う method / constructor / function が検出された場合 |
+| `callEdge`     | 必須      | 解決済み caller / callee の呼び出し関係が検出された場合                |
+| `diagnostic`   | 必須      | 未解決 symbol、部分解析、警告、非致命的エラーがある場合                |
+| `error`        | 必須      | 致命的エラー時。出力後、Analyzer は非ゼロ終了する                      |
 
 `Core 対応 = 必須` は Core parser / validator がその record type を実装するという意味であり、すべての解析結果にその record が 1 件以上出ることを意味しない。
 
 #### `methodSymbol`
 
-| field | 必須/任意 | 説明 |
-| ----- | --------- | ---- |
-| `schemaVersion` | 必須 | Protocol version |
-| `recordType` | 必須 | `methodSymbol` |
-| `methodId` | 必須 | Analyzer が決定的に生成する stable ID |
-| `language` | 必須 | 対象言語。Phase1 は `java` |
-| `symbolKind` | 必須 | `method` / `constructor` / `function` / `initializer` |
-| `qualifiedName` | 必須 | 表示・debug 用の完全修飾名 |
-| `signature` | 必須 | overload を区別できる正規化済み signature |
-| `sourceLocation` | 任意 | 定義位置。位置を持てない symbol では省略できる |
-| `metadata` | 任意 | 言語固有情報。Core の graph 構築は依存しない |
+| field            | 必須/任意 | 説明                                                  |
+| ---------------- | --------- | ----------------------------------------------------- |
+| `schemaVersion`  | 必須      | Protocol version                                      |
+| `recordType`     | 必須      | `methodSymbol`                                        |
+| `methodId`       | 必須      | Analyzer が決定的に生成する stable ID                 |
+| `language`       | 必須      | 対象言語。Phase1 は `java`                            |
+| `symbolKind`     | 必須      | `method` / `constructor` / `function` / `initializer` |
+| `qualifiedName`  | 必須      | 表示・debug 用の完全修飾名                            |
+| `signature`      | 必須      | overload を区別できる正規化済み signature             |
+| `sourceLocation` | 任意      | 定義位置。位置を持てない symbol では省略できる        |
+| `metadata`       | 任意      | 言語固有情報。Core の graph 構築は依存しない          |
 
 `methodId` は、同一 Analyzer 実装 version、同一 `analysisRequest`、同一 source content、同一 `qualifiedName` / `signature` に対して決定的に再生成できる ID とする。Analyzer version をまたぐ永続 ID は要求しない。
 
 #### `callEdge`
 
-| field | 必須/任意 | 説明 |
-| ----- | --------- | ---- |
-| `schemaVersion` | 必須 | Protocol version |
-| `recordType` | 必須 | `callEdge` |
-| `edgeId` | 必須 | Analyzer が決定的に生成する stable ID |
-| `callerMethodId` | 必須 | 呼び出し元の `methodSymbol.methodId` |
-| `calleeMethodId` | 必須 | 呼び出し先の `methodSymbol.methodId` |
-| `callSite` | 任意 | 呼び出し式の source 位置 |
-| `metadata` | 任意 | dispatch 種別、解析 confidence、言語固有 call kind など |
+| field            | 必須/任意 | 説明                                                    |
+| ---------------- | --------- | ------------------------------------------------------- |
+| `schemaVersion`  | 必須      | Protocol version                                        |
+| `recordType`     | 必須      | `callEdge`                                              |
+| `edgeId`         | 必須      | Analyzer が決定的に生成する stable ID                   |
+| `callerMethodId` | 必須      | 呼び出し元の `methodSymbol.methodId`                    |
+| `calleeMethodId` | 必須      | 呼び出し先の `methodSymbol.methodId`                    |
+| `callSite`       | 任意      | 呼び出し式の source 位置                                |
+| `metadata`       | 任意      | dispatch 種別、解析 confidence、言語固有 call kind など |
 
 valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み `methodSymbol` を参照する。未解決 symbol は `diagnostic` として表現する。
+
+**`metadata` の Core 内保持 (決定済み 2026-07-14)**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。#21 が解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。実装は [Issue #22](https://github.com/Fukuemon/depwalk/issues/22) の D11 が担う。
+
+`methodSymbol.metadata` は Analyzer Protocol record として受理するが、現行 Core の `graph.Symbol` は保持しない。#21 は `resolution` / `provenance` を `callEdge.metadata` だけに載せ、新しい `methodSymbol.metadata` の利用や Core/CLI での表出を受け入れ条件に含めないため、この既存 gap は #21 の blocker ではない。また #22 D11 の委譲対象にも含めない。将来 `methodSymbol.metadata` の Core/CLI 利用者を追加する issue で、`graph.Symbol` への opaque passthrough を別途設計する。
 
 #### `SourceLocation`
 
 `SourceLocation` は独立 JSONL record ではなく、`methodSymbol.sourceLocation` または `callEdge.callSite` に埋め込む value object とする。
 
-| field | 必須/任意 | 説明 |
-| ----- | --------- | ---- |
-| `path` | 必須 | `workspaceRoot` からの相対 path |
-| `startLine` | 必須 | 1-based の開始行 |
-| `startColumn` | 任意 | 1-based の開始 column |
-| `endLine` | 任意 | 1-based の終了行 |
-| `endColumn` | 任意 | 1-based の終了 column |
+| field         | 必須/任意 | 説明                            |
+| ------------- | --------- | ------------------------------- |
+| `path`        | 必須      | `workspaceRoot` からの相対 path |
+| `startLine`   | 必須      | 1-based の開始行                |
+| `startColumn` | 任意      | 1-based の開始 column           |
+| `endLine`     | 任意      | 1-based の終了行                |
+| `endColumn`   | 任意      | 1-based の終了 column           |
 
 #### `diagnostic` / `error`
 
@@ -126,10 +130,10 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 
 `error` は Analyzer が解析を継続できない致命的な問題を表す。Analyzer が `error` を出力した場合、Analyzer process は非ゼロ exit code で終了する。
 
-| record | 必須 field | 任意 field |
-| ------ | ---------- | ---------- |
+| record       | 必須 field                                                   | 任意 field                                      |
+| ------------ | ------------------------------------------------------------ | ----------------------------------------------- |
 | `diagnostic` | `schemaVersion`, `recordType`, `severity`, `code`, `message` | `sourceLocation`, `relatedMethodId`, `metadata` |
-| `error` | `schemaVersion`, `recordType`, `code`, `message` | `sourceLocation`, `metadata` |
+| `error`      | `schemaVersion`, `recordType`, `code`, `message`             | `sourceLocation`, `metadata`                    |
 
 `diagnostic.severity` は `info` / `warning` / `partialFailure` とする。不正 JSONL、schema 不準拠、未対応 `schemaVersion` は Analyzer が表現する `error` ではなく、Core 側 validation error として扱う。
 
@@ -176,15 +180,15 @@ flowchart TD
 
 `schemaVersion` は record 種別ごとの個別 version ではなく、protocol 全体の version を表す。record の受信者は対応済み major version の record だけを受け付ける。未対応 major version の record を受け取った場合、受信者は schema version mismatch として解析を失敗させる。
 
-| 変更種別 | 互換性 | 扱い |
-| -------- | ------ | ---- |
-| 任意 field の追加 | 互換 | record の受信者は未知 field を無視し、既知 field だけで処理を継続する |
-| `metadata` 内の追加 | 互換 | record の受信者は必要な既知 field のみを採用し、Core の graph 構築は `metadata` に依存しない |
-| 必須 field の追加 | 非互換 | major version bump の対象 |
-| 必須 field の削除 | 非互換 | major version bump の対象 |
-| field 型の変更 | 非互換 | major version bump の対象 |
-| field 意味論の変更 | 非互換 | major version bump の対象 |
-| record type の削除 | 非互換 | major version bump の対象 |
+| 変更種別            | 互換性 | 扱い                                                                                         |
+| ------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| 任意 field の追加   | 互換   | record の受信者は未知 field を無視し、既知 field だけで処理を継続する                        |
+| `metadata` 内の追加 | 互換   | record の受信者は必要な既知 field のみを採用し、Core の graph 構築は `metadata` に依存しない |
+| 必須 field の追加   | 非互換 | major version bump の対象                                                                    |
+| 必須 field の削除   | 非互換 | major version bump の対象                                                                    |
+| field 型の変更      | 非互換 | major version bump の対象                                                                    |
+| field 意味論の変更  | 非互換 | major version bump の対象                                                                    |
+| record type の削除  | 非互換 | major version bump の対象                                                                    |
 
 Handshake / capability negotiation は Phase1 では採用しない。
 
@@ -218,9 +222,10 @@ Handshake / capability negotiation は Phase1 では採用しない。
 
 ## 上位資料からの変更点
 
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容 |
-| --------- | --------------------------------- | ---- |
-| PRD       | 継承 | 統合 Design Doc の S5 / P1-P4 を具体化する。 |
-| DesignDoc | 追記 | Analyzer Protocol / SPI feature の正本を本 doc に移す。 |
-| context   | 追記 | protocol contract test の横断観点を `context/testing.md` に反映する。 |
-| ADR       | 追記 | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。 |
+| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                                                                                                                          |
+| --------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD       | 継承                              | 統合 Design Doc の S5 / P1-P4 を具体化する。                                                                                                                                                                                                                                                                                                  |
+| DesignDoc | 追記                              | Analyzer Protocol / SPI feature の正本を本 doc に移す。                                                                                                                                                                                                                                                                                       |
+| context   | 追記                              | protocol contract test の横断観点を `context/testing.md` に反映する。                                                                                                                                                                                                                                                                         |
+| ADR       | 追記                              | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。                                                                                                                                                                                                                                                                 |
+| spec #21  | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正 (D9): #21 が利用する `callEdge.metadata` は #22 D11 が opaque passthrough として保持する。`methodSymbol.metadata` の既存 gap は #21/#22 D11 の対象外で、将来の利用者追加時に別途設計する。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
