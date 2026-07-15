@@ -27,7 +27,7 @@
 | 4   | 論点整理                    | 完了       | 2026-07-12 |                                                                                                                                                                                               |
 | 5   | 論点解決                    | レビュー済 | 2026-07-15 | D11 を拡張 (graph.Symbol/output.NodeView への Metadata 透過を追加)。develop rebase 後の再検証で再オープンし再確定                                                                             |
 | 6   | Interface / Routing 設計    | レビュー済 | 2026-07-15 | CLI flag 体系表・exit code 配線・Request/Response 変換・D11 拡張の Node 側 JSON スキーマ影響を記述。1周目レビュー NEEDS_WORK (feature doc analyzer-protocol との矛盾) 対応後、再レビュー PASS |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                                                                                                                                               |
+| 7   | Content / Data 設計         | レビュー済 | 2026-07-15 | 永続ストアなし・package 配置方針を記述。CLI のため Content/Assets・UI Reuse は該当なし。レビュー PASS (1周目)                                                                                 |
 | 8   | Performance / Security 設計 | 未着手     |            |                                                                                                                                                                                               |
 | 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                               |
 | 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                               |
@@ -179,11 +179,11 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ### Content / Assets
 
-(clarify 以降で記述)
+- 該当なし。解析対象はソース + 依存 jar/classes (`classpath` metadata) であり、コンテンツ配信は発生しない (#21 index.md の同種判断を踏襲)。
 
 ### UI Reuse
 
-(clarify 以降で記述)
+- 該当なし (CLI 出力のみ)。Console / JSON フォーマットは既存 Output Engine (`output.Write`、#7 実装済み) をそのまま再利用し、新規 formatter は追加しない (D5)。
 
 ### Testing
 
@@ -225,11 +225,14 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ### 保存・管理するデータ
 
-(clarify 以降で記述)
+- 永続ストアは持たない (既存方針を継承、#21 index.md の同種判断を踏襲)。Core プロセス内の中間状態として `graph.Graph` と `traversal.Result` を保持するのみで、CLI 実行が終われば破棄される。method selector の照合 (D1) や graph convert の Metadata 保持 (D11) もすべてこのプロセス内メモリ上で完結する。
 
 ### コンテンツ配置 / package / route
 
-(clarify 以降で記述)
+- CLI entrypoint (flag 定義・method selector 照合・exit code 制御) は既存の `core/internal/cli` package (`analyze.go`) を拡張する。既存の `--analyzer-cmd`/`--language`/`--analyzer-meta` flag 定義や `newAnalyzeCommand` の構造は変更せず、そこへ `--method`/`--direction`/`--max-depth`/`--format` を追加する形にする (D2)。
+- analyze use case (`core/internal/analyze`) の `Options`/`Run` に AnalysisMode の明示設定 (D6) と method selector 照合結果の受け渡しを追加する。graph convert (`core/internal/graph/convert.go`) は `graph.Symbol`/`graph.Edge` への Metadata 保持を追加する (D11 拡張)。
+- `output.RegisteredFormats()` (D5 拡張で新設) は `core/internal/output` package に置き、既存の unexported `registeredFormats()` (`registry.go`) をラップする形で追加する。package 構成の変更は生じない。
+- E2E (D9) は既存 `core/e2e` 配下に `os/exec` バイナリ起動テストを追加する。golden file の配置は既存 fixture 規約 (`testdata/` 配下) を踏襲し、具体 path は実装分割時に確定する。
 
 ## Performance / Security 設計
 
@@ -344,6 +347,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-15 | PASS                     | (D11 拡張分 再レビュー) 前回指摘 2 件の解消を確認、新たな不整合なし                                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                       |
 | 2026-07-15 | NEEDS_WORK               | (phase 6 Interface/Routing 設計) CLI flag 体系・exit code・Request/Response 変換・`output.RegisteredFormats()` 提案は D1-D11 と実装コードに整合。ただし `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:113,231` (durable 正本、2026-07-14 sync 済み) が「methodSymbol.metadata は #21/#22 双方の対象外」という override 前の記述のままで、本 spec の D11 拡張と矛盾。フェーズ6を「完了」としているが備考は「レビュー待ち」で状態と実態が不一致 | 対応済 (feature doc 2 箇所を override 後の内容へ先行更新、#21 index.md:470 の反映済み行も同期、フェーズ6を進行中に修正) |
 | 2026-07-15 | PASS                     | (phase 6 再レビュー) 前回指摘 3 件 (feature doc override 反映・フェーズ6状態不一致・#21 反映済み行同期) すべて解消を確認、新たな不整合なし。#21 index.md の変更履歴に今回の再同期を追記すべきという非ブロッキング補足あり                                                                                                                                                                                                                                         | 対応済 (#21 変更履歴に追記)                                                                                             |
+| 2026-07-15 | PASS                     | (phase 7 Content/Data 設計) 「該当なし」判断・package 配置方針が D1-D11・実装コード・context/architecture.md の package boundary と矛盾なし。指摘なし                                                                                                                                                                                                                                                                                                             | —                                                                                                                       |
 
 ## 変更履歴
 
@@ -372,6 +376,8 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-15 | Claude         | phase 6 (Interface / Routing 設計): CLI flag 体系表 (D1-D5)・`--format` 検証用の `output.RegisteredFormats()` 公開 API 化 (D5 拡張)・exit code 配線 (D8)・CLI→traversal.Request→output.Write の変換手順・D11 拡張に伴う `output.NodeView.Metadata` の後方互換追加を記述。機能仕様の Routing/URL State (D2 のコマンド構造) も記入。備考の引き継ぎメモ 2 件を解消。レビュー待ち                                                                                                                                                                                                                                                                                                                      |
 | 2026-07-15 | Claude         | phase 6 spec-review 指摘対応 (NEEDS_WORK 1件): `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (durable 正本、L3/L113/L231) が override 前の「methodSymbol.metadata は #21/#22 双方の対象外」のままだった矛盾を解消 (override 後の内容へ更新)。`specs/21-java-dispatch-spring-di/index.md` の対応する反映済み行も同期。フェーズ6の状態を「完了」から「進行中」に修正 (レビュー未了のため)                                                                                                                                                                                                                                                                                       |
 | 2026-07-15 | Claude         | phase 6 再レビュー PASS。フェーズ6を「レビュー済」に更新、`specs/21-java-dispatch-spring-di/index.md` の変更履歴に今回の再同期を追記 (非ブロッキング補足対応)。論点整理〜Interface/Routing 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-07-15 | Claude         | phase 7 (Content / Data 設計): 永続ストアなし (Core プロセス内メモリのみ) を明記、`core/internal/cli`/`core/internal/analyze`/`core/internal/graph`/`core/internal/output`/`core/e2e` への配置方針 (既存 package 構成を変更しない) を記述。機能仕様の Content/Assets・UI Reuse を「該当なし」で記入。備考の引き継ぎメモを解消。レビュー待ち                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-07-15 | Claude         | phase 7 spec-review PASS (指摘なし)。フェーズ7を「レビュー済」に更新。Content/Data 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## 備考
 
@@ -385,4 +391,4 @@ appendix は取り込まない (CLI ツールであり API / DB / 認可 / 画�
 
 phase 7 (Content/Data 設計) への引き継ぎメモ:
 
-- Content / Data 設計節では「CLI のみで永続ストアなし」の該当なし判断を明示する想定 (#21 index.md の同種判断を踏襲)。
+- ~~Content / Data 設計節では「CLI のみで永続ストアなし」の該当なし判断を明示する想定 (#21 index.md の同種判断を踏襲)。~~ → phase 7 で記述済み (2026-07-15)。

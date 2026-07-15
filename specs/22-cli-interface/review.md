@@ -111,3 +111,17 @@ Verdict: PASS
 - 3 文書 (spec #22 / spec #21 / feature doc analyzer-protocol) が同一の override 事実を矛盾なく記述していることをクロスチェックで確認
 - 新たな不整合なし
 - 補足 (非ブロッキング、対応済み): #21 index.md の変更履歴に今回の再同期を追記
+
+## Review 2026-07-15 (phase 7 Content/Data 設計)
+
+Verdict: PASS
+
+- 上位文書整合: PASS — 「永続ストアなし」判断は `context/architecture.md:47-48` と一致。package 配置方針は `context/architecture.md:19-30` の package 一覧および実コード (`core/internal/cli/analyze.go`, `core/internal/graph/convert.go`, `core/internal/output/registry.go`) と矛盾なし。D11拡張の Metadata 透過方針は override 反映済みの feature doc と一致。
+- 未解決論点: PASS — 論点テーブル空、下流節は D1/D5/D6/D7/D9/D11 のみ参照し未決前提の記述なし
+- 実装対象明示: PASS — target が `context/project.md` と一致、`context/architecture.md` の依存方向規約とも矛盾なし
+- template 必須節: PASS — 全節存在、フェーズ表11行、メタ情報・変更履歴とも同期済み
+- EARS acceptance: PASS
+- prompts 自己完結性: N/A (phase 10 未着手)
+- 正本境界: PASS — feature doc への影響テーブルで analyzer-protocol 行のみ「反映済」、他は「未反映」のまま (sync phase 前の契約どおり)
+
+指摘: なし
