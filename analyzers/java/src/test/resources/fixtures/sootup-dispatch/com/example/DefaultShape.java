@@ -7,3 +7,8 @@ public interface DefaultShape {
 
 interface ChildDefaultShape extends DefaultShape {
 }
+
+interface AbstractChildDefaultShape extends DefaultShape {
+    @Override
+    void draw();
+}
