@@ -660,7 +660,7 @@ public final class SpringDiIndex {
             List<BeanEntry> primaries = assignable.stream()
                     .filter(entry -> entry.definition().primary())
                     .toList();
-            if (primaries.size() == 1) {
+            if (primaries.size() == 1 && primaries.get(0).definition().conditionTypes().isEmpty()) {
                 selected = primaries;
             }
         }
