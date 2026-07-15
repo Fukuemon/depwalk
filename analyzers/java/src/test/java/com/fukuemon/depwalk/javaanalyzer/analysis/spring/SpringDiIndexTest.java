@@ -127,7 +127,7 @@ class SpringDiIndexTest {
     }
 
     @Test
-    void keepsSingleConditionalCandidateAmbiguousWithoutEvaluatingCondition() {
+    void keepsSelectedConditionalCandidateAmbiguousWithoutEvaluatingCondition() {
         SpringDiIndex.InjectionResolution conditional = resolution("conditionalOnly");
 
         assertEquals(SpringDiIndex.ResolutionStatus.AMBIGUOUS, conditional.status());
@@ -136,9 +136,7 @@ class SpringDiIndexTest {
                 List.of("org.springframework.context.annotation.Profile"),
                 conditional.candidates().get(0).bean().conditionTypes());
 
-        SpringDiIndex.InjectionResolution conditionalWithPrimary = resolution("conditionalWithPrimary");
-        assertEquals(SpringDiIndex.ResolutionStatus.AMBIGUOUS, conditionalWithPrimary.status());
-        assertEquals(2, conditionalWithPrimary.candidates().size());
+        assertUnique("conditionalWithPrimary", "com.example.ConditionalPrimary");
     }
 
     @Test

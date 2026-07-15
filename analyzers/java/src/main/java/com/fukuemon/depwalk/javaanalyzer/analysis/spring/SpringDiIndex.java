@@ -620,10 +620,8 @@ public final class SpringDiIndex {
                     runtimeProvided ? "runtime-provided" : "no bean candidate");
         }
 
-        boolean containsConditional = assignable.stream()
-                .anyMatch(entry -> !entry.definition().conditionTypes().isEmpty());
         List<BeanEntry> selected = assignable;
-        if (!containsConditional && assignable.size() > 1) {
+        if (assignable.size() > 1) {
             List<BeanEntry> primaries = assignable.stream()
                     .filter(entry -> entry.definition().primary())
                     .toList();
@@ -631,6 +629,8 @@ public final class SpringDiIndex {
                 selected = primaries;
             }
         }
+        boolean containsConditional = selected.stream()
+                .anyMatch(entry -> !entry.definition().conditionTypes().isEmpty());
         List<BeanCandidate> candidates = selected.stream()
                 .map(entry -> new BeanCandidate(entry.definition(), List.of("spring-di")))
                 .toList();
