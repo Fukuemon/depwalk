@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -168,7 +169,7 @@ public final class SootUpTypeHierarchyIndex {
     }
 
     private Resolution resolveMethodUncached(MethodKey key) {
-        try {
+        return guardQuery(key.declaringType(), () -> {
             ClassType declaredType = view().getIdentifierFactory().getClassType(key.declaringType());
             Optional<JavaSootClass> declaredClass = view().getClass(declaredType);
             if (declaredClass.isEmpty()) {
@@ -200,13 +201,11 @@ public final class SootUpTypeHierarchyIndex {
                         candidates.putIfAbsent(candidateKey(candidate), candidate));
             }
             return Resolution.available(candidates.values().stream().sorted(candidateComparator()).toList());
-        } catch (RuntimeException e) {
-            return unavailable(key.declaringType(), describe(e));
-        }
+        });
     }
 
     private Resolution resolveConstructorsUncached(String declaringType) {
-        try {
+        return guardQuery(declaringType, () -> {
             ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
             Optional<JavaSootClass> sootClass = view().getClass(classType);
             if (sootClass.isEmpty()) {
@@ -218,13 +217,11 @@ public final class SootUpTypeHierarchyIndex {
                     .sorted(candidateComparator())
                     .toList();
             return Resolution.available(constructors);
-        } catch (RuntimeException e) {
-            return unavailable(declaringType, describe(e));
-        }
+        });
     }
 
     private Resolution resolveImplementationMethodUncached(MethodKey key) {
-        try {
+        return guardQuery(key.declaringType(), () -> {
             ClassType receiverType = view().getIdentifierFactory().getClassType(key.declaringType());
             if (view().getClass(receiverType).isEmpty()) {
                 return unavailable(key.declaringType(), "class was not found in the supplied classpath");
@@ -232,8 +229,23 @@ public final class SootUpTypeHierarchyIndex {
             return findEffectiveMethod(receiverType, key)
                     .map(candidate -> Resolution.available(List.of(candidate)))
                     .orElseGet(() -> Resolution.available(List.of()));
-        } catch (RuntimeException e) {
-            return unavailable(key.declaringType(), describe(e));
+        });
+    }
+
+    /**
+     * SootUp問い合わせ中の入力不正と依存classのlink失敗を、解析全体を停止させない利用不能結果へ変換する。
+     * {@link LinkageError}はJVM自体の回復不能errorではなく、対象classpathの不足・不整合として発生し得るため、
+     * この外部ライブラリ境界に限って捕捉する。
+     *
+     * @param binaryName 問い合わせ対象型のbinary name
+     * @param query 実行するSootUp問い合わせ
+     * @return 問い合わせ結果、または失敗理由を保持する利用不能結果
+     */
+    static Resolution guardQuery(String binaryName, Supplier<Resolution> query) {
+        try {
+            return query.get();
+        } catch (RuntimeException | LinkageError failure) {
+            return unavailable(binaryName, describe(failure));
         }
     }
 
@@ -321,8 +333,8 @@ public final class SootUpTypeHierarchyIndex {
         return Resolution.unavailable("SootUp could not index " + binaryName + ": " + detail);
     }
 
-    private static String describe(RuntimeException exception) {
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
+    private static String describe(Throwable failure) {
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
     }
 }

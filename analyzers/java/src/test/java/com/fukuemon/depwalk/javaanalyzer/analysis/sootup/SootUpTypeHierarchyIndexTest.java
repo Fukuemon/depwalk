@@ -145,6 +145,19 @@ class SootUpTypeHierarchyIndexTest {
         assertTrue(resolution.unavailableReason().contains("com.example.Broken"));
     }
 
+    @Test
+    void returnsUnavailableInsteadOfPropagatingClasspathLinkageError() {
+        SootUpTypeHierarchyIndex.Resolution resolution = SootUpTypeHierarchyIndex.guardQuery(
+                "com.example.Dependent",
+                () -> {
+                    throw new NoClassDefFoundError("com/example/MissingDependency");
+                });
+
+        assertFalse(resolution.isAvailable());
+        assertTrue(resolution.unavailableReason().contains("com.example.Dependent"));
+        assertTrue(resolution.unavailableReason().contains("com/example/MissingDependency"));
+    }
+
     private Path compileFixture(String fixtureName, boolean enableLombok) throws Exception {
         Path sourceRoot = Path.of(getClass().getResource("/fixtures/" + fixtureName).toURI());
         Path classesDir = tempDir.resolve(fixtureName + "-classes");
