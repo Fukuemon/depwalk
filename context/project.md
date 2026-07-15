@@ -1,6 +1,6 @@
 # Project Profile
 
-> 最終更新: 2026-07-14
+> 最終更新: 2026-07-15
 
 このプロダクト固有の値 (リポジトリ / 命名 / コマンド / 対象ドメイン / トラッカー / 正本パス) を集約する **唯一の正本**。`.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` 等の skill は、固有値をハードコードせず本ファイルを読む。
 
@@ -55,7 +55,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 | Unit test               | `cd core && go test ./...`                                                                                                                                                                                                                                                                                                                         |
 | Java Analyzer build     | `cd analyzers/java && ./gradlew shadowJar`                                                                                                                                                                                                                                                                                                         |
 | Java Analyzer unit test | `cd analyzers/java && ./gradlew test`                                                                                                                                                                                                                                                                                                              |
-| E2E                     | `(cd analyzers/java && ./gradlew shadowJar) && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)` (要 JDK 25)                                                                                                                                                                                                                             |
+| E2E                     | `(cd analyzers/java && ./gradlew shadowJar) && ./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project clean writeDepwalkClasspath && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)` (要 JDK 25。fixture task は `classes` に依存し、classes directory と runtime jar の manifest を生成する)                   |
 | 健全性検査              | `lefthook run pre-commit`                                                                                                                                                                                                                                                                                                                          |
 | 依存整理                | `cd core && go mod tidy`                                                                                                                                                                                                                                                                                                                           |
 | 依存追加                | `cd core && go get <module>@<version>`                                                                                                                                                                                                                                                                                                             |
