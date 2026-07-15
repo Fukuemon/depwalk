@@ -111,6 +111,13 @@ class SpringDiIndexTest {
         SpringDiIndex.InjectionPoint allArgs = injection("com.example.LombokAllArgsConsumer", "mutableService");
         assertEquals(SpringDiIndex.InjectionKind.CONSTRUCTOR, allArgs.kind());
         assertTrue(allArgs.bytecodeGenerated());
+
+        SpringDiIndex.InjectionPoint nonNull = injection("com.example.LombokNonNullConsumer", "nonNullService");
+        assertEquals(SpringDiIndex.InjectionKind.CONSTRUCTOR, nonNull.kind());
+        assertTrue(nonNull.bytecodeGenerated());
+        assertFalse(result.injections().stream().anyMatch(injection ->
+                "com.example.LombokNonNullConsumer".equals(injection.ownerType())
+                        && "optionalService".equals(injection.targetName())));
     }
 
     @Test
