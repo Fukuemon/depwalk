@@ -90,6 +90,16 @@ class DispatchCandidateIntegrationTest {
             assertCandidateMetadata(edge, "ambiguous", List.of("sootup"));
         }
 
+        String childCaller = "java:com.example.DispatchOnlyConsumer#runChild(com.example.ChildDispatchService)";
+        Map<String, Object> childEdge = assertEdge(
+                childCaller,
+                "java:com.example.ChildDispatchImplementation#invoke()",
+                null);
+        assertCandidateMetadata(childEdge, "unique", List.of("sootup"));
+        assertFalse(hasEdge(
+                childCaller,
+                "java:com.example.ParentOnlyDispatchImplementation#invoke()"));
+
         String shadowedCaller = "java:com.example.PrimaryConsumer#checkoutWithShadowedParameter(com.example.PaymentService)";
         for (String callee : List.of(
                 "java:com.example.PaypalPayment#pay()",

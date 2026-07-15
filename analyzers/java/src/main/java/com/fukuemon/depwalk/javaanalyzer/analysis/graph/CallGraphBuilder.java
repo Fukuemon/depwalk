@@ -279,7 +279,14 @@ public final class CallGraphBuilder {
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
-        emitDispatchCandidateEdges(resolved, dispatch, mce, ctx, callSite, calleeSymbol.methodId());
+        emitDispatchCandidateEdges(
+                resolved,
+                dispatch,
+                receiverSite,
+                mce,
+                ctx,
+                callSite,
+                calleeSymbol.methodId());
     }
 
     private void processObjectCreation(ObjectCreationExpr oce, WalkContext ctx) {
@@ -359,7 +366,14 @@ public final class CallGraphBuilder {
         for (String callerId : ctx.callerMethodIds()) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
-        emitDispatchCandidateEdges(resolved, dispatch, mre, ctx, callSite, calleeSymbol.methodId());
+        emitDispatchCandidateEdges(
+                resolved,
+                dispatch,
+                receiverSite,
+                mre,
+                ctx,
+                callSite,
+                calleeSymbol.methodId());
     }
 
     /**
@@ -777,6 +791,7 @@ public final class CallGraphBuilder {
     private void emitDispatchCandidateEdges(
             ResolvedMethodDeclaration resolved,
             String dispatch,
+            TypeSite receiverSite,
             Node callNode,
             WalkContext ctx,
             SourceLocation callSite,
@@ -786,8 +801,10 @@ public final class CallGraphBuilder {
         }
         String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
         List<String> parameterTypes = paramBinaryNames(resolved);
+        String receiverType = receiverSite == null ? declaringType : receiverSite.binaryName();
         SootUpTypeHierarchyIndex.Resolution sootResolution = sootUpIndex.resolveMethod(
                 declaringType,
+                receiverType,
                 resolved.getName(),
                 parameterTypes);
         if (!sootResolution.isAvailable()) {

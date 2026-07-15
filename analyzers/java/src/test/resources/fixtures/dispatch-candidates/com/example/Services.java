@@ -66,3 +66,20 @@ class OverridingProcessor extends BaseProcessor {
         return super::process;
     }
 }
+
+interface ParentDispatchService {
+    void invoke();
+}
+
+interface ChildDispatchService extends ParentDispatchService {
+}
+
+class ChildDispatchImplementation implements ChildDispatchService {
+    public void invoke() {
+    }
+}
+
+class ParentOnlyDispatchImplementation implements ParentDispatchService {
+    public void invoke() {
+    }
+}

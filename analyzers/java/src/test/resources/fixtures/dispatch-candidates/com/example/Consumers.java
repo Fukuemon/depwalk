@@ -64,6 +64,10 @@ class DispatchOnlyConsumer {
     void run(AuditService service) {
         service.audit();
     }
+
+    void runChild(ChildDispatchService service) {
+        service.invoke();
+    }
 }
 
 @Component
