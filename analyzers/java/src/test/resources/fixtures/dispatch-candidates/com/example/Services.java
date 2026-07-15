@@ -47,3 +47,22 @@ class ConditionalNotifier implements NotificationService {
     public void notifyUser() {
     }
 }
+
+class BaseProcessor {
+    void process() {
+    }
+}
+
+class OverridingProcessor extends BaseProcessor {
+    @Override
+    void process() {
+    }
+
+    void callSuper() {
+        super.process();
+    }
+
+    Runnable referenceSuper() {
+        return super::process;
+    }
+}
