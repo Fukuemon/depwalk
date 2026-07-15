@@ -94,6 +94,19 @@ class ConditionalPrimary implements ConditionalPrimaryContract {
 class ConditionalAlternative implements ConditionalPrimaryContract {
 }
 
+interface ConditionalSelectedPrimaryContract {
+}
+
+@Service
+@Primary
+@Profile("selected")
+class ConditionalSelectedPrimary implements ConditionalSelectedPrimaryContract {
+}
+
+@Service
+class ConditionalSelectedFallback implements ConditionalSelectedPrimaryContract {
+}
+
 @Configuration
 class FactoryConfig {
     @Bean(name = {"factoryService", "factoryAlias"})

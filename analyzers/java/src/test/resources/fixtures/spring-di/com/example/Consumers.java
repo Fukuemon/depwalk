@@ -55,4 +55,7 @@ class SelectionConsumer {
 
     @Autowired
     ConditionalPrimaryContract conditionalWithPrimary;
+
+    @Autowired
+    ConditionalSelectedPrimaryContract conditionalSelectedPrimary;
 }

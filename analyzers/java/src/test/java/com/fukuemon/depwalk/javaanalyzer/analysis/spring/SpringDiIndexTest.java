@@ -154,6 +154,10 @@ class SpringDiIndexTest {
                 conditional.candidates().get(0).bean().conditionTypes());
 
         assertUnique("conditionalWithPrimary", "com.example.ConditionalPrimary");
+
+        SpringDiIndex.InjectionResolution conditionalSelectedPrimary = resolution("conditionalSelectedPrimary");
+        assertEquals(SpringDiIndex.ResolutionStatus.AMBIGUOUS, conditionalSelectedPrimary.status());
+        assertEquals(2, conditionalSelectedPrimary.candidates().size());
     }
 
     @Test
