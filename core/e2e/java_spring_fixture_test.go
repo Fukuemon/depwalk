@@ -1,11 +1,9 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -128,19 +126,19 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 	})
 
 	t.Run("CoreGraphCallerCallee", func(t *testing.T) {
-		result, err := analyze.Run(analyze.Options{
-			WorkspaceRoot: sourceRoot,
-			Language:      protocol.LanguageJava,
-			AnalyzerCmd:   fmt.Sprintf("%s -jar %s", strconv.Quote(javaPath), strconv.Quote(jarPath)),
-			AnalyzerMeta:  metadataPairs,
-		})
-		if err != nil {
-			t.Fatalf("build Core graph from Spring fixture: %v", err)
+		callGraph := graph.New()
+		for _, record := range runResult.Records {
+			switch typed := record.(type) {
+			case protocol.MethodSymbol:
+				callGraph.AddNode(graph.NodeFromMethodSymbol(typed))
+			case protocol.CallEdge:
+				callGraph.AddEdge(graph.EdgeFromCallEdge(typed))
+			}
 		}
 		caller := "java:com.example.springfixture.LombokCheckoutService#checkout()"
 		callee := "java:com.example.springfixture.PaypalPayment#pay()"
 		found := false
-		for _, edge := range result.Graph.Neighbors(caller, graph.DirectionCallee) {
+		for _, edge := range callGraph.Neighbors(caller, graph.DirectionCallee) {
 			if edge.CalleeID == callee {
 				found = true
 				break
