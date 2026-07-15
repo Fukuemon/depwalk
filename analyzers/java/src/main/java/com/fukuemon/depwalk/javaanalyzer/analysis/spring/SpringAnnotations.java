@@ -10,6 +10,7 @@ import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /** Spring を classpath に追加せず、annotation の FQN と文字列属性だけを読む。 */
@@ -109,18 +110,53 @@ final class SpringAnnotations {
                 return writtenName;
             }
             return annotation.findCompilationUnit()
-                    .flatMap(cu -> cu.getImports().stream()
-                            .filter(importDeclaration -> matches(importDeclaration, writtenName))
-                            .map(ImportDeclaration::getNameAsString)
-                            .findFirst())
+                    .flatMap(cu -> importedFqn(cu.getImports(), writtenName))
                     .orElse(null);
         }
     }
 
-    private static boolean matches(ImportDeclaration importDeclaration, String simpleName) {
-        return !importDeclaration.isAsterisk()
-                && !importDeclaration.isStatic()
-                && importDeclaration.getName().getIdentifier().equals(simpleName);
+    /**
+     * 型解決できないannotation名を、明示importまたは対応対象packageのwildcard importから復元する。
+     * wildcard importは任意のpackage名を推測せず、この解析器が意味を理解するSpring・MyBatis
+     * annotationだけを候補にする。複数候補が残る場合は誤認を避けて未解決とする。
+     *
+     * @param imports compilation unitのimport宣言
+     * @param simpleName sourceに記述されたannotationの単純名
+     * @return 一意に復元できたFQN。候補なしまたは曖昧なら空
+     */
+    private static Optional<String> importedFqn(
+            List<ImportDeclaration> imports,
+            String simpleName) {
+        Set<String> candidates = new LinkedHashSet<>();
+        for (ImportDeclaration importDeclaration : imports) {
+            if (importDeclaration.isStatic()) {
+                continue;
+            }
+            if (importDeclaration.isAsterisk()) {
+                String candidate = importDeclaration.getNameAsString() + "." + simpleName;
+                if (isSupportedAnnotation(candidate)) {
+                    candidates.add(candidate);
+                }
+            } else if (importDeclaration.getName().getIdentifier().equals(simpleName)) {
+                candidates.add(importDeclaration.getNameAsString());
+            }
+        }
+        return candidates.size() == 1
+                ? Optional.of(candidates.iterator().next())
+                : Optional.empty();
+    }
+
+    private static boolean isSupportedAnnotation(String fqn) {
+        return AUTOWIRED.equals(fqn)
+                || BEAN.equals(fqn)
+                || CONFIGURATION.equals(fqn)
+                || MAPPER.equals(fqn)
+                || PRIMARY.equals(fqn)
+                || PROFILE.equals(fqn)
+                || QUALIFIER.equals(fqn)
+                || SPRING_CONDITIONAL.equals(fqn)
+                || STEREOTYPES.contains(fqn)
+                || fqn.startsWith("org.springframework.boot.autoconfigure.condition.Conditional");
     }
 
     private static void addStrings(Expression expression, List<String> values) {
