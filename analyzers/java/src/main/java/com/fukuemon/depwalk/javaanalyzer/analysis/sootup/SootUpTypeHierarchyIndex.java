@@ -286,7 +286,7 @@ public final class SootUpTypeHierarchyIndex {
                             hierarchy().subclassesOf(receiverType));
             Map<String, MethodCandidate> candidates = new LinkedHashMap<>();
             if (receiverClass.get().isInterface()) {
-                findEffectiveMethod(receiverType, methodKey).ifPresent(candidate ->
+                findEffectiveInterfaceDefault(receiverType, methodKey).ifPresent(candidate ->
                         candidates.put(candidateKey(candidate), candidate));
             }
             receiverCandidates
@@ -296,6 +296,39 @@ public final class SootUpTypeHierarchyIndex {
                             candidates.putIfAbsent(candidateKey(candidate), candidate)));
             return Resolution.available(candidates.values().stream().sorted(candidateComparator()).toList());
         });
+    }
+
+    /**
+     * interface receiverから継承される最も具体的なdefault methodを返す。
+     *
+     * <p>子interfaceが親のdefault methodをabstractとして再宣言した場合、親defaultは実効候補ではない。
+     * そのためreceiverと全親interfaceの同一signature宣言を集め、より具体的な宣言に覆われたものを除外する。
+     * 有効なJava bytecodeでは最も具体的な宣言は1件に定まるため、複数残る不整合時は誤候補を返さない。
+     *
+     * @param receiverType call siteで観測したinterface型
+     * @param key 探索するmethod signature
+     * @return 継承可能なdefault method。abstract再宣言または不整合時は空
+     */
+    private Optional<MethodCandidate> findEffectiveInterfaceDefault(ClassType receiverType, MethodKey key) {
+        List<Map.Entry<ClassType, JavaSootMethod>> declarations = Stream.concat(
+                        Stream.of(receiverType),
+                        hierarchy().implementedInterfacesOf(receiverType))
+                .distinct()
+                .map(type -> Map.entry(type, view().getClass(type)
+                        .flatMap(owner -> findDeclaredMethod(owner, key))))
+                .filter(entry -> entry.getValue().isPresent())
+                .map(entry -> Map.entry(entry.getKey(), entry.getValue().orElseThrow()))
+                .toList();
+        List<JavaSootMethod> mostSpecific = declarations.stream()
+                .filter(candidate -> declarations.stream().noneMatch(other ->
+                        !candidate.getKey().equals(other.getKey())
+                                && hierarchy().isSubtype(candidate.getKey(), other.getKey())))
+                .map(Map.Entry::getValue)
+                .toList();
+        if (mostSpecific.size() != 1 || !mostSpecific.get(0).isConcrete()) {
+            return Optional.empty();
+        }
+        return Optional.of(toCandidate(mostSpecific.get(0)));
     }
 
     private Resolution resolveImplementationMethodUncached(MethodKey key) {
