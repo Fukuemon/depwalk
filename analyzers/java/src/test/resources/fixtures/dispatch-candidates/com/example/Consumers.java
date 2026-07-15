@@ -92,6 +92,20 @@ class RenamedConstructorConsumer {
     }
 }
 
+@Component
+class RenamedSetterConsumer {
+    PaymentService paymentService;
+
+    @Autowired
+    void setPaymentService(PaymentService service) {
+        this.paymentService = service;
+    }
+
+    void checkout() {
+        paymentService.pay();
+    }
+}
+
 class PaymentHolder {
     PaymentService payment;
 }
