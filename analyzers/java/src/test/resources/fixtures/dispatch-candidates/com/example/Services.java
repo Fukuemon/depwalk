@@ -83,3 +83,17 @@ class ParentOnlyDispatchImplementation implements ParentDispatchService {
     public void invoke() {
     }
 }
+
+interface NonBeanService {
+    void execute();
+}
+
+class NonBeanOne implements NonBeanService {
+    public void execute() {
+    }
+}
+
+class NonBeanTwo implements NonBeanService {
+    public void execute() {
+    }
+}
