@@ -192,6 +192,7 @@ public final class SpringDiIndex {
     }
 
     private static final String SPRING_DATA_REPOSITORY = "org.springframework.data.repository.Repository";
+    private static final String LOMBOK_NON_NULL = "lombok.NonNull";
 
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final Map<String, TypeInfo> typeInfoByBinaryName = new LinkedHashMap<>();
@@ -433,8 +434,9 @@ public final class SpringDiIndex {
             return;
         }
         List<VariableDeclarator> requiredFields = type.getFields().stream()
-                .filter(field -> !field.isStatic() && field.isFinal())
-                .flatMap(field -> field.getVariables().stream())
+                .filter(field -> !field.isStatic())
+                .flatMap(field -> field.getVariables().stream()
+                        .filter(variable -> isRequiredConstructorField(field, variable)))
                 .filter(variable -> variable.getInitializer().isEmpty())
                 .toList();
         String ownerType = BinaryNames.forTypeLikeNode(type);
@@ -468,6 +470,22 @@ public final class SpringDiIndex {
                     true,
                     lineOf(field)));
         }
+    }
+
+    /**
+     * Lombokのrequired constructorに含まれるfieldかをsource annotationから判定する。
+     * {@code @RequiredArgsConstructor}は未初期化のfinal fieldに加えて、未初期化の
+     * {@code @NonNull} fieldもconstructor引数に含める。
+     *
+     * @param field field宣言。複数variable宣言時のmodifierと宣言annotationを保持する
+     * @param variable 判定対象のvariable
+     * @return required constructorの候補fieldなら{@code true}
+     */
+    private static boolean isRequiredConstructorField(FieldDeclaration field, VariableDeclarator variable) {
+        return field.isFinal()
+                || SpringAnnotations.has(field, LOMBOK_NON_NULL)
+                || variable.getType().getAnnotations().stream()
+                        .anyMatch(annotation -> LOMBOK_NON_NULL.equals(SpringAnnotations.fqn(annotation)));
     }
 
     private void collectFieldInjections(ClassOrInterfaceDeclaration type, List<InjectionPoint> injections) {
