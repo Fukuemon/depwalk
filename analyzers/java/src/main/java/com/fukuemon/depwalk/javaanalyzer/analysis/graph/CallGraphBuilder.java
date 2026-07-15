@@ -32,6 +32,7 @@ import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.SuperExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
@@ -777,7 +778,7 @@ public final class CallGraphBuilder {
             WalkContext ctx,
             SourceLocation callSite,
             String declarationMethodId) {
-        if ("static".equals(dispatch)) {
+        if ("static".equals(dispatch) || isExplicitSuperDispatch(callNode)) {
             return;
         }
         String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
@@ -841,6 +842,22 @@ public final class CallGraphBuilder {
                 accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
             }
         }
+    }
+
+    /**
+     * {@code super.method()} と {@code super::method} は JVM の {@code invokespecial} に相当し、
+     * 実行時のレシーバー型によるオーバーライド選択を行わない。そのため宣言先への通常 edge は保持しつつ、
+     * 型階層由来の実装候補 edge だけを生成対象外とする。
+     *
+     * @param callNode 候補 edge を検討しているメソッド呼び出しまたはメソッド参照
+     * @return 明示的な {@code super} 呼び出し・参照なら {@code true}
+     */
+    private static boolean isExplicitSuperDispatch(Node callNode) {
+        if (callNode instanceof MethodCallExpr methodCall) {
+            return methodCall.getScope().filter(SuperExpr.class::isInstance).isPresent();
+        }
+        return callNode instanceof MethodReferenceExpr methodReference
+                && methodReference.getScope() instanceof SuperExpr;
     }
 
     private SpringDiIndex.InjectionResolution springResolutionFor(Node callNode, WalkContext ctx) {

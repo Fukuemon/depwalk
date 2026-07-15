@@ -115,6 +115,19 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    void keepsExplicitSuperDispatchBoundToTheSuperclassDeclaration() {
+        String declaration = "java:com.example.BaseProcessor#process()";
+        String override = "java:com.example.OverridingProcessor#process()";
+        for (String caller : List.of(
+                "java:com.example.OverridingProcessor#callSuper()",
+                "java:com.example.OverridingProcessor#referenceSuper()")) {
+            assertEdge(caller, declaration, null);
+            assertFalse(hasEdge(caller, override),
+                    () -> "explicit super dispatch must not add an override candidate: " + caller);
+        }
+    }
+
+    @Test
     void resolvesLombokConstructorInjectionAndDistinguishesRuntimeDiagnostics() {
         Map<String, Object> lombok = assertEdge(
                 "java:com.example.LombokConsumer#checkout()",
