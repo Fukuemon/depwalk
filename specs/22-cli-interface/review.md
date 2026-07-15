@@ -125,3 +125,32 @@ Verdict: PASS
 - 正本境界: PASS — feature doc への影響テーブルで analyzer-protocol 行のみ「反映済」、他は「未反映」のまま (sync phase 前の契約どおり)
 
 指摘: なし
+
+## Review 2026-07-15 15:30 (phase 8 Performance/Security 設計)
+
+Verdict: NEEDS_WORK
+
+- 上位文書整合: PASS — Performance 節は feature doc (java-analyzer 性能方針節) の「SLO は #22 完了時に確定」という委譲を、数値を捏造せず実装フェーズへ引き継いでいる。Security 節も context/architecture.md の読み取り専用方針と整合。D11 Fallback も #21 index.md D6 の観測責務境界と整合。
+- 未解決論点: PASS
+- 実装対象明示: PASS
+- template 必須節: NEEDS_WORK — フェーズ8の状態が「完了」・備考「レビュー待ち」で不一致。フェーズ6で既に自己是正した同一パターンが再発
+- EARS acceptance: PASS
+- prompts 自己完結性 / 正本境界: N/A
+
+指摘: フェーズ8の状態表記を実態 (レビュー未了) に合わせて「進行中」に修正すること → 対応済み
+
+## Review 2026-07-15 (phase 8 再レビュー 2回目)
+
+Verdict: NEEDS_WORK
+
+- フェーズ8の状態修正自体 (完了→進行中) は解消を確認
+- ただし `## 変更履歴` にこの修正を記録する行がなく、フェーズ6の同種修正時の運用 (変更履歴にも記録) から外れていた
+- 指摘: 変更履歴への追記漏れを解消すること → 対応済み
+
+## Review 2026-07-15 (phase 8 再レビュー 3回目)
+
+Verdict: PASS
+
+- 変更履歴への記録漏れが解消
+- フェーズ表・レビュー表・変更履歴の3節 (状態・日付) が矛盾なく整合していることを確認
+- 新たな不整合なし。phase 8 (Performance/Security 設計) 完了
