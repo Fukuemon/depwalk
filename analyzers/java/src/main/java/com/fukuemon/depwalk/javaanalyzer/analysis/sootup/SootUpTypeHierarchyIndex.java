@@ -285,6 +285,10 @@ public final class SootUpTypeHierarchyIndex {
                             receiverClass.get().isConcrete() ? Stream.of(receiverType) : Stream.empty(),
                             hierarchy().subclassesOf(receiverType));
             Map<String, MethodCandidate> candidates = new LinkedHashMap<>();
+            if (receiverClass.get().isInterface()) {
+                findEffectiveMethod(receiverType, methodKey).ifPresent(candidate ->
+                        candidates.put(candidateKey(candidate), candidate));
+            }
             receiverCandidates
                     .filter(type -> view().getClass(type).map(JavaSootClass::isConcrete).orElse(false))
                     .sorted(Comparator.comparing(ClassType::getFullyQualifiedName))
