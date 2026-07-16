@@ -15,3 +15,19 @@ Verdict: PASS
 - 正本境界: N/A — sync phase 未実行であり、上位資料への `反映済` 行はない。durable な追加は将来の track / sync phase で反映すると明記されている (`specs/24-gradle-multi-module-source-roots/index.md:330-363`)。
 
 PASS
+
+## Review 2026-07-16 12:48
+
+Verdict: PASS
+
+### 観点別評価
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-57` に統合モードの Why / What、Design Doc の S1 / S2 / S4 / S5、Protocol・Java Analyzer feature doc、context、ADR-0001 / 0003 / 0005 との整合方針が明記されている。Core は共通 Protocol と言語非依存な `--source-root` の受け渡しだけを担い、Gradle Tooling API・source set・型解決を Java Analyzer に閉じる (`specs/24-gradle-multi-module-source-roots/index.md:194-203,297-310,324-326`) ため、Design Doc の P1〜P4 (`design/DesignDoc.md:159-166`) と package boundary (`context/architecture.md:8-17`) に整合する。既存契約との差分は sync 候補として分類済みで、新規 ADR-0006 の必要性も追跡されている (`specs/24-gradle-multi-module-source-roots/index.md:519-567`)。
+- 未解決論点: PASS — D1〜D9 の全行が `解決済み` (`specs/24-gradle-multi-module-source-roots/index.md:150-165`) で、各決定に理由・トレードオフ・ADR 判断・決定日・決定者がある (`specs/24-gradle-multi-module-source-roots/index.md:167-291`)。未確定事項は明示的に「なし」 (`specs/24-gradle-multi-module-source-roots/index.md:293-295`)。図は diagram phase 前の空 placeholder と明記されており、未決定のまま下流設計を確定した状態ではない (`specs/24-gradle-multi-module-source-roots/index.md:485-500`)。
+- 実装対象明示: PASS — `core / traversal / output / analyzer-protocol / java-analyzer` の全 target が `context/project.md:66-74` の対象ドメインと一致し、変更有無と責務が明示されている (`specs/24-gradle-multi-module-source-roots/index.md:297-310`)。Core → Analyzer は Protocol のみで、Gradle 固有処理は `analyzers/java/` に閉じる (`specs/24-gradle-multi-module-source-roots/index.md:322-326,380-385`)。spec 固有の別系統な検証コマンドは提示されておらず、Quick Commands との競合もない。
+- template 必須節: PASS — テンプレートの必須 Level 2 節がすべて存在する (`specs/24-gradle-multi-module-source-roots/index.md:6-597`)。`hooks/spec/validate_document.sh specs/24-gradle-multi-module-source-roots/index.md` もエラーなし。更新日、フェーズ状況、レビュー、変更履歴も本文の clarify 完了状態と同期している (`specs/24-gradle-multi-module-source-roots/index.md:6-31,569-592`)。
+- EARS acceptance: PASS — `WHEN / IF / THE SYSTEM SHALL` による観測可能な基準が、正常系、validation、discovery、型解決 context、fallback、性能計測、E2E 同値性、Core 境界まで定義されている (`specs/24-gradle-multi-module-source-roots/index.md:124-148`)。対応する具体的なテスト観点と計測指標も列挙されている (`specs/24-gradle-multi-module-source-roots/index.md:431-483`)。
+- prompts 自己完結性: N/A — clarify phase 完了時点のレビューで prompts は未生成。実装分割も prompts 生成方針までで、tasks phase の確定前である (`specs/24-gradle-multi-module-source-roots/index.md:502-517`)。
+- 正本境界: N/A — 上位資料への durable 成果は track / sync phase で反映すると明記され、現時点の変更表は候補であり「反映済」行を持たない (`specs/24-gradle-multi-module-source-roots/index.md:519-567`)。
+
+PASS
