@@ -31,3 +31,68 @@ Verdict: PASS
 - 正本境界: N/A — 上位資料への durable 成果は track / sync phase で反映すると明記され、現時点の変更表は候補であり「反映済」行を持たない (`specs/24-gradle-multi-module-source-roots/index.md:519-567`)。
 
 PASS
+
+## Review 2026-07-17 07:35
+
+Verdict: PASS
+
+### 観点別評価
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-57` で Design Doc、feature docs、context、ADR との継承・補足・更新予定を明示し、Core の言語非依存境界も `:374-381` で維持している。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:165-179` の D1〜D13 はすべて解決済みで、`:364-366` も未確定事項なしと明記している。図は `:588-603` で次 phase の空プレースホルダーに留まる。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:368-381` は `context/project.md:66-74` の全 target と一致し、Core／Protocol／Java Analyzer の責務境界を明示している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-713` に `templates/specs/template.md:7-287` および `hooks/spec/validate_document.sh:21-44` の必須節・必須サブ節がすべて存在する。更新日、設計フェーズ状況、変更履歴も `:11`、`:19-31`、`:687-708` で同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:124-158` に WHEN / IF / THE SYSTEM SHALL の観測可能な基準があり、対応するテスト観点を `:523-575` に具体化している。
+- prompts 自己完結性: N/A — prompts は未生成でレビュー対象外。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:622-676` は track / sync 前の変更候補で、「反映済」行がないため未 sync 段階である。
+
+PASS
+
+## Review 2026-07-18 08:34
+
+Verdict: NEEDS_WORK
+
+### 観点別評価
+
+- 上位文書整合: NEEDS_WORK — D14 は scope 内の全 call site を分類対象にする一方、Java Analyzer 正本はパース不能ファイルを file-level diagnostic だけで除外して継続する。パースできないファイル内の call site は列挙できず、両契約を同時に満たせない。
+- 未解決論点: NEEDS_WORK — call-site 完全性の母集合と source/bytecode 再対応付けの到達可能性境界が未確定。
+- 実装対象明示: PASS — Core、Protocol、Java Analyzer の変更有無と責務は `context/project.md` の対象ドメインおよび Core の言語非依存境界と整合する。
+- template 必須節: PASS — 必須節、更新日、フェーズ状態、変更履歴は D14 clarify 再review待ちの状態と同期している。
+- EARS acceptance: NEEDS_WORK — 「全 call site」「固定期待集合」を検証するための call-site identity と観測経路が不足している。
+- prompts 自己完結性: N/A — prompts は未生成。
+- 正本境界: N/A — track / sync 前で、durable な変更は反映候補として管理されている。
+
+### 指摘
+
+- High: パース不能ファイルと「全 call site 分類」の境界を決める必要がある。D14 は scope 内 source file の全 call site に primary 終端種別を要求するが、既存正本は `JAVA_PARSE_ERROR` によりファイル全体を飛ばして継続する。この場合、ファイル内 call site の総数も outcome も確定できない。分類母集合を「正常に parse できた AST から列挙した call site」に限定する、parse error を fatal にする、または file-level outcome を別指標として扱う、のいずれかを明記し、EARS・計測・テストを同期する必要がある。
+  - `specs/24-gradle-multi-module-source-roots/index.md:151`
+  - `specs/24-gradle-multi-module-source-roots/index.md:369-376`
+  - `design/features/java-analyzer/DesignDoc_java-analyzer.md:185-193`
+  - `design/features/java-analyzer/DesignDoc_java-analyzer.md:295-303`
+- High: bytecode から source への再対応付けを、owning context と依存到達可能 context に制限する必要がある。D6 は非依存 module の型を solver に混ぜない契約だが、D14 の workspace-wide index は同一 binary name/signature だけで bytecode 宣言を source へ対応付けるよう読める。module A が外部 jar の型を参照し、非依存 module B に同名 source 型がある場合、B へ誤帰属し得る。project classes output 由来か、かつ呼出元 context から到達可能な source declaration かを照合条件として明記する必要がある。
+  - `specs/24-gradle-multi-module-source-roots/index.md:250-259`
+  - `specs/24-gradle-multi-module-source-roots/index.md:369-372`
+  - `specs/24-gradle-multi-module-source-roots/index.md:577-581`
+- Medium: silent omission の検出母集合と E2E 観測方法が不足している。outcome 解決処理自身が call site を登録する構造では、visitor が見落とした call site は総数にも入らず、誤って `silentOmission = 0` になり得る。また stderr は理由別集計だけなので、record を出さない `excluded` を含む「call site ごとの固定期待集合」は検証できない。解決前に path・range・kind 等の安定 identity で call-site inventory を作ること、および test から個別 outcome を観測する方法を定義するか、受け入れ基準を集計値照合へ限定する必要がある。
+  - `specs/24-gradle-multi-module-source-roots/index.md:373-376`
+  - `specs/24-gradle-multi-module-source-roots/index.md:562-563`
+  - `specs/24-gradle-multi-module-source-roots/index.md:591`
+  - `specs/24-gradle-multi-module-source-roots/index.md:612-615`
+
+NEEDS_WORK
+
+## Review 2026-07-18 10:35
+
+Verdict: PASS
+
+### 観点別評価
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-57, 717-775`。Design Doc / feature doc / context / ADR との継承・補足・変更候補と sync 先が明示され、Core の言語非依存境界も維持されている。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:171-194, 432-434`。D1〜D17 はすべて解決済みで、未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:436-449`。`context/project.md` の全 target と一致し、変更対象・非変更対象および Core / Analyzer 間の責務境界が明示されている。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-31, 33-104, 171-196, 432-451, 503-600, 683-821`。validation contract の必須節と11フェーズを備え、更新日・レビュー・変更履歴も同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:126-169`。WHEN / IF / THE SYSTEM SHALL により、入力、出力、fatal、分類完全性、性能計測が観測可能に定義されている。
+- prompts 自己完結性: N/A — `specs/24-gradle-multi-module-source-roots/index.md:710-715`。現在は prompts 生成前の clarify phase。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:717-720`。上位資料への「反映済」行はなく、track / sync 前の作業記録段階。
+
+PASS
