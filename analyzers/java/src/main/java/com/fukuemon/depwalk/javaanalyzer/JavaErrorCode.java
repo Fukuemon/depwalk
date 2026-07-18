@@ -17,6 +17,13 @@ public enum JavaErrorCode {
     /** analysisRequest が Java Analyzer として処理できない (未対応 language 等)。 */
     JAVA_INVALID_REQUEST,
 
+    /**
+     * Gradle build model の自動 discovery に失敗した (対応範囲外 version、
+     * provider 非互換、daemon JVM 非互換、model 取得失敗)。安定 reason は
+     * {@code DiscoveryFailure.Category} が持つ。
+     */
+    JAVA_GRADLE_MODEL_ERROR,
+
     /** 上記以外の継続不能な内部エラー。 */
     JAVA_INTERNAL_ERROR;
 
