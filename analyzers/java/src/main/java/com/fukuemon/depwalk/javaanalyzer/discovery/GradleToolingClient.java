@@ -19,6 +19,23 @@ import java.util.Optional;
  */
 public final class GradleToolingClient implements ToolingClient {
 
+    private final String forcedGradleVersion;
+
+    /** 通常経路: wrapper があれば build distribution、なければ同梱 version。 */
+    public GradleToolingClient() {
+        this(null);
+    }
+
+    /**
+     * cross-version matrix test 用に target Gradle version を強制する
+     * (wrapper 判定を行わない)。production 経路では使用しない。
+     *
+     * @param forcedGradleVersion 強制する Gradle version。{@code null} なら通常経路
+     */
+    public GradleToolingClient(String forcedGradleVersion) {
+        this.forcedGradleVersion = forcedGradleVersion;
+    }
+
     @Override
     public BuildEnvironmentInfo buildEnvironment(Path workspaceRoot) throws ToolingRequestException {
         try (ProjectConnection connection = connect(workspaceRoot)) {
@@ -55,7 +72,9 @@ public final class GradleToolingClient implements ToolingClient {
     private ProjectConnection connect(Path workspaceRoot) {
         GradleConnector connector = GradleConnector.newConnector()
                 .forProjectDirectory(workspaceRoot.toFile());
-        if (hasWrapper(workspaceRoot)) {
+        if (forcedGradleVersion != null) {
+            connector.useGradleVersion(forcedGradleVersion);
+        } else if (hasWrapper(workspaceRoot)) {
             connector.useBuildDistribution();
         } else {
             connector.useGradleVersion(GradleVersionSupport.BUNDLED_GRADLE_VERSION);

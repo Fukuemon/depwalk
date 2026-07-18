@@ -57,7 +57,31 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("gradle-compat")
+    }
+}
+
+// Gradle discovery compatibility matrix (context/toolchain.md の CI anchor)。
+// daemon JDK は toolchain 解決 (foojay) で供給し、未解決 anchor は fail させる (skip 成功にしない)。
+val matrixJdkMajors = listOf(8, 17, 25)
+tasks.register<Test>("gradleCompatibilityTest") {
+    description = "Gradle 7.6.5/8.14.5/9.6.1 × daemon JDK 8/17/25 の discovery 互換性 matrix"
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("gradle-compat")
+    }
+    matrixJdkMajors.forEach { major ->
+        val launcher = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(major))
+        }
+        jvmArgumentProviders.add(CommandLineArgumentProvider {
+            listOf("-Ddepwalk.matrix.jdk$major=" + launcher.get().metadata.installationPath.asFile.absolutePath)
+        })
+    }
+    shouldRunAfter(tasks.test)
 }
 
 tasks.shadowJar {
