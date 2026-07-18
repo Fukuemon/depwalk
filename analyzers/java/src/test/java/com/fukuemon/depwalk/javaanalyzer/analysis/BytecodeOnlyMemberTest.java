@@ -181,26 +181,39 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
-    void genericElementTypeIsErasedToObjectAndStaysUnresolved() throws Exception {
-        // D31 の既知の限界 (spec D31 記録): 合成 member の generic 型引数は
-        // erasure で Object 埋めされるため、要素型に依存する後続 call は
-        // 解決できず完全性 gate に残る。この限界を回帰として固定する。
+    void genericElementTypeIsRecoveredFromSignatureAttribute() throws Exception {
+        // D32: 合成 member の generic 戻り値は Signature 属性から実型引数を
+        // 復元するため、要素型が scope 内型の連鎖 (getItems().get(0).ping())
+        // も edge として解決できる。
         Path build = temp.resolve("generic-src");
+        write(build, "com/example/Item.java", """
+                package com.example;
+                public class Item {
+                    public void ping() {}
+                }
+                """);
         write(build, "com/example/Owner.java", """
                 package com.example;
                 import java.util.List;
                 public class Owner {
-                    public List<String> getTags() { return List.of(); }
+                    public List<Item> getItems() { return List.of(); }
                 }
                 """);
         Path classes = temp.resolve("generic-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
                 "--release", "17", "-d", classes.toString(),
+                build.resolve("com/example/Item.java").toString(),
                 build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 
         Path workspace = temp.resolve("generic-workspace");
+        write(workspace, "com/example/Item.java", """
+                package com.example;
+                public class Item {
+                    public void ping() {}
+                }
+                """);
         write(workspace, "com/example/Owner.java", """
                 package com.example;
                 public class Owner {
@@ -209,23 +222,21 @@ class BytecodeOnlyMemberTest {
         write(workspace, "com/example/Caller.java", """
                 package com.example;
                 public class Caller {
-                    int sizeOnly(Owner owner) { return owner.getTags().size(); }
-                    int elementDependent(Owner owner) { return owner.getTags().get(0).length(); }
+                    void use(Owner owner) { owner.getItems().get(0).ping(); }
                 }
                 """);
 
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
 
-        // 要素型に依存しない size() までは解決する。要素型に依存する
-        // get(0).length() は receiver が Object (external) となり、edge を
-        // 生成せず external-target の明示除外へ分類される (要素型の復元は
-        // generic Signature 読み取りの後続課題)。
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         assertTrue(ran.byType("methodSymbol").stream()
-                .anyMatch(n -> "java:com.example.Owner#getTags()".equals(n.get("methodId"))),
+                .anyMatch(n -> "java:com.example.Owner#getItems()".equals(n.get("methodId"))),
                 () -> ran.records().toString());
-        assertTrue(ran.stderr().contains("excluded[external-target]"), ran.stderr());
+        // 復元された要素型 (Item) 上の ping() が edge として解決される。
+        assertTrue(ran.byType("callEdge").stream()
+                .anyMatch(e -> "java:com.example.Item#ping()".equals(e.get("calleeMethodId"))),
+                () -> ran.records().toString());
         assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
     }
 

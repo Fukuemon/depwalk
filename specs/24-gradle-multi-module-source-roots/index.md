@@ -100,6 +100,17 @@ durableな設計の正本は [Design Doc](../../design/DesignDoc.md)、[Analyzer
   - 決定日: 2026-07-19
   - 決定者: Fukuemon (方式A選択)、実装・限界記録はClaude
 
+- **D32: generic Signature属性から合成memberの実型引数を復元する。**
+  - `GenericSignatureReader` (ASM) が自contextのclasses outputからmethodのSignature属性を読み、
+    戻り値型を実型引数付きで復元する。型変数は宣言erasure (Object) へ写像して
+    JavaParserの型変数自己写像による無限再帰を避ける。引数型はerasureのまま (arity一致で十分)。
+  - Signature属性が無い/読めないmemberはerasureへdegradeし、解析は失敗させない。
+  - 要素型がscope内型の連鎖 (`getItems().get(0).ping()`) がedgeとして解決されることを回帰で固定した。
+  - 実環境検証: 未解決callは3,900→3,267。残存は生成member以外の複数要因の混合 (別診断が必要) で、
+    D31/D32のscope外として本specでは追わない。
+  - 決定日: 2026-07-19
+  - 決定者: Fukuemon (D32着手指示)、実装はClaude
+
 ## 背景
 
 現行の `analysisRequest` は単一の `workspaceRoot` を持つ。

@@ -15,11 +15,30 @@ import java.util.Optional;
 public final class ProjectBytecodeMemberIndex {
 
     private final SootUpTypeHierarchyIndex sootUpIndex;
+    private final com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader signatureReader;
     private final java.util.Map<String, List<SootUpTypeHierarchyIndex.MethodCandidate>> declaredCache =
             new java.util.HashMap<>();
 
     public ProjectBytecodeMemberIndex(SootUpTypeHierarchyIndex sootUpIndex) {
+        this(sootUpIndex, List.of());
+    }
+
+    /**
+     * @param classesOutputDirs generic Signature 属性の読み取りに使う自 context の
+     *     classes output (spec #24 D32)
+     */
+    public ProjectBytecodeMemberIndex(
+            SootUpTypeHierarchyIndex sootUpIndex, List<java.nio.file.Path> classesOutputDirs) {
         this.sootUpIndex = sootUpIndex;
+        this.signatureReader =
+                new com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader(classesOutputDirs);
+    }
+
+    /** 合成 member の generic 戻り値型 (Signature 属性が無ければ empty)。 */
+    public java.util.Optional<com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader.BytecodeType>
+            genericReturnType(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return signatureReader.genericReturnType(
+                candidate.declaringType(), candidate.methodName(), candidate.parameterTypes());
     }
 
     /**

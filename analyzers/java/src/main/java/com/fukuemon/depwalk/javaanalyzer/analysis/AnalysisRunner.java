@@ -162,7 +162,8 @@ public final class AnalysisRunner {
             }
             SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(entries);
             sootUpByContext.put(context.id(), index);
-            bytecodeIndexByContext.put(context.id(), new ProjectBytecodeMemberIndex(index));
+            bytecodeIndexByContext.put(context.id(),
+                    new ProjectBytecodeMemberIndex(index, context.classesOutputs()));
         }
 
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
