@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.gradleprovider;
 
+import org.gradle.api.JavaVersion;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
@@ -123,12 +124,25 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
             }
             String sourceCompatibility = compileTask.getSourceCompatibility();
             if (sourceCompatibility != null) {
-                return sourceCompatibility;
+                return canonicalMajor(sourceCompatibility);
             }
         }
         JavaPluginExtension javaExtension =
                 project.getExtensions().getByType(JavaPluginExtension.class);
-        return javaExtension.getSourceCompatibility().toString();
+        return canonicalMajor(javaExtension.getSourceCompatibility().toString());
+    }
+
+    /**
+     * {@code sourceCompatibility} の "1.8" 等の legacy 表記を Analyzer 側
+     * {@code LanguageLevels} が受理する canonical major ("8") へ正規化する。
+     * 解釈できない表記はそのまま返し、Analyzer 側の validation に委ねる。
+     */
+    private static String canonicalMajor(String version) {
+        try {
+            return JavaVersion.toVersion(version).getMajorVersion();
+        } catch (IllegalArgumentException e) {
+            return version;
+        }
     }
 
     private boolean previewEnabled(Project project, SourceSet main) {

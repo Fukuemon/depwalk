@@ -619,6 +619,17 @@ public final class CallGraphBuilder {
 
     private void commitEmitted(Node callNode, CallSiteId.CallKind kind, WalkContext ctx) {
         for (String caller : ledgerCallers(callNode, ctx)) {
+            if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
+                // caller 宣言が resolve できない site は edge を出力できないため、
+                // emitted でなく primary diagnostic として完全性 gate に残す (D14 / D20)。
+                ledger.commitDiagnostic(
+                        CallSiteInventory.of(callNode, currentPath, kind, caller),
+                        JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
+                        "unresolved-caller",
+                        null,
+                        null);
+                continue;
+            }
             ledger.commitEmitted(CallSiteInventory.of(callNode, currentPath, kind, caller));
         }
     }

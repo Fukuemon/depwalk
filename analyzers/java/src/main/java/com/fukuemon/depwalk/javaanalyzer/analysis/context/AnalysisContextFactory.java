@@ -163,7 +163,24 @@ public final class AnalysisContextFactory {
             List<Path> classpathPaths = new ArrayList<>();
             for (File entry : project.getMainCompileClasspath()) {
                 Path path = entry.toPath().toAbsolutePath().normalize();
-                if (!Files.exists(path) || !Files.isReadable(path)) {
+                if (!Files.exists(path)) {
+                    // model 取得は task を実行しないため、workspace 内の project 依存
+                    // build output は未 build だと存在しない。依存 project の型は
+                    // 依存 context の source root が solver へ入るため、workspace 内
+                    // entry の欠落は warning で除外し source 解析を継続する。
+                    // workspace 外 (external artifact) の欠落は従来どおり fatal。
+                    if (withinWorkspace(path, workspaceRoot)) {
+                        warnings.add(sootUpUnavailableWarning(contextId,
+                                "excluded an unbuilt workspace classpath entry; continuing without its bytecode in project "
+                                        + project.getProjectPath()));
+                        continue;
+                    }
+                    throw new AnalyzerFatalException(
+                            JavaErrorCode.JAVA_MISSING_JAR,
+                            "a resolved compile classpath entry is missing or unreadable in project "
+                                    + project.getProjectPath());
+                }
+                if (!Files.isReadable(path)) {
                     throw new AnalyzerFatalException(
                             JavaErrorCode.JAVA_MISSING_JAR,
                             "a resolved compile classpath entry is missing or unreadable in project "
@@ -326,6 +343,21 @@ public final class AnalysisContextFactory {
             }
         }
         return false;
+    }
+
+    /**
+     * 存在しない可能性のある path が workspace 配下かを判定する。実在する最寄りの
+     * 祖先を real path 化して比較し、symlink 配下の workspace でも安定させる。
+     */
+    private static boolean withinWorkspace(Path path, Path workspaceRoot) {
+        Path ancestor = path;
+        while (ancestor != null && !Files.exists(ancestor)) {
+            ancestor = ancestor.getParent();
+        }
+        if (ancestor == null) {
+            return false;
+        }
+        return realPathWithin(ancestor, workspaceRoot);
     }
 
     private static boolean realPathWithin(Path path, Path workspaceRoot) {

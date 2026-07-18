@@ -138,4 +138,108 @@ class AnalysisContextFactoryTest {
         assertTrue(LanguageLevels.resolve("1.8", false).isEmpty());
         assertTrue(LanguageLevels.resolve(null, false).isEmpty());
     }
+
+    @Test
+    void skipsUnbuiltWorkspaceClasspathEntriesWithAWarning() throws Exception {
+        // model 取得は task を実行しないため、workspace 内の project 依存 build
+        // output は fresh checkout で存在しない。fatal でなく warning で除外する。
+        Files.createDirectories(workspace.resolve("app/src/main/java"));
+        Path unbuilt = workspace.resolve("service/build/libs/service.jar");
+
+        AnalysisContextFactory.Result result = AnalysisContextFactory.discoveredContexts(
+                workspace,
+                model(project(":app", workspace.resolve("app"),
+                        List.of(workspace.resolve("app/src/main/java")), List.of(unbuilt))),
+                List.of());
+
+        assertEquals(1, result.contexts().size());
+        assertTrue(result.contexts().get(0).classpath().stream().noneMatch(unbuilt::equals));
+        assertTrue(result.warnings().stream()
+                .anyMatch(w -> "JAVA_SOOTUP_UNAVAILABLE".equals(w.code())
+                        && w.message().contains("unbuilt")));
+    }
+
+    @Test
+    void failsOnMissingExternalClasspathArtifacts() throws Exception {
+        Files.createDirectories(workspace.resolve("app/src/main/java"));
+        Path external = workspace.getParent().resolve("depwalk-missing-external.jar");
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
+                () -> AnalysisContextFactory.discoveredContexts(
+                        workspace,
+                        model(project(":app", workspace.resolve("app"),
+                                List.of(workspace.resolve("app/src/main/java")), List.of(external))),
+                        List.of()));
+        assertEquals(JavaErrorCode.JAVA_MISSING_JAR, e.errorCode());
+    }
+
+    private com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel model(
+            com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel... projects) {
+        return new com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel() {
+            @Override
+            public java.io.File getBuildRootDirectory() {
+                return workspace.toFile();
+            }
+
+            @Override
+            public List<? extends com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel> getProjects() {
+                return List.of(projects);
+            }
+
+            @Override
+            public List<String> getExcludedSourceSetNames() {
+                return List.of();
+            }
+
+            @Override
+            public int getExcludedSourceSetCount() {
+                return 0;
+            }
+        };
+    }
+
+    private static com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel project(
+            String path, Path projectDir, List<Path> sourceDirs, List<Path> classpath) {
+        return new com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel() {
+            @Override
+            public String getProjectPath() {
+                return path;
+            }
+
+            @Override
+            public java.io.File getProjectDirectory() {
+                return projectDir.toFile();
+            }
+
+            @Override
+            public List<java.io.File> getMainJavaSourceDirectories() {
+                return sourceDirs.stream().map(Path::toFile).toList();
+            }
+
+            @Override
+            public List<java.io.File> getMainCompileClasspath() {
+                return classpath.stream().map(Path::toFile).toList();
+            }
+
+            @Override
+            public List<java.io.File> getMainClassesOutputDirectories() {
+                return List.of();
+            }
+
+            @Override
+            public List<String> getProjectDependencyPaths() {
+                return List.of();
+            }
+
+            @Override
+            public String getSourceLanguageLevel() {
+                return "17";
+            }
+
+            @Override
+            public boolean isPreviewEnabled() {
+                return false;
+            }
+        };
+    }
 }

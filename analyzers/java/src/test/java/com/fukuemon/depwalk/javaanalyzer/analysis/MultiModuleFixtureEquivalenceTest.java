@@ -72,9 +72,26 @@ class MultiModuleFixtureEquivalenceTest {
         Process process = new ProcessBuilder(javaBin.toString(), "-jar", jar.toString()).start();
         process.getOutputStream().write(requestJson.getBytes(StandardCharsets.UTF_8));
         process.getOutputStream().close();
+        // stderr は並行 drain する: stdout の EOF を待つ間に stderr の pipe が
+        // 満杯になると子 process と相互待ちでデッドロックするため。
+        java.io.ByteArrayOutputStream stderrBytes = new java.io.ByteArrayOutputStream();
+        Thread stderrDrainer = new Thread(() -> {
+            try {
+                process.getErrorStream().transferTo(stderrBytes);
+            } catch (java.io.IOException ignored) {
+                // process 終了時の stream close は失敗扱いにしない。
+            }
+        });
+        stderrDrainer.start();
         String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-        int exit = process.waitFor();
+        if (!process.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)) {
+            process.destroyForcibly();
+            throw new AssertionError("analyzer process timed out; stderr so far: "
+                    + stderrBytes.toString(StandardCharsets.UTF_8));
+        }
+        stderrDrainer.join(java.util.concurrent.TimeUnit.SECONDS.toMillis(30));
+        String stderr = stderrBytes.toString(StandardCharsets.UTF_8);
+        int exit = process.exitValue();
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, Object>> records = new ArrayList<>();
         for (String line : stdout.split("\n")) {

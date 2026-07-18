@@ -85,6 +85,11 @@ class CredentialIsolationTest {
         }
     }
 
+    /** JSON string へ埋め込む path を escape する (Windows の backslash 対策)。 */
+    private static String jsonPath(Path path) {
+        return path.toAbsolutePath().toString().replace("\\", "\\\\");
+    }
+
     private static void deleteRecursively(Path root) throws Exception {
         try (Stream<Path> paths = Files.walk(root)) {
             paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
@@ -97,7 +102,7 @@ class CredentialIsolationTest {
         Path workspace = markerWorkspace(marker, false);
         try {
             Ran ran = runAnalyzer("{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
-                    + "\"requestId\":\"leak-ok\",\"workspaceRoot\":\"" + workspace + "\",\"language\":\"java\"}");
+                    + "\"requestId\":\"leak-ok\",\"workspaceRoot\":\"" + jsonPath(workspace) + "\",\"language\":\"java\"}");
 
             assertEquals(0, ran.exitCode(), ran.stderr());
             assertFalse(ran.stdout().contains(marker), "marker leaked to Protocol stdout");
@@ -117,7 +122,7 @@ class CredentialIsolationTest {
         Path workspace = markerWorkspace(marker, true);
         try {
             Ran ran = runAnalyzer("{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
-                    + "\"requestId\":\"leak-fail\",\"workspaceRoot\":\"" + workspace + "\",\"language\":\"java\"}");
+                    + "\"requestId\":\"leak-fail\",\"workspaceRoot\":\"" + jsonPath(workspace) + "\",\"language\":\"java\"}");
 
             assertEquals(1, ran.exitCode());
             assertFalse(ran.stdout().contains(marker), "marker leaked to the error record");
@@ -138,7 +143,7 @@ class CredentialIsolationTest {
         Path workspace = markerWorkspace(marker, true);
         try {
             Ran ran = runAnalyzer("{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
-                    + "\"requestId\":\"leak-explicit\",\"workspaceRoot\":\"" + workspace + "\","
+                    + "\"requestId\":\"leak-explicit\",\"workspaceRoot\":\"" + jsonPath(workspace) + "\","
                     + "\"sourceRoots\":[\"src/main/java\"],\"language\":\"java\","
                     + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"17\"]}}");
 
