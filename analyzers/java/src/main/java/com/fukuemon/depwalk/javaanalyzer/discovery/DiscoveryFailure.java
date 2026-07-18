@@ -12,6 +12,7 @@ public class DiscoveryFailure extends Exception {
         UNSUPPORTED_GRADLE_VERSION("unsupported-gradle-version"),
         PROVIDER_INCOMPATIBLE("provider-incompatible"),
         DAEMON_JVM_INCOMPATIBLE("daemon-jvm-incompatible"),
+        CONNECTION_FAILED("connection-failed"),
         MODEL_REQUEST_FAILED("model-request-failed"),
         NO_JAVA_SOURCE_ROOTS("no-java-source-roots");
 

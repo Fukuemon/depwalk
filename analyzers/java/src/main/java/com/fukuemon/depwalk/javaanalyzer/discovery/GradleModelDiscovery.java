@@ -62,8 +62,7 @@ public final class GradleModelDiscovery {
         try {
             environment = client.buildEnvironment(workspaceRoot);
         } catch (ToolingClient.ToolingRequestException e) {
-            throw new DiscoveryFailure(
-                    DiscoveryFailure.Category.MODEL_REQUEST_FAILED, e.phase(), e.getMessage());
+            throw new DiscoveryFailure(categoryFor(e.phase()), e.phase(), e.getMessage());
         }
 
         checkCompatibility(environment);
@@ -116,9 +115,15 @@ public final class GradleModelDiscovery {
                     DiscoveryFailure.Phase.MODEL_REQUEST,
                     "the bundled model provider could not be prepared in a temporary directory");
         } catch (ToolingClient.ToolingRequestException e) {
-            throw new DiscoveryFailure(
-                    DiscoveryFailure.Category.MODEL_REQUEST_FAILED, e.phase(), e.getMessage());
+            throw new DiscoveryFailure(categoryFor(e.phase()), e.phase(), e.getMessage());
         }
+    }
+
+    private static DiscoveryFailure.Category categoryFor(DiscoveryFailure.Phase phase) {
+        if (phase == DiscoveryFailure.Phase.CONNECT) {
+            return DiscoveryFailure.Category.CONNECTION_FAILED;
+        }
+        return DiscoveryFailure.Category.MODEL_REQUEST_FAILED;
     }
 
     private void validateModel(DepwalkGradleModel model) throws DiscoveryFailure {
