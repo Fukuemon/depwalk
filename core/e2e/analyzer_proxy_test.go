@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -64,6 +65,8 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 	defer stderrFile.Close()
 
 	cmd := exec.Command(command[0], command[1:]...)
+	// capture へ写るのは Analyzer が実際に読んだ bytes。現行 Protocol は
+	// 1 行の analysisRequest を必ず読み切るため request 全体が写る。
 	cmd.Stdin = io.TeeReader(stdin, requestFile)
 	cmd.Stdout = io.MultiWriter(stdout, stdoutFile)
 	cmd.Stderr = io.MultiWriter(stderr, stderrFile)
@@ -72,7 +75,7 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 	exit := 0
 	if runErr != nil {
 		var exitErr *exec.ExitError
-		if ok := errorsAs(runErr, &exitErr); ok {
+		if errors.As(runErr, &exitErr) {
 			exit = exitErr.ExitCode()
 		} else {
 			fmt.Fprintf(stderr, "recording proxy: failed to run analyzer: %v\n", runErr)
@@ -85,16 +88,6 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 		return 97
 	}
 	return exit
-}
-
-// errorsAs is a tiny local wrapper so the helper stays free of extra imports
-// at call sites.
-func errorsAs(err error, target *(*exec.ExitError)) bool {
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		*target = exitErr
-		return true
-	}
-	return false
 }
 
 // TestProxyEchoChildHelperProcess is a fixed child used by the transparency
