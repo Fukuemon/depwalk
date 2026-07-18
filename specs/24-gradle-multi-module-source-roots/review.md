@@ -276,3 +276,41 @@ Verdict: PASS
 - 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1119-1122`。sync phaseは未実行で「反映済」行はなく、durable成果は今後ハンドオフ予定。
 
 PASS
+
+## Review 2026-07-18 17:11
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:1131-1178` の sync リストに、正本境界と反映内容の漏れがある
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:205-243` は D1〜D30 をすべて解決済みとして管理し、`:666-668` は未確定事項なし
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:670-683` は `context/project.md:66-74` の対象ドメインと一致し、Core と Analyzer の Protocol 境界も明記
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1274` にテンプレート必須節、11フェーズ、レビュー、変更履歴が存在
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:139-203` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、`:848-956` に対応する検証観点と合否指標がある
+- prompts 自己完結性: N/A — prompts phase のレビューではなく、prompts は入力対象外
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1121-1123` は全変更を未反映としており、sync phase 未実行
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:1147` — Java 固有の `metadata.classpath` 意味論を analyzer-protocol feature doc の反映先としているが、同 doc は Java 固有型解決を対象外とし、metadata を opaque hint としている (`design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:35-40,64`)。Java 固有 metadata の正本は `design/features/java-analyzer/DesignDoc_java-analyzer.md:59-76` である。sync 先を Java Analyzer の metadata 契約へ移し、Protocol 側には共通 wire 契約だけを残す必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:1131-1135` — Design Doc への影響を「なし」としているが、Java Analyzer は Gradle Tooling API / daemon / custom provider という新しい runtime 依存を持つ (`:1156-1159`)。Design Doc のモジュール責務表は Java Analyzer の依存先を `JavaParser / SymbolSolver / SootUp` と明記している (`design/DesignDoc.md:128-140`)。少なくとも依存先または landscape 上の条件付き Gradle runtime を更新対象に含めるか、詳細委譲により更新不要とする明確な整合理由が必要。
+- `specs/24-gradle-multi-module-source-roots/index.md:1178` — D12 を参照しているものの、toolchain への変更内容には「project toolchain / source language level」と「Analyzer JDK / daemon JVM」の分離が記載されていない。D12 自身はこの分離を toolchain 正本へ反映すると決定している (`:396-408`)。現状の行だけでは sync 実施者が D12 の durable な toolchain 更新を一意に再現できない。
+
+NEEDS_WORK
+
+## Review 2026-07-18 17:33
+
+Verdict: PASS
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-63,1120-1190` で既存資料との差分と sync 先を網羅的に分類済み。前回指摘の Java 固有 metadata 正本、条件付き Gradle runtime、toolchain 4軸分離も `:1160,1136,1178` に反映され、未追跡の矛盾はない。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:211-242` の D1〜D30 はすべて解決済みで、`:667-669` の未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:671-684` は `context/project.md:66-74` の全 target と一致し、Core → Analyzer の Protocol 境界を明示。コマンド契約の差分も `:1177` に追跡済み。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1279` に全必須節が存在し、`hooks/spec/validate_document.sh` も終了コード 0。更新日、フェーズ状況、レビュー、変更履歴も同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:142-204` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、`:853-957` に対応する検証観点と合否指標が定義されている。
+- prompts 自己完結性: N/A — track phase のレビューであり、prompts はレビュー対象に含まれていない。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1122-1124` は全変更を未反映の変更提案として管理しており、sync phase は未実行。冒頭 `:3-4` でも durable 成果は sync phase でハンドオフすると明示されている。
+
+PASS
