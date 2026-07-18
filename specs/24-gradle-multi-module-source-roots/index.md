@@ -8,7 +8,7 @@
 - Issue: `#24`
 - ステータス: `In Progress`
 - 作成日: 2026-07-15
-- 更新日: 2026-07-18
+- 更新日: 2026-07-19
 - Branch: `feature/24`
 - Owner: Fukuemon
 
@@ -83,33 +83,6 @@ durableな設計の正本は [Design Doc](../../design/DesignDoc.md)、[Analyzer
 - [spec #21](../21-java-dispatch-spring-di/index.md): 単一 source root 制約から本 Issue を切り出した決定経緯
 - [Gradle Tooling API](https://docs.gradle.org/current/userguide/tooling_api.html): client / daemon / target Gradleの互換性契約
 - [Gradle Java Compatibility](https://docs.gradle.org/current/userguide/compatibility.html): Gradle versionごとのdaemon JVM対応範囲
-
-- **D31: solver層でscope内source型へbytecode memberを合成する (決定A)。**
-  - 実環境のGradle multi-project検証で、Lombok生成member起点のchained call / stream連鎖が
-    call-site駆動の救済 (D18) では解決できないことを確認した (solverが式の型を知らないため連鎖を辿れない)。
-  - `MemberAugmentingTypeSolver`がsource rootのsolverを包み、class宣言を`AugmentedJavaParserClassDeclaration`
-    (subclass) へ差し替える。`solveMethod` / `solveMethodAsUsage` のfallbackと`getDeclaredMethods`への合成で、
-    直接呼び出し・式の型伝播・継承memberの階層走査 (自型と祖先) をカバーする。合成対象は同一contextの
-    classes outputにある一意なname + arityのcallable memberのみで、source宣言と帰属規則 (D6 / D14) は変更しない。
-  - 合成member解決はD18と同じ出力契約 (sourceLocation省略 + ownerSourceLocation metadata +
-    calleeOrigin=project-bytecode-member edge) で emit する。
-  - **既知の限界**: generic宣言の型引数はObject埋めのerased形で返す (型変数の自己写像による
-    JavaParserの無限再帰を回避)。このため要素型に依存する後続callは解決できず、receiver型が
-    external (Object等) と判明した場合はexternal-target除外、判明しない場合はunresolvedとして
-    完全性gateに残る。実型引数の復元はD32へ切り出した。
-  - 決定日: 2026-07-19
-  - 決定者: Fukuemon (方式A選択)、実装・限界記録はClaude
-
-- **D32: generic Signature属性から合成memberの実型引数を復元する。**
-  - `GenericSignatureReader` (ASM) が自contextのclasses outputからmethodのSignature属性を読み、
-    戻り値型を実型引数付きで復元する。型変数は宣言erasure (Object) へ写像して
-    JavaParserの型変数自己写像による無限再帰を避ける。引数型はerasureのまま (arity一致で十分)。
-  - Signature属性が無い/読めないmemberはerasureへdegradeし、解析は失敗させない。
-  - 要素型がscope内型の連鎖 (`getItems().get(0).ping()`) がedgeとして解決されることを回帰で固定した。
-  - 実環境検証: 未解決callは3,900→3,267。残存は生成member以外の複数要因の混合 (別診断が必要) で、
-    D31/D32のscope外として本specでは追わない。
-  - 決定日: 2026-07-19
-  - 決定者: Fukuemon (D32着手指示)、実装はClaude
 
 ## 背景
 
@@ -271,7 +244,8 @@ EARS 風で振る舞いを記述する。
 | D28 | initializer内の1つのAST callを複数constructor callerへ畳み込むときinventory / ledgerをどう数えるか | A: lexical call siteとsemantic callerの組ごとにentryを展開し、callerを含むIDごとに1 outcomeを持つ                          | 解決済み |
 | D29 | bytecode-only memberのowner metadataをCore graphへ保持する変更をどの正本へ反映するか               | A: Graph feature docをsync対象へ追加し、`graph.Symbol`のopaque metadata passthroughを正式契約にする                        | 解決済み |
 | D30 | custom model providerとGradle / daemon JVMの互換性matrixをいつ・どの値で確定するか                 | A: clarifyでbundled Tooling API、対応wrapper範囲、provider classfile target、daemon JVM matrixを確定する                   | 解決済み |
-| D31 | Lombok等の生成memberを起点とする式の型伝播 (chained call / stream連鎖) をどう解決するか            | 未定: A) solver層でscope内source型へbytecode memberを合成 / B) project classes優先のsolver順序へ反転しsource再対応付け     | 未解決   |
+| D31 | Lombok等の生成memberを起点とする式の型伝播 (chained call / stream連鎖) をどう解決するか            | A: solver層でscope内source型へbytecode memberを合成する (`MemberAugmentingTypeSolver`)                                     | 解決済み |
+| D32 | D31の合成memberがgeneric宣言でerased型しか返せず、要素型依存の後続callを解決できない               | A: ASMでclasses outputのSignature属性を読み、戻り値型を実型引数付きで復元する                                              | 解決済み |
 
 ## 解決済みの論点
 
@@ -695,6 +669,33 @@ EARS 風で振る舞いを記述する。
   - ADR判断: 新規ADR・既存ADR廃止は不要。ADR-0006へTooling API version、target Gradle範囲、provider baseline、daemon JVM委譲、CI anchor、範囲外fatal、明示bypassを記録し、`context/toolchain.md`をversion matrixの詳細正本とする。
   - 決定日: 2026-07-18
   - 決定者: Fukuemon
+
+- **D31: solver層でscope内source型へbytecode memberを合成する (決定A)。**
+  - 実環境のGradle multi-project検証で、Lombok生成member起点のchained call / stream連鎖が
+    call-site駆動の救済 (D18) では解決できないことを確認した (solverが式の型を知らないため連鎖を辿れない)。
+  - `MemberAugmentingTypeSolver`がsource rootのsolverを包み、class宣言を`AugmentedJavaParserClassDeclaration`
+    (subclass) へ差し替える。`solveMethod` / `solveMethodAsUsage` のfallbackと`getDeclaredMethods`への合成で、
+    直接呼び出し・式の型伝播・継承memberの階層走査 (自型と祖先) をカバーする。合成対象は同一contextの
+    classes outputにある一意なname + arityのcallable memberのみで、source宣言と帰属規則 (D6 / D14) は変更しない。
+  - 合成member解決はD18と同じ出力契約 (sourceLocation省略 + ownerSourceLocation metadata +
+    calleeOrigin=project-bytecode-member edge) で emit する。
+  - **既知の限界**: generic宣言の型引数はObject埋めのerased形で返す (型変数の自己写像による
+    JavaParserの無限再帰を回避)。このため要素型に依存する後続callは解決できず、receiver型が
+    external (Object等) と判明した場合はexternal-target除外、判明しない場合はunresolvedとして
+    完全性gateに残る。実型引数の復元はD32へ切り出した。
+  - 決定日: 2026-07-19
+  - 決定者: Fukuemon (方式A選択)、実装・限界記録はClaude
+
+- **D32: generic Signature属性から合成memberの実型引数を復元する。**
+  - `GenericSignatureReader` (ASM) が自contextのclasses outputからmethodのSignature属性を読み、
+    戻り値型を実型引数付きで復元する。型変数は宣言erasure (Object) へ写像して
+    JavaParserの型変数自己写像による無限再帰を避ける。引数型はerasureのまま (arity一致で十分)。
+  - Signature属性が無い/読めないmemberはerasureへdegradeし、解析は失敗させない。
+  - 要素型がscope内型の連鎖 (`getItems().get(0).ping()`) がedgeとして解決されることを回帰で固定した。
+  - 実環境検証: 未解決callは3,900→3,267。残存は生成member以外の複数要因の混合 (別診断が必要) で、
+    D31/D32のscope外として本specでは追わない。
+  - 決定日: 2026-07-19
+  - 決定者: Fukuemon (D32着手指示)、実装はClaude
 
 ## 未確定事項
 
@@ -1333,6 +1334,9 @@ D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc
 | 2026-07-18 | Claude | 実装prompt P1〜P6を完了 (PR #26)。各promptで実装→検証→commit→レビュー→指摘反映を実施し、Gradle 9.x削除API・symlink workspaceのpath破損・JVM WARNINGのstderr汚染等を修正 |
 | 2026-07-18 | Claude | provider compile artifactを7.6.4で確定 (7.6.5のAPI artifact未配布、patchはpublic API不変)。ユーザー承認済み。toolchain matrixとADR-0006へ補記                           |
 | 2026-07-18 | Claude | include / excludeのCLI flag追加はIssue #22のbranchで対応する方針をユーザー決定。#24ではworkspace相対globの意味論をAnalyzer実jar testで固定済み                          |
+| 2026-07-19 | Claude | 実環境検証で判明した生成member起点の型伝播をD31として登録し、方式A (solver層のbytecode member合成) で解決。実装・レビュー反映済み                                       |
+| 2026-07-19 | Claude | D31の既知の限界 (generic erasure) をD32として切り出し、Signature属性による実型引数の復元で解決。実環境の未解決callは3,900→3,267、残存は本specのscope外                  |
+| 2026-07-19 | Claude | D31 / D32の解決記録を解決済みの論点節・論点表・メタ情報へ同期                                                                                                           |
 
 ## 備考
 
