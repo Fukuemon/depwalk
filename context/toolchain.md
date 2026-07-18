@@ -55,6 +55,12 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 
 範囲外・version判定不能なcustom distribution、provider load失敗、daemon JVM非互換は、それぞれ `JAVA_GRADLE_MODEL_ERROR` の安定reason `unsupported-gradle-version` / `provider-incompatible` / `daemon-jvm-incompatible` でfatalにする。対応下限・上限を変えるときは本表、ADR-0006、Java Analyzer feature docを同時更新する。明示 `sourceRoots` 経路はwrapper判定、Tooling API、provider load、daemon matrixを完全bypassする。
 
+### 実装上の互換性ハマりどころ (#24 実測)
+
+- **provider が呼べる Gradle API は「7.6 に存在し、かつ 9.x で削除されていない」ものだけ**。compile baseline が 7.6 でも runtime は対象 build の daemon (最大 9.6.x) で動くため、compile が通っても runtime で `NoSuchMethodError` になる。実例: `ProjectDependency.getDependencyProject()` は Gradle 9.0 で削除済み (代替の `ProjectDependency.getPath()` は 8.11 追加で 7.6 に無い)。project 依存の収集は両系列に存在する `ResolutionResult` の `ProjectComponentIdentifier#getProjectPath()` を使う。provider へ API を追加するときは 7.6 と 9.6 の両 Javadoc で存在を確認する。
+- **SootUp 2.0.0 は classfile major 69 (Java 25) を読めない**。`guardQuery` が `unavailable` を返すため、bytecode 型階層補完と bytecode-only member 救済が例外なしに静かに無効化される (major 61 = Java 17 は読める)。解析対象 project の classes output が JDK 25 で compile されていると SootUp 依存の機能が効かないので、原因不明の `JAVA_INCOMPLETE_ANALYSIS` や候補 edge の欠落ではまず classes output の classfile version を疑う。test 内で `ToolProvider.getSystemJavaCompiler()` を使って fixture を compile するときは test JVM (JDK 25) の major になるため、`--release 17` を明示する。
+- **cross-version matrix の daemon JDK は Gradle toolchain (foojay resolver) の自動 provisioning で供給する** (`analyzers/java` の `gradleCompatibilityTest` task が `javaToolchains.launcherFor` で解決し system property で test へ渡す)。JDK 8 は arm64 macOS では Temurin が無く Zulu が供給される。anchor の JDK を解決できない場合は skip 成功にせず fail させる契約。daemon JVM の固定は一時 copy した fixture の `gradle.properties` へ `org.gradle.java.home` を書く方式が全対象 version で機能する。
+
 ## Scaffold Policy
 
 - 新規 Analyzer は `analyzer-protocol` の SPI / JSONL スキーマに準拠する形で scaffold する。対象言語の公式ツール (パーサ等) を優先採用する。

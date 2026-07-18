@@ -40,3 +40,4 @@
 - 個人情報・認証・権限は扱わない。将来扱う場合の方針は該当 feature / spec に置く。
 - 自動 discovery は **trusted build** 前提であり、任意 build logic の副作用を sandbox しない。Analyzer 自身の read-only 契約と Gradle runtime 全体の副作用を区別する。
 - 非漏洩保証は depwalk が生成・転送する Protocol、CLI、log、test artifact に限定する。Gradle 自身や利用者 build logic が生成する output / cache / file / network side effect は保証範囲外とする。詳細判断は [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)。
+- Analyzer stderr の出力隔離 (depwalk 生成の固定行のみ) は Gradle 由来 output だけでなく **JVM 自身の警告にも破られる**。JDK 24+ は Tooling API の native-platform load で `WARNING: A restricted method in java.lang.System has been called` 系の警告を stderr へ出すため、fat jar の manifest に `Enable-Native-Access: ALL-UNNAMED` を設定して抑止する (`analyzers/java/build.gradle.kts` の shadowJar manifest)。実 CLI E2E (`TestGradleMultiProjectCLI`) の「stderr は depwalk 固定行のみ」検証がこの回帰を検出する。
