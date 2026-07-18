@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.discovery.DiscoveryFailure;
 import com.fukuemon.depwalk.javaanalyzer.discovery.GradleModelDiscovery;
@@ -91,11 +92,22 @@ public final class Main {
 
             try {
                 AnalysisRunner.RunStats stats = AnalysisRunner.run(request, contexts, writer);
+                errStream.println(stats.callSiteSummary());
                 Duration elapsed = Duration.between(start, Instant.now());
                 MetricsSummary summary = new MetricsSummary(
                         stats.analyzedFileCount(), elapsed.toMillis(), stats.parsePreflightMillis(), stats.unresolvedCount());
                 MetricsReporter.report(errStream, summary);
                 return 0;
+            } catch (IncompleteAnalysisException e) {
+                writer.write(new ErrorRecord(
+                        com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema.VERSION,
+                        ErrorRecord.RECORD_TYPE,
+                        JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
+                        e.getMessage(),
+                        null,
+                        e.metadata(),
+                        e.details()));
+                return 1;
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
                 return 1;

@@ -334,15 +334,6 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		}
 	})
 
-	t.Run("UnresolvedSymbolCoexistsWithResolvedEdges", func(t *testing.T) {
-		assertDiagnosticCode(t, result.Diagnostics, "JAVA_UNRESOLVED_SYMBOL")
-		if _, ok := findCallEdge(edges,
-			"java:com.example.UnresolvedCaller#resolvedCall()",
-			"java:com.example.EnglishGreeter#greet(java.lang.String)"); !ok {
-			t.Error("resolved callEdge in the same file as the unresolved call is missing")
-		}
-	})
-
 	t.Run("AllExpectedDiagnosticsPresent", func(t *testing.T) {
 		for _, exp := range expectedDiagnostics {
 			assertDiagnosticCode(t, result.Diagnostics, exp.Code)
