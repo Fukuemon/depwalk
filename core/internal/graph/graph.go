@@ -28,10 +28,15 @@ type Node struct {
 }
 
 // Symbol describes a method represented by a [Node]. Source is optional.
+// Metadata is an optional graph-owned opaque JSON object copied from the
+// Analyzer record; the graph, traversal, and output layers never interpret
+// its keys. A nil map means the record had no metadata; an empty map means
+// the record carried an explicit empty object.
 type Symbol struct {
 	QualifiedName string
 	Signature     string
 	Source        *protocol.SourceLocation
+	Metadata      map[string]any
 }
 
 // Edge is a directed call edge identified by the Analyzer Protocol edgeId.

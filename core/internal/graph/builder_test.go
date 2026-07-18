@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
@@ -52,7 +53,7 @@ func TestBuilderBuildsNodeWithSymbolAndEdgeWithCallSite(t *testing.T) {
 	if !ok {
 		t.Fatal("Node(method:b) not found")
 	}
-	if gotNode.Symbol != symbol {
+	if !reflect.DeepEqual(gotNode.Symbol, symbol) {
 		t.Errorf("Node(method:b).Symbol = %#v, want %#v", gotNode.Symbol, symbol)
 	}
 	edges := g.Neighbors("method:a", DirectionCallee)
@@ -74,7 +75,7 @@ func TestBuilderExistingMethodsUseZeroValueMetadata(t *testing.T) {
 	if !ok {
 		t.Fatal("Node(method:a) not found")
 	}
-	if node.Symbol != (Symbol{}) {
+	if !reflect.DeepEqual(node.Symbol, Symbol{}) {
 		t.Errorf("Node(method:a).Symbol = %#v, want zero value", node.Symbol)
 	}
 	edges := g.Neighbors("method:a", DirectionCallee)
