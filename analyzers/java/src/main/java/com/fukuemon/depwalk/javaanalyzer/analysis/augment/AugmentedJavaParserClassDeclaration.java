@@ -134,13 +134,10 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             return new SynthesizedBytecodeMethodDeclaration(owner, candidate, owner::resolveBinaryName);
         }
         var model = genericReturn.get();
-        return new SynthesizedBytecodeMethodDeclaration(owner, candidate, binaryName -> {
-            // 戻り値だけは Signature 由来の実型引数で解決する (引数型は erasure のまま)。
-            if (binaryName.equals(candidate.returnType())) {
-                return owner.resolveGenericModel(model);
-            }
-            return owner.resolveBinaryName(binaryName);
-        });
+        // 戻り値専用の supplier で解決し、同じ erasure 名を持つ引数型へ
+        // 戻り値の generic model が漏れないようにする (引数型は erasure のまま)。
+        return new SynthesizedBytecodeMethodDeclaration(
+                owner, candidate, owner::resolveBinaryName, () -> owner.resolveGenericModel(model));
     }
 
     /** {@link GenericSignatureReader.BytecodeType} を ResolvedType へ解決する。 */

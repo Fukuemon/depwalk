@@ -23,6 +23,7 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     private final ResolvedReferenceTypeDeclaration declaringType;
     private final SootUpTypeHierarchyIndex.MethodCandidate candidate;
     private final BytecodeTypeResolver typeResolver;
+    private final java.util.function.Supplier<ResolvedType> genericReturnType;
 
     /** binary name → ResolvedType の変換 (primitive / array / 参照型)。 */
     public interface BytecodeTypeResolver {
@@ -33,9 +34,22 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
             ResolvedReferenceTypeDeclaration declaringType,
             SootUpTypeHierarchyIndex.MethodCandidate candidate,
             BytecodeTypeResolver typeResolver) {
+        this(declaringType, candidate, typeResolver, null);
+    }
+
+    /**
+     * @param genericReturnType 戻り値だけを generic Signature 由来で解決する
+     *     supplier (D32)。引数型は常に {@code typeResolver} の erasure を使う
+     */
+    public SynthesizedBytecodeMethodDeclaration(
+            ResolvedReferenceTypeDeclaration declaringType,
+            SootUpTypeHierarchyIndex.MethodCandidate candidate,
+            BytecodeTypeResolver typeResolver,
+            java.util.function.Supplier<ResolvedType> genericReturnType) {
         this.declaringType = declaringType;
         this.candidate = candidate;
         this.typeResolver = typeResolver;
+        this.genericReturnType = genericReturnType;
     }
 
     /** 合成元の bytecode candidate (owner metadata 構築用)。 */
@@ -45,6 +59,9 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     @Override
     public ResolvedType getReturnType() {
+        if (genericReturnType != null) {
+            return genericReturnType.get();
+        }
         return typeResolver.resolve(candidate.returnType());
     }
 
