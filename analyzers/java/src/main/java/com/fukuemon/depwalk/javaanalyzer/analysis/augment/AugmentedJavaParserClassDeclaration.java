@@ -92,7 +92,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         for (SootUpTypeHierarchyIndex.MethodCandidate candidate
                 : bytecodeIndex.declaredCallableMethods(binaryName())) {
             if (sourceKeys.add(candidate.methodName() + "/" + candidate.parameterTypes().size())) {
-                declared.add(new SynthesizedBytecodeMethodDeclaration(this, candidate, this::resolveBinaryName));
+                declared.add(synthesize(this, candidate));
             }
         }
         return declared;
@@ -107,17 +107,16 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         Optional<SootUpTypeHierarchyIndex.MethodCandidate> own =
                 bytecodeIndex.uniqueMethod(binaryName(), name, arity);
         if (own.isPresent()) {
-            return Optional.of(new SynthesizedBytecodeMethodDeclaration(this, own.get(), this::resolveBinaryName));
+            return Optional.of(synthesize(this, own.get()));
         }
         try {
             for (var ancestor : getAllAncestors()) {
                 var declaration = ancestor.getTypeDeclaration().orElse(null);
                 if (declaration instanceof AugmentedJavaParserClassDeclaration augmented) {
                     Optional<SootUpTypeHierarchyIndex.MethodCandidate> inherited =
-                            bytecodeIndex.uniqueMethod(augmented.binaryName(), name, arity);
+                            augmented.bytecodeIndex.uniqueMethod(augmented.binaryName(), name, arity);
                     if (inherited.isPresent()) {
-                        return Optional.of(new SynthesizedBytecodeMethodDeclaration(
-                                augmented, inherited.get(), augmented::resolveBinaryName));
+                        return Optional.of(augmented.synthesize(augmented, inherited.get()));
                     }
                 }
             }
@@ -125,6 +124,53 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             return Optional.empty();
         }
         return Optional.empty();
+    }
+
+    /** generic Signature (D32) があれば実型引数付きの戻り値 resolver で合成する。 */
+    private SynthesizedBytecodeMethodDeclaration synthesize(
+            AugmentedJavaParserClassDeclaration owner, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        var genericReturn = owner.bytecodeIndex.genericReturnType(candidate);
+        if (genericReturn.isEmpty()) {
+            return new SynthesizedBytecodeMethodDeclaration(owner, candidate, owner::resolveBinaryName);
+        }
+        var model = genericReturn.get();
+        return new SynthesizedBytecodeMethodDeclaration(owner, candidate, binaryName -> {
+            // 戻り値だけは Signature 由来の実型引数で解決する (引数型は erasure のまま)。
+            if (binaryName.equals(candidate.returnType())) {
+                return owner.resolveGenericModel(model);
+            }
+            return owner.resolveBinaryName(binaryName);
+        });
+    }
+
+    /** {@link GenericSignatureReader.BytecodeType} を ResolvedType へ解決する。 */
+    ResolvedType resolveGenericModel(com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader.BytecodeType model) {
+        if (model.typeVariable()) {
+            // 型変数は erasure (Object) へ写像し、自己写像の無限再帰を避ける。
+            return referenceType("java.lang.Object");
+        }
+        ResolvedType base;
+        if (model.typeArguments().isEmpty()) {
+            base = resolveBinaryName(model.binaryName());
+        } else {
+            var declaration = typeSolver.solveType(model.binaryName());
+            List<ResolvedType> arguments = new java.util.ArrayList<>();
+            for (var argument : model.typeArguments()) {
+                arguments.add(resolveGenericModel(argument));
+            }
+            // 宣言の型変数数と一致しない場合は Object で補正する (raw / 内部 class 差)。
+            while (arguments.size() < declaration.getTypeParameters().size()) {
+                arguments.add(referenceType("java.lang.Object"));
+            }
+            if (arguments.size() > declaration.getTypeParameters().size()) {
+                arguments = arguments.subList(0, declaration.getTypeParameters().size());
+            }
+            base = new com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl(declaration, arguments);
+        }
+        for (int i = 0; i < model.arrayDims(); i++) {
+            base = new ResolvedArrayType(base);
+        }
+        return base;
     }
 
     /**
