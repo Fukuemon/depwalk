@@ -25,16 +25,5 @@
     "caller": "java:com.example.LambdaUser#run()",
     "callee": "java:com.example.LambdaUser#helperMessage()",
     "viaLambda": true
-  },
-  {
-    "description": "resolved constructor + method calls coexist with an unresolved call in the same file (UnresolvedCaller)",
-    "caller": "java:com.example.UnresolvedCaller#resolvedCall()",
-    "callee": "java:com.example.EnglishGreeter#<init>()"
-  },
-  {
-    "description": "resolved constructor + method calls coexist with an unresolved call in the same file (UnresolvedCaller)",
-    "caller": "java:com.example.UnresolvedCaller#resolvedCall()",
-    "callee": "java:com.example.EnglishGreeter#greet(java.lang.String)",
-    "dispatch": "virtual"
   }
 ]

@@ -8,6 +8,12 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDeclarationIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ContextScope;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ParsePreflight;
@@ -77,8 +83,10 @@ public final class AnalysisRunner {
      * @param analyzedFileCount AST 解析と graph 生成を完了した source file 数
      * @param unresolvedCount call edge または DI 候補を解決できなかった件数
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
+     * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
      */
-    public record RunStats(long analyzedFileCount, long unresolvedCount, long parsePreflightMillis) {
+    public record RunStats(
+            long analyzedFileCount, long unresolvedCount, long parsePreflightMillis, String callSiteSummary) {
     }
 
     /**
@@ -94,7 +102,7 @@ public final class AnalysisRunner {
     public static RunStats run(
             AnalysisRequest request,
             AnalysisContextFactory.Result contextResult,
-            RecordWriter writer) throws IOException, AnalyzerFatalException {
+            RecordWriter writer) throws IOException, AnalyzerFatalException, IncompleteAnalysisException {
         // source root は real path で保持されるため、record path / glob の基準も
         // real path の workspaceRoot に揃える (symlink を含む workspace 対策)。
         Path workspaceRoot;
@@ -206,21 +214,32 @@ public final class AnalysisRunner {
                 SpringDiIndex.create(SootUpTypeHierarchyIndex.fromClasspath(List.copyOf(unionEntries)));
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
         GraphAccumulator accumulator = new GraphAccumulator();
+        // resolver とは独立した call-site inventory と source 宣言索引 (spec #24 D17 / D18)。
+        CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
+        WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
+        CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
 
         // Spring Bean/注入点と候補 method の source location は compact な first-pass index に落とす。
         // CompilationUnit は各 iteration で破棄し、fullGraph の AST 逐次破棄契約を維持する。
         for (Path file : scope.allFiles()) {
             JavaParser parser = parserByContext.get(contextByFile.get(file).id());
+            CompilationUnit unit;
             try {
                 ParseResult<CompilationUnit> result = parser.parse(file);
-                if (result.isSuccessful() && result.getResult().isPresent()) {
-                    CompilationUnit unit = result.getResult().get();
-                    springDiIndex.accept(unit);
-                    sourceMethodIndex.accept(unit);
+                if (!result.isSuccessful() || result.getResult().isEmpty()) {
+                    throw new IllegalStateException("file failed to parse after a successful pre-flight: " + file);
                 }
+                unit = result.getResult().get();
             } catch (IOException | ParseProblemException e) {
                 // pre-flight で全 file の parse 成功を確認済みのため、ここへの到達は内部エラー。
                 throw new IllegalStateException("file failed to parse after a successful pre-flight: " + file, e);
+            }
+            // inventory / 宣言索引の不変条件違反は diagnostic へ降格せず internal fatal のまま伝播させる。
+            inventory.accept(unit);
+            declIndex.accept(unit, contextByFile.get(file).id());
+            try {
+                springDiIndex.accept(unit);
+                sourceMethodIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
                 accumulator.incrementUnresolved();
                 accumulator.addDiagnostic(Diagnostic.of(
@@ -241,6 +260,9 @@ public final class AnalysisRunner {
             if (scope.filesByContext().get(context.id()).isEmpty()) {
                 continue;
             }
+            Set<String> reachable = new LinkedHashSet<>();
+            reachable.add(context.id());
+            reachable.addAll(reachableDependencyIds(context, contextById));
             builderByContext.put(context.id(), new CallGraphBuilder(
                     workspaceRoot,
                     attributionResolver,
@@ -248,7 +270,12 @@ public final class AnalysisRunner {
                     sootUpByContext.get(context.id()),
                     sourceMethodIndex,
                     springResult,
-                    originsByContext.get(context.id())));
+                    originsByContext.get(context.id()),
+                    ledger,
+                    declIndex,
+                    new ProjectBytecodeMemberIndex(sootUpByContext.get(context.id())),
+                    context.id(),
+                    reachable));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
@@ -317,7 +344,48 @@ public final class AnalysisRunner {
             }
         }
 
-        return new RunStats(analyzedFileCount, accumulator.unresolvedCount(), preflightMillis);
+        // 完全性 gate (spec #24 D20 / D22): 全 entry の分類を検査し、primary
+        // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
+        ledger.validateComplete();
+        Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
+        if (!primary.isEmpty()) {
+            throw incompleteAnalysis(primary);
+        }
+
+        return new RunStats(
+                analyzedFileCount, accumulator.unresolvedCount(), preflightMillis, ledger.summary());
+    }
+
+    private static IncompleteAnalysisException incompleteAnalysis(
+            Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary) {
+        List<com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail> details = new ArrayList<>();
+        Map<String, Long> reasonCounts = new java.util.TreeMap<>();
+        for (Map.Entry<CallSiteId, CallSiteOutcomeLedger.Outcome> entry : primary.entrySet()) {
+            CallSiteId id = entry.getKey();
+            CallSiteOutcomeLedger.Outcome outcome = entry.getValue();
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("callKind", id.callKind().label());
+            metadata.put("reason", outcome.reason());
+            if (outcome.target() != null) {
+                metadata.put("target", outcome.target());
+            }
+            if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
+                metadata.put("candidates", outcome.candidates());
+            }
+            details.add(new com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail(
+                    outcome.code(),
+                    outcome.reason(),
+                    com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation.of(id.path(), id.beginLine()),
+                    metadata));
+            reasonCounts.merge(outcome.code() + ":" + outcome.reason(), 1L, Long::sum);
+        }
+        Map<String, Object> topMetadata = new LinkedHashMap<>();
+        topMetadata.put("total", (long) details.size());
+        topMetadata.put("reasonCounts", reasonCounts);
+        return new IncompleteAnalysisException(
+                "unresolved in-scope call sites remain after all resolvers and bytecode recovery",
+                details,
+                topMetadata);
     }
 
     private static boolean hasEntrypoints(AnalysisRequest request) {

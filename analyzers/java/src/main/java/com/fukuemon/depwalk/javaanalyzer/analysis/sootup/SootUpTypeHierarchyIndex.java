@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.sootup;
 
 import sootup.core.inputlocation.AnalysisInputLocation;
+import sootup.core.model.MethodModifier;
 import sootup.core.model.SourceType;
 import sootup.core.typehierarchy.TypeHierarchy;
 import sootup.core.typehierarchy.ViewTypeHierarchy;
@@ -304,6 +305,33 @@ public final class SootUpTypeHierarchyIndex {
                         candidates.putIfAbsent(candidateKey(candidate), candidate));
             }
             return Resolution.available(candidates.values().stream().sorted(candidateComparator()).toList());
+        });
+    }
+
+    /**
+     * 宣言 class 自身の指定名 callable method を bytecode から列挙する
+     * (bridge / synthetic を除外)。bytecode-only member 救済 (spec #24 D18) の
+     * 照会用で、型階層は辿らない。
+     *
+     * @param declaringType 所有 class の binary name
+     * @param methodName 照会する method 名
+     * @return 一致した declared method の候補一覧、または unavailable
+     */
+    public Resolution resolveDeclaredCallableMethods(String declaringType, String methodName) {
+        return guardQuery(declaringType, () -> {
+            ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
+            Optional<JavaSootClass> sootClass = view().getClass(classType);
+            if (sootClass.isEmpty()) {
+                return unavailable(declaringType, "class was not found in the supplied classpath");
+            }
+            List<MethodCandidate> methods = sootClass.get().getMethods().stream()
+                    .filter(method -> method.getName().equals(methodName))
+                    .filter(method -> !method.getModifiers().contains(MethodModifier.BRIDGE)
+                            && !method.getModifiers().contains(MethodModifier.SYNTHETIC))
+                    .map(this::toCandidate)
+                    .sorted(candidateComparator())
+                    .toList();
+            return Resolution.available(methods);
         });
     }
 

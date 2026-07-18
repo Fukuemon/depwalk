@@ -2,6 +2,11 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDeclarationIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResult;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
@@ -70,8 +75,15 @@ public final class CallGraphBuilder {
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final SourceMethodIndex sourceMethodIndex;
     private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
-    // P4 の source 再対応付けが参照する solver origin 境界 (spec #24 D6 / D16)。
+    // source 再対応付けが参照する solver origin 境界 (spec #24 D6 / D16)。
     private final SolverOriginIndex solverOrigins;
+    private final CallSiteOutcomeLedger ledger;
+    private final WorkspaceSourceDeclarationIndex declIndex;
+    private final ProjectBytecodeMemberIndex bytecodeIndex;
+    private final String contextId;
+    private final java.util.Set<String> reachableContextIds;
+    /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
+    private String currentPath;
 
     /**
      * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
@@ -91,13 +103,23 @@ public final class CallGraphBuilder {
             SootUpTypeHierarchyIndex sootUpIndex,
             SourceMethodIndex sourceMethodIndex,
             SpringDiIndex.Result springResult,
-            SolverOriginIndex solverOrigins) {
+            SolverOriginIndex solverOrigins,
+            CallSiteOutcomeLedger ledger,
+            WorkspaceSourceDeclarationIndex declIndex,
+            ProjectBytecodeMemberIndex bytecodeIndex,
+            String contextId,
+            java.util.Set<String> reachableContextIds) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
         this.sourceMethodIndex = sourceMethodIndex;
         this.solverOrigins = solverOrigins;
+        this.ledger = ledger;
+        this.declIndex = declIndex;
+        this.bytecodeIndex = bytecodeIndex;
+        this.contextId = contextId;
+        this.reachableContextIds = reachableContextIds;
         this.springResolutionsByReceiver = new LinkedHashMap<>();
         for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
             SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();
@@ -117,6 +139,10 @@ public final class CallGraphBuilder {
      * @param cu 解析対象の compilation unit。呼び出し後に参照は保持しない
      */
     public void process(CompilationUnit cu) {
+        currentPath = cu.getStorage()
+                .map(storage -> RelativePaths.toRecordPath(
+                        workspaceRoot.relativize(storage.getPath().toAbsolutePath().normalize()).toString()))
+                .orElseThrow(() -> new IllegalStateException("compilation unit without storage path"));
         walk(cu, new WalkContext(null, List.of(), false));
     }
 
@@ -146,7 +172,8 @@ public final class CallGraphBuilder {
                 symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
             } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(md, "failed to resolve method declaration: " + md.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of()));
+                recurseChildren(node, ctx.withCaller(List.of(
+                        CallSiteInventory.CallerIdentities.methodCallerId(ctx.enclosingTypeNode(), md, currentPath))));
                 return;
             }
             accumulator.addNode(symbol);
@@ -160,7 +187,8 @@ public final class CallGraphBuilder {
                 symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
             } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of()));
+                recurseChildren(node, ctx.withCaller(List.of(
+                        CallSiteInventory.CallerIdentities.constructorCallerId(ctx.enclosingTypeNode(), cd, currentPath))));
                 return;
             }
             accumulator.addNode(symbol);
@@ -177,7 +205,8 @@ public final class CallGraphBuilder {
                 symbol = buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd);
             } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(ccd, "failed to resolve compact constructor declaration: " + ccd.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of()));
+                recurseChildren(node, ctx.withCaller(List.of(
+                        CallSiteInventory.CallerIdentities.compactConstructorCallerId(ctx.enclosingTypeNode(), ccd, currentPath))));
                 return;
             }
             accumulator.addNode(symbol);
@@ -257,7 +286,8 @@ public final class CallGraphBuilder {
     private boolean containsAnyCall(Node node) {
         return !node.findAll(MethodCallExpr.class).isEmpty()
                 || !node.findAll(ObjectCreationExpr.class).isEmpty()
-                || !node.findAll(ExplicitConstructorInvocationStmt.class).isEmpty();
+                || !node.findAll(ExplicitConstructorInvocationStmt.class).isEmpty()
+                || !node.findAll(MethodReferenceExpr.class).isEmpty();
     }
 
     // ------------------------------------------------------------------
@@ -269,7 +299,13 @@ public final class CallGraphBuilder {
         try {
             resolved = mce.resolve();
         } catch (RuntimeException | LinkageError e) {
+            if (tryBytecodeMethodRescue(mce, ctx)) {
+                commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+                return;
+            }
             reportUnresolved(mce, ctx);
+            commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                    "unresolved-method-call", mce.getNameAsString());
             return;
         }
 
@@ -277,6 +313,7 @@ public final class CallGraphBuilder {
         TypeSite receiverSite = receiverSiteOf(mce, ctx, resolved, declaringSite);
         AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
         if (attribution.isOmitted()) {
+            commitExcluded(mce, CallSiteId.CallKind.METHOD_CALL, ctx, attribution);
             return;
         }
 
@@ -286,9 +323,10 @@ public final class CallGraphBuilder {
         String dispatch = dispatchOf(resolved);
         Map<String, Object> metadata = edgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mce);
-        for (String callerId : ctx.callerMethodIds()) {
+        for (String callerId : edgeCallers(mce, ctx)) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
         emitDispatchCandidateEdges(
                 resolved,
                 dispatch,
@@ -304,10 +342,16 @@ public final class CallGraphBuilder {
         try {
             resolved = oce.resolve();
         } catch (RuntimeException | LinkageError e) {
+            if (tryBytecodeConstructorRescue(oce, ctx)) {
+                commitEmitted(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx);
+                return;
+            }
             reportUnresolved(oce, ctx);
+            commitDiagnostic(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
+                    "unresolved-constructor-call", oce.getTypeAsString());
             return;
         }
-        emitConstructorCall(resolved, oce, ctx);
+        emitConstructorCall(resolved, oce, ctx, CallSiteId.CallKind.OBJECT_CREATION);
     }
 
     private void processExplicitConstructorInvocation(ExplicitConstructorInvocationStmt ecis, WalkContext ctx) {
@@ -316,15 +360,19 @@ public final class CallGraphBuilder {
             resolved = ecis.resolve();
         } catch (RuntimeException | LinkageError e) {
             reportUnresolved(ecis, ctx);
+            commitDiagnostic(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
+                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super");
             return;
         }
-        emitConstructorCall(resolved, ecis, ctx);
+        emitConstructorCall(resolved, ecis, ctx, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION);
     }
 
-    private void emitConstructorCall(ResolvedConstructorDeclaration resolved, Node callNode, WalkContext ctx) {
+    private void emitConstructorCall(
+            ResolvedConstructorDeclaration resolved, Node callNode, WalkContext ctx, CallSiteId.CallKind kind) {
         TypeSite declaringSite = typeSiteOf(resolved.declaringType());
         AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
         if (attribution.isOmitted()) {
+            commitExcluded(callNode, kind, ctx, attribution);
             return;
         }
         MethodSymbol calleeSymbol = buildConstructorSymbol(attribution, resolved);
@@ -332,9 +380,10 @@ public final class CallGraphBuilder {
 
         Map<String, Object> metadata = edgeMetadata(null, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(callNode);
-        for (String callerId : ctx.callerMethodIds()) {
+        for (String callerId : edgeCallers(callNode, ctx)) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        commitEmitted(callNode, kind, ctx);
     }
 
     /** {@code Foo::new} の source 上の識別子 ({@code getIdentifier()} が返す値)。 */
@@ -357,6 +406,8 @@ public final class CallGraphBuilder {
             resolved = mre.resolve();
         } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
+            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    "unresolved-method-reference", mre.getIdentifier());
             return;
         }
 
@@ -364,6 +415,7 @@ public final class CallGraphBuilder {
         TypeSite receiverSite = typeSiteOfExpression(mre.getScope());
         AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
         if (attribution.isOmitted()) {
+            commitExcluded(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, attribution);
             return;
         }
 
@@ -373,9 +425,10 @@ public final class CallGraphBuilder {
         String dispatch = dispatchOf(resolved);
         Map<String, Object> metadata = methodReferenceEdgeMetadata(dispatch, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mre);
-        for (String callerId : ctx.callerMethodIds()) {
+        for (String callerId : edgeCallers(mre, ctx)) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
         emitDispatchCandidateEdges(
                 resolved,
                 dispatch,
@@ -399,27 +452,36 @@ public final class CallGraphBuilder {
             ResolvedType scopeType = mre.getScope().calculateResolvedType();
             if (!scopeType.isReferenceType()) {
                 reportUnresolved(mre, ctx);
+                commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                        "unresolved-constructor-reference", mre.getScope().toString());
                 return;
             }
             scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
             if (scopeDecl == null) {
                 reportUnresolved(mre, ctx);
+                commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                        "unresolved-constructor-reference", mre.getScope().toString());
                 return;
             }
         } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
+            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    "unresolved-constructor-reference", mre.getScope().toString());
             return;
         }
 
         TypeSite declaringSite = typeSiteOf(scopeDecl);
         AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
         if (attribution.isOmitted()) {
+            commitExcluded(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, attribution);
             return;
         }
 
         ResolvedConstructorDeclaration resolvedCtor = selectConstructor(scopeDecl.getConstructors(), mre);
         if (resolvedCtor == null) {
             reportUnresolved(mre, ctx);
+            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    "ambiguous-constructor-reference", mre.getScope().toString());
             return;
         }
 
@@ -428,9 +490,10 @@ public final class CallGraphBuilder {
 
         Map<String, Object> metadata = methodReferenceEdgeMetadata(null, ctx.viaLambda());
         SourceLocation callSite = sourceLocationOf(mre);
-        for (String callerId : ctx.callerMethodIds()) {
+        for (String callerId : edgeCallers(mre, ctx)) {
             accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
         }
+        commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
     }
 
     /**
@@ -494,6 +557,157 @@ public final class CallGraphBuilder {
         }
         metadata.put("viaMethodReference", true);
         return metadata;
+    }
+
+
+    // ------------------------------------------------------------------
+    // call-site outcome ledger (spec #24 D14 / D17 / D20)
+    // ------------------------------------------------------------------
+
+    /** ledger 用の実効 caller (caller 不在の site は <clinit> / placeholder へ帰着)。 */
+    private List<String> ledgerCallers(Node callNode, WalkContext ctx) {
+        return CallSiteInventory.CallerIdentities.effectiveCallers(
+                ctx.callerMethodIds(), ctx.enclosingTypeNode(), callNode, currentPath);
+    }
+
+    /** edge 出力に使える caller (placeholder を除外し、caller 不在時は <clinit> node を保証する)。 */
+    private List<String> edgeCallers(Node callNode, WalkContext ctx) {
+        List<String> callers = ledgerCallers(callNode, ctx);
+        List<String> result = new ArrayList<>();
+        for (String caller : callers) {
+            if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
+                continue;
+            }
+            if (ctx.callerMethodIds().isEmpty() && ctx.enclosingTypeNode() != null) {
+                // enum constant 引数など member 外の call は <clinit> caller で edge 化する。
+                ensureStaticInitializerNode(ctx.enclosingTypeNode());
+            }
+            result.add(caller);
+        }
+        return result;
+    }
+
+    private void commitEmitted(Node callNode, CallSiteId.CallKind kind, WalkContext ctx) {
+        for (String caller : ledgerCallers(callNode, ctx)) {
+            ledger.commitEmitted(CallSiteInventory.of(callNode, currentPath, kind, caller));
+        }
+    }
+
+    private void commitExcluded(Node callNode, CallSiteId.CallKind kind, WalkContext ctx, AttributionResult attribution) {
+        String reason = attribution.outcome() == AttributionResult.Outcome.OMIT_EXCLUDED
+                ? CallSiteOutcomeLedger.REASON_LIFT_EXCLUDED_PACKAGE
+                : CallSiteOutcomeLedger.REASON_EXTERNAL_TARGET;
+        for (String caller : ledgerCallers(callNode, ctx)) {
+            ledger.commitExcluded(CallSiteInventory.of(callNode, currentPath, kind, caller), reason);
+        }
+    }
+
+    private void commitDiagnostic(Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target) {
+        for (String caller : ledgerCallers(callNode, ctx)) {
+            ledger.commitDiagnostic(
+                    CallSiteInventory.of(callNode, currentPath, kind, caller),
+                    JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
+                    reason,
+                    target,
+                    null);
+        }
+    }
+
+    /**
+     * 解決失敗した method call を、scope 内 source type の到達可能な project
+     * bytecode の一意 member へ generator 非依存で救済する (spec #24 D18 / D21)。
+     */
+    private boolean tryBytecodeMethodRescue(MethodCallExpr mce, WalkContext ctx) {
+        String ownerBinaryName = bytecodeRescueOwner(mce, ctx);
+        if (ownerBinaryName == null) {
+            return false;
+        }
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
+        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+            return false;
+        }
+        var candidate = bytecodeIndex.uniqueMethod(ownerBinaryName, mce.getNameAsString(), mce.getArguments().size())
+                .orElse(null);
+        if (candidate == null) {
+            return false;
+        }
+        emitBytecodeOnlyCall(mce, ctx, owner,
+                candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method");
+        return true;
+    }
+
+    /** 解決失敗した object creation の bytecode-only constructor 救済。 */
+    private boolean tryBytecodeConstructorRescue(ObjectCreationExpr oce, WalkContext ctx) {
+        String ownerBinaryName;
+        try {
+            ownerBinaryName = BinaryNames.erasureOf(oce.getType().resolve());
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
+        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+            return false;
+        }
+        var candidate = bytecodeIndex.uniqueConstructor(ownerBinaryName, oce.getArguments().size()).orElse(null);
+        if (candidate == null) {
+            return false;
+        }
+        emitBytecodeOnlyCall(oce, ctx, owner,
+                candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor");
+        return true;
+    }
+
+    /** 救済対象 method call の owner (receiver の static type、暗黙 this は囲み型)。 */
+    private String bytecodeRescueOwner(MethodCallExpr mce, WalkContext ctx) {
+        try {
+            if (mce.getScope().isPresent()) {
+                ResolvedType scopeType = mce.getScope().get().calculateResolvedType();
+                if (!scopeType.isReferenceType()) {
+                    return null;
+                }
+                return BinaryNames.erasureOf(scopeType);
+            }
+            return ctx.enclosingTypeNode() != null ? BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode()) : null;
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+    }
+
+    private void emitBytecodeOnlyCall(
+            Node callNode,
+            WalkContext ctx,
+            WorkspaceSourceDeclarationIndex.TypeLocation owner,
+            String declaringType,
+            String methodNameToken,
+            List<String> parameterTypes,
+            String symbolKind) {
+        String signature = MethodIds.signature(declaringType, methodNameToken, parameterTypes);
+        String methodId = MethodIds.methodId(signature);
+        if (owner.path() == null) {
+            throw new IllegalStateException(
+                    "adopted a bytecode-only member without a constructible owner location: " + methodId);
+        }
+        String qualifiedName = declaringType.replace('$', '.') + "." + methodNameToken;
+        Map<String, Object> symbolMetadata = new LinkedHashMap<>();
+        symbolMetadata.put("declarationOrigin", "project-bytecode");
+        symbolMetadata.put("sourceAnchor", "owner-type");
+        Map<String, Object> ownerLocation = new LinkedHashMap<>();
+        ownerLocation.put("path", owner.path());
+        ownerLocation.put("startLine", owner.beginLine());
+        symbolMetadata.put("ownerSourceLocation", ownerLocation);
+        // 定義位置を偽装しない: sourceLocation は省略し、owner 位置は metadata へ分離する (D21)。
+        accumulator.addNode(MethodSymbol.of(
+                methodId, "java", symbolKind, qualifiedName, signature, null, symbolMetadata));
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("calleeOrigin", "project-bytecode-member");
+        if (ctx.viaLambda()) {
+            metadata.put("viaLambda", true);
+        }
+        SourceLocation callSite = sourceLocationOf(callNode);
+        for (String callerId : edgeCallers(callNode, ctx)) {
+            accumulator.addEdge(callerId, methodId, callSite, metadata);
+        }
     }
 
     private void reportUnresolved(Node callNode, WalkContext ctx) {
@@ -646,6 +860,7 @@ public final class CallGraphBuilder {
                 ids.add(MethodIds.methodId(signature));
             } catch (RuntimeException | LinkageError e) {
                 reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
+                ids.add(CallSiteInventory.CallerIdentities.constructorCallerId(enclosingType, cd, currentPath));
             }
         }
         return ids;

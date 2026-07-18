@@ -1,6 +1,1 @@
-[
-  {
-    "code": "JAVA_UNRESOLVED_SYMBOL",
-    "description": "UnresolvedCaller.triggerUnresolved() calls a method that does not exist on java.lang.Object; the Analyzer must report this diagnostic while still resolving UnresolvedCaller.resolvedCall() in the same file."
-  }
-]
+[]
