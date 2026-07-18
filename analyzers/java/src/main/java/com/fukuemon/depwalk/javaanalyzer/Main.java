@@ -95,7 +95,11 @@ public final class Main {
                 errStream.println(stats.callSiteSummary());
                 Duration elapsed = Duration.between(start, Instant.now());
                 MetricsSummary summary = new MetricsSummary(
-                        stats.analyzedFileCount(), elapsed.toMillis(), stats.parsePreflightMillis(), stats.unresolvedCount());
+                        stats.analyzedFileCount(),
+                        elapsed.toMillis(),
+                        stats.parsePreflightMillis(),
+                        stats.contextBuildMillis(),
+                        stats.unresolvedCount());
                 MetricsReporter.report(errStream, summary);
                 return 0;
             } catch (IncompleteAnalysisException e) {

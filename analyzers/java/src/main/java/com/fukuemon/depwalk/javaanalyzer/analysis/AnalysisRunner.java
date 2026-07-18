@@ -83,10 +83,15 @@ public final class AnalysisRunner {
      * @param analyzedFileCount AST 解析と graph 生成を完了した source file 数
      * @param unresolvedCount call edge または DI 候補を解決できなかった件数
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
+     * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間 (D8 の分離計測)
      * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
      */
     public record RunStats(
-            long analyzedFileCount, long unresolvedCount, long parsePreflightMillis, String callSiteSummary) {
+            long analyzedFileCount,
+            long unresolvedCount,
+            long parsePreflightMillis,
+            long contextBuildMillis,
+            String callSiteSummary) {
     }
 
     /**
@@ -139,6 +144,7 @@ public final class AnalysisRunner {
             }
         }
 
+        long contextBuildStart = System.nanoTime();
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
         Map<String, SolverOriginIndex> originsByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
@@ -176,6 +182,7 @@ public final class AnalysisRunner {
             parserByContext.put(context.id(), new JavaParser(config));
             originsByContext.put(context.id(), origins);
         }
+        long contextBuildMillis = (System.nanoTime() - contextBuildStart) / 1_000_000;
 
         // graph record 出力前に全 file の parse を検証する。失敗は request 全体 fatal。
         long preflightMillis =
@@ -353,7 +360,11 @@ public final class AnalysisRunner {
         }
 
         return new RunStats(
-                analyzedFileCount, accumulator.unresolvedCount(), preflightMillis, ledger.summary());
+                analyzedFileCount,
+                accumulator.unresolvedCount(),
+                preflightMillis,
+                contextBuildMillis,
+                ledger.summary());
     }
 
     private static IncompleteAnalysisException incompleteAnalysis(

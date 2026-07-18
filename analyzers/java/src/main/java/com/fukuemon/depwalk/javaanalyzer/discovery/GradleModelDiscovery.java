@@ -57,6 +57,7 @@ public final class GradleModelDiscovery {
     public DepwalkGradleModel discover(Path workspaceRoot) throws DiscoveryFailure {
         stderr.println(SAFETY_NOTICE);
         stderr.println("depwalk: discovery phase=start");
+        long startNanos = System.nanoTime();
 
         ToolingClient.BuildEnvironmentInfo environment;
         try {
@@ -76,7 +77,8 @@ public final class GradleModelDiscovery {
         stderr.println("depwalk: discovery phase=end gradleVersion=" + environment.gradleVersion()
                 + " projects=" + model.getProjects().size()
                 + " sourceRoots=" + sourceRootCount
-                + " excludedSourceSets=" + model.getExcludedSourceSetCount());
+                + " excludedSourceSets=" + model.getExcludedSourceSetCount()
+                + " discoveryMs=" + (System.nanoTime() - startNanos) / 1_000_000);
         return model;
     }
 

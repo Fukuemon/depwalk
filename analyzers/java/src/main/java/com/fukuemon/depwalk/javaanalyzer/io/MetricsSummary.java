@@ -7,7 +7,13 @@ package com.fukuemon.depwalk.javaanalyzer.io;
  * @param analyzedFileCount    解析したファイル数
  * @param durationMillis       解析全体に要した時間 (ミリ秒)
  * @param parsePreflightMillis parse pre-flight に要した時間 (通常解析と分離)
+ * @param contextBuildMillis   context 別 solver / parser 構築に要した時間
  * @param unresolvedCount      未解決件数
  */
-public record MetricsSummary(long analyzedFileCount, long durationMillis, long parsePreflightMillis, long unresolvedCount) {
+public record MetricsSummary(
+        long analyzedFileCount,
+        long durationMillis,
+        long parsePreflightMillis,
+        long contextBuildMillis,
+        long unresolvedCount) {
 }
