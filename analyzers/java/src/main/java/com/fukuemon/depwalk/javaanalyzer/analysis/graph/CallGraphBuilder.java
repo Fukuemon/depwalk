@@ -298,7 +298,8 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
-        } catch (RuntimeException | LinkageError e) {
+        } catch (RuntimeException e) {
+            rethrowUnlessIsolableResolutionFailure(e);
             if (tryBytecodeMethodRescue(mce, ctx)) {
                 commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
@@ -341,7 +342,8 @@ public final class CallGraphBuilder {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = oce.resolve();
-        } catch (RuntimeException | LinkageError e) {
+        } catch (RuntimeException e) {
+            rethrowUnlessIsolableResolutionFailure(e);
             if (tryBytecodeConstructorRescue(oce, ctx)) {
                 commitEmitted(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx);
                 return;
@@ -358,7 +360,8 @@ public final class CallGraphBuilder {
         ResolvedConstructorDeclaration resolved;
         try {
             resolved = ecis.resolve();
-        } catch (RuntimeException | LinkageError e) {
+        } catch (RuntimeException e) {
+            rethrowUnlessIsolableResolutionFailure(e);
             reportUnresolved(ecis, ctx);
             commitDiagnostic(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
                     "unresolved-constructor-call", ecis.isThis() ? "this" : "super");
@@ -404,7 +407,8 @@ public final class CallGraphBuilder {
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mre.resolve();
-        } catch (RuntimeException | LinkageError e) {
+        } catch (RuntimeException e) {
+            rethrowUnlessIsolableResolutionFailure(e);
             reportUnresolved(mre, ctx);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
                     "unresolved-method-reference", mre.getIdentifier());
@@ -669,6 +673,36 @@ public final class CallGraphBuilder {
             }
             return ctx.enclosingTypeNode() != null ? BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode()) : null;
         } catch (RuntimeException | LinkageError e) {
+            // receiver が source に無い bytecode-only field (Lombok logging field 等)
+            // の場合、囲み型の bytecode field 型で receiver を補完する (step 3.6)。
+            return bytecodeFieldReceiverType(mce, ctx);
+        }
+    }
+
+    /** scope が単純名 / this.field で、囲み型の bytecode-only field なら field 型を返す。 */
+    private String bytecodeFieldReceiverType(MethodCallExpr mce, WalkContext ctx) {
+        if (mce.getScope().isEmpty() || ctx.enclosingTypeNode() == null) {
+            return null;
+        }
+        String fieldName = null;
+        var scope = mce.getScope().get();
+        if (scope instanceof com.github.javaparser.ast.expr.NameExpr nameExpr) {
+            fieldName = nameExpr.getNameAsString();
+        } else if (scope instanceof com.github.javaparser.ast.expr.FieldAccessExpr fieldAccess
+                && fieldAccess.getScope() instanceof com.github.javaparser.ast.expr.ThisExpr) {
+            fieldName = fieldAccess.getNameAsString();
+        }
+        if (fieldName == null) {
+            return null;
+        }
+        try {
+            String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
+            WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerType).orElse(null);
+            if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+                return null;
+            }
+            return bytecodeIndex.fieldType(ownerType, fieldName).orElse(null);
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -708,6 +742,23 @@ public final class CallGraphBuilder {
         for (String callerId : edgeCallers(callNode, ctx)) {
             accumulator.addEdge(callerId, methodId, callSite, metadata);
         }
+    }
+
+    /**
+     * 要素単位に隔離可能と確認済みの resolution failure だけを diagnostic 経路へ
+     * 通し、それ以外の RuntimeException は request fatal (JAVA_INTERNAL_ERROR)
+     * として伝播させる (spec #24 D13 / step 4.2)。LinkageError はここへ来ず
+     * Main の internal error 境界で処理される。
+     */
+    private static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
+        if (e instanceof UnsupportedOperationException) {
+            return;
+        }
+        String packageName = e.getClass().getPackageName();
+        if (packageName.startsWith("com.github.javaparser.resolution")) {
+            return;
+        }
+        throw e;
     }
 
     private void reportUnresolved(Node callNode, WalkContext ctx) {
@@ -1090,7 +1141,7 @@ public final class CallGraphBuilder {
             }
             accumulator.addNode(candidateSymbol);
             Map<String, Object> metadata = candidateEdgeMetadata(info);
-            for (String callerId : ctx.callerMethodIds()) {
+            for (String callerId : edgeCallers(callNode, ctx)) {
                 accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
             }
         }
@@ -1295,7 +1346,13 @@ public final class CallGraphBuilder {
     }
 
     private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
-        return sourceMethodIndex.find(candidate).orElseGet(() -> {
+        // bytecode 候補を source 宣言へ再対応付けするのは、宣言型が scope 内 source に
+        // 存在し、呼出元 context から依存到達可能な場合だけ (spec #24 D16)。external /
+        // JDK / 非依存 context を workspace 全体の名前一致で source へ戻さない。
+        boolean remappable = declIndex.find(candidate.declaringType())
+                .map(owner -> reachableContextIds.contains(owner.contextId()))
+                .orElse(false);
+        return (remappable ? sourceMethodIndex.find(candidate) : java.util.Optional.<MethodSymbol>empty()).orElseGet(() -> {
             String signature = MethodIds.signature(
                     candidate.declaringType(),
                     candidate.methodName(),

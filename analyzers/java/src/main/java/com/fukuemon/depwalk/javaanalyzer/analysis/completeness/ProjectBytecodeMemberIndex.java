@@ -41,6 +41,11 @@ public final class ProjectBytecodeMemberIndex {
         return uniqueByArity(resolution, arity);
     }
 
+    /** bytecode-only field の型を receiver 解決の補完としてだけ返す (node 化しない)。 */
+    public Optional<String> fieldType(String ownerBinaryName, String fieldName) {
+        return sootUpIndex.resolveDeclaredFieldType(ownerBinaryName, fieldName);
+    }
+
     private static Optional<SootUpTypeHierarchyIndex.MethodCandidate> uniqueByArity(
             SootUpTypeHierarchyIndex.Resolution resolution, int arity) {
         if (!resolution.isAvailable()) {

@@ -111,9 +111,9 @@ public final class Main {
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
                 return 1;
-            } catch (RuntimeException e) {
-                // 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
-                // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
+            } catch (RuntimeException | LinkageError e) {
+                // 解析中の未捕捉 RuntimeException と LinkageError (binary 非互換等) を
+                // 継続不能な内部エラーとして扱う (spec #24 step 4.2)。他の Error は catch しない。
                 return reportInternalError(writer, errStream, e);
             } catch (IOException e) {
                 // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
@@ -164,7 +164,7 @@ public final class Main {
         return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
     }
 
-    private static int reportInternalError(RecordWriter writer, PrintStream errStream, Exception e) {
+    private static int reportInternalError(RecordWriter writer, PrintStream errStream, Throwable e) {
         String detail = e.getClass().getName() + ": " + e.getMessage();
         errStream.println("internal error during analysis: " + detail);
         try {
