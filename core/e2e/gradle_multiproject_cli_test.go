@@ -26,6 +26,13 @@ import (
 // include / exclude は CLI flag として未実装のため本 E2E では扱わない。その
 // 観点は Analyzer 側の実 jar test (MultiModuleFixtureEquivalenceTest) が
 // workspace 相対 glob として固定済みである。
+//
+// step 4.4 / 4.5 / 4.6 (error なし非ゼロ exit・malformed stdout・参照不整合の
+// 非公開、fatal reason の維持、Java 非依存 generic failure fixture の共通
+// renderer) は fake analyzer では実現できない実 process 観点ではないため、
+// core/internal/analyze・core/internal/cli の process contract test
+// (dangling-edge-then-error / dangling-edge-clean-exit / bad-exit /
+// error-with-details / malformed) が required gate として固定済みである。
 func TestGradleMultiProjectCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -177,7 +184,9 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 		if !(summary >= 0 && summary < first && first < second) {
 			t.Errorf("CLI stderr must render summary then ordered details:\n%s", result.stderr)
 		}
-		if !strings.Contains(result.stderr, `"callKind"`) {
+		// renderer は Analyzer 固有 key を解釈せず canonical JSON として表示する。
+		// 特定 key 名には依存せず、metadata 行の存在だけを検証する。
+		if !strings.Contains(result.stderr, "  metadata {") {
 			t.Errorf("CLI stderr must render detail metadata as canonical JSON:\n%s", result.stderr)
 		}
 	})
