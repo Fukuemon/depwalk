@@ -52,7 +52,7 @@ func TestEdgeFromCallEdge(t *testing.T) {
 
 	got := EdgeFromCallEdge(record)
 	want := Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("EdgeFromCallEdge() = %#v, want %#v", got, want)
 	}
 }

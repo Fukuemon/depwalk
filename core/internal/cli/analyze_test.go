@@ -214,6 +214,9 @@ func TestAnalyzeCommandRendersStructuredFailureDetails(t *testing.T) {
 	if !(summary < first && first < firstAt && firstAt < firstMeta && firstMeta < second) {
 		t.Fatalf("stderr = %q, want summary before detail[0] before detail[1]", got)
 	}
+	if strings.Contains(got, "Usage:") {
+		t.Fatalf("stderr = %q, want no usage block after the structured failure render", got)
+	}
 	if strings.Contains(stdout.String(), "analyzed") {
 		t.Fatalf("stdout = %q, want no success summary on fatal failure", stdout.String())
 	}

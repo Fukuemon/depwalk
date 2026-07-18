@@ -3,18 +3,38 @@ package graph
 import "github.com/Fukuemon/depwalk/core/internal/protocol"
 
 // NodeFromMethodSymbol converts an Analyzer Protocol method symbol to a [Node].
-// The record's opaque metadata is deep copied into a graph-owned value so
-// later mutation of the protocol DTO cannot change the graph.
+// The record's source location and opaque metadata are deep copied into
+// graph-owned values so later mutation of the protocol DTO cannot change the
+// graph.
 func NodeFromMethodSymbol(record protocol.MethodSymbol) Node {
 	return Node{
 		ID: record.MethodID,
 		Symbol: Symbol{
 			QualifiedName: record.QualifiedName,
 			Signature:     record.Signature,
-			Source:        record.Source,
+			Source:        copySourceLocation(record.Source),
 			Metadata:      copyMetadataObject(record.Metadata),
 		},
 	}
+}
+
+func copySourceLocation(location *protocol.SourceLocation) *protocol.SourceLocation {
+	if location == nil {
+		return nil
+	}
+	copied := *location
+	copied.StartColumn = copyIntPointer(location.StartColumn)
+	copied.EndLine = copyIntPointer(location.EndLine)
+	copied.EndColumn = copyIntPointer(location.EndColumn)
+	return &copied
+}
+
+func copyIntPointer(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	copied := *value
+	return &copied
 }
 
 func copyMetadataObject(object map[string]any) map[string]any {
@@ -46,12 +66,13 @@ func copyMetadataValue(value any) any {
 	}
 }
 
-// EdgeFromCallEdge converts an Analyzer Protocol call edge to an [Edge].
+// EdgeFromCallEdge converts an Analyzer Protocol call edge to an [Edge]. The
+// call site is deep copied into a graph-owned value like the node conversion.
 func EdgeFromCallEdge(record protocol.CallEdge) Edge {
 	return Edge{
 		ID:       record.EdgeID,
 		CallerID: record.CallerMethodID,
 		CalleeID: record.CalleeMethodID,
-		CallSite: record.CallSite,
+		CallSite: copySourceLocation(record.CallSite),
 	}
 }
