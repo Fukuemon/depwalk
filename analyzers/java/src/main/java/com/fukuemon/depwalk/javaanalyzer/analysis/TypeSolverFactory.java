@@ -62,11 +62,28 @@ public final class TypeSolverFactory {
      */
     public static CombinedTypeSolver createForRoots(
             List<Path> sourceRoots, List<Path> classpathEntries, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
+        return createForRoots(sourceRoots, classpathEntries, languageLevel, null);
+    }
+
+    /**
+     * bytecode member 合成付きの合成 TypeSolver を生成する (spec #24 D31)。
+     * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
+     * 同一 context classes output の bytecode-only member を fallback 合成する。
+     */
+    public static CombinedTypeSolver createForRoots(
+            List<Path> sourceRoots,
+            List<Path> classpathEntries,
+            ParserConfiguration.LanguageLevel languageLevel,
+            com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex bytecodeIndex)
+            throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
         for (Path root : sourceRoots) {
-            typeSolver.add(new JavaParserTypeSolver(root, typeSolverConfig));
+            JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);
+            typeSolver.add(bytecodeIndex != null
+                    ? new com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver(sourceSolver, bytecodeIndex)
+                    : sourceSolver);
         }
         // JavaParserTypeSolver が内部 parse した AST にも resolver を注入する。
         // record の canonical constructor 解決 (JavaParserRecordDeclaration) は

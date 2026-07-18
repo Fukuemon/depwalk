@@ -145,6 +145,23 @@ public final class AnalysisRunner {
         }
 
         long contextBuildStart = System.nanoTime();
+        // SootUp index は lazy のため全 context 分を先に用意し、solver の
+        // bytecode member 合成 (D31) と builder の候補解決で同一 instance を共有する。
+        Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
+        Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
+        for (SourceSetAnalysisContext context : contexts) {
+            List<String> entries = new ArrayList<>();
+            for (Path path : context.classpath()) {
+                entries.add(path.toString());
+            }
+            for (Path path : context.classesOutputs()) {
+                entries.add(path.toString());
+            }
+            SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(entries);
+            sootUpByContext.put(context.id(), index);
+            bytecodeIndexByContext.put(context.id(), new ProjectBytecodeMemberIndex(index));
+        }
+
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
         Map<String, SolverOriginIndex> originsByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
@@ -174,8 +191,8 @@ public final class AnalysisRunner {
                         ? ResolvedDeclarationOrigin.projectClasses(owner)
                         : ResolvedDeclarationOrigin.externalArtifact(entry.toString()));
             }
-            CombinedTypeSolver typeSolver =
-                    TypeSolverFactory.createForRoots(solverRoots, solverEntries, context.languageLevel());
+            CombinedTypeSolver typeSolver = TypeSolverFactory.createForRoots(
+                    solverRoots, solverEntries, context.languageLevel(), bytecodeIndexByContext.get(context.id()));
             ParserConfiguration config = new ParserConfiguration()
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
@@ -199,23 +216,18 @@ public final class AnalysisRunner {
         // SootUp index は context ごとに分離する (D6)。Spring DI の Bean 母集合は
         // request 全体の意味論 (module 間 DI 解決が成功条件) のため、DI 索引だけは
         // 全 context の entry を統合した index を使う。
-        // file を持たない context の SootUp 構築は行わない (include で絞った場合の
-        // 無駄な index 構築を避ける lazy 境界)。
-        Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
+        // DI 索引の union は file を持つ context の entry だけで構成する。
         Set<String> unionEntries = new LinkedHashSet<>();
         for (SourceSetAnalysisContext context : contexts) {
             if (scope.filesByContext().get(context.id()).isEmpty()) {
                 continue;
             }
-            List<String> entries = new ArrayList<>();
             for (Path path : context.classpath()) {
-                entries.add(path.toString());
+                unionEntries.add(path.toString());
             }
             for (Path path : context.classesOutputs()) {
-                entries.add(path.toString());
+                unionEntries.add(path.toString());
             }
-            unionEntries.addAll(entries);
-            sootUpByContext.put(context.id(), SootUpTypeHierarchyIndex.fromClasspath(entries));
         }
         SpringDiIndex springDiIndex =
                 SpringDiIndex.create(SootUpTypeHierarchyIndex.fromClasspath(List.copyOf(unionEntries)));
@@ -280,7 +292,7 @@ public final class AnalysisRunner {
                     originsByContext.get(context.id()),
                     ledger,
                     declIndex,
-                    new ProjectBytecodeMemberIndex(sootUpByContext.get(context.id())),
+                    bytecodeIndexByContext.get(context.id()),
                     context.id(),
                     reachable));
         }

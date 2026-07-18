@@ -319,6 +319,23 @@ public final class CallGraphBuilder {
             return;
         }
 
+        // D31: solver が合成した bytecode-only member は既存 D18 と同じ出力契約
+        // (sourceLocation 省略 + owner metadata + calleeOrigin edge) で emit する。
+        if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
+            WorkspaceSourceDeclarationIndex.TypeLocation owner =
+                    declIndex.find(synthesized.candidate().declaringType()).orElse(null);
+            if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+                throw new IllegalStateException(
+                        "synthesized bytecode member without a reachable in-scope owner: "
+                                + synthesized.candidate().declaringType() + "#" + synthesized.getName());
+            }
+            emitBytecodeOnlyCall(mce, ctx, owner,
+                    synthesized.candidate().declaringType(), synthesized.getName(),
+                    synthesized.candidate().parameterTypes(), "method");
+            commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+            return;
+        }
+
         TypeSite declaringSite = typeSiteOf(resolved.declaringType());
         TypeSite receiverSite = receiverSiteOf(mce, ctx, resolved, declaringSite);
         AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
