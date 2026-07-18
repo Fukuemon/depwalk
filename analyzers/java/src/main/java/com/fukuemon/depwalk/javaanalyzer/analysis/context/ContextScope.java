@@ -117,7 +117,8 @@ public final class ContextScope {
         }
     }
 
-    private static List<PathMatcher> toMatchers(List<String> globs) {
+    /** include / exclude glob を {@link PathMatcher} 一覧へ変換する。 */
+    public static List<PathMatcher> toMatchers(List<String> globs) {
         if (globs == null || globs.isEmpty()) {
             return List.of();
         }

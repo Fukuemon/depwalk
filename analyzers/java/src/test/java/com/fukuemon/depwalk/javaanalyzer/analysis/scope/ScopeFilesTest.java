@@ -30,14 +30,14 @@ class ScopeFilesTest {
 
     @Test
     void backslashSeparatedInputMatchesForwardSlashGlob() {
-        List<PathMatcher> matchers = ScopeFiles.toMatchers(List.of("com/example/**"));
+        List<PathMatcher> matchers = com.fukuemon.depwalk.javaanalyzer.analysis.context.ContextScope.toMatchers(List.of("com/example/**"));
         assertTrue(matchers.stream().anyMatch(m -> m.matches(ScopeFiles.toMatchablePath("com\\example\\lib\\Foo.java"))),
                 "Windows-style backslash-separated relative path must match a forward-slash glob");
     }
 
     @Test
     void nonMatchingPathStillDoesNotMatchAfterNormalization() {
-        List<PathMatcher> matchers = ScopeFiles.toMatchers(List.of("com/example/**"));
+        List<PathMatcher> matchers = com.fukuemon.depwalk.javaanalyzer.analysis.context.ContextScope.toMatchers(List.of("com/example/**"));
         assertFalse(matchers.stream().anyMatch(m -> m.matches(ScopeFiles.toMatchablePath("org\\other\\Foo.java"))));
     }
 }

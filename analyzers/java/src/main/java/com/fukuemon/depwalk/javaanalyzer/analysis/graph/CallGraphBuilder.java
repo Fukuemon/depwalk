@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResult;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
@@ -69,6 +70,8 @@ public final class CallGraphBuilder {
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final SourceMethodIndex sourceMethodIndex;
     private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
+    // P4 の source 再対応付けが参照する solver origin 境界 (spec #24 D6 / D16)。
+    private final SolverOriginIndex solverOrigins;
 
     /**
      * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
@@ -79,6 +82,7 @@ public final class CallGraphBuilder {
      * @param sootUpIndex bytecode 型階層から実装候補を得る索引
      * @param sourceMethodIndex 候補メソッドの source location を補完する索引
      * @param springResult Spring Bean と注入点の解決結果
+     * @param solverOrigins 所有 context の solver entry と origin の対応
      */
     public CallGraphBuilder(
             Path workspaceRoot,
@@ -86,12 +90,14 @@ public final class CallGraphBuilder {
             GraphAccumulator accumulator,
             SootUpTypeHierarchyIndex sootUpIndex,
             SourceMethodIndex sourceMethodIndex,
-            SpringDiIndex.Result springResult) {
+            SpringDiIndex.Result springResult,
+            SolverOriginIndex solverOrigins) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
         this.sourceMethodIndex = sourceMethodIndex;
+        this.solverOrigins = solverOrigins;
         this.springResolutionsByReceiver = new LinkedHashMap<>();
         for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
             SpringDiIndex.InjectionPoint injection = resolution.injectionPoint();

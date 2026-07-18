@@ -11,6 +11,8 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ContextScope;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ParsePreflight;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.ResolvedDeclarationOrigin;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.SourceSetAnalysisContext;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
@@ -93,7 +95,16 @@ public final class AnalysisRunner {
             AnalysisRequest request,
             AnalysisContextFactory.Result contextResult,
             RecordWriter writer) throws IOException, AnalyzerFatalException {
-        Path workspaceRoot = Path.of(request.workspaceRoot()).toAbsolutePath().normalize();
+        // source root は real path で保持されるため、record path / glob の基準も
+        // real path の workspaceRoot に揃える (symlink を含む workspace 対策)。
+        Path workspaceRoot;
+        try {
+            workspaceRoot = Path.of(request.workspaceRoot()).toRealPath();
+        } catch (IOException e) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "failed to resolve the real path of analysisRequest.workspaceRoot");
+        }
         List<SourceSetAnalysisContext> contexts = contextResult.contexts();
         ContextScope.Scope scope =
                 ContextScope.enumerate(workspaceRoot, contexts, request.include(), request.exclude());
@@ -112,13 +123,29 @@ public final class AnalysisRunner {
         // context ごとの parser / TypeSolver。solver には自 root、Gradle project
         // 依存で到達可能な context の root、自 context の外部 entry だけを登録し、
         // 非依存 module や異なる依存 version を混在させない (D6)。
-        Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
+        // 各 classes output の所有 context (origin 判定用)。
+        Map<Path, String> classesOutputOwners = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
+            for (Path output : context.classesOutputs()) {
+                classesOutputOwners.putIfAbsent(output, context.id());
+            }
+        }
+
+        Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
+        Map<String, SolverOriginIndex> originsByContext = new LinkedHashMap<>();
+        for (SourceSetAnalysisContext context : contexts) {
+            SolverOriginIndex origins = new SolverOriginIndex();
             List<Path> solverRoots = new ArrayList<>(context.sourceRoots());
+            for (Path root : context.sourceRoots()) {
+                origins.register(root, ResolvedDeclarationOrigin.source(context.id()));
+            }
             for (String dependencyId : reachableDependencyIds(context, contextById)) {
                 SourceSetAnalysisContext dependency = contextById.get(dependencyId);
                 if (dependency != null) {
                     solverRoots.addAll(dependency.sourceRoots());
+                    for (Path root : dependency.sourceRoots()) {
+                        origins.register(root, ResolvedDeclarationOrigin.source(dependencyId));
+                    }
                 }
             }
             List<Path> solverEntries = new ArrayList<>(context.classpath());
@@ -127,12 +154,19 @@ public final class AnalysisRunner {
                     solverEntries.add(output);
                 }
             }
+            for (Path entry : solverEntries) {
+                String owner = classesOutputOwners.get(entry);
+                origins.register(entry, owner != null
+                        ? ResolvedDeclarationOrigin.projectClasses(owner)
+                        : ResolvedDeclarationOrigin.externalArtifact(entry.toString()));
+            }
             CombinedTypeSolver typeSolver =
                     TypeSolverFactory.createForRoots(solverRoots, solverEntries, context.languageLevel());
             ParserConfiguration config = new ParserConfiguration()
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
             parserByContext.put(context.id(), new JavaParser(config));
+            originsByContext.put(context.id(), origins);
         }
 
         // graph record 出力前に全 file の parse を検証する。失敗は request 全体 fatal。
@@ -150,9 +184,14 @@ public final class AnalysisRunner {
         // SootUp index は context ごとに分離する (D6)。Spring DI の Bean 母集合は
         // request 全体の意味論 (module 間 DI 解決が成功条件) のため、DI 索引だけは
         // 全 context の entry を統合した index を使う。
+        // file を持たない context の SootUp 構築は行わない (include で絞った場合の
+        // 無駄な index 構築を避ける lazy 境界)。
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Set<String> unionEntries = new LinkedHashSet<>();
         for (SourceSetAnalysisContext context : contexts) {
+            if (scope.filesByContext().get(context.id()).isEmpty()) {
+                continue;
+            }
             List<String> entries = new ArrayList<>();
             for (Path path : context.classpath()) {
                 entries.add(path.toString());
@@ -199,13 +238,17 @@ public final class AnalysisRunner {
         SpringDiagnosticEmitter.emit(springResult, workspaceRoot, accumulator);
         Map<String, CallGraphBuilder> builderByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
+            if (scope.filesByContext().get(context.id()).isEmpty()) {
+                continue;
+            }
             builderByContext.put(context.id(), new CallGraphBuilder(
                     workspaceRoot,
                     attributionResolver,
                     accumulator,
                     sootUpByContext.get(context.id()),
                     sourceMethodIndex,
-                    springResult));
+                    springResult,
+                    originsByContext.get(context.id())));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);

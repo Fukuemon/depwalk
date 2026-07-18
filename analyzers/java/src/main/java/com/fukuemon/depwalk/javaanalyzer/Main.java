@@ -133,8 +133,15 @@ public final class Main {
     private static AnalysisContextFactory.Result buildContexts(
             AnalysisRequest request, PreflightValidator.Validated validated, PrintStream errStream)
             throws AnalyzerFatalException, DiscoveryFailure {
-        java.nio.file.Path workspaceRoot =
-                java.nio.file.Path.of(request.workspaceRoot()).toAbsolutePath().normalize();
+        java.nio.file.Path workspaceRoot;
+        try {
+            // root 検証・相対化と同じ基準にするため real path を使う。
+            workspaceRoot = java.nio.file.Path.of(request.workspaceRoot()).toRealPath();
+        } catch (java.io.IOException e) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "failed to resolve the real path of analysisRequest.workspaceRoot");
+        }
         if (GradleModelDiscovery.isExplicitOverride(request.sourceRoots())) {
             return AnalysisContextFactory.explicitContext(
                     workspaceRoot, request.sourceRoots(), validated.classpath(), request.metadata());
