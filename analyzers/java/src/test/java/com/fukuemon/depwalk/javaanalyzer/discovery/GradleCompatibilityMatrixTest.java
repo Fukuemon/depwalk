@@ -96,6 +96,34 @@ class GradleCompatibilityMatrixTest {
         }
     }
 
+    @org.junit.jupiter.api.Test
+    void unsupportedGradleVersionFailsWithStableReasonOnRealDaemon() throws Exception {
+        String jdkHome = System.getProperty("depwalk.matrix.jdk17");
+        org.junit.jupiter.api.Assertions.assertNotNull(jdkHome,
+                "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");
+        Path source = Path.of("..", "..", "testdata", "fixtures", "java", "multi-module-spring-project")
+                .toAbsolutePath().normalize();
+        Path workspace = Files.createTempDirectory("depwalk-matrix-neg-").toRealPath();
+        try {
+            copyFixture(source, workspace);
+            Files.writeString(workspace.resolve("gradle.properties"), "org.gradle.java.home=" + jdkHome + "\n");
+            ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
+            PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
+
+            DiscoveryFailure failure = org.junit.jupiter.api.Assertions.assertThrows(DiscoveryFailure.class,
+                    () -> new GradleModelDiscovery(new GradleToolingClient("7.6.4"), stderr)
+                            .discover(workspace));
+
+            assertEquals(DiscoveryFailure.Category.UNSUPPORTED_GRADLE_VERSION, failure.category());
+            assertTrue(failure.userMessage().contains("unsupported-gradle-version"));
+            assertTrue(failure.userMessage().contains("--source-root"));
+        } finally {
+            try (Stream<Path> paths = Files.walk(workspace)) {
+                paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+    }
+
     private static void assertRoot(DepwalkProjectModel project, Path workspace, String expectedRelative) {
         assertNotNull(project);
         List<String> roots = project.getMainJavaSourceDirectories().stream()

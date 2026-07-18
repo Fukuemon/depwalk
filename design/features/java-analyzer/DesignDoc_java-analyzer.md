@@ -292,15 +292,15 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
   所要時間には JVM 起動、Spring DI / 候補 method 用 first pass、SootUp 型階層索引化が含まれる。fixture が 10 ファイルと小さいため、この 1 回の値だけから実プロジェクト規模の傾向や SLO を決定しない。SLO は既定どおり #22 完了時に、実プロジェクト規模の複数回計測を入力として確定する。
 
-- **#24 実装後の実測値 (計測日 2026-07-18)**: 明示 single-root、single-project 自動 discovery、multi-module 自動 discovery (3 module、`testdata/fixtures/java/multi-module-spring-project`) の 3 経路を、同一 checkout・同一 Gradle user home・warm daemon / cache 状態で実 jar により計測した。各経路は初回 1 回 + warm 3 回 (中央値)。環境: commit `ca92290`、JDK 25 (Eclipse Temurin 25.0.3+9)、target Gradle 9.6.1、macOS (Darwin 23.6.0) / Apple Silicon arm64。command は stdin へ `analysisRequest` を渡す `/usr/bin/time -l java -jar analyzers/java/build/libs/java-analyzer.jar`。single 経路の fixture は 2 file の一時 Gradle project。数値 SLO は設けず Issue #22 へ委ねる。
+- **#24 実装後の実測値 (計測日 2026-07-18)**: 明示 single-root、single-project 自動 discovery、multi-module 自動 discovery (3 module、`testdata/fixtures/java/multi-module-spring-project`) の 3 経路を、同一 checkout・同一 Gradle user home・warm daemon / cache 状態で実 jar により計測した。各経路は初回 1 回 + warm 3 回 (中央値)。環境: commit `081a262` 時点の実装 (phase metrics 追加後)、JDK 25 (Eclipse Temurin 25.0.3+9)、target Gradle 9.6.1、macOS (Darwin 23.6.0) / Apple Silicon arm64。command は stdin へ `analysisRequest` を渡す `/usr/bin/time -l java -jar analyzers/java/build/libs/java-analyzer.jar`。single 経路の fixture は 2 file の一時 Gradle project。数値 SLO は設けず Issue #22 へ委ねる。
 
-  | 経路                            | 初回 wall | warm 中央値 | 最大 RSS (warm) | parse pre-flight (warm) | 完全性 metrics                         |
-  | ------------------------------- | --------- | ----------- | --------------- | ----------------------- | -------------------------------------- |
-  | 明示 single-root (2 file)       | 592ms     | 540ms       | 約 115 MiB      | 70ms                    | callSites=3 emitted=3 silentOmission=0 |
-  | single-project discovery        | 1,310ms   | 1,262ms     | 約 166 MiB      | 75ms                    | callSites=3 emitted=3 silentOmission=0 |
-  | multi-module discovery (5 file) | 2,927ms   | 2,783ms     | 約 386 MiB      | 114ms                   | callSites=2 emitted=2 silentOmission=0 |
+  | 経路                            | 初回 wall | warm 中央値 | 最大 RSS (warm) | discovery (warm) | context 構築 (warm) | parse pre-flight (warm) | 完全性 metrics                         |
+  | ------------------------------- | --------- | ----------- | --------------- | ---------------- | ------------------- | ----------------------- | -------------------------------------- |
+  | 明示 single-root (2 file)       | 557ms     | 515ms       | 約 115 MiB      | - (bypass)       | 23ms                | 72ms                    | callSites=3 emitted=3 silentOmission=0 |
+  | single-project discovery        | 1,216ms   | 1,119ms     | 約 168 MiB      | 634ms            | 15ms                | 65ms                    | callSites=3 emitted=3 silentOmission=0 |
+  | multi-module discovery (5 file) | 2,756ms   | 2,455ms     | 約 378 MiB      | 638ms            | 41ms                | 81ms                    | callSites=2 emitted=2 silentOmission=0 |
 
-  discovery の増分 (single 比較で warm 約 +0.7s) は Tooling API 接続・provider 展開・model 取得と context 構築を含む。multi-module は context ごとの TypeSolver / SootUp 構築と Spring 依存 jar (11 classpath entry) の索引化で RSS が増える。unresolved symbol / bytecode-only member / error.details は全経路 0 件 (correctness gate を先に満たした状態で計測)。
+  discovery 時間は Tooling API 接続・provider 一時展開・Gradle configuration / classpath 解決・model 転送を含む合計で、stderr の `discoveryMs` (D8 の分離計測) をそのまま記録した。provider 展開や Gradle 内部の configuration / 転送の内訳は client 側から個別計測できないため、推測値は記録しない。multi-module の RSS 増分は context ごとの TypeSolver / SootUp 構築と Spring 依存 jar (11 classpath entry) の索引化による。unresolved symbol / bytecode-only member / error.details は全経路 0 件 (correctness gate を先に満たした状態で計測)。
 
 ### 帰属型の決定規則
 

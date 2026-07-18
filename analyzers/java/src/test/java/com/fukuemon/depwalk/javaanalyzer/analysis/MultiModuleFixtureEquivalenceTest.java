@@ -6,8 +6,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,7 +18,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fukuemon.depwalk.javaanalyzer.Main;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 3 module primary fixture (spec #24 P5 step 1-2) の自動 discovery と明示
- * override の同値検証。process 起動 wiring は P6 の実 CLI E2E が担い、本 test は
- * Analyzer entry point ({@link Main#run}) を両経路で実行して graph を照合する。
+ * override の同値検証。実 jar (shadowJar) を子 process として両経路で実行し、
+ * 固定期待集合 (testdata の expected/graph.json) と graph を照合する。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MultiModuleFixtureEquivalenceTest {
@@ -69,18 +66,23 @@ class MultiModuleFixtureEquivalenceTest {
     }
 
     private Run analyze(String requestJson) throws Exception {
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        int exit = Main.run(
-                new ByteArrayInputStream(requestJson.getBytes(StandardCharsets.UTF_8)), stdout, stderr);
+        Path jar = Path.of("build", "libs", "java-analyzer.jar").toAbsolutePath().normalize();
+        assertTrue(Files.exists(jar), "run ./gradlew shadowJar first: " + jar);
+        Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
+        Process process = new ProcessBuilder(javaBin.toString(), "-jar", jar.toString()).start();
+        process.getOutputStream().write(requestJson.getBytes(StandardCharsets.UTF_8));
+        process.getOutputStream().close();
+        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exit = process.waitFor();
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, Object>> records = new ArrayList<>();
-        for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
+        for (String line : stdout.split("\n")) {
             if (!line.isBlank()) {
                 records.add(mapper.readValue(line, Map.class));
             }
         }
-        return new Run(exit, records, stderr.toString(StandardCharsets.UTF_8));
+        return new Run(exit, records, stderr);
     }
 
     private Run runAuto() throws Exception {
@@ -140,44 +142,39 @@ class MultiModuleFixtureEquivalenceTest {
         Run run = analyze(request);
 
         assertEquals(0, run.exitCode(), run.stderr());
+        // include glob は workspace 相対 path (module directory を含む) で判定される。
+        for (Map<String, Object> method : methodSet(run)) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> location = (Map<String, Object>) method.get("sourceLocation");
+            if (location != null) {
+                assertTrue(((String) location.get("path")).startsWith("repository/"),
+                        "include repository/** must restrict the scope by path: " + method);
+            }
+        }
         Set<String> methods = methodSet(run).stream()
                 .map(m -> (String) m.get("methodId")).collect(Collectors.toSet());
-        assertTrue(methods.stream().allMatch(id -> id.contains("repository")), methods.toString());
         assertTrue(methods.contains("java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)"),
                 methods.toString());
     }
 
-    private void assertExpectedGraph(Run run) {
-        // 設計から固定した期待集合 (module 境界をまたぐ call / DI / dispatch)。
-        Set<String> methods = methodSet(run).stream()
-                .map(m -> (String) m.get("methodId")).collect(Collectors.toSet());
-        for (String expected : List.of(
-                "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
-                "java:com.example.mm.app.OrderController#<init>(com.example.mm.service.OrderService)",
-                "java:com.example.mm.service.OrderService#process(java.lang.String)",
-                "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
-                "java:com.example.mm.repository.OrderRepository#save(java.lang.String)",
-                "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)")) {
-            assertTrue(methods.contains(expected), () -> "missing " + expected + " in " + methods);
+    @SuppressWarnings("unchecked")
+    private void assertExpectedGraph(Run run) throws Exception {
+        // 固定期待集合の正本は testdata の expected/graph.json (P6 の実 CLI E2E も参照可能)。
+        Map<String, Object> expected = new ObjectMapper()
+                .readValue(fixture.resolve("expected/graph.json").toFile(), Map.class);
+        Map<String, Map<String, Object>> methodsById = methodSet(run).stream()
+                .collect(Collectors.toMap(m -> (String) m.get("methodId"), m -> m));
+        for (Map<String, Object> expectedMethod : (List<Map<String, Object>>) expected.get("methods")) {
+            String methodId = (String) expectedMethod.get("methodId");
+            Map<String, Object> actual = methodsById.get(methodId);
+            assertTrue(actual != null, () -> "missing " + methodId + " in " + methodsById.keySet());
+            Map<String, Object> location = (Map<String, Object>) actual.get("sourceLocation");
+            assertEquals(expectedMethod.get("sourceLocation"), location.get("path"), methodId);
         }
-
-        assertEdge(run, "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
-                "java:com.example.mm.service.OrderService#process(java.lang.String)", null);
-        assertEdge(run, "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
-                "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)", "unique");
-        assertEdge(run, "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
-                "java:com.example.mm.repository.OrderRepository#save(java.lang.String)", null);
-        assertEdge(run, "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
-                "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)", "unique");
-
-        // workspace 相対 location (module directory を含む)。
-        Map<String, Object> controller = methodSet(run).stream()
-                .filter(m -> "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)".equals(m.get("methodId")))
-                .findFirst().orElseThrow();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> location = (Map<String, Object>) controller.get("sourceLocation");
-        assertEquals("app/src/main/java/com/example/mm/app/OrderController.java", location.get("path"));
-
+        for (Map<String, Object> expectedEdge : (List<Map<String, Object>>) expected.get("edges")) {
+            assertEdge(run, (String) expectedEdge.get("caller"), (String) expectedEdge.get("callee"),
+                    (String) expectedEdge.get("resolution"));
+        }
         assertTrue(run.stderr().contains("silentOmission=0"), run.stderr());
     }
 

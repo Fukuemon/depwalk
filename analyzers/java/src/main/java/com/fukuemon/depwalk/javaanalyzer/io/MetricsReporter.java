@@ -19,10 +19,11 @@ public final class MetricsReporter {
      */
     public static void report(PrintStream err, MetricsSummary summary) {
         err.printf(
-                "analyzedFiles=%d durationMs=%d parsePreflightMs=%d unresolvedSymbols=%d%n",
+                "analyzedFiles=%d durationMs=%d parsePreflightMs=%d contextBuildMs=%d unresolvedSymbols=%d%n",
                 summary.analyzedFileCount(),
                 summary.durationMillis(),
                 summary.parsePreflightMillis(),
+                summary.contextBuildMillis(),
                 summary.unresolvedCount());
         err.flush();
     }

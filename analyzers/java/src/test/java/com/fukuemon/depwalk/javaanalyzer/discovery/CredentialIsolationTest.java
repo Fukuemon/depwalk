@@ -67,6 +67,24 @@ class CredentialIsolationTest {
         return workspace;
     }
 
+    /**
+     * depwalk が生成し得る artifact へ marker が残っていないことを検証する。
+     * marker を含む test 入力 (gradle.properties / build.gradle) は検査対象外。
+     */
+    private static void assertNoMarkerInGeneratedArtifacts(Path workspace, String marker) throws Exception {
+        try (Stream<Path> paths = Files.walk(workspace)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                String name = path.getFileName().toString();
+                if (name.equals("gradle.properties") || name.equals("build.gradle")) {
+                    continue;
+                }
+                byte[] content = Files.readAllBytes(path);
+                assertFalse(new String(content, StandardCharsets.ISO_8859_1).contains(marker),
+                        "marker leaked into a generated artifact: " + workspace.relativize(path));
+            }
+        }
+    }
+
     private static void deleteRecursively(Path root) throws Exception {
         try (Stream<Path> paths = Files.walk(root)) {
             paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
@@ -87,6 +105,7 @@ class CredentialIsolationTest {
             // 固定安全通知と discovery の固定行は残る。
             assertTrue(ran.stderr().contains(GradleModelDiscovery.SAFETY_NOTICE), ran.stderr());
             assertTrue(ran.stderr().contains("discovery phase=end"), ran.stderr());
+            assertNoMarkerInGeneratedArtifacts(workspace, marker);
         } finally {
             deleteRecursively(workspace);
         }
@@ -107,6 +126,7 @@ class CredentialIsolationTest {
             assertTrue(ran.stdout().contains("JAVA_GRADLE_MODEL_ERROR"), ran.stdout());
             assertTrue(ran.stdout().contains("--source-root"), ran.stdout());
             assertTrue(ran.stdout().contains("\"phase\""), ran.stdout());
+            assertNoMarkerInGeneratedArtifacts(workspace, marker);
         } finally {
             deleteRecursively(workspace);
         }
