@@ -1,6 +1,6 @@
 # Testing Conventions
 
-> 最終更新: 2026-07-11
+> 最終更新: 2026-07-18
 
 テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.md](project.md)。
 
@@ -11,7 +11,7 @@ Core の test framework は Go 標準の `testing` とする。
 
 | 種別              | 配置                                                              | 主担当範囲                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ----------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)。Java Analyzer 側は `analyzers/java/` で JUnit を用いる (三層構成は下記「Java Analyzer 三層」参照)                                                                                                                                                                                                   |
+| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)。Java Analyzer 側は `analyzers/java/` で JUnit を用いる (三層構成は下記「Java Analyzer 三層」参照)                                                                                                                                                                                                                                                              |
 | Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠                                                                                                                                                                                                                                                                                                    |
 | E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3)。S1/S2 は Traversal Engine 層の到達集合照合 ([feature doc](../design/features/traversal/DesignDoc_traversal.md) が正本) と CLI 出力照合の 2 層からなり、CLI 出力レベルの完成は CLI interface spec 完了後。S3 も同様に Output Engine 層の照合 ([feature doc](../design/features/output/DesignDoc_output.md) が正本。unit / golden) と CLI 出力照合の 2 層からなる |
 
@@ -74,9 +74,20 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - valid `diagnostic` record を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと。
 - valid `error` record を Core が fatal failure として扱うこと。
 - Analyzer が `error` record 出力後に非ゼロ exit code で終了すること。
+- valid `error`、非ゼロ exit、parse / schema error が先行 graph record と diagnostic をすべて無効化し、staging Graph を公開しないこと。正常 stream だけが参照完全性を満たすこと。
 - 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと。
 - valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること。
-- Java 固有情報を `metadata` に含む record でも、Core が共通必須 field のみで graph を構築できること。
+- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal と既存 Output schema は表出しないこと。
+- `error.details` の共通 fieldを決定順で保持し、Analyzer 固有 code に分岐せず CLI が汎用表示できること。
+
+## Gradle multi-project / 完全性の横断テスト
+
+- Protocol contract: optional `sourceRoots`、workspace 相対 path、`.`、empty / absolute / `..` rejection、fatal request の原子性、共通 `FailureDetail`、optional symbol location / opaque metadata。
+- Java unit / integration: Tooling API discovery、custom model、`main` source set、root normalize / realpath / dedup / nesting、project dependency context、language level / preview、parse pre-flight、resolver allowlist、source attribution、call-site driven bytecode member index、initializer caller 展開、call inventory / ledger、`JAVA_INCOMPLETE_ANALYSIS` details。
+- Go process / Graph: valid record の staging Graph への 1-pass 変換、wire DTO 非保持、metadata deep copy、成功時だけ公開、fatal 時の Graph / diagnostic 破棄、正常 stream の参照完全性、generic CLI failure 表示。
+- Required E2E: app / service / repository の3 project、変更 `projectDir`、custom source dir、project 間 call / DI を含む fixture。実 Core CLI と実 Analyzer jar を test-only 透過 proxy で接続し、自動 discovery と明示 override の graph、request、exit を照合する。
+- Compatibility / security: Gradle `7.6.5`〜`9.6.x` と daemon JVM anchor matrix、Gradle stdout / stderr の隔離、credential / URL / absolute path を含む negative fixture の非漏洩を検証する。
+- Performance: 明示 single-root、自動 single-project、自動 multi-project の初回と warm 3回中央値、および discovery phase 別時間を記録する。数値 SLO は別 issue の契約に従う。
 
 ## 横断テスト方針
 

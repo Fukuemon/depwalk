@@ -38,6 +38,7 @@ Java Analyzerへ次の二つを一つの後続featureとして段階導入する
 
 1. **call graph 生成の委譲範囲**: SootUpは型階層・override・interface実装候補の索引としてのみ使用し、call graph生成までは委譲しない (spec #21 D1)。
 2. **候補edge / 解決根拠 / 曖昧性のProtocol表現**: call siteごとにcaller→各実装候補への複数`CallEdge`を出力し、宣言型への既存edgeも保持する。各edgeの`metadata`に解決根拠 (`resolution` / `provenance` 等) を付与する (spec #21 D2)。
+3. **project bytecode member index (spec #24、2026-07-18)**: source に現れない生成 member は、call site から要求された signature だけを自 project の compile classes output から索引化して解決する。index は Lombok 等の generator 固有 annotation に依存しない。SootUp は bytecode member / 型情報の取得を担い、call graph 生成と call inventory の完全性判定は引き続き Java Analyzer が担う。bytecode-only member は Protocol 上の `sourceLocation` を省略し、owner の source anchor を opaque metadata で保持する。
 
 詳細な決定理由は [spec #21](../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) と [feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を参照する。
 
@@ -85,3 +86,4 @@ Spring DIとInterface Dispatch / SootUpは別Issueに分けず、一つのfeatur
 - [adr/0004-defer-runtime-call-tracing.md](0004-defer-runtime-call-tracing.md): 動的呼び出しの完全追跡との境界
 - [specs/9-java-analyzer](../specs/9-java-analyzer/): Phase 1の設計と実装分割
 - [specs/21-java-dispatch-spring-di](../specs/21-java-dispatch-spring-di/): SootUp統合範囲・dispatch候補表現・Spring条件評価・性能受け入れ基準の決定記録 (D1〜D6)
+- [specs/24-gradle-multi-module-source-roots](../specs/24-gradle-multi-module-source-roots/): generator 非依存の project bytecode member index と完全性 gate の決定経緯

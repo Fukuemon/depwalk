@@ -16,6 +16,29 @@ Verdict: PASS
 
 PASS
 
+## Review 2026-07-18 17:55
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — sync 後も D30 の正確な互換性 matrix が上位文書へ反映されず、安全境界にも反映漏れ・曖昧さが残る
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:210-247,671-673` で D1〜D30 はすべて解決済み、未確定事項は「なし」
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688` で全 target と責務、Core → Analyzer の Protocol 境界を明示
+- template 必須節: NEEDS_WORK — 必須節と validator は満たすが、sync review 前後のフェーズ・レビュー情報が矛盾している
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:144-208` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、対応するテスト観点も `:853-960` に存在
+- prompts 自己完結性: N/A — prompts はレビュー対象外
+- 正本境界: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:3-4,62-64,1124-1130` はハンドオフと決定時スナップショットを明示するが、一部 durable 契約が依然 spec にしか存在しない
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:656-667` — D30 は正確な対応範囲、wrapper 不在時の挙動、安定 reason、`7.6.5/JDK 8`・`8.14.5/JDK 17`・`9.6.1/JDK 25` の固定 CI anchor を決定し、`context/toolchain.md` を詳細正本とするとしている。一方、`context/toolchain.md:17-29`、`design/features/java-analyzer/DesignDoc_java-analyzer.md:109-111,416`、`adr/0006-adopt-gradle-tooling-api-discovery.md:19-26` は範囲と「下限・系列代表・上限」という抽象表現だけで、正確な matrix が spec に残っている。詳細正本へハンドオフする必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:166-169` — 自動 discovery 前に build 評価・network・credential・cache 副作用を CLI help と stderr で明示する安全契約が、`design/features/java-analyzer/DesignDoc_java-analyzer.md:133-137`、`context/infrastructure.md:15-18,29-40`、`adr/0006-adopt-gradle-tooling-api-discovery.md:28` に反映されていない。各文書はリスク自体を記すが、利用者への通知チャネルとタイミングが欠落している。
+- `design/features/java-analyzer/DesignDoc_java-analyzer.md:113,238` — workspace 外 root を一律 fatal とする本文と、workspace 外 external included build を warning 付き除外とする code 表が両立する条件・評価順を説明していない。spec の区別 (`specs/24-gradle-multi-module-source-roots/index.md:267,334-335`) を feature 正本へ反映し、in-scope source escape と external included build の境界を一意にする必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:23,1204-1220` — 「上位文書突合」を `レビュー済` としながら備考は `review待ち` で、レビュー表にも sync review 結果が存在しない。review 前は状態を `完了` または `進行中` にするか、review 結果記録後に `レビュー済` へ更新し、メタ情報を同期する必要がある。
+
+NEEDS_WORK
+
 ## Review 2026-07-16 12:48
 
 Verdict: PASS
@@ -312,5 +335,104 @@ Verdict: PASS
 - EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:142-204` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、`:853-957` に対応する検証観点と合否指標が定義されている。
 - prompts 自己完結性: N/A — track phase のレビューであり、prompts はレビュー対象に含まれていない。
 - 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1122-1124` は全変更を未反映の変更提案として管理しており、sync phase は未実行。冒頭 `:3-4` でも durable 成果は sync phase でハンドオフすると明示されている。
+
+PASS
+
+## Review 2026-07-18 18:04
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:450-458,656-667,1196` と上位正本に未解消の矛盾・未反映がある。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:217-246` の D1〜D30 は全件「解決済み」、同 `:671-673` の未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688` は `context/project.md:69-77` の全 target と一致し、変更有無・責務・Protocol 境界を明示している。検証入口は `context/project.md:46-67` に集約されている。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-31,33-121,210-248,671-690,749-853,963-1288` に必須節が揃い、`hooks/spec/validate_document.sh` の必須見出しと一致する。前回 sync review と対応開始・再review待ちも同 `:23,1221,1285-1286` で同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:146-208` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、固定 matrix、build 評価前通知、external build 除外、workspace escape fatal をテスト可能に記述している。
+- prompts 自己完結性: N/A — prompts はレビュー対象外。
+- 正本境界: NEEDS_WORK — snapshot 降格と正本リンク自体は `specs/24-gradle-multi-module-source-roots/index.md:1-4,62-64,1124-1130` にあるが、D30 の詳細正本が二重指定され、D7 の ADR ハンドオフ宣言と実体も一致しない。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `context/toolchain.md:28,39-41` / `design/features/java-analyzer/DesignDoc_java-analyzer.md:111` / `specs/24-gradle-multi-module-source-roots/index.md:667` — D30 の version matrix 詳細正本について、spec と Java Analyzer feature doc は `context/toolchain.md` を指す一方、`context/toolchain.md:28` は Java Analyzer feature doc を「詳細の正本」としており、同じ toolchain 文書の `:41` とも矛盾する。正本を `context/toolchain.md#gradle-discovery-compatibility-matrix` に一本化する必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:331-342,1196` / `adr/0006-adopt-gradle-tooling-api-discovery.md:17-32` — spec は D7 の discovery 除外・source-only fallback・workspace real-path 境界を ADR-0006 へ反映済みとしているが、ADR 本文には external included build を root validation 前に除外する境界、in-scope project の workspace escape を fatal にする境界、未作成 root / classes output fallback がない。Java Analyzer feature doc `:113` には反映されているため、ADR へのハンドオフ宣言か ADR 本文のどちらかを整合させる必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:450-458,876-877` / `design/features/java-analyzer/DesignDoc_java-analyzer.md:119,356,414` — D15 と feature doc の設計節は決定順の「最初の parse failure」を返す契約だが、主要シナリオ `:356` は「全 parse failure を error.details へ集約」としている。first-only と all-details のどちらを durable 契約にするか確定し、シナリオと E2E 観点を統一する必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 18:12
+
+Verdict: NEEDS_WORK
+
+### 観点別評価
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:321,844` は明示経路で空 classpath を許可しつつ、source-only fallback を「model 由来 classes output 欠落時だけ」と限定している。一方、`design/features/java-analyzer/DesignDoc_java-analyzer.md:90-96,236` は明示経路で自 project classes が未指定の場合も `JAVA_SOOTUP_UNAVAILABLE` warning 付きで継続すると定義しており、fallback 境界が一致しない。前回指摘の matrix 一本化、ADR-0006 の D7 境界、parse first-only は反映済み。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:215-246,671-673` で D1〜D30 はすべて解決済み、未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688` は全正規 target と変更有無・責務を明示し、Core → Analyzer の Protocol 境界を維持している。
+- template 必須節: NEEDS_WORK — 必須節と11フェーズは存在するが、文書メタ情報が最新対応と同期していない。`specs/24-gradle-multi-module-source-roots/index.md:23` は前々回の4指摘対応だけを記載し、変更履歴も `:1288` の「3指摘へ対応予定」で終了している。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:146-208` に観測可能な WHEN / IF / THE SYSTEM SHALL 条件があり、成功・fatal・bypass・E2E結果を検証できる。
+- prompts 自己完結性: N/A — prompts はレビュー対象外。
+- 正本境界: PASS — `specs/24-gradle-multi-module-source-roots/index.md:3-4,64,1124-1130` で作業記録・決定時スナップショットへ降格し、Design Doc、feature doc、context、ADRへのハンドオフ先を明示している。
+
+### 指摘
+
+- `specs/24-gradle-multi-module-source-roots/index.md:321,813,844` / `design/features/java-analyzer/DesignDoc_java-analyzer.md:90-96,236` — 明示 classpath に自 project classes output が含まれない場合の挙動を、source-only継続か非fallbackかで統一する必要がある。`spec-lifecycle` の sync phase で reconciliation すること。
+- `specs/24-gradle-multi-module-source-roots/index.md:23,1222,1288` — 最新3指摘の反映完了を設計フェーズ備考と変更履歴へ追記し、本文更新とメタ情報を同期すること。
+
+NEEDS_WORK
+
+## Review 2026-07-18 18:19
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — 直近指摘の fallback 境界は spec `:337-338`、Java Analyzer feature doc `:94-96`、ADR-0006 `:26` で一致している。しかし call-site identity の公開境界に下記矛盾が残る。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:215-246,671-673` で D1〜D30 は全件解決済み、未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688` は `context/project.md:69-77` の正規 target と一致し、Core → Analyzer を Protocol 経由に限定している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-31,33-121,210-248,671-690,749-853,963-1295` に必須節が揃い、validator も終了コード 0。最新 phase、review、change history は `:23,1223,1290` で同期済み。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:146-208` に観測可能な WHEN / IF / THE SYSTEM SHALL があり、source-only、生成 member completeness fatal、classpath fatal のテスト可能な詳細は `:337-338,813,883-907` に定義されている。
+- prompts 自己完結性: N/A — prompts は対象外。
+- 正本境界: NEEDS_WORK — snapshot 降格、正本リンク、反映済み宣言は `specs/24-gradle-multi-module-source-roots/index.md:3-4,64,1124-1130` にあるが、Java Analyzer の durable 契約が下記のとおり決定時スナップショットと矛盾している。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `design/features/java-analyzer/DesignDoc_java-analyzer.md:121,131` / `specs/24-gradle-multi-module-source-roots/index.md:477,479,547-550` — feature doc は `CallSiteId` を「内部 identity とし Protocol へ出力しない」としながら、同時に未解決 call の `CallSiteId` を `error.details` に含めると定義している。spec は `CallSiteId` を配列の決定順にのみ使用し、detail は位置・code・message・reason・target・candidatesからなる自己完結形式としている。feature doc `:131` を「内部 `CallSiteId` 順で details を並べるが ID 自体は出力しない」に統一する必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 18:25
+
+Verdict: NEEDS_WORK
+
+### 観点別評価
+
+- 上位文書整合: NEEDS_WORK — CallSiteId の公開境界は `design/features/java-analyzer/DesignDoc_java-analyzer.md:121,131` と `specs/24-gradle-multi-module-source-roots/index.md:477,547-550` で整合したが、source-only fallback に下記の矛盾が残る。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:210-248,671-673`。D1〜D30 は全件解決済みで、未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688`。`context/project.md:69-77` の全 target と一致し、Core → Analyzer の Protocol 境界も明示している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-31,33-121,210-248,671-690,749-1297`。必須節と11フェーズが揃い、最新レビュー待ち・指摘対応履歴も `:23,1224,1292` に同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:144-208`。入力、discovery、完全性、fatal、E2E の観測可能な条件を定義している。
+- prompts 自己完結性: N/A — prompts は対象外。
+- 正本境界: PASS — `specs/24-gradle-multi-module-source-roots/index.md:3-4,62-64,1124-1130`。spec を作業記録・決定時スナップショットへ降格し、Design Doc、feature doc、context、ADR へのハンドオフ先を明示している。
+
+### 指摘
+
+- `specs/24-gradle-multi-module-source-roots/index.md:844` — fallback を「model 由来 project classes output 欠落時だけ」と限定しており、同 spec の D7・E5 (`:337,813`)、Java Analyzer 正本 (`design/features/java-analyzer/DesignDoc_java-analyzer.md:96`)、ADR-0006 (`adr/0006-adopt-gradle-tooling-api-discovery.md:26`) が定める「明示経路で自 project classes output を指定していない場合も `JAVA_SOOTUP_UNAVAILABLE` warning付きで source-only 継続」と矛盾する。Fallback 節にも明示経路を含めて統一し、sync phase を再レビューする必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 18:30
+
+Verdict: PASS
+
+### 観点別評価
+
+- 上位文書整合: PASS — Fallback 契約は spec、Java Analyzer feature doc、ADR-0006 で一致。未作成 model classes または明示経路で自 project classes 未指定は warning 付き source-only、明示・model 解決済み entry の欠落は fatal (`specs/24-gradle-multi-module-source-roots/index.md:337-338,813-844`; `design/features/java-analyzer/DesignDoc_java-analyzer.md:94-96`; `adr/0006-adopt-gradle-tooling-api-discovery.md:26`)。その他の durable 契約も上位資料への反映先と整合する (`specs/24-gradle-multi-module-source-roots/index.md:33-64`)。
+- 未解決論点: PASS — D1〜D30 はすべて解決済みで、未確定事項は「なし」 (`specs/24-gradle-multi-module-source-roots/index.md:210-246,671-673`)。
+- 実装対象明示: PASS — `core`、`traversal`、`output`、`analyzer-protocol`、`java-analyzer` が対象ドメイン一覧と一致し、Core → Analyzer の Protocol 境界も明記されている (`specs/24-gradle-multi-module-source-roots/index.md:675-688`; `context/project.md:69-77`)。
+- template 必須節: PASS — 必須節がすべて存在する (`specs/24-gradle-multi-module-source-roots/index.md:6-1299`)。更新日、phase 状態、直近 NEEDS_WORK、対応履歴も最新修正と同期している (`specs/24-gradle-multi-module-source-roots/index.md:6-31,1200-1225,1288-1294`)。
+- EARS acceptance: PASS — WHEN / IF / THE SYSTEM SHALL による観測可能な受け入れ基準を網羅している (`specs/24-gradle-multi-module-source-roots/index.md:144-208`)。
+- prompts 自己完結性: N/A — prompts は今回のレビュー対象外。
+- 正本境界: PASS — durable 成果を feature doc / context / ADR へハンドオフ済みと明記し、spec を決定時スナップショットへ降格して正本リンクを保持している (`specs/24-gradle-multi-module-source-roots/index.md:3-4,64,1124-1130`)。
 
 PASS
