@@ -246,7 +246,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	libJar := filepath.Join(root, "lib", "fixture-lib.jar")
 	expectedDir := filepath.Join(root, "expected")
 
-	metadata, err := analyze.BuildMetadata([]string{"classpath=" + libJar})
+	metadata, err := analyze.BuildMetadata([]string{"classpath=" + libJar, "javaLanguageLevel=25"})
 	if err != nil {
 		t.Fatalf("build analyzer metadata: %v", err)
 	}
@@ -256,6 +256,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		RecordType:    protocol.RecordTypeAnalysisRequest,
 		RequestID:     "e2e-fixture",
 		WorkspaceRoot: projectRoot,
+		SourceRoots:   []string{"."},
 		Language:      protocol.LanguageJava,
 		Metadata:      metadata,
 	}
@@ -330,15 +331,6 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		}
 		if !metadataBool(edge.Metadata, "viaLambda") {
 			t.Errorf("viaLambda metadata not set on edge %s", edge.EdgeID)
-		}
-	})
-
-	t.Run("ParseErrorContinuesAnalysis", func(t *testing.T) {
-		assertDiagnosticCode(t, result.Diagnostics, "JAVA_PARSE_ERROR")
-		if _, ok := findCallEdge(edges,
-			"java:com.example.GreetingService#greetUser(java.lang.String)",
-			"java:com.example.Greeter#greet(java.lang.String)"); !ok {
-			t.Error("other files' callEdges are missing even though only BrokenSyntax.java should fail to parse")
 		}
 	})
 

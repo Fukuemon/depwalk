@@ -10,35 +10,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * diagnostic の code / severity と、解析が継続すること (パース不能ファイルを飛ばして
- * 他ファイルの解析を続ける / 未解決 symbol があっても他の callEdge は出力する)。
+ * diagnostic の code / severity の契約。parse 不能 file は spec #24 D15 により
+ * request 全体の fatal ({@code JAVA_PARSE_ERROR})。未解決 symbol は解析を継続する。
  */
 class DiagnosticsTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/diagnostics");
 
     @Test
-    void parseErrorIsReportedAndOtherFilesStillAnalyzed() throws Exception {
+    void parseErrorFailsWholeRequestBeforeAnyGraphRecord() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
 
-        assertEquals(0, ran.exitCode(), "parse error is partialFailure, not fatal");
+        assertEquals(1, ran.exitCode(), "a parse failure must fail the whole request");
 
-        List<Map<String, Object>> diagnostics = ran.byType("diagnostic");
-        assertTrue(diagnostics.stream().anyMatch(d ->
-                        "JAVA_PARSE_ERROR".equals(d.get("code")) && "partialFailure".equals(d.get("severity"))),
-                "expected JAVA_PARSE_ERROR/partialFailure diagnostic: " + diagnostics);
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertTrue(errors.stream().anyMatch(e ->
+                        "JAVA_PARSE_ERROR".equals(e.get("code"))
+                                && String.valueOf(e.get("message")).contains("com/example/Broken.java")),
+                "expected a JAVA_PARSE_ERROR fatal error with the workspace-relative path: " + errors);
 
-        // Broken.java is skipped, but Ok.java (a sibling file) is still analyzed.
-        List<Map<String, Object>> nodes = ran.byType("methodSymbol");
-        assertTrue(nodes.stream().anyMatch(n -> "java:com.example.Ok#safe()".equals(n.get("methodId"))),
-                "sibling file must still be analyzed after a parse error: " + nodes);
+        // graph record は 1 件も出力しない (partial mode なし)。
+        assertEquals(0, ran.byType("methodSymbol").size());
+        assertEquals(0, ran.byType("callEdge").size());
+        assertEquals(0, ran.byType("diagnostic").size());
     }
 
     @Test
     void unresolvedSymbolIsReportedAsWarningAndAnalysisContinues() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
-                FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
+                FIXTURE, AnalysisTestSupport.classpathMetadata(), null,
+                List.of("com/example/Broken.java"), null, null);
 
         List<Map<String, Object>> diagnostics = ran.byType("diagnostic");
         assertTrue(diagnostics.stream().anyMatch(d ->
@@ -58,7 +60,8 @@ class DiagnosticsTest {
     @Test
     void entrypointNotFoundIsReportedAsWarning() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
-                FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null,
+                FIXTURE, AnalysisTestSupport.classpathMetadata(), null,
+                List.of("com/example/Broken.java"),
                 List.of(Map.of("qualifiedName", "com.example.Ok.doesNotExist")), "reachableFromEntrypoints");
 
         List<Map<String, Object>> diagnostics = ran.byType("diagnostic");

@@ -2,6 +2,11 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
+import com.fukuemon.depwalk.javaanalyzer.discovery.DiscoveryFailure;
+import com.fukuemon.depwalk.javaanalyzer.discovery.GradleModelDiscovery;
+import com.fukuemon.depwalk.javaanalyzer.discovery.GradleToolingClient;
+import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsReporter;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsSummary;
 import com.fukuemon.depwalk.javaanalyzer.io.ProtocolObjectMapper;
@@ -68,19 +73,32 @@ public final class Main {
             }
 
             PreflightValidator.Validated validated;
+            AnalysisContextFactory.Result contexts;
             try {
                 validated = PreflightValidator.validate(request);
+                contexts = buildContexts(request, validated, errStream);
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
+                return 1;
+            } catch (DiscoveryFailure e) {
+                writer.write(ErrorRecord.of(
+                        JavaErrorCode.JAVA_GRADLE_MODEL_ERROR.code(),
+                        e.userMessage(),
+                        null,
+                        java.util.Map.of("reason", e.category().reason(), "phase", e.phase().label())));
                 return 1;
             }
 
             try {
-                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, validated.classpath(), writer);
+                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, contexts, writer);
                 Duration elapsed = Duration.between(start, Instant.now());
-                MetricsSummary summary = new MetricsSummary(stats.analyzedFileCount(), elapsed.toMillis(), stats.unresolvedCount());
+                MetricsSummary summary = new MetricsSummary(
+                        stats.analyzedFileCount(), elapsed.toMillis(), stats.parsePreflightMillis(), stats.unresolvedCount());
                 MetricsReporter.report(errStream, summary);
                 return 0;
+            } catch (AnalyzerFatalException e) {
+                writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
+                return 1;
             } catch (RuntimeException e) {
                 // 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
                 // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
@@ -105,6 +123,26 @@ public final class Main {
                 // best-effort close; exit code is already decided above.
             }
         }
+    }
+
+    /**
+     * 明示 {@code sourceRoots} なら synthetic context、省略なら Gradle build model
+     * discovery (P2_02) から解析 context を構築する。明示 root は Tooling API
+     * runtime を完全 bypass する。
+     */
+    private static AnalysisContextFactory.Result buildContexts(
+            AnalysisRequest request, PreflightValidator.Validated validated, PrintStream errStream)
+            throws AnalyzerFatalException, DiscoveryFailure {
+        java.nio.file.Path workspaceRoot =
+                java.nio.file.Path.of(request.workspaceRoot()).toAbsolutePath().normalize();
+        if (GradleModelDiscovery.isExplicitOverride(request.sourceRoots())) {
+            return AnalysisContextFactory.explicitContext(
+                    workspaceRoot, request.sourceRoots(), validated.classpath(), request.metadata());
+        }
+        AnalysisContextFactory.rejectLanguageMetadataOnDiscovery(request.metadata());
+        DepwalkGradleModel model =
+                new GradleModelDiscovery(new GradleToolingClient(), errStream).discover(workspaceRoot);
+        return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
     }
 
     private static int reportInternalError(RecordWriter writer, PrintStream errStream, Exception e) {
