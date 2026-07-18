@@ -129,6 +129,107 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    void resolvesInheritedSynthesizedMembersThroughHierarchyWalk() throws Exception {
+        // D31: 親 class の bytecode-only member (継承した生成 getter) は
+        // getDeclaredMethods への合成経由で階層走査から解決できる。
+        Path build = temp.resolve("inherit-src");
+        write(build, "com/example/Base.java", """
+                package com.example;
+                public class Base {
+                    public String getName() { return "x"; }
+                }
+                """);
+        write(build, "com/example/Child.java", """
+                package com.example;
+                public class Child extends Base {
+                }
+                """);
+        Path classes = temp.resolve("inherit-classes");
+        Files.createDirectories(classes);
+        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "--release", "17", "-d", classes.toString(),
+                build.resolve("com/example/Base.java").toString(),
+                build.resolve("com/example/Child.java").toString());
+        assertEquals(0, rc, "fixture compile failed");
+
+        Path workspace = temp.resolve("inherit-workspace");
+        write(workspace, "com/example/Base.java", """
+                package com.example;
+                public class Base {
+                }
+                """);
+        write(workspace, "com/example/Child.java", """
+                package com.example;
+                public class Child extends Base {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    boolean use(Child child) { return child.getName().isEmpty(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        assertTrue(ran.byType("methodSymbol").stream()
+                .anyMatch(n -> "java:com.example.Base#getName()".equals(n.get("methodId"))),
+                () -> ran.records().toString());
+        assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
+    }
+
+    @Test
+    void genericElementTypeIsErasedToObjectAndStaysUnresolved() throws Exception {
+        // D31 の既知の限界 (spec D31 記録): 合成 member の generic 型引数は
+        // erasure で Object 埋めされるため、要素型に依存する後続 call は
+        // 解決できず完全性 gate に残る。この限界を回帰として固定する。
+        Path build = temp.resolve("generic-src");
+        write(build, "com/example/Owner.java", """
+                package com.example;
+                import java.util.List;
+                public class Owner {
+                    public List<String> getTags() { return List.of(); }
+                }
+                """);
+        Path classes = temp.resolve("generic-classes");
+        Files.createDirectories(classes);
+        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "--release", "17", "-d", classes.toString(),
+                build.resolve("com/example/Owner.java").toString());
+        assertEquals(0, rc, "fixture compile failed");
+
+        Path workspace = temp.resolve("generic-workspace");
+        write(workspace, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    int sizeOnly(Owner owner) { return owner.getTags().size(); }
+                    int elementDependent(Owner owner) { return owner.getTags().get(0).length(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        // 要素型に依存しない size() までは解決する。要素型に依存する
+        // get(0).length() は receiver が Object (external) となり、edge を
+        // 生成せず external-target の明示除外へ分類される (要素型の復元は
+        // generic Signature 読み取りの後続課題)。
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        assertTrue(ran.byType("methodSymbol").stream()
+                .anyMatch(n -> "java:com.example.Owner#getTags()".equals(n.get("methodId"))),
+                () -> ran.records().toString());
+        assertTrue(ran.stderr().contains("excluded[external-target]"), ran.stderr());
+        assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
+    }
+
+    @Test
     void doesNotRescueAmbiguousOrForeignMembers() throws Exception {
         // owner type が scope 内 source に存在しない場合は救済せず fatal に残す。
         Path workspace = temp.resolve("workspace2");

@@ -21,6 +21,10 @@ public final class MemberAugmentingTypeSolver implements TypeSolver {
     private final JavaParserTypeSolver delegate;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
     private TypeSolver parent;
+    // hot path のため、型名ごとに augmented 宣言を 1 instance へ固定する
+    // (delegate の cache と同様の identity 安定化)。
+    private final java.util.Map<String, SymbolReference<ResolvedReferenceTypeDeclaration>> cache =
+            new java.util.HashMap<>();
 
     public MemberAugmentingTypeSolver(JavaParserTypeSolver delegate, ProjectBytecodeMemberIndex bytecodeIndex) {
         this.delegate = delegate;
@@ -55,9 +59,11 @@ public final class MemberAugmentingTypeSolver implements TypeSolver {
         // record) は source 宣言をそのまま使う (必要になったら種別を追加する)。
         if (declaration instanceof JavaParserClassDeclaration classDeclaration
                 && !(declaration instanceof AugmentedJavaParserClassDeclaration)) {
-            ClassOrInterfaceDeclaration wrapped = classDeclaration.getWrappedNode();
-            return SymbolReference.solved(
-                    new AugmentedJavaParserClassDeclaration(wrapped, getRoot(), bytecodeIndex));
+            return cache.computeIfAbsent(name, key -> {
+                ClassOrInterfaceDeclaration wrapped = classDeclaration.getWrappedNode();
+                return SymbolReference.solved(
+                        new AugmentedJavaParserClassDeclaration(wrapped, getRoot(), bytecodeIndex));
+            });
         }
         return solved;
     }

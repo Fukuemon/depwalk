@@ -302,6 +302,10 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
   discovery 時間は Tooling API 接続・provider 一時展開・Gradle configuration / classpath 解決・model 転送を含む合計で、stderr の `discoveryMs` (D8 の分離計測) をそのまま記録した。provider 展開や Gradle 内部の configuration / 転送の内訳は client 側から個別計測できないため、推測値は記録しない。multi-module の RSS 増分は context ごとの TypeSolver / SootUp 構築と Spring 依存 jar (11 classpath entry) の索引化による。unresolved symbol / bytecode-only member / error.details は全経路 0 件 (correctness gate を先に満たした状態で計測)。
 
+### solver 層の bytecode member 合成 (spec #24 D31)
+
+scope 内 source 型を solver が解決するとき、同一 context の classes output にしか存在しない一意な callable member (Lombok 等の生成 member) を解決時に合成する。call-site 駆動の救済 (生成 member 索引) だけでは式の型伝播 (chained call / stream 連鎖) を辿れないための拡張で、source 宣言と source 優先の帰属規則は変更しない。合成 member の出力は bytecode-only member と同じ契約 (定義位置省略 + owner metadata) に従う。既知の限界: generic 型引数は erasure (Object 埋め) となり、要素型依存の後続 call は解決されない (実型引数の復元は spec #24 D32)。決定経緯は [spec #24 D31](../../../specs/24-gradle-multi-module-source-roots/index.md#解決済みの論点)。
+
 ### 帰属型の決定規則
 
 帰属型 (メソッドが属する型) は「宣言型を優先し、宣言が scope 外のときだけレシーバの静的型へ引き上げる」。
@@ -442,4 +446,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #21  | 追記                              | 追加 sync phase (2026-07-14、clarify 再オープン分) で D7 (Lombok 生成コンストラクタは SootUp の自プロジェクト bytecode 照会で解決、解析対象はビルド済みが前提) / D8 (runtime-provided マーカーに MyBatis `@Mapper` を追加) を反映。決定経緯は [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
 | spec #21  | 追記                              | 実装前レビュー対応 (2026-07-14) で classpath の classes directory 入力契約、E3 と fatal pre-flight の境界、metadata key/value、Spring Bean 名・Qualifier・Primary 選択規則、dispatch/DI 解決フローを確定                                                                                                                                                                                                 |
 | spec #21  | 追記                              | 実装・実測 (2026-07-15) で Spring fixture の配置完了と、Issue #9 と同一 fixture による所要時間・最大 RSS の増分を性能方針へ記録                                                                                                                                                                                                                                                                          |
-| spec #24  | 追記                              | Gradle Tooling API discovery、明示 override、project/main context、language level、parse・call完全性、生成 member、failure detail、安全境界、E2E / matrix / 性能計測を反映。実装後の 3 経路実測値 (2026-07-18) を性能方針へ追記。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)                                                                                              |
+| spec #24  | 追記                              | Gradle Tooling API discovery、明示 override、project/main context、language level、parse・call完全性、生成 member、failure detail、安全境界、E2E / matrix / 性能計測を反映。実装後の 3 経路実測値 (2026-07-18) を性能方針へ追記。D31 の solver 層 member 合成と erasure 限界 (2026-07-19) を型解決節へ追記。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)                   |

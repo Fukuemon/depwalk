@@ -44,13 +44,9 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         }
         // source AST に無い member を同一 context の classes output から合成する。
         // 一意な name + arity の場合だけ採用し、曖昧なら合成しない (D18 と同じ規則)。
-        Optional<SootUpTypeHierarchyIndex.MethodCandidate> candidate =
-                bytecodeIndex.uniqueMethod(binaryName(), name, argumentsTypes.size());
-        if (candidate.isEmpty()) {
-            return solved;
-        }
-        return SymbolReference.solved(
-                new SynthesizedBytecodeMethodDeclaration(this, candidate.get(), this::resolveBinaryName));
+        return synthesizedInHierarchy(name, argumentsTypes.size())
+                .<SymbolReference<ResolvedMethodDeclaration>>map(SymbolReference::solved)
+                .orElse(solved);
     }
 
     @Override
@@ -59,16 +55,27 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             List<ResolvedType> argumentTypes,
             com.github.javaparser.resolution.Context invokationContext,
             List<ResolvedType> typeParameterValues) {
-        java.util.Optional<com.github.javaparser.resolution.MethodUsage> solved =
-                super.solveMethodAsUsage(name, argumentTypes, invokationContext, typeParameterValues);
+        java.util.Optional<com.github.javaparser.resolution.MethodUsage> solved;
+        try {
+            solved = super.solveMethodAsUsage(name, argumentTypes, invokationContext, typeParameterValues);
+        } catch (RuntimeException e) {
+            // JavaParser は未解決を Optional.empty でなく例外で返す経路があるため、
+            // 合成 fallback まで到達させる。
+            solved = java.util.Optional.empty();
+        }
         if (solved.isPresent()) {
             return solved;
         }
         // 式の型伝播 (chained call) は usage 経路を通るため、宣言 fallback と
-        // 同じ規則で合成 member を MethodUsage 化する。
-        return bytecodeIndex.uniqueMethod(binaryName(), name, argumentTypes.size())
-                .map(candidate -> new com.github.javaparser.resolution.MethodUsage(
-                        new SynthesizedBytecodeMethodDeclaration(this, candidate, this::resolveBinaryName)));
+        // 同じ規則で合成 member を MethodUsage 化する。MethodUsage の構築は
+        // 全 param 型を即時解決するため、classpath に無い型を含む member は
+        // 合成せず未解決のまま返す (単発呼び出し側は D18 経路が拾う)。
+        try {
+            return synthesizedInHierarchy(name, argumentTypes.size())
+                    .map(com.github.javaparser.resolution.MethodUsage::new);
+        } catch (RuntimeException e) {
+            return java.util.Optional.empty();
+        }
     }
 
     @Override
@@ -89,6 +96,57 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             }
         }
         return declared;
+    }
+
+    /**
+     * 自型と source 祖先 (augmented) の bytecode declared member から一意な
+     * name + arity の候補を探す。usage 経路の階層走査は JavaParser 内部で
+     * 完結しないため、fallback 側で祖先まで探索する。
+     */
+    private Optional<SynthesizedBytecodeMethodDeclaration> synthesizedInHierarchy(String name, int arity) {
+        Optional<SootUpTypeHierarchyIndex.MethodCandidate> own =
+                bytecodeIndex.uniqueMethod(binaryName(), name, arity);
+        if (own.isPresent()) {
+            return Optional.of(new SynthesizedBytecodeMethodDeclaration(this, own.get(), this::resolveBinaryName));
+        }
+        try {
+            for (var ancestor : getAllAncestors()) {
+                var declaration = ancestor.getTypeDeclaration().orElse(null);
+                if (declaration instanceof AugmentedJavaParserClassDeclaration augmented) {
+                    Optional<SootUpTypeHierarchyIndex.MethodCandidate> inherited =
+                            bytecodeIndex.uniqueMethod(augmented.binaryName(), name, arity);
+                    if (inherited.isPresent()) {
+                        return Optional.of(new SynthesizedBytecodeMethodDeclaration(
+                                augmented, inherited.get(), augmented::resolveBinaryName));
+                    }
+                }
+            }
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * JavaParser の {@code JavaParserClassDeclaration#equals} は {@code getClass()}
+     * 一致を要求するため、subclass のままでは同じ型の plain 宣言 (Context 経由で
+     * 生成される) と等価にならず、階層走査の重複や偽の型不一致を生む。同じ
+     * wrappedNode を指す {@code JavaParserClassDeclaration} 系宣言を等価として
+     * 扱う (plain 側から見た比較は false のままの非対称性が残るが、集合への
+     * 追加順で吸収される。根本解消は JavaParser 側の equality 契約に依存)。
+     */
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        return other instanceof JavaParserClassDeclaration otherDeclaration
+                && getWrappedNode().equals(otherDeclaration.getWrappedNode());
+    }
+
+    @Override
+    public int hashCode() {
+        return getWrappedNode().hashCode();
     }
 
     /** JavaParser の qualified name (nested は {@code .}) を binary name へ変換する。 */
