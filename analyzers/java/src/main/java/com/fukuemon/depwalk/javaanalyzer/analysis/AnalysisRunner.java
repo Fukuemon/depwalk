@@ -147,6 +147,9 @@ public final class AnalysisRunner {
         long contextBuildStart = System.nanoTime();
         // SootUp index は lazy のため全 context 分を先に用意し、solver の
         // bytecode member 合成 (D31) と builder の候補解決で同一 instance を共有する。
+        // D31 の合成は「呼出元 context の classpath 視点」で行う (依存 project の型も
+        // 自 context の classpath に含まれる classes output から引く)。emit 時に
+        // declIndex + 到達可能 context の検査 (D16) で owner を制約する。
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {

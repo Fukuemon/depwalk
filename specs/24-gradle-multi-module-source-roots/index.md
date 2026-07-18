@@ -84,6 +84,22 @@ durableな設計の正本は [Design Doc](../../design/DesignDoc.md)、[Analyzer
 - [Gradle Tooling API](https://docs.gradle.org/current/userguide/tooling_api.html): client / daemon / target Gradleの互換性契約
 - [Gradle Java Compatibility](https://docs.gradle.org/current/userguide/compatibility.html): Gradle versionごとのdaemon JVM対応範囲
 
+- **D31: solver層でscope内source型へbytecode memberを合成する (決定A)。**
+  - 実環境のGradle multi-project検証で、Lombok生成member起点のchained call / stream連鎖が
+    call-site駆動の救済 (D18) では解決できないことを確認した (solverが式の型を知らないため連鎖を辿れない)。
+  - `MemberAugmentingTypeSolver`がsource rootのsolverを包み、class宣言を`AugmentedJavaParserClassDeclaration`
+    (subclass) へ差し替える。`solveMethod` / `solveMethodAsUsage` のfallbackと`getDeclaredMethods`への合成で、
+    直接呼び出し・式の型伝播・継承memberの階層走査 (自型と祖先) をカバーする。合成対象は同一contextの
+    classes outputにある一意なname + arityのcallable memberのみで、source宣言と帰属規則 (D6 / D14) は変更しない。
+  - 合成member解決はD18と同じ出力契約 (sourceLocation省略 + ownerSourceLocation metadata +
+    calleeOrigin=project-bytecode-member edge) で emit する。
+  - **既知の限界**: generic宣言の型引数はObject埋めのerased形で返す (型変数の自己写像による
+    JavaParserの無限再帰を回避)。このため要素型に依存する後続callは解決できず、receiver型が
+    external (Object等) と判明した場合はexternal-target除外、判明しない場合はunresolvedとして
+    完全性gateに残る。実型引数の復元はD32へ切り出した。
+  - 決定日: 2026-07-19
+  - 決定者: Fukuemon (方式A選択)、実装・限界記録はClaude
+
 ## 背景
 
 現行の `analysisRequest` は単一の `workspaceRoot` を持つ。

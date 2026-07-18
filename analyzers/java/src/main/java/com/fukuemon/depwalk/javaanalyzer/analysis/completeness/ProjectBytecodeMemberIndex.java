@@ -15,6 +15,8 @@ import java.util.Optional;
 public final class ProjectBytecodeMemberIndex {
 
     private final SootUpTypeHierarchyIndex sootUpIndex;
+    private final java.util.Map<String, List<SootUpTypeHierarchyIndex.MethodCandidate>> declaredCache =
+            new java.util.HashMap<>();
 
     public ProjectBytecodeMemberIndex(SootUpTypeHierarchyIndex sootUpIndex) {
         this.sootUpIndex = sootUpIndex;
@@ -43,6 +45,10 @@ public final class ProjectBytecodeMemberIndex {
 
     /** 所有 class 自身の全 callable method (JVM 内部 member 除外)。合成候補の列挙用。 */
     public List<SootUpTypeHierarchyIndex.MethodCandidate> declaredCallableMethods(String ownerBinaryName) {
+        return declaredCache.computeIfAbsent(ownerBinaryName, this::declaredCallableMethodsUncached);
+    }
+
+    private List<SootUpTypeHierarchyIndex.MethodCandidate> declaredCallableMethodsUncached(String ownerBinaryName) {
         SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveDeclaredCallableMethods(ownerBinaryName);
         if (!resolution.isAvailable()) {
             return List.of();
