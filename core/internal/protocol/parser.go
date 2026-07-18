@@ -100,7 +100,11 @@ func decodeExact(raw map[string]json.RawMessage, fields map[string]struct{}, out
 	if err != nil {
 		return invalid("jsonl", err.Error())
 	}
-	if err := json.Unmarshal(body, out); err != nil {
+	// UseNumber keeps opaque metadata numbers as their exact decimal text so
+	// integers beyond float64 precision survive a parse/serialize round trip.
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(out); err != nil {
 		return invalid("jsonl", err.Error())
 	}
 	return nil
@@ -108,12 +112,12 @@ func decodeExact(raw map[string]json.RawMessage, fields map[string]struct{}, out
 
 func rejectUnknownNestedFields(raw map[string]json.RawMessage) error {
 	if value, ok := raw["sourceLocation"]; ok {
-		if err := rejectUnknownObjectFields("sourceLocation", value, acceptedSourceLocationJSONFields()); err != nil {
+		if _, err := rejectUnknownObjectFields("sourceLocation", value, acceptedSourceLocationJSONFields()); err != nil {
 			return err
 		}
 	}
 	if value, ok := raw["callSite"]; ok {
-		if err := rejectUnknownObjectFields("callSite", value, acceptedSourceLocationJSONFields()); err != nil {
+		if _, err := rejectUnknownObjectFields("callSite", value, acceptedSourceLocationJSONFields()); err != nil {
 			return err
 		}
 	}
@@ -138,20 +142,16 @@ func rejectUnknownFailureDetailFields(field string, raw json.RawMessage) error {
 	if err := json.Unmarshal(raw, &details); err != nil {
 		return invalid(field, err.Error())
 	}
+	detailFields := acceptedFailureDetailJSONFields()
+	locationFields := acceptedSourceLocationJSONFields()
 	for i, detail := range details {
 		element := fmt.Sprintf("%s[%d]", field, i)
-		if err := rejectUnknownObjectFields(element, detail, acceptedFailureDetailJSONFields()); err != nil {
+		object, err := rejectUnknownObjectFields(element, detail, detailFields)
+		if err != nil {
 			return err
 		}
-		if bytes.Equal(bytes.TrimSpace(detail), []byte("null")) {
-			continue
-		}
-		var object map[string]json.RawMessage
-		if err := json.Unmarshal(detail, &object); err != nil {
-			return invalid(element, err.Error())
-		}
 		if value, ok := object["sourceLocation"]; ok {
-			if err := rejectUnknownObjectFields(element+".sourceLocation", value, acceptedSourceLocationJSONFields()); err != nil {
+			if _, err := rejectUnknownObjectFields(element+".sourceLocation", value, locationFields); err != nil {
 				return err
 			}
 		}
@@ -159,20 +159,20 @@ func rejectUnknownFailureDetailFields(field string, raw json.RawMessage) error {
 	return nil
 }
 
-func rejectUnknownObjectFields(field string, raw json.RawMessage, fields map[string]struct{}) error {
+func rejectUnknownObjectFields(field string, raw json.RawMessage, fields map[string]struct{}) (map[string]json.RawMessage, error) {
 	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return nil
+		return nil, nil
 	}
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &object); err != nil {
-		return invalid(field, err.Error())
+		return nil, invalid(field, err.Error())
 	}
 	for key := range object {
 		if _, ok := fields[key]; !ok {
-			return invalid(field, fmt.Sprintf("unknown field %q", key))
+			return nil, invalid(field, fmt.Sprintf("unknown field %q", key))
 		}
 	}
-	return nil
+	return object, nil
 }
 
 func rejectUnknownArrayObjectFields(field string, raw json.RawMessage, fields map[string]struct{}) error {
@@ -184,7 +184,7 @@ func rejectUnknownArrayObjectFields(field string, raw json.RawMessage, fields ma
 		return invalid(field, err.Error())
 	}
 	for i, object := range objects {
-		if err := rejectUnknownObjectFields(fmt.Sprintf("%s[%d]", field, i), object, fields); err != nil {
+		if _, err := rejectUnknownObjectFields(fmt.Sprintf("%s[%d]", field, i), object, fields); err != nil {
 			return err
 		}
 	}

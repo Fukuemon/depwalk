@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -211,7 +212,7 @@ func TestParseRecordRoundTripsOpaqueMetadata(t *testing.T) {
 	}{
 		{
 			name: "bytecode-only method symbol with owner metadata",
-			line: `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"com.example.Owner.builder","signature":"builder():com.example.Owner$Builder","metadata":{"declarationOrigin":"projectClasses","ownerSourceLocation":{"path":"module-a/src/main/java/com/example/Owner.java","startLine":3},"sourceAnchor":null,"tags":["generated",1,true]}}`,
+			line: `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"com.example.Owner.builder","signature":"builder():com.example.Owner$Builder","metadata":{"declarationOrigin":"projectClasses","ownerSourceLocation":{"path":"module-a/src/main/java/com/example/Owner.java","startLine":3},"sourceAnchor":null,"tags":["generated",1,true],"issueId":9007199254740993}}`,
 		},
 		{
 			name: "error details with nested metadata in input order",
@@ -242,6 +243,11 @@ func TestParseRecordRoundTripsOpaqueMetadata(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("round trip = %v, want %v", got, want)
+			}
+			// map-level comparison is blind to float64 rounding, so pin the
+			// exact decimal text of an integer beyond float64 precision.
+			if strings.Contains(tt.line, "9007199254740993") && !strings.Contains(string(marshaled), "9007199254740993") {
+				t.Fatalf("round trip lost integer precision: %s", marshaled)
 			}
 		})
 	}
