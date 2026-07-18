@@ -27,8 +27,8 @@
 | 7   | Content / Data 設計         | レビュー済 | 2026-07-18 | Java固有metadataの正本先をJava Analyzer feature docへ確定。review PASS     |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-07-18 | 条件付きGradle runtimeとtoolchain 4軸分離をtrack済み。review PASS          |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-07-18 | Protocol・Java・Core・実CLI E2Eとstaging Graph検証をtrack済み。review PASS |
-| 10  | 実装分割                    | 未着手     |            |                                                                            |
-| 11  | レビュー済                  | 未着手     |            |                                                                            |
+| 10  | 実装分割                    | レビュー済 | 2026-07-18 | 7 promptを生成。セルフ検証とfresh-context review PASS                      |
+| 11  | レビュー済                  | レビュー済 | 2026-07-18 | tasks phaseのfresh-context review PASS。実装開始可能                       |
 
 ## 上位文書整合
 
@@ -1108,18 +1108,23 @@ sequenceDiagram
 
 ### 実装タスク案
 
-| Phase | 対象                         | 概要                                                                                                                        | 依存                                      |
-| ----- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| P1    | `analyzer-protocol` / `core` | 複数rootのrequest契約、CLI入力、共通failure detail schema・汎用表示                                                         | D1〜D4・D22・D24の確定後に分割            |
-| P2    | `java-analyzer`              | 列挙、型解決、source帰属、bytecode member / owner metadata、pre-flight、call-site ledger / completeness gate / fatal detail | P1、D5〜D7・D14〜D18・D20〜D22・D24の確定 |
-| P3    | `java-analyzer` / `core`     | fixture、contract、実jar / 実CLI E2E、透過proxy、output隔離、性能計測                                                       | P1 / P2、D19・D25の確定                   |
+| Phase | Prompt                                                   | 対象                | 概要                                                                   | 依存                |
+| ----- | -------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------- | ------------------- |
+| P1    | `P1_01_analyzer-protocol_multi-root-failure-contract.md` | `analyzer-protocol` | 複数root、共通failure detail、opaque symbol metadataのwire契約         | なし                |
+| P2    | `P2_01_core_request-staging-failure.md`                  | `core`              | CLI request、staging Graph、Graph metadata、failure汎用表示            | P1_01               |
+| P2    | `P2_02_java-analyzer_gradle-model-provider.md`           | `java-analyzer`     | Tooling API、custom provider、version guard、output隔離                | P1_01               |
+| P3    | `P3_01_java-analyzer_source-context-preflight.md`        | `java-analyzer`     | root、project別context、language level、parse pre-flight               | P2_02               |
+| P4    | `P4_01_java-analyzer_call-completeness-bytecode.md`      | `java-analyzer`     | source帰属、bytecode-only member、inventory / ledger、完全性gate       | P1_01、P3_01        |
+| P5    | `P5_01_java-analyzer_fixture-compatibility-security.md`  | `java-analyzer`     | multi-module fixture、Gradle / JVM matrix、security negative、性能計測 | P2_02、P3_01、P4_01 |
+| P6    | `P6_01_core_required-cli-e2e.md`                         | `core`              | test-only透過proxyと実Core CLI / 実Analyzer required E2E               | P2_01、P5_01        |
 
 ### prompts 生成方針
 
-- Protocol / CoreとJava Analyzerの責務境界でpromptを分ける。
-- wire schema確定後にJava側request modelとTypeSolverを実装する。
-- fixtureと実jar E2Eはproduction contractの実装後に行う。
-- 詳細な並列可否はtasks phaseで決める。
+- Protocol契約をP1で固定し、CoreとJava Analyzerの責務境界でpromptを分ける。
+- P2_01とP2_02は共通のP1だけに依存し、変更pathがCoreとJava Analyzerに分かれるため並列実行できる。
+- Java Analyzer内のmodel provider、source context、call完全性、統合fixtureは同じproduction pathを更新するためP2_02からP5まで直列実行する。
+- 実Core CLI E2EはCore側実装とJava Analyzer統合fixtureの両方へ依存するためP6で最後に実行する。
+- 実行順序と並列可否の索引は`prompts/README.md`、各実装指示は個別promptを参照する。
 
 ## 上位資料からの変更点
 
@@ -1224,6 +1229,7 @@ D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc
 | 2026-07-18 | NEEDS_WORK               | 内部CallSiteIdをfailure detailへ出力するように読めるfeature記述の修正が必要            | syncを保留し1指摘へ対応           |
 | 2026-07-18 | NEEDS_WORK               | Fallback節に残るmodel由来classes output欠落時だけという旧限定の修正が必要              | syncを保留し1指摘へ対応           |
 | 2026-07-18 | PASS                     | Fallbackを含むD1〜D30のdurable契約、正本リンク、メタ情報が上位資料と整合               | Phase 6 sync gate完了             |
+| 2026-07-18 | PASS                     | 7 promptの自己完結性、対象境界、依存順、上位正本整合、未解決論点なしを確認             | Phase 7 tasks gate完了            |
 
 ## 変更履歴
 
@@ -1294,6 +1300,8 @@ D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc
 | 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、CallSiteIdはdetail順序決定だけに使いID自体はProtocolへ出さない公開境界へJava Analyzer featureを統一                               |
 | 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、Fallback節も明示経路の自project classes未指定時source-only・明示entry欠落時fatalへ統一                                            |
 | 2026-07-18 | Codex  | sync phaseのfresh-context review PASSを記録し、上位文書突合をレビュー済へ更新                                                                                      |
+| 2026-07-18 | Codex  | tasks phaseを開始し、Protocol、Core、Gradle discovery、解析context、call完全性、統合fixture、実CLI E2Eの7 promptへ分割                                             |
+| 2026-07-18 | Codex  | tasks phaseのセルフ検証とfresh-context review PASSを記録し、実装分割・最終レビューをレビュー済へ更新                                                               |
 
 ## 備考
 

@@ -436,3 +436,19 @@ Verdict: PASS
 - 正本境界: PASS — durable 成果を feature doc / context / ADR へハンドオフ済みと明記し、spec を決定時スナップショットへ降格して正本リンクを保持している (`specs/24-gradle-multi-module-source-roots/index.md:3-4,64,1124-1130`)。
 
 PASS
+
+## Review 2026-07-18 19:15
+
+Verdict: PASS
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-64` に統合 PRD、Design Doc、3 feature docs、context、ADR の整合・反映先が埋まっている。Core の言語非依存境界、条件付き Gradle runtime、staging Graph、failure detail は `design/DesignDoc.md:128-142`、`design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:49-69,130-143`、`design/features/graph/DesignDoc_graph.md:65-75`、`design/features/java-analyzer/DesignDoc_java-analyzer.md:100-139` と整合し、関連 ADR も覆していない。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:215-246` の D1〜D30 はすべて「解決済み」、`specs/24-gradle-multi-module-source-roots/index.md:671-673` の未確定事項は「なし」。下流 prompts に未決定事項を持ち越していない。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:675-688` は `core`、`analyzer-protocol`、`java-analyzer` の変更責務と `traversal` / `output` 非変更を明示し、`context/project.md:69-77` の正規 target 一覧と一致する。Core→Analyzer は Protocol のみという境界も明記されている。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1307` に `templates/specs/template.md:7-287` および `hooks/spec/validate_document.sh:15-40` の必須節がすべて存在する。更新日・phase 状態・レビュー・変更履歴も `index.md:6-31,1205-1302` で同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:144-208` に WHEN / IF / THE SYSTEM SHALL の観測可能な基準があり、request field、fatal code、exit、Graph、stderr、E2E の具体的な検証結果まで定義されている。
+- prompts 自己完結性: PASS — 全7 prompt が必須10節を備える (`P1_01_analyzer-protocol_multi-root-failure-contract.md:3-181`、`P2_01_core_request-staging-failure.md:3-197`、`P2_02_java-analyzer_gradle-model-provider.md:3-189`、`P3_01_java-analyzer_source-context-preflight.md:3-191`、`P4_01_java-analyzer_call-completeness-bytecode.md:3-208`、`P5_01_java-analyzer_fixture-compatibility-security.md:3-206`、`P6_01_core_required-cli-e2e.md:3-198`)。各 prompt の絶対ルールには必須制約ブロックと探索禁止・path 境界があり、命名・target は `prompts/README.md:6-14`、依存・並列可否は `prompts/README.md:16-27` に明示されている。
+- 正本境界: PASS — `specs/24-gradle-multi-module-source-roots/index.md:3-4,64` が spec を作業記録・決定時スナップショットに降格し、durable 正本へのリンクを列挙している。`index.md:1129-1135` も sync 済み・反映済みを明示し、各正本側も `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:3-5`、`design/features/graph/DesignDoc_graph.md:3-5`、`design/features/java-analyzer/DesignDoc_java-analyzer.md:3-5` で正本と決定経緯の境界を明記している。
+
+PASS
