@@ -14,6 +14,9 @@ import java.util.Map;
  * @param recordType    {@code analysisRequest}
  * @param requestId     解析要求を識別する ID
  * @param workspaceRoot 解析対象 repository root
+ * @param sourceRoots   workspaceRoot 相対の source root 配列 (任意)。省略時は Analyzer の
+ *                      build model discovery、1 件以上指定時は明示値だけを使用する。
+ *                      空配列は invalid (pre-flight で拒否する)
  * @param language      対象言語。Java Analyzer では {@code java}
  * @param include       workspaceRoot からの相対 path glob 配列 (任意)
  * @param exclude       workspaceRoot からの相対除外 path glob 配列 (任意)
@@ -28,6 +31,7 @@ public record AnalysisRequest(
         String recordType,
         String requestId,
         String workspaceRoot,
+        List<String> sourceRoots,
         String language,
         List<String> include,
         List<String> exclude,

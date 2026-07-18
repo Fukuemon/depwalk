@@ -122,6 +122,40 @@ func rejectUnknownNestedFields(raw map[string]json.RawMessage) error {
 			return err
 		}
 	}
+	if value, ok := raw["details"]; ok {
+		if err := rejectUnknownFailureDetailFields("details", value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectUnknownFailureDetailFields(field string, raw json.RawMessage) error {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil
+	}
+	var details []json.RawMessage
+	if err := json.Unmarshal(raw, &details); err != nil {
+		return invalid(field, err.Error())
+	}
+	for i, detail := range details {
+		element := fmt.Sprintf("%s[%d]", field, i)
+		if err := rejectUnknownObjectFields(element, detail, acceptedFailureDetailJSONFields()); err != nil {
+			return err
+		}
+		if bytes.Equal(bytes.TrimSpace(detail), []byte("null")) {
+			continue
+		}
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(detail, &object); err != nil {
+			return invalid(element, err.Error())
+		}
+		if value, ok := object["sourceLocation"]; ok {
+			if err := rejectUnknownObjectFields(element+".sourceLocation", value, acceptedSourceLocationJSONFields()); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -233,6 +267,7 @@ func acceptedAnalysisRequestJSONFields() map[string]struct{} {
 		"recordType",
 		"requestId",
 		"workspaceRoot",
+		"sourceRoots",
 		"language",
 		"include",
 		"exclude",
@@ -285,6 +320,16 @@ func acceptedAnalyzerErrorJSONFields() map[string]struct{} {
 	return fieldSet(
 		"schemaVersion",
 		"recordType",
+		"code",
+		"message",
+		"sourceLocation",
+		"metadata",
+		"details",
+	)
+}
+
+func acceptedFailureDetailJSONFields() map[string]struct{} {
+	return fieldSet(
 		"code",
 		"message",
 		"sourceLocation",

@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -139,6 +141,108 @@ func TestParseRecordRejectsNonNormalizedProtocolPaths(t *testing.T) {
 			t.Parallel()
 
 			assertParseRecordValidationError(t, tt.line)
+		})
+	}
+}
+
+func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
+	t.Parallel()
+
+	line := `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","sourceRoots":["module-b/src/main/java","module-a/src/main/java","."]}`
+	record, err := ParseRecord([]byte(line))
+	if err != nil {
+		t.Fatalf("ParseRecord() error = %v", err)
+	}
+	request, ok := record.(AnalysisRequest)
+	if !ok {
+		t.Fatalf("ParseRecord() type = %T, want AnalysisRequest", record)
+	}
+	want := []string{"module-b/src/main/java", "module-a/src/main/java", "."}
+	if !reflect.DeepEqual(request.SourceRoots, want) {
+		t.Fatalf("SourceRoots = %v, want %v", request.SourceRoots, want)
+	}
+}
+
+func TestParseRecordRejectsInvalidSourceRootsAndDetails(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		line []byte
+	}{
+		{
+			name: "explicit empty sourceRoots",
+			line: []byte(`{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","sourceRoots":[]}`),
+		},
+		{
+			name: "explicit empty details",
+			line: []byte(`{"schemaVersion":"1","recordType":"error","code":"JAVA_INCOMPLETE_ANALYSIS","message":"failed","details":[]}`),
+		},
+		{
+			name: "detail unknown field",
+			line: []byte(`{"schemaVersion":"1","recordType":"error","code":"JAVA_INCOMPLETE_ANALYSIS","message":"failed","details":[{"code":"C","message":"m","extra":true}]}`),
+		},
+		{
+			name: "detail source location field name must be exact",
+			line: []byte(`{"schemaVersion":"1","recordType":"error","code":"JAVA_INCOMPLETE_ANALYSIS","message":"failed","details":[{"code":"C","message":"m","sourceLocation":{"Path":"src/App.java","startLine":1}}]}`),
+		},
+		{
+			name: "detail missing message",
+			line: []byte(`{"schemaVersion":"1","recordType":"error","code":"JAVA_INCOMPLETE_ANALYSIS","message":"failed","details":[{"code":"C"}]}`),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertParseRecordValidationError(t, tt.line)
+		})
+	}
+}
+
+func TestParseRecordRoundTripsOpaqueMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		line string
+	}{
+		{
+			name: "bytecode-only method symbol with owner metadata",
+			line: `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"m","language":"java","symbolKind":"method","qualifiedName":"com.example.Owner.builder","signature":"builder():com.example.Owner$Builder","metadata":{"declarationOrigin":"projectClasses","ownerSourceLocation":{"path":"module-a/src/main/java/com/example/Owner.java","startLine":3},"sourceAnchor":null,"tags":["generated",1,true]}}`,
+		},
+		{
+			name: "error details with nested metadata in input order",
+			line: `{"schemaVersion":"1","recordType":"error","code":"JAVA_INCOMPLETE_ANALYSIS","message":"unresolved calls remain","details":[{"code":"JAVA_UNRESOLVED_SYMBOL","message":"first","sourceLocation":{"path":"module-a/src/App.java","startLine":10},"metadata":{"callKind":"virtual","candidates":[{"qualifiedName":"com.example.A"},null],"reason":"ambiguous"}},{"code":"JAVA_UNRESOLVED_SYMBOL","message":"second"}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			record, err := ParseRecord([]byte(tt.line))
+			if err != nil {
+				t.Fatalf("ParseRecord() error = %v", err)
+			}
+			marshaled, err := json.Marshal(record)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+
+			var want, got map[string]any
+			if err := json.Unmarshal([]byte(tt.line), &want); err != nil {
+				t.Fatalf("Unmarshal(input) error = %v", err)
+			}
+			if err := json.Unmarshal(marshaled, &got); err != nil {
+				t.Fatalf("Unmarshal(output) error = %v", err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("round trip = %v, want %v", got, want)
+			}
 		})
 	}
 }

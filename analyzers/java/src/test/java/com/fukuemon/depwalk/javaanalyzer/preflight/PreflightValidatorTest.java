@@ -155,6 +155,7 @@ class PreflightValidatorTest {
                 "analysisRequest",
                 "req-1",
                 workspaceRoot,
+                null,
                 language,
                 null,
                 null,

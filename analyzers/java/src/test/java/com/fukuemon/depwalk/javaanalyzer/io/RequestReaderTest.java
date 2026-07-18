@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,6 +31,32 @@ class RequestReaderTest {
         assertEquals("/workspace/depwalk", request.workspaceRoot());
         assertEquals("java", request.language());
         assertEquals(1, request.include().size());
+    }
+
+    @Test
+    void readsSourceRootsPreservingOrder() throws IOException {
+        String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
+                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
+                + "\"language\":\"java\","
+                + "\"sourceRoots\":[\"module-b/src/main/java\",\"module-a/src/main/java\",\".\"],"
+                + "\"metadata\":{\"classpath\":[]}}";
+
+        AnalysisRequest request = reader.read(inputStream(json));
+
+        assertEquals(
+                List.of("module-b/src/main/java", "module-a/src/main/java", "."),
+                request.sourceRoots());
+    }
+
+    @Test
+    void leavesOmittedSourceRootsNull() throws IOException {
+        String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
+                + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
+                + "\"language\":\"java\",\"metadata\":{\"classpath\":[]}}";
+
+        AnalysisRequest request = reader.read(inputStream(json));
+
+        assertEquals(null, request.sourceRoots());
     }
 
     @Test
