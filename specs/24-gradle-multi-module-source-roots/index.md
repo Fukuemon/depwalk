@@ -23,7 +23,7 @@
 | 3   | 上位文書突合                | レビュー済 | 2026-07-15 | Design Doc / feature doc / context / ADR と矛盾なし。spec-review PASS |
 | 4   | 論点整理                    | レビュー済 | 2026-07-15 | D1〜D9 を未決論点として抽出。spec-review PASS                         |
 | 5   | 論点解決                    | レビュー済 | 2026-07-18 | D1〜D30を解決。fresh-context review PASS                              |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                                                       |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-18 | D13旧構築表現をstaging Graph方針へ統一。fresh-context review PASS     |
 | 7   | Content / Data 設計         | 未着手     |            |                                                                       |
 | 8   | Performance / Security 設計 | 未着手     |            |                                                                       |
 | 9   | Test / Metrics 設計         | 未着手     |            |                                                                       |
@@ -38,25 +38,25 @@
 - Design Doc 更新要否: 不要。Core と Analyzer の責務境界および成功条件 S1 / S2 / S4 / S5 の範囲内である。
 - ADR 起票要否: 要。D3 / D23 / D25のGradle Tooling API採用、build script評価、output隔離のruntime / security boundaryを、sync phaseでADR-0006として起票する。D13 / D20 / D22 / D24のstreaming後fatal invalidationと共通failure detailをADR-0001へ、D22 / D24のfatal時の未解決理由をADR-0004へ、D18のproject bytecode member索引をADR-0005へ追記する。D24はADR-0003の言語非依存境界を維持するため、ADR-0003の更新・廃止は行わない。
 
-| 上位文書                    | 節 / 該当箇所                                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                  |
-| --------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Design Doc                  | Why / What、成功条件 S1 / S2 / S4                                             | 継承。Java / Spring Boot の変更影響解析を実プロジェクト構成へ広げる                                                                |
-| Design Doc                  | 成功条件 S5、設計原則 P1〜P4、モジュール責務                                  | 継承。Core に Gradle / Java 固有の探索規則を持たせない                                                                             |
-| feature doc (protocol)      | `analysisRequest.workspaceRoot`、`include` / `exclude`、`SourceLocation.path` | 補足。既存の相対 path 基準を保ちながら複数 source root の入力契約を詰める                                                          |
-| feature doc (protocol)      | Versioning / compatibility                                                    | 継承。任意 field 追加を優先し、既存 request の意味を維持する                                                                       |
-| feature doc (protocol)      | `methodSymbol.sourceLocation` / `metadata`                                    | 変更提案。D21で定義位置の意味を維持し、bytecode-only memberのowner位置をopaque metadataとして保持する                              |
-| feature doc (protocol)      | `error.details` / failure rendering                                           | 変更提案。D24で言語共通のfailure detail構造とCoreの汎用表示を追加する                                                              |
-| feature doc (graph)         | `Node.Symbol` / Protocol recordからの変換                                     | 変更提案。D29で`methodSymbol.metadata`をgraph-ownedなopaque JSON値として保持する                                                   |
-| feature doc (java-analyzer) | TypeSolver、帰属型決定、pre-flight、性能方針                                  | 補足。複数rootの列挙・型解決・scope membership・source優先帰属を具体化する                                                         |
-| feature doc (java-analyzer) | Java unit / Go process contract / 実 jar E2E                                  | 継承。既存三層へマルチモジュールの検証を追加する                                                                                   |
-| context (architecture.md)   | Package Boundary / Runtime Boundary / State Boundary                          | 変更提案。Core → Analyzer はProtocolのみとし、Analyzer自身のread-only性とD23 / D25 / D26のGradle runtime・output隔離境界を分離する |
-| context (project.md)        | Quick Commands / E2E command contract                                         | 変更提案。D27の自動discovery、明示override、実CLI E2Eの実行入口を追加する                                                          |
-| context (testing.md)        | Protocol contract test / Java Analyzer 三層                                   | 継承。Protocol、Java unit、実 jar E2E の責務を分ける                                                                               |
-| context (engineering.md)    | Repository Quality Gate / 依存境界 gate                                       | 継承。Go / Java の既存 gate を維持する                                                                                             |
-| ADR-0001                    | JSONL streaming、fatal failure、versioning                                    | 補足。fatal時は同requestの先行recordをすべて無効とする                                                                             |
-| ADR-0003                    | Core は Analyzer 固有の意味を解釈しない                                       | 継承。Core に Gradle 固有の module discovery を入れない                                                                            |
-| ADR-0004                    | 動的・未解決callの候補と理由を観測可能にする                                  | 変更提案。D22 / D24のfatal error detailsで全未解決callの候補と理由を保持する                                                       |
-| ADR-0005                    | JavaParser / SymbolSolver、SootUp、Spring DI、Core の責務境界                 | 変更提案。D18のcall site駆動project bytecode member索引をSootUp責務へ追加                                                          |
+| 上位文書                    | 節 / 該当箇所                                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Design Doc                  | Why / What、成功条件 S1 / S2 / S4                                             | 継承。Java / Spring Boot の変更影響解析を実プロジェクト構成へ広げる                                                                                    |
+| Design Doc                  | 成功条件 S5、設計原則 P1〜P4、モジュール責務                                  | 継承。Core に Gradle / Java 固有の探索規則を持たせない                                                                                                 |
+| feature doc (protocol)      | `analysisRequest.workspaceRoot`、`include` / `exclude`、`SourceLocation.path` | 補足。既存の相対 path 基準を保ちながら複数 source root の入力契約を詰める                                                                              |
+| feature doc (protocol)      | Versioning / compatibility                                                    | 継承。任意 field 追加を優先し、既存 request の意味を維持する                                                                                           |
+| feature doc (protocol)      | `methodSymbol.sourceLocation` / `metadata`                                    | 変更提案。D21で定義位置の意味を維持し、bytecode-only memberのowner位置をopaque metadataとして保持する                                                  |
+| feature doc (protocol)      | `error.details` / failure rendering                                           | 変更提案。D24で言語共通のfailure detail構造とCoreの汎用表示を追加する                                                                                  |
+| feature doc (graph)         | `Node.Symbol` / Protocol recordからの変換・構築                               | 変更提案。D13で受信recordを非公開staging Graphへ1-pass登録して成功時だけ公開し、D29で`methodSymbol.metadata`をgraph-ownedなopaque JSON値として保持する |
+| feature doc (java-analyzer) | TypeSolver、帰属型決定、pre-flight、性能方針                                  | 補足。複数rootの列挙・型解決・scope membership・source優先帰属を具体化する                                                                             |
+| feature doc (java-analyzer) | Java unit / Go process contract / 実 jar E2E                                  | 継承。既存三層へマルチモジュールの検証を追加する                                                                                                       |
+| context (architecture.md)   | Package Boundary / Runtime Boundary / State Boundary                          | 変更提案。Core → Analyzer はProtocolのみとし、Analyzer自身のread-only性とD23 / D25 / D26のGradle runtime・output隔離境界を分離する                     |
+| context (project.md)        | Quick Commands / E2E command contract                                         | 変更提案。D27の自動discovery、明示override、実CLI E2Eの実行入口を追加する                                                                              |
+| context (testing.md)        | Protocol contract test / Java Analyzer 三層                                   | 継承。Protocol、Java unit、実 jar E2E の責務を分ける                                                                                                   |
+| context (engineering.md)    | Repository Quality Gate / 依存境界 gate                                       | 継承。Go / Java の既存 gate を維持する                                                                                                                 |
+| ADR-0001                    | JSONL streaming、fatal failure、versioning                                    | 補足。逐次転送と成功結果の可視性を分離し、fatal時は非公開staging Graphを破棄して同requestの先行recordをすべて無効とする                                |
+| ADR-0003                    | Core は Analyzer 固有の意味を解釈しない                                       | 継承。Core に Gradle 固有の module discovery を入れない                                                                                                |
+| ADR-0004                    | 動的・未解決callの候補と理由を観測可能にする                                  | 変更提案。D22 / D24のfatal error detailsで全未解決callの候補と理由を保持する                                                                           |
+| ADR-0005                    | JavaParser / SymbolSolver、SootUp、Spring DI、Core の責務境界                 | 変更提案。D18のcall site駆動project bytecode member索引をSootUp責務へ追加                                                                              |
 
 前回reviewで検出したarchitecture / project commandの差分はD26 / D27としてsync候補へ分類済みである。最新reviewのinitializer / Graph / Gradle互換性差分はD28〜D30で解決済みである。
 Protocol と Java Analyzer の durable な追記内容は、clarify で決定後に track / sync phase で反映する。
@@ -416,9 +416,12 @@ EARS 風で振る舞いを記述する。
   - graph node、edge、Spring DI index、source method indexへのmutationは要素単位の必要なresolutionが成功してからcommitする。既知のfailureが発生した要素について、途中まで作成したnode、edge、index entryを残さない。同じfile内の独立して解決できた要素は保持できる。
   - pre-flightで確定できるinput error、root ambiguity、binary name重複、classpath / language level異常は、既存決定どおりrecord streaming開始前にfatalにする。解析中にしか検出できない未知例外では、先行する`methodSymbol`、`callEdge`、`diagnostic`の後に`error`が出力され得る。
   - validな`error` recordまたは非ゼロexitは、同じAnalyzer processへ送ったrequestの先行recordをすべて無効にする。Coreと他のProtocol consumerは部分graph、diagnostic、件数を成功結果として公開せず破棄する。`diagnostic`だけでexit code 0にできるのは、D20どおりscope内callのedge欠落を伴わない場合に限る。
-  - CoreはstdoutのJSON構文、schema、許可record typeを読み取り時に検証する。malformed JSONやinvalid recordは引き続きProtocol failureとする。一方、validなfatalを受信したrequestにはgraph完成を要求せず、先行`callEdge`の参照完全性検証やgraph構築を行わない。fatal reasonを部分recordの参照不整合で上書きしない。
+  - CoreはstdoutのJSON構文、schema、許可record typeを読み取り時に検証する。malformed JSONやinvalid recordは引き続きProtocol failureとする。一方、validなfatalを受信したrequestにはstaging Graphの参照完全性検証と成功公開を要求せず、そのGraphを破棄する。fatal reasonを部分recordの参照不整合で上書きしない。
   - Analyzerが`error`を出力してexit code 0となる、または`error`なしでexit code非ゼロとなる場合もfatalとして全recordを破棄する。前者はAnalyzer contract violationとしてstderrへ記録し、後者はprocess exit failureとして利用者へ伝える。
-  - fullGraphのAnalyzer側streamingは維持し、予期しないfatalを防ぐために全graphをAnalyzer memoryへbufferしない。Coreの成功結果はprocess完了とfatal不在を確認してから構築する。
+  - fullGraphのAnalyzer側streamingは維持し、予期しないfatalを防ぐために全graphをAnalyzer memoryへbufferしない。Coreは受信中に非公開staging Graphを構築し、process完了、fatal不在、stream全体の参照完全性を確認した場合だけ成功結果として公開する。
+  - v1のCoreは逐次parse / schema validationに成功した`methodSymbol` / `callEdge`をAnalyze Use Caseへ渡し、受信ごとにProtocol DTOからgraph-ownedな値型へ変換して非公開のstaging Graphへ1-pass登録する。wire record全件をprocess終了まで保持しない。
+  - staging GraphとdiagnosticはAnalyzer process終了まで成功結果として公開しない。validな`error`がなくexit code 0で終了し、stream全体の参照完全性検証にも成功した場合だけstaging Graphを成功結果として公開する。validなfatalまたは非ゼロexitでは参照完全性を要求せずstaging Graphと先行diagnosticを破棄する。
+  - transportがstreamingであること、Core内部でgraph値型へ逐次変換すること、成功結果の可視性がrequest単位で原子的であることを分離する。Graph本体は既存のin-memory stateとして保持するが、Analyzer側の全graph bufferとCore側のwire DTO全件bufferを追加しない。
   - 決定理由: 既知failureの発生時点で直ちに停止すると、独立要素の解析とD18までの救済を完了できず、利用者へ原因を十分に示せない。一方、広い例外catchは実装bugやlibrary非互換を既知failureに見せる。既知failureだけを要素単位に隔離して解析を完走し、D20の完全性gateまたは未知fatalでrequest単位の成功を判定する。
   - トレードオフ: adapterごとのfailure分類と要素単位commitが必要になる。Analyzer stdoutを直接消費する利用者も、process終了を確認するまで受信recordを確定結果として扱えない。
   - ADR判断: JSONL streamingとfatal failureの組合せに関するProtocol全体の判断であるため、ADR-0001へ先行record invalidationとconsumer責務を追記する。新規ADR、ADR-0001の廃止、その他既存ADRの更新・廃止は不要。
@@ -689,12 +692,13 @@ Core は path の正規化と共通 request schema だけを扱い、Gradle modu
 4. Java Analyzerが全対象fileを設定済みlanguage levelでparse pre-flightし、1件でも失敗すればgraph record出力前にrequest全体をfatalにする。
 5. parse成功後、Java Analyzerがresolverとは独立したAST走査で安定`CallSiteId`付きinventoryを構築し、initializer内callはlexical siteとsemantic caller constructor / `<clinit>()`の組へ展開する。各fileを所属project / `main` source setのsource language levelとclasspathを持つ解析contextで型解決し、solver originと依存到達可能contextで制限したsource宣言索引を帰属の正とする。source ASTにないscope内typeのmemberは同じcontextの`ProjectBytecodeMemberIndex`でgenerator非依存に補完し、inventoryの全entryをedge・明示除外・diagnosticへ分類する。明示rootの場合は全rootを1つのlevelとclasspathを共有するsynthetic contextとして扱う。
 6. Java Analyzerが全救済後のledgerを検査し、全call siteが`emitted`または根拠付き`excluded`なら成功終了する。primary diagnosticが1件でも残れば全件の原因をProtocol共通`error.details`へ集約した`JAVA_INCOMPLETE_ANALYSIS`と非ゼロexitでrequest全体をfatalにする。
-7. Core がAnalyzer processの終了とfatal不在を確認し、成功時だけ既存のGraph / Traversal / Output処理へrecordを渡す。fatal時は先行recordを破棄し、構造化`AnalyzerFailure`の共通fieldをCLIへ汎用表示する。
+7. CoreはAnalyzerのvalid recordを受信ごとにgraph-ownedな値型へ変換して非公開staging Graphへ登録する。processのexit 0、fatal不在、stream全体の参照完全性を確認した場合だけGraphを成功結果として公開し、fatal時はstaging Graphと先行diagnosticを破棄して構造化`AnalyzerFailure`の共通fieldをCLIへ汎用表示する。
 
 ### Reuse Policy
 
 - Protocol DTOとvalidationは`core/internal/protocol`の既存`AnalysisRequest`を拡張する。
-- `methodSymbol.metadata`はAnalyze Use Caseでgraph-ownedなopaque JSON値へdeep copyし、`graph.Symbol`に保持する。Traversalと既存Output formatterは内容を解釈しない。
+- Analyzer process境界はvalid typed recordをAnalyze Use Caseのrecord consumerへ逐次渡し、Analyze Use Caseは非公開staging Graphへ1-pass登録する。Graphの公開 / 破棄はprocess終了状態の確認後にAnalyze Use Caseが決める。
+- `methodSymbol.metadata`はstaging Graph登録時にgraph-ownedなopaque JSON値へdeep copyし、`graph.Symbol`に保持する。Traversalと既存Output formatterは内容を解釈しない。
 - Gradle Tooling API、custom model provider、Java source setの選択、TypeSolver構築は`analyzers/java/`に閉じる。
 - Gradle build modelの共通 abstractionは本Issueで追加しない。
 
@@ -729,7 +733,7 @@ Analyzer自身は解析対象sourceとbuild成果物をread-onlyで扱う。自�
 - bytecode-only member: scope内source typeのmethod / constructor / receiver fieldをcontext別project classes outputからcall site駆動で解決し、generator名に依存しないことをJava unit / integration testで検証する。
 - bytecode-only location: member自身の`sourceLocation`を省略し、`ownerSourceLocation`を所有type位置としてProtocolからgraph-owned metadataまでdeep copyできることをJava unit / Protocol contract / Core graph testで検証する。
 - language level: projectごとの`release` / `sourceCompatibility`優先順位、mixed-version context、明示metadata、preview、未対応levelのfatalをJava unit / process testで検証する。
-- failure containment: allowlist化したresolution failureの要素単位diagnostic、全救済後のcall-site completeness gate、未知例外のfatal、mutationの非部分commit、fatal時のCore全record破棄と構造化failure detail保持をJava unit / Go process contractで検証する。
+- failure containment: allowlist化したresolution failureの要素単位diagnostic、全救済後のcall-site completeness gate、未知例外のfatal、mutationの非部分commit、Coreの非公開staging Graphへの逐次登録、fatal時のGraph / diagnostic破棄と構造化failure detail保持をJava unit / Go process contractで検証する。
 - parse completeness: parser未対応構文と構文不正を`JAVA_PARSE_ERROR`のstreaming前fatalにし、method / edgeを返さないことをJava unitと実jar process testで検証する。
 - custom tooling model: provider単体のGradle TestKitまたは同等のintegration testと、D30の`7.6.5/JDK 8`・`8.14.5/JDK 17`・`9.6.1/JDK 25` cross-version matrixでmodel field、task非実行、repository / cache副作用、Gradle build outputのdiscard、exception sanitization、depwalk outputへのcredential非出力、明示bypass、非互換時fatalを検証する。Tooling API clientは全runでAnalyzer JDK 25とする。
 - 実jar process E2E: D9の3 module fixtureについて、自動discoveryと明示overrideのmethod / edge / diagnostic固定期待集合、workspace相対location、module glob、call-site inventoryとoutcomeのstderr集計を照合する。call site別の固定期待集合は内部ledgerを読むJava unit / integration testで検証する。
@@ -887,8 +891,9 @@ Gradle model取得失敗時にraw build output、exception message、stack trace
 - 実jar E2Eでcall site別identityをProtocolへ出さず、stderrのinventory総数と理由別outcome集計、`silentOmission = 0`を固定期待値として検証できる。
 - 未分類または二重分類を注入したunit testで`JAVA_INTERNAL_ERROR`と非ゼロexitになり、D13どおり先行recordが無効になることを検証できる。
 - allowlist外のruntime exception、内部不変条件違反、`LinkageError`を`JAVA_INTERNAL_ERROR`と非ゼロexitへ変換し、file単位diagnosticへ降格しないことを検証できる。
-- validな`error`または非ゼロexitの前にmethod / edge / diagnosticを受信しても、Coreが全recordを破棄しgraph、diagnostic、件数を成功結果として返さないことを検証できる。
-- fatal requestでは先行recordの参照完全性を要求せずfatal reasonを維持し、malformed JSON / invalid schemaは引き続きProtocol failureにできる。
+- method / edgeを受信ごとにgraph-owned値へ変換して非公開staging Graphへ登録し、wire DTO全件をprocess終了まで保持しないことを検証できる。
+- validな`error`または非ゼロexitの前にmethod / edge / diagnosticを受信しても、Coreがstaging Graphと先行diagnosticを破棄し、graph、diagnostic、件数を成功結果として返さないことを検証できる。
+- fatal requestではstaging Graphの参照完全性を要求せずfatal reasonを維持する。exit 0の正常streamではedgeがnodeより先に到着してもstream終了後に参照完全性を検証でき、malformed JSON / invalid schemaは引き続きProtocol failureにできる。
 - call edge欠落を表さないdiagnosticだけのrequestはexit code 0でgraphとdiagnosticを返せるが、primary diagnosticのcall siteが1件でもあれば`JAVA_INCOMPLETE_ANALYSIS`と非ゼロexitになる。
 - `JAVA_INCOMPLETE_ANALYSIS`が該当件数と決定的な最初のsource locationに加え、全未解決callの位置・call kind・diagnostic code・reason・判明済みtarget / candidatesを決定順の`error.details`で返せる。
 - top-level fatal metadataの`total` / `reasonCounts`と`error.details`件数がledgerと一致し、0件、不一致、非決定順、discarded method IDだけのcandidateを`JAVA_INTERNAL_ERROR`にできる。
@@ -952,20 +957,147 @@ Gradle model取得失敗時にraw build output、exception message、stack trace
 
 ## フロー / シーケンス
 
-diagram phaseで、CLI入力から複数root列挙・型解決・graph出力までのflowchartと、Core / Protocol / Java Analyzerのsequenceを生成する。
-D1〜D30は解決済みである。clarify review gate通過後にdiagram phaseで確定図を生成する。
+以下の図はD1〜D30の可視化である。図と本文に差異がある場合は、sync phaseまでは`## 解決済みの論点`と`## 機能仕様`の記述を優先する。
 
 ### Flowchart (ユーザー操作起点)
 
+CLI入力からroot決定、完全性検査、成功時のGraph出力またはfatal終了までを描く。明示overrideはGradle runtimeを起動せず、自動discoveryだけがbuild評価を行う。parse失敗とcall-site欠落は部分解析へ降格しない。
+
 ```mermaid
 flowchart TD
+    Start(("利用者 / CIがworkspaceを指定して<br/>depwalk analyzeを実行")) --> CoreReq["Core CLIがanalysisRequestを正規化して<br/>Java Analyzerへ送信"]
+    CoreReq --> RootMode{"--source-rootを<br/>1件以上指定したか"}
+    RootMode -->|"Yes"| Explicit["明示root・classpath・language levelを検証<br/>1つのsynthetic contextを構築<br/>Tooling APIは起動しない"]
+    RootMode -->|"No"| Notice["build logic評価・network・credential・cacheの<br/>利用可能性と明示bypassを告知"]
+    Notice --> Discovery["Tooling API 9.6.1からcustom providerを注入し<br/>各projectのmain source setを取得"]
+    Discovery --> ModelOK{"Gradle / daemon JVMは対応範囲内で<br/>model取得に成功したか"}
+    ModelOK -->|"No"| GradleFatal["JAVA_GRADLE_MODEL_ERROR<br/>安定reasonと明示override案内"]
+    ModelOK -->|"Yes"| Contexts["project・main source set別の<br/>解析contextを構築"]
+    Explicit --> Roots["rootをreal pathへ正規化し<br/>workspace境界・重複・包含関係を検査"]
+    Contexts --> Roots
+    Roots --> RootsOK{"有効rootと入力metadataは<br/>一意で妥当か"}
+    RootsOK -->|"No"| InputFatal["入力・root・language levelの<br/>対応するfatal error"]
+    RootsOK -->|"Yes"| Parse["include / exclude後の全対象fileを<br/>設定済みlanguage levelでparse pre-flight"]
+    Parse --> ParseOK{"全fileをparseできたか"}
+    ParseOK -->|"No"| ParseFatal["JAVA_PARSE_ERROR<br/>graph record出力前に失敗"]
+    ParseOK -->|"Yes"| Inventory["独立AST走査でCallSiteInventoryを構築<br/>initializerはsemantic callerごとに展開"]
+    Inventory --> Resolve["context別solverでsource宣言を優先して解決<br/>必要時だけproject bytecode memberを補完"]
+    Resolve --> Classify["各inventory entryをemitted・理由付きexcluded・<br/>primary diagnosticのいずれかへ分類"]
+    Classify --> Stream["method / edge / diagnosticを逐次出力<br/>Coreはvalid recordを非公開staging Graphへ1-pass登録"]
+    Stream --> RuntimeOK{"解析・streaming中にallowlist外例外・<br/>LinkageError・errorなし非ゼロexitがないか"}
+    RuntimeOK -->|"No"| RuntimeFatal["JAVA_INTERNAL_ERROR<br/>またはprocess exit failure"]
+    RuntimeOK -->|"Yes"| LedgerOK{"CallSiteOutcomeLedgerに<br/>欠落・重複・二重分類がないか"}
+    LedgerOK -->|"No"| InternalFatal["JAVA_INTERNAL_ERROR<br/>内部不変条件違反"]
+    LedgerOK -->|"Yes"| Unresolved{"primary diagnosticが<br/>1件以上残るか"}
+    Unresolved -->|"Yes"| IncompleteFatal["JAVA_INCOMPLETE_ANALYSIS<br/>全件をerror.detailsへ決定順で格納"]
+    Unresolved -->|"No"| Success["Analyzerがfatal不在と<br/>exit 0を確定"]
+    Success --> RefCheck["Coreがstream全体の<br/>node / edge参照完全性を検証"]
+    RefCheck --> RefOK{"全edgeのendpointが<br/>staging Graphに存在するか"}
+    RefOK -->|"No"| ProtocolFatal["Protocol validation failure"]
+    RefOK -->|"Yes"| Graph["Coreがstaging Graphを成功結果として公開<br/>Traversal / Outputはopaque metadataを解釈しない"]
+    GradleFatal --> Failure["Coreがstaging Graphと先行diagnosticを破棄し<br/>共通failure detailをstderrへ汎用表示"]
+    InputFatal --> Failure
+    ParseFatal --> Failure
+    RuntimeFatal --> Failure
+    InternalFatal --> Failure
+    IncompleteFatal --> Failure
+    ProtocolFatal --> Failure
+    Failure --> Failed(("非ゼロexit<br/>部分graphは返さない"))
+    Graph --> Done(("解析結果を出力"))
 ```
+
+この図の分岐点は、入力の選び方ではなく「完全な解析結果を返せるか」である。明示・自動の両経路とも、成功時は全call siteの終端分類を保証し、fatal時は先行recordを利用者へ渡さない。
 
 ### Sequence
 
+CoreがAnalyzerのvalid recordを非公開staging Graphへ逐次変換し、終了確認後に公開または破棄する境界と、Java Analyzerがparse pre-flight、inventory、resolver、ledgerの順に完全性を確定する内部処理を描く。Gradle daemonは自動discovery時だけ登場し、providerはAnalyzer本体と異なるJava 8 classfile境界で実行される。
+
 ```mermaid
 sequenceDiagram
+    actor User as 利用者 / CI
+    participant Core as Core CLI / Analyze Use Case
+    participant JA as Java Analyzer
+    participant TAPI as Gradle Tooling API 9.6.1
+    participant GD as Gradle daemon / custom provider
+    participant Resolver as Source resolver / bytecode index
+    participant Graph as Core Graph / Traversal / Output
+
+    User->>Core: workspace・include / exclude・任意のsourceRootsを指定
+    Core->>JA: analysisRequestをJSONLで送信
+
+    alt sourceRootsを1件以上明示
+        JA->>JA: root・classpath・language levelを検証<br/>synthetic contextを構築
+        Note over JA,TAPI: Tooling API経路を完全にbypass
+    else sourceRootsを省略
+        JA-->>Core: build評価・network / credential / cache利用可能性を告知
+        Core-->>User: 固定noticeと明示bypassを表示
+        JA->>TAPI: custom modelを要求<br/>build outputはdiscard sinkへ接続
+        TAPI->>GD: Java 8 providerを一時init scriptから注入
+        GD->>GD: settings / build scriptを評価し<br/>main source setとclasspathを収集
+        GD-->>TAPI: custom model
+        TAPI-->>JA: modelまたは安定した失敗category
+    end
+
+    JA->>JA: real path・workspace境界・重複・包含・<br/>context・language levelをpre-flight
+    alt model・入力・rootが不正
+        JA-->>Core: fatal errorと非ゼロexit
+        Core->>Core: requestの暫定stateを破棄
+        Core-->>User: 共通fieldをstderrへ表示
+    else rootとcontextが有効
+        JA->>JA: include / exclude後の全fileをparse pre-flight
+        alt 1 file以上をparseできない
+            JA-->>Core: JAVA_PARSE_ERRORと非ゼロexit<br/>graph recordは未出力
+            Core-->>User: parse failureを表示
+        else 全fileのparse成功
+            JA->>JA: 独立AST走査でCallSiteInventoryを構築<br/>initializerをsemantic callerへ展開
+            loop inventory entryごと
+                JA->>Resolver: context・origin・signatureを指定して解決
+                Resolver->>Resolver: source宣言を優先し<br/>必要時だけproject bytecode memberを照会
+                Resolver-->>JA: 解決結果・ResolutionFailure<br/>または予期しないfailure
+                break allowlist外RuntimeException / LinkageError
+                    JA-->>Core: JAVA_INTERNAL_ERRORと非ゼロexit<br/>出力可能な場合だけerror recordを送信
+                    Core->>Graph: staging Graphを破棄
+                    Core->>Core: 先行diagnosticを破棄
+                    Core-->>User: 内部failureを表示
+                end
+                JA->>JA: primary outcomeをledgerへ1回commit
+                JA-->>Core: method / edge / diagnostic recordを逐次送信
+                Core->>Graph: valid recordをgraph-owned値へ変換して登録<br/>metadataはnested valueごとdeep copy
+            end
+            break error recordを出力できないError / process異常終了
+                Core->>Core: waitでerrorなし非ゼロexitを検出
+                Core->>Graph: staging Graphを破棄
+                Core->>Core: 先行diagnosticを破棄
+                Core-->>User: process exit failureを表示
+            end
+            JA->>JA: ledgerの件数・一意性・全entryの終端を検査
+            alt ledger不整合
+                JA-->>Core: JAVA_INTERNAL_ERRORと非ゼロexit
+                Core->>Graph: staging Graphを破棄
+                Core->>Core: 先行diagnosticを破棄
+                Core-->>User: 内部failureを表示
+            else primary diagnosticが残る
+                JA-->>Core: JAVA_INCOMPLETE_ANALYSIS<br/>全件のerror.detailsと非ゼロexit
+                Core->>Graph: staging Graphを破棄
+                Core->>Core: 先行diagnosticを破棄し<br/>AnalyzerFailureだけ保持
+                Core-->>User: 共通detailとopaque metadataを汎用表示
+            else 全entryがemittedまたは理由付きexcluded
+                JA-->>Core: exit 0
+                Core->>Core: stream全体のnode / edge参照完全性を検証
+                alt 参照不整合
+                    Core->>Graph: staging Graphを破棄
+                    Core-->>User: Protocol validation failureと非ゼロexit
+                else 参照完全
+                    Core->>Graph: staging Graphを成功結果として公開
+                    Graph-->>Core: traversal / output結果
+                    Core-->>User: 成功結果とexit 0
+                end
+            end
+        end
+    end
 ```
+
+この図では、Graphへの内部登録と成功結果としての公開を分離している。Coreはvalid recordを受信ごとに非公開staging Graphへ1-pass登録するが、Analyzerのexit 0、fatal不在、stream全体の参照完全性を確認した場合だけ公開する。fatal時は部分的なstaging Graphを参照検証せず破棄する。
 
 ## 実装分割
 
@@ -1003,60 +1135,60 @@ D1〜D30のdurableな変更候補を記録済みである。track / sync phase�
 
 ### feature doc への影響
 
-| 対象 doc / 節                                 | 変更内容                                                                                                                                                                                                                            | 理由                                                                                                                     |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| analyzer-protocol / `analysisRequest`         | (source: clarify, D1) optional `sourceRoots`を明示overrideとして追加し、省略時はAnalyzer discovery、空配列はinvalidとする                                                                                                           | 単一・複数rootを同じv1 schemaで扱い、通常利用と明示overrideを両立するため                                                |
-| analyzer-protocol / path contract             | (source: clarify, D2) `sourceRoots`をworkspace相対・`/`区切りとし、`.`を許可、絶対path・空文字・`..`を拒否する                                                                                                                      | `include` / `exclude` / `SourceLocation.path`と基準を統一し、requestを環境非依存にするため                               |
-| analyzer-protocol / path contract             | (source: clarify, D4) `workspaceRoot`をinclude / excludeと全`SourceLocation`の唯一の座標系とし、root IDを追加しない                                                                                                                 | module directoryを含むpathで一意性を保ち、既存のpath意味論を維持するため                                                 |
-| analyzer-protocol / fatal streaming           | (source: clarify, D13) validな`error`または非ゼロexitで同requestの先行recordをすべて無効とする                                                                                                                                      | streaming後の未知fatalから部分graphを成功結果として公開しないため                                                        |
-| analyzer-protocol / completeness fatal        | (source: clarify, D20/D22/D24) primary diagnosticのcallが残るrequestをfatalにし、先行recordを無効化しつつ全未解決detailを共通`error.details`へ集約する                                                                              | 既知のedge欠落を持つgraphを正常結果として渡さず、Coreの言語非依存性と修正情報を両立するため                              |
-| analyzer-protocol / failure detail            | (source: clarify, D24) optional `FailureDetail`の共通field、opaque metadata、順序、validationとCore汎用表示を追加する                                                                                                               | 2つ目以降のAnalyzer固有failureをCore変更なしで構造化表示するため                                                         |
-| analyzer-protocol / Java metadata             | (source: clarify, D6) `metadata.classpath`を明示root時は必須、自動discovery時は任意の共通追加classpathとする                                                                                                                        | 自動経路ではGradle modelを正とし、明示経路では従来の入力責任を維持するため                                               |
-| analyzer-protocol / symbol location・metadata | (source: clarify, D18/D21/D29) bytecode-only methodSymbolの`sourceLocation`を省略し、owner位置をmetadataとしてGraphまでopaque passthroughするwire契約と既存gap記述を更新する                                                        | 定義位置の既存意味を維持し、生成起点のsource typeをCore境界で欠落させないため                                            |
-| Graph / `Node.Symbol`・record変換             | (source: clarify, D29) graph-ownedなoptional metadataを追加し、Protocolのopaque JSON objectをnested valueごとdeep copyして保持する。Traversalと既存Output schemaは解釈・露出しない                                                  | Analyzer固有keyをGraphの専用fieldへ昇格せず、wire DTOとのaliasとmetadata欠落を防ぐため                                   |
-| Java Analyzer / 解析入力解決                  | (source: clarify, D1) 明示root優先、build model discovery、推測fallback禁止の責務を追加                                                                                                                                             | Gradle modelで非標準source setを解決し、失敗を不完全解析へ降格しないため                                                 |
-| Java Analyzer / root正規化                    | (source: clarify, D2) discovery結果をworkspace相対へ正規化し、workspace外rootをscopeへ含めない                                                                                                                                      | 明示入力とdiscovery結果へ同じpath境界を適用するため                                                                      |
-| Java Analyzer / root正規化・pre-flight        | (source: clarify, D5) 完全重複rootは先頭を残して除去し、異なるrootの包含関係を拒否し、fileを絶対pathで重複排除する                                                                                                                  | package hierarchyの曖昧化と二重解析を防ぐため                                                                            |
-| Java Analyzer / root pre-flight               | (source: clarify, D7) 明示・既存rootの異常とworkspace escapeはfatal、未作成discovery rootは除外、real pathで境界判定する                                                                                                            | 空directoryを許容しつつ不完全解析とworkspace外読取を防ぐため                                                             |
-| Java Analyzer / 型解決context                 | (source: clarify, D6) discovery時はproject / source set別context、明示root時はglobal classpathのsynthetic contextを使用する                                                                                                         | Gradle moduleの依存境界とdependency versionを維持するため                                                                |
-| Java Analyzer / scope・location               | (source: clarify, D4) 全rootのfileへworkspace相対globを適用し、絶対path集合でscope判定し、locationをworkspace相対で出力する                                                                                                         | 複数rootを単一scopeとして扱い、module間の同名pathを区別するため                                                          |
-| Java Analyzer / build model discovery         | (source: clarify, D3) `sourceRoots`省略時にGradle Tooling APIでproject階層・Java source setを自動取得し、明示時は完全bypassする                                                                                                     | rootだけで非標準layoutを解決しつつ、安全・再現性が必要な環境では明示入力へ切り替えるため                                 |
-| Java Analyzer / Gradle runtime boundary       | (source: clarify, D23/D25) 自動discoveryのbuild logic評価、repository / credential委譲、network / cache副作用、build output隔離、例外sanitize、trusted build前提を明示する                                                          | root入力の利便性を維持しつつ、実行code・外部runtime依存とdepwalkの非漏洩保証境界を誤認させないため                       |
-| Java Analyzer / discovery scope               | (source: clarify, D10) 自動discoveryを各projectの`main` source setに限定し、他source setは明示rootで扱う                                                                                                                            | test依存をproduction graphへ混在させず、通常解析の対象を予測可能にするため                                               |
-| Java Analyzer / custom tooling model          | (source: clarify, D11/D30) 一時init scriptで同梱providerを注入し、`main`のroot、compile classpath、output、project依存を直接取得する。Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider Java 8 classfileの互換性境界を追加する | D6のproject別classpath境界をGradle modelどおりに構築し、custom providerが保証するversion範囲を明確にするため             |
-| Java Analyzer / source language level         | (source: clarify, D12) discoveryは`release`優先の実効levelをcontext別に使い、明示rootはlevel metadataを必須とする                                                                                                                   | mixed-version buildをGradle設定どおりparseし、Analyzer JDK 25固定からsource grammarを分離するため                        |
-| Java Analyzer / failure containment           | (source: clarify, D13/D20/D22/D24) resolution failureの救済を継続し、call edge欠落は全原因を共通detailsに持つrequest-level fatal、未知例外はinternal fatalとする                                                                    | 不完全なcall graphを成功扱いせず、既知failureの原因も言語共通形式で観測可能に保つため                                    |
-| Java Analyzer / source attribution            | (source: clarify, D14) scope内sourceを帰属の正とし、bytecode宣言をsource methodへ再対応付けし、全call siteの終端を分類する                                                                                                          | source / classes output併存時のscope内call欠落を防ぎ、silent omissionを機械検出するため                                  |
-| Java Analyzer / remapping boundary            | (source: clarify, D16) solver originと依存到達可能contextでbytecode宣言からsourceへの再対応付けを制限する                                                                                                                           | 非依存moduleやexternal artifactの同名宣言へ誤帰属しないため                                                              |
-| Java Analyzer / call-site completeness        | (source: clarify, D17/D28) resolver前の安定ID付きinventoryを構築し、initializer内callをlexical siteとsemantic callerごとに展開して内部outcome ledgerで全entryの終端を検査する                                                       | resolver自身の見落としとinitializerの複数caller展開を同じcardinalityで検査し、Protocolを変更せず個別結果をテストするため |
-| Java Analyzer / bytecode-only member          | (source: clarify, D18/D21) scope内source typeのcallable memberをgenerator非依存で補完し、member定義位置は省略してowner anchorをmetadataへ分離する                                                                                   | compile時memberをgraphへ含めつつ、所有type位置を実在しないmember定義として扱わないため                                   |
-| Java Analyzer / parse completeness            | (source: clarify, D15) 全対象fileのparse pre-flightをstreaming前に行い、1件でもparse不能ならrequest全体をfatalにする                                                                                                                | call site母集合を作れないfileを含む部分graphを成功結果として公開しないため                                               |
-| Java Analyzer / 性能方針                      | (source: clarify, D8) single明示・single discovery・multi discoveryの初回値とwarm中央値を記録し、SLOは#22で確定する                                                                                                                 | Tooling APIと複数contextの増分を分離し、将来の数値目標の入力にするため                                                   |
-| Java Analyzer / E2E fixture                   | (source: clarify, D9) app / service / repository、変更projectDir、custom source dir、module間call / DIの固定期待集合を追加                                                                                                          | 標準・非標準Gradle構成を実jarで検証し、自動・明示経路の同値性を保証するため                                              |
-| Java Analyzer / CLI E2E boundary              | (source: clarify, D19) test-only透過proxyで実Core CLIと実Analyzerを接続し、request、raw graph、CLI終了状態をrequired gateで照合                                                                                                     | productionの出力責務を広げず、CLIからAnalyzerまでのproduction wiringとgraph完全性を保証するため                          |
-| Java Analyzer / call completeness gate        | (source: clarify, D20/D22/D24) 全救済後もprimary diagnosticに残るcallを全件detail付き`JAVA_INCOMPLETE_ANALYSIS`でfatalにする                                                                                                        | v1の成功graphから既知のedge欠落を排除し、未対応形状と修正根拠を顕在化するため                                            |
+| 対象 doc / 節                                 | 変更内容                                                                                                                                                                                                                                                                                                   | 理由                                                                                                                                       |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| analyzer-protocol / `analysisRequest`         | (source: clarify, D1) optional `sourceRoots`を明示overrideとして追加し、省略時はAnalyzer discovery、空配列はinvalidとする                                                                                                                                                                                  | 単一・複数rootを同じv1 schemaで扱い、通常利用と明示overrideを両立するため                                                                  |
+| analyzer-protocol / path contract             | (source: clarify, D2) `sourceRoots`をworkspace相対・`/`区切りとし、`.`を許可、絶対path・空文字・`..`を拒否する                                                                                                                                                                                             | `include` / `exclude` / `SourceLocation.path`と基準を統一し、requestを環境非依存にするため                                                 |
+| analyzer-protocol / path contract             | (source: clarify, D4) `workspaceRoot`をinclude / excludeと全`SourceLocation`の唯一の座標系とし、root IDを追加しない                                                                                                                                                                                        | module directoryを含むpathで一意性を保ち、既存のpath意味論を維持するため                                                                   |
+| analyzer-protocol / fatal streaming           | (source: clarify, D13) validな`error`または非ゼロexitで同requestの先行recordをすべて無効とする                                                                                                                                                                                                             | streaming後の未知fatalから部分graphを成功結果として公開しないため                                                                          |
+| analyzer-protocol / completeness fatal        | (source: clarify, D20/D22/D24) primary diagnosticのcallが残るrequestをfatalにし、先行recordを無効化しつつ全未解決detailを共通`error.details`へ集約する                                                                                                                                                     | 既知のedge欠落を持つgraphを正常結果として渡さず、Coreの言語非依存性と修正情報を両立するため                                                |
+| analyzer-protocol / failure detail            | (source: clarify, D24) optional `FailureDetail`の共通field、opaque metadata、順序、validationとCore汎用表示を追加する                                                                                                                                                                                      | 2つ目以降のAnalyzer固有failureをCore変更なしで構造化表示するため                                                                           |
+| analyzer-protocol / Java metadata             | (source: clarify, D6) `metadata.classpath`を明示root時は必須、自動discovery時は任意の共通追加classpathとする                                                                                                                                                                                               | 自動経路ではGradle modelを正とし、明示経路では従来の入力責任を維持するため                                                                 |
+| analyzer-protocol / symbol location・metadata | (source: clarify, D18/D21/D29) bytecode-only methodSymbolの`sourceLocation`を省略し、owner位置をmetadataとしてGraphまでopaque passthroughするwire契約と既存gap記述を更新する                                                                                                                               | 定義位置の既存意味を維持し、生成起点のsource typeをCore境界で欠落させないため                                                              |
+| Graph / `Node.Symbol`・record変換・構築フロー | (source: clarify, D13/D29 + diagram review) valid recordを受信ごとにgraph-owned値へ変換して非公開staging Graphへ1-pass登録し、fatal時は参照完全性を要求せず破棄、exit 0・fatal不在・参照完全時だけ公開する。optional metadataはnested valueごとdeep copyし、Traversalと既存Output schemaは解釈・露出しない | JSONL streaming、request単位の成功可視性、wire DTO非保持を両立し、Analyzer固有keyをGraphの専用fieldへ昇格せずaliasとmetadata欠落を防ぐため |
+| Java Analyzer / 解析入力解決                  | (source: clarify, D1) 明示root優先、build model discovery、推測fallback禁止の責務を追加                                                                                                                                                                                                                    | Gradle modelで非標準source setを解決し、失敗を不完全解析へ降格しないため                                                                   |
+| Java Analyzer / root正規化                    | (source: clarify, D2) discovery結果をworkspace相対へ正規化し、workspace外rootをscopeへ含めない                                                                                                                                                                                                             | 明示入力とdiscovery結果へ同じpath境界を適用するため                                                                                        |
+| Java Analyzer / root正規化・pre-flight        | (source: clarify, D5) 完全重複rootは先頭を残して除去し、異なるrootの包含関係を拒否し、fileを絶対pathで重複排除する                                                                                                                                                                                         | package hierarchyの曖昧化と二重解析を防ぐため                                                                                              |
+| Java Analyzer / root pre-flight               | (source: clarify, D7) 明示・既存rootの異常とworkspace escapeはfatal、未作成discovery rootは除外、real pathで境界判定する                                                                                                                                                                                   | 空directoryを許容しつつ不完全解析とworkspace外読取を防ぐため                                                                               |
+| Java Analyzer / 型解決context                 | (source: clarify, D6) discovery時はproject / source set別context、明示root時はglobal classpathのsynthetic contextを使用する                                                                                                                                                                                | Gradle moduleの依存境界とdependency versionを維持するため                                                                                  |
+| Java Analyzer / scope・location               | (source: clarify, D4) 全rootのfileへworkspace相対globを適用し、絶対path集合でscope判定し、locationをworkspace相対で出力する                                                                                                                                                                                | 複数rootを単一scopeとして扱い、module間の同名pathを区別するため                                                                            |
+| Java Analyzer / build model discovery         | (source: clarify, D3) `sourceRoots`省略時にGradle Tooling APIでproject階層・Java source setを自動取得し、明示時は完全bypassする                                                                                                                                                                            | rootだけで非標準layoutを解決しつつ、安全・再現性が必要な環境では明示入力へ切り替えるため                                                   |
+| Java Analyzer / Gradle runtime boundary       | (source: clarify, D23/D25) 自動discoveryのbuild logic評価、repository / credential委譲、network / cache副作用、build output隔離、例外sanitize、trusted build前提を明示する                                                                                                                                 | root入力の利便性を維持しつつ、実行code・外部runtime依存とdepwalkの非漏洩保証境界を誤認させないため                                         |
+| Java Analyzer / discovery scope               | (source: clarify, D10) 自動discoveryを各projectの`main` source setに限定し、他source setは明示rootで扱う                                                                                                                                                                                                   | test依存をproduction graphへ混在させず、通常解析の対象を予測可能にするため                                                                 |
+| Java Analyzer / custom tooling model          | (source: clarify, D11/D30) 一時init scriptで同梱providerを注入し、`main`のroot、compile classpath、output、project依存を直接取得する。Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider Java 8 classfileの互換性境界を追加する                                                                        | D6のproject別classpath境界をGradle modelどおりに構築し、custom providerが保証するversion範囲を明確にするため                               |
+| Java Analyzer / source language level         | (source: clarify, D12) discoveryは`release`優先の実効levelをcontext別に使い、明示rootはlevel metadataを必須とする                                                                                                                                                                                          | mixed-version buildをGradle設定どおりparseし、Analyzer JDK 25固定からsource grammarを分離するため                                          |
+| Java Analyzer / failure containment           | (source: clarify, D13/D20/D22/D24) resolution failureの救済を継続し、call edge欠落は全原因を共通detailsに持つrequest-level fatal、未知例外はinternal fatalとする                                                                                                                                           | 不完全なcall graphを成功扱いせず、既知failureの原因も言語共通形式で観測可能に保つため                                                      |
+| Java Analyzer / source attribution            | (source: clarify, D14) scope内sourceを帰属の正とし、bytecode宣言をsource methodへ再対応付けし、全call siteの終端を分類する                                                                                                                                                                                 | source / classes output併存時のscope内call欠落を防ぎ、silent omissionを機械検出するため                                                    |
+| Java Analyzer / remapping boundary            | (source: clarify, D16) solver originと依存到達可能contextでbytecode宣言からsourceへの再対応付けを制限する                                                                                                                                                                                                  | 非依存moduleやexternal artifactの同名宣言へ誤帰属しないため                                                                                |
+| Java Analyzer / call-site completeness        | (source: clarify, D17/D28) resolver前の安定ID付きinventoryを構築し、initializer内callをlexical siteとsemantic callerごとに展開して内部outcome ledgerで全entryの終端を検査する                                                                                                                              | resolver自身の見落としとinitializerの複数caller展開を同じcardinalityで検査し、Protocolを変更せず個別結果をテストするため                   |
+| Java Analyzer / bytecode-only member          | (source: clarify, D18/D21) scope内source typeのcallable memberをgenerator非依存で補完し、member定義位置は省略してowner anchorをmetadataへ分離する                                                                                                                                                          | compile時memberをgraphへ含めつつ、所有type位置を実在しないmember定義として扱わないため                                                     |
+| Java Analyzer / parse completeness            | (source: clarify, D15) 全対象fileのparse pre-flightをstreaming前に行い、1件でもparse不能ならrequest全体をfatalにする                                                                                                                                                                                       | call site母集合を作れないfileを含む部分graphを成功結果として公開しないため                                                                 |
+| Java Analyzer / 性能方針                      | (source: clarify, D8) single明示・single discovery・multi discoveryの初回値とwarm中央値を記録し、SLOは#22で確定する                                                                                                                                                                                        | Tooling APIと複数contextの増分を分離し、将来の数値目標の入力にするため                                                                     |
+| Java Analyzer / E2E fixture                   | (source: clarify, D9) app / service / repository、変更projectDir、custom source dir、module間call / DIの固定期待集合を追加                                                                                                                                                                                 | 標準・非標準Gradle構成を実jarで検証し、自動・明示経路の同値性を保証するため                                                                |
+| Java Analyzer / CLI E2E boundary              | (source: clarify, D19) test-only透過proxyで実Core CLIと実Analyzerを接続し、request、raw graph、CLI終了状態をrequired gateで照合                                                                                                                                                                            | productionの出力責務を広げず、CLIからAnalyzerまでのproduction wiringとgraph完全性を保証するため                                            |
+| Java Analyzer / call completeness gate        | (source: clarify, D20/D22/D24) 全救済後もprimary diagnosticに残るcallを全件detail付き`JAVA_INCOMPLETE_ANALYSIS`でfatalにする                                                                                                                                                                               | v1の成功graphから既知のedge欠落を排除し、未対応形状と修正根拠を顕在化するため                                                              |
 
 ### context への影響
 
-| 対象 doc / 節                                         | 変更内容                                                                                                                                                                                                                                                                                                                                                                                            | 理由                                                                                                                                                                                                       |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| architecture.md / Package・Runtime・State Boundary    | (source: clarify, D3/D6/D7/D13/D18/D20/D21/D22/D23/D24/D25/D26/D29) Core / Analyzer境界とfailure伝播を維持し、Graph EngineがSymbolのopaque metadataを保持することを補足する。自動discovery時だけ加わるGradle runtime、build評価・network / credential / cache・任意副作用、明示経路の完全bypassを要約し、詳細をGraph feature / infrastructure / ADR-0006へ参照する                                  | CoreへJava / Gradle固有解釈を持ち込まず、Graph属性、Analyzer自身のread-only性、Gradle runtime全体の副作用を区別し、詳細契約の二重管理を避けるため                                                          |
-| project.md / Quick Commands・E2E command contract     | (source: clarify, D27/D30) workspace rootだけで開始する自動discovery、source roots・classpath・language levelを渡す明示override、実Core CLIと実Analyzer jarを通すrequired E2E、Gradle / daemon JDK matrixの再現可能な実行入口を追加する                                                                                                                                                             | 通常利用、安全なbypass、production wiring / cross-version検証を`dev-commands`から一意に解決し、issue終了後もrepository標準として保守するため                                                               |
-| toolchain.md / 標準スタック                           | (source: clarify, D3/D11/D12/D30) Tooling API `9.6.1`、target Gradle `7.6.5`〜`9.6.x`、provider Gradle API `7.6.5` / Java 8 classfile、Analyzer JDK 25、daemon JVM委譲、CI anchorを追記                                                                                                                                                                                                             | custom model discovery、daemon JVM互換性、parser levelの基準を標準toolchainとして固定するため                                                                                                              |
-| testing.md                                            | (source: clarify, D3/D7/D8/D9/D10/D11/D12/D13/D14/D15/D16/D17/D18/D19/D20/D21/D22/D24/D25/D28/D29) discovery、custom model、source set、language level、failure containment、parse fatal、source帰属、bytecode-only member / owner metadataのGraph deep copy、initializer caller展開、call ledger、共通fatal detail、汎用CLI表示、Gradle output隔離・negative secret fixture、実CLI E2E、性能を追記 | build model、parse完全性、生成member、位置意味論、initializer cardinality、Graph metadata保持、誤帰属防止、言語非依存failure観測、credential非漏洩境界、production wiring、graph完全性、性能を検証するため |
-| infrastructure.md / Infrastructure Contract・Security | (source: clarify, D23/D25) 外部service非依存とGradle runtime依存を分離し、build評価、repository / credential委譲、network / cache副作用、Gradle output discard、exception sanitization、保証対象、trusted build、明示bypassを追記                                                                                                                                                                   | local / CIで必要な権限・副作用と、depwalkが保証できるcredential非漏洩境界を固定するため                                                                                                                    |
+| 対象 doc / 節                                         | 変更内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 理由                                                                                                                                                                                                       |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| architecture.md / Package・Runtime・State Boundary    | (source: clarify, D3/D6/D7/D13/D18/D20/D21/D22/D23/D24/D25/D26/D29 + diagram review) Core / Analyzer境界とfailure伝播を維持し、Analyze Use Caseがvalid recordを非公開staging Graphへ逐次変換して成功時だけ公開するstate boundaryと、Graph EngineがSymbolのopaque metadataを保持することを補足する。自動discovery時だけ加わるGradle runtime、build評価・network / credential / cache・任意副作用、明示経路の完全bypassを要約し、詳細をGraph feature / infrastructure / ADR-0006へ参照する | CoreへJava / Gradle固有解釈を持ち込まず、request原子性、Graph属性、Analyzer自身のread-only性、Gradle runtime全体の副作用を区別し、詳細契約の二重管理を避けるため                                           |
+| project.md / Quick Commands・E2E command contract     | (source: clarify, D27/D30) workspace rootだけで開始する自動discovery、source roots・classpath・language levelを渡す明示override、実Core CLIと実Analyzer jarを通すrequired E2E、Gradle / daemon JDK matrixの再現可能な実行入口を追加する                                                                                                                                                                                                                                                  | 通常利用、安全なbypass、production wiring / cross-version検証を`dev-commands`から一意に解決し、issue終了後もrepository標準として保守するため                                                               |
+| toolchain.md / 標準スタック                           | (source: clarify, D3/D11/D12/D30) Tooling API `9.6.1`、target Gradle `7.6.5`〜`9.6.x`、provider Gradle API `7.6.5` / Java 8 classfile、Analyzer JDK 25、daemon JVM委譲、CI anchorを追記                                                                                                                                                                                                                                                                                                  | custom model discovery、daemon JVM互換性、parser levelの基準を標準toolchainとして固定するため                                                                                                              |
+| testing.md                                            | (source: clarify, D3/D7/D8/D9/D10/D11/D12/D13/D14/D15/D16/D17/D18/D19/D20/D21/D22/D24/D25/D28/D29) discovery、custom model、source set、language level、failure containment、parse fatal、source帰属、bytecode-only member / owner metadataのGraph deep copy、initializer caller展開、call ledger、共通fatal detail、汎用CLI表示、Gradle output隔離・negative secret fixture、実CLI E2E、性能を追記                                                                                      | build model、parse完全性、生成member、位置意味論、initializer cardinality、Graph metadata保持、誤帰属防止、言語非依存failure観測、credential非漏洩境界、production wiring、graph完全性、性能を検証するため |
+| infrastructure.md / Infrastructure Contract・Security | (source: clarify, D23/D25) 外部service非依存とGradle runtime依存を分離し、build評価、repository / credential委譲、network / cache副作用、Gradle output discard、exception sanitization、保証対象、trusted build、明示bypassを追記                                                                                                                                                                                                                                                        | local / CIで必要な権限・副作用と、depwalkが保証できるcredential非漏洩境界を固定するため                                                                                                                    |
 
 ### ADR の新規 / 更新
 
-| ADR ID              | 変更内容                                                                                                                                                                                                                                                                                                                                           | 理由                                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| ADR-0001            | (source: clarify, D13/D20/D22/D24) fatal requestの先行record invalidationと、Protocol共通`error.details`だけを有効なfailure detailとして保持・汎用表示する責務を追記                                                                                                                                                                               | JSONL streamingとrequest原子性を維持しながら言語非依存に未解決理由を伝えるため                             |
-| ADR-0004            | (source: clarify, D22/D24) `JAVA_INCOMPLETE_ANALYSIS.error.details`で動的・未解決callの全候補と理由をfatal時も観測可能にする                                                                                                                                                                                                                       | 不完全graphを成功させない方針と既存の観測可能性契約を両立するため                                          |
-| ADR-0003            | (source: clarify, D1/D3/D13/D14/D15/D16/D17/D18/D24) 更新・廃止なし。Coreの言語非依存とopaque metadata / 共通failure detail passthroughを継承                                                                                                                                                                                                      | Java固有のbytecode member解決やfailure code分岐をCoreへ持ち込まないため                                    |
-| ADR-0005            | (source: clarify, D18) SootUpの責務へcall site駆動のproject bytecode member索引を追加し、call graph生成はJava Analyzerに維持                                                                                                                                                                                                                       | generator非依存のcompiled-only member救済を既存JavaParser / SootUp境界へ位置付けるため                     |
-| ADR-0006 (新規予定) | (source: clarify, D3/D6/D7/D10/D11/D23/D25/D26/D30) Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider baseline / Java 8、daemon JVM委譲、CI anchor、custom provider、`main`限定、build評価、repository / credential委譲、network / cache、output隔離、exception sanitization、保証対象、trusted build、明示bypass、architecture参照境界を記録 | runtime副作用、解析scope、型解決、filesystem / secret安全性、version compatibilityを横断判断として残すため |
-| なし                | (source: clarify, D19) 実CLI E2Eのtest-only観測境界について新規・更新・廃止なし                                                                                                                                                                                                                                                                    | production architectureとProtocolの意思決定を変更しないため                                                |
-| なし                | (source: clarify, D29) Graph Symbolへのopaque metadata保持について新規・更新・廃止なし                                                                                                                                                                                                                                                             | ADR-0001 / ADR-0002のProtocol・Core package境界を維持した属性追加であるため                                |
+| ADR ID              | 変更内容                                                                                                                                                                                                                                                                                                                                                                  | 理由                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ADR-0001            | (source: clarify, D13/D20/D22/D24 + diagram review) transport streaming、Coreの非公開staging Graphへの1-pass変換、成功結果のrequest単位公開を分離する。Analyzerは全graphをbufferせず、Coreはwire DTO全件を保持しない。fatal requestではstaging Graphと先行diagnosticを破棄し、Protocol共通`error.details`だけを有効なfailure detailとして保持・汎用表示する責務を追記する | JSONL streamingとrequest原子性を維持しながら言語非依存に未解決理由を伝え、Analyzer / Core双方の重複bufferを避けるため |
+| ADR-0004            | (source: clarify, D22/D24) `JAVA_INCOMPLETE_ANALYSIS.error.details`で動的・未解決callの全候補と理由をfatal時も観測可能にする                                                                                                                                                                                                                                              | 不完全graphを成功させない方針と既存の観測可能性契約を両立するため                                                     |
+| ADR-0003            | (source: clarify, D1/D3/D13/D14/D15/D16/D17/D18/D24) 更新・廃止なし。Coreの言語非依存とopaque metadata / 共通failure detail passthroughを継承                                                                                                                                                                                                                             | Java固有のbytecode member解決やfailure code分岐をCoreへ持ち込まないため                                               |
+| ADR-0005            | (source: clarify, D18) SootUpの責務へcall site駆動のproject bytecode member索引を追加し、call graph生成はJava Analyzerに維持                                                                                                                                                                                                                                              | generator非依存のcompiled-only member救済を既存JavaParser / SootUp境界へ位置付けるため                                |
+| ADR-0006 (新規予定) | (source: clarify, D3/D6/D7/D10/D11/D23/D25/D26/D30) Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider baseline / Java 8、daemon JVM委譲、CI anchor、custom provider、`main`限定、build評価、repository / credential委譲、network / cache、output隔離、exception sanitization、保証対象、trusted build、明示bypass、architecture参照境界を記録                        | runtime副作用、解析scope、型解決、filesystem / secret安全性、version compatibilityを横断判断として残すため            |
+| なし                | (source: clarify, D19) 実CLI E2Eのtest-only観測境界について新規・更新・廃止なし                                                                                                                                                                                                                                                                                           | production architectureとProtocolの意思決定を変更しないため                                                           |
+| なし                | (source: clarify, D29) Graph Symbolへのopaque metadata保持について新規・更新・廃止なし                                                                                                                                                                                                                                                                                    | ADR-0001 / ADR-0002のProtocol・Core package境界を維持した属性追加であるため                                           |
 
 ## レビュー
 
@@ -1073,54 +1205,66 @@ D1〜D30のdurableな変更候補を記録済みである。track / sync phase�
 | 2026-07-18 | NEEDS_WORK               | Coreの言語非依存表示、credential非漏洩境界、architecture / projectのsync候補が不足     | clarifyを保留しD24〜D27を判断待ち |
 | 2026-07-18 | NEEDS_WORK               | initializer call identity、Graph metadata正本、Gradle互換性matrixの確定が必要          | clarifyを保留しD28〜D30を判断待ち |
 | 2026-07-18 | PASS                     | D28〜D30でinitializer identity、Graph metadata正本、Gradle互換性matrixを確定           | Phase 3再review完了。diagram待ち  |
+| 2026-07-18 | NEEDS_WORK               | Flowchartのstreaming境界とresolver例外・非ゼロexitの破棄経路がD13と不整合              | diagramを保留し方針判断待ち       |
+| 2026-07-18 | NEEDS_WORK               | 前回図指摘は解消。Core暫定record保持とGraph feature docの1-pass即時登録が不整合        | diagramを保留しGraph境界判断待ち  |
+| 2026-07-18 | NEEDS_WORK               | 図・staging境界は整合。D13に終了後Graph構築と読める旧表現が2箇所残存                   | diagramを保留し文面修正判断待ち   |
+| 2026-07-18 | PASS                     | D13・図・上位文書変更候補がstaging Graphの逐次構築・成功時公開・fatal時破棄で整合      | Phase 4 gate完了                  |
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                                                                                     |
-| ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                            |
-| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                |
-| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                       |
-| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                           |
-| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                           |
-| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                         |
-| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                   |
-| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                            |
-| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                         |
-| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                          |
-| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                      |
-| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                       |
-| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                 |
-| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                    |
-| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                    |
-| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                |
-| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                           |
-| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                     |
-| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                |
-| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                             |
-| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                              |
-| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                            |
-| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                             |
-| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                      |
-| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                    |
-| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                |
-| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                   |
-| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                   |
-| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                |
-| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                         |
-| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                          |
-| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                       |
-| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期           |
-| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                 |
-| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                  |
-| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期  |
-| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期 |
-| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                          |
-| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                 |
-| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期       |
-| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期               |
-| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                 |
-| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                |
+| 日付       | 変更者 | 変更内容                                                                                                                         |
+| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                                |
+| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                    |
+| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                           |
+| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                               |
+| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                               |
+| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                             |
+| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                       |
+| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                                |
+| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                             |
+| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                              |
+| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                          |
+| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                           |
+| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                     |
+| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                        |
+| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                        |
+| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                    |
+| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                               |
+| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                         |
+| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                    |
+| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                                 |
+| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                                  |
+| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                                |
+| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                                 |
+| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                          |
+| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                        |
+| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                    |
+| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                       |
+| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                       |
+| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                    |
+| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                             |
+| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                              |
+| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                           |
+| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期               |
+| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                     |
+| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                      |
+| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期      |
+| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期     |
+| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                              |
+| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                     |
+| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期           |
+| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期                   |
+| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                     |
+| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                    |
+| 2026-07-18 | Codex  | diagram phaseでCLI起点flowchartとCore / Java Analyzer sequenceを生成し、D1〜D30の成功・fatal境界を可視化                         |
+| 2026-07-18 | Codex  | diagram phaseのfresh-context review NEEDS_WORKを記録し、streaming / resolver fatal経路の判断待ちとして保留                       |
+| 2026-07-18 | Codex  | diagram指摘を選択Aで対応し、D13のAnalyzer streaming・Core暫定保持と未知resolver / process fatalの全record破棄を図とADR候補へ同期 |
+| 2026-07-18 | Codex  | diagram再reviewで前回指摘解消とGraph feature docの1-pass構築境界との新規不整合を記録し、方針判断待ちとして保留                   |
+| 2026-07-18 | Codex  | Graph境界をstaging方式で解決し、valid recordの1-pass変換、成功時公開、fatal時破棄、参照完全性検証をD13・図・sync候補へ同期       |
+| 2026-07-18 | Codex  | staging Graph再reviewで図とsync候補の整合を確認し、D13に残る旧構築表現2箇所の判断待ちとして保留                                  |
+| 2026-07-18 | Codex  | D13の旧構築表現を選択Aで修正し、受信中の非公開staging Graph構築と成功時公開・fatal時破棄へ統一                                   |
+| 2026-07-18 | Codex  | D13文面修正後のfresh-context review PASSを記録し、Interface / Routing設計をレビュー済へ更新                                      |
 
 ## 備考
 

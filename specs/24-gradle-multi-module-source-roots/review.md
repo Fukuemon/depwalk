@@ -196,3 +196,83 @@ Verdict: PASS
 - 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:987-1059` に「反映済」行はなく sync phase 前である。冒頭 `3-4` と `61-62` でも durable 成果は sync phase で handoff すると明示されている。
 
 PASS
+
+## Review 2026-07-18 16:02
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33` の突合表と `:1085` の変更候補で、既存 feature doc / context / ADR との差分と sync 先を分類済み。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:205` の D1〜D30 は全件解決済み、`:663` の未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:667` の target は `context/project.md:66` の対象ドメインと一致し、`:679` で Core → Analyzer の Protocol 境界を維持している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1224` にテンプレート必須節がすべて存在し、diagram phase 更新は `:15`、`:1175` に同期済み。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:139-203` に観測可能な WHEN / IF / THE SYSTEM SHALL 条件がある。
+- prompts 自己完結性: N/A — diagram phase のレビューであり prompts は対象外。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1085` はすべて変更候補で、上位資料への「反映済」行はなく sync 前。
+- diagram phase gate: NEEDS_WORK — 下記の図間・D13間の不整合がある。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:979-985` — Flowchart は ledger と primary diagnostic の判定後に初めて `method / edge / diagnostic` を出力する流れで、Analyzer が成功判定まで全 graph をbufferするように読める。一方、Sequence は `:1040-1045` で ledger検査前にrecordをstreamし、D13も `:417-421` で「先行record後にfatalがあり得る」「Analyzer-side streamingを維持し、bufferするのはCore」と確定している。Flowchartの成功nodeをexit 0の確定だけにするか、record streamingを完全性判定前へ移し、Core保留との境界を両図で一致させる必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:979-984`、`:1040-1056` — 両図とも resolver中のallowlist外例外 / `LinkageError` / error未出力の非ゼロexit経路がなく、D13 `:412-420` と E21/E22 `:820-821` のrequest-level fatalを可視化できていない。「D1〜D30の可視化」とするなら、resolverから`JAVA_INTERNAL_ERROR`またはprocess exit failureへ至り、Coreが先行recordを破棄する分岐を追加する必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 16:24
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:422,1056,1074` は Core が wire record を暫定保持し、exit 0 後に Graph へ commit すると定める。一方、`design/features/graph/DesignDoc_graph.md:64,85,89` は受信時に値型へ変換・Graph 登録し、wire record を持ち回らない 1-pass 契約である。`specs/24-gradle-multi-module-source-roots/index.md:1130` の Graph 変更候補は metadata のみで、この変更を追跡していない。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:205-240` の D1〜D30 はすべて解決済みで、同 `:665-667` の未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:669-682` は `context/project.md:66-74` の全 target と一致し、Core／Protocol／Java Analyzer の責務境界を明示している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1243` に template／validator の必須節が揃い、同 `:11,26,1241` で更新日・phase 状態・変更履歴も同期している。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:139-203` に観測可能な WHEN／IF／THE SYSTEM SHALL 条件があり、特に fatal と全 record 破棄は同 `:168-174` でテスト可能に定義されている。
+- prompts 自己完結性: N/A — diagram phase の review であり prompts は対象外。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1101-1104` は track／sync 前の変更候補で、「反映済」行はない。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:1120-1130 / 上位資料からの変更点` — D13 による Core の暫定 record 保持と exit 0 後の Graph commit は、Graph feature doc の 1-pass 即時登録契約も変更する。Graph の「record 変換／構築フロー」を sync 対象へ追加し、`spec-lifecycle` の sync phase で `design/features/graph/DesignDoc_graph.md:64,85,89` を更新する必要がある。
+- 前回の diagram 指摘自体は解消済み。Analyzer-side streaming と Core 暫定保持は `specs/24-gradle-multi-module-source-roots/index.md:983-998,1055-1075`、allowlist 外 `RuntimeException`／`LinkageError` は同 `:1050-1053`、error record なし非ゼロ exit と全 record 破棄は同 `:1058-1061` に明示され、D13 (`:412-423`) と整合する。
+
+NEEDS_WORK
+
+## Review 2026-07-18 16:35
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — Graph feature doc の既存 1-pass 契約 (`design/features/graph/DesignDoc_graph.md:64,85,89`) を維持しつつ、非公開 staging Graph と公開・破棄境界を変更提案として分類している (`specs/24-gradle-multi-module-source-roots/index.md:49,1148`)。architecture と ADR-0001 の sync 候補にも追跡済みである (`:1175,1185`)。
+- 未解決論点: NEEDS_WORK — D1〜D30 は解決済み、未確定事項は「なし」だが (`specs/24-gradle-multi-module-source-roots/index.md:212-241,666-668`)、D13 内に staging 方針と矛盾する旧「終了後に構築」表現が残っている (`:419-423`)。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:670-683` は `context/project.md:66-74` の全 target と一致し、Core／Protocol／Java Analyzer の責務境界を明示している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1267` にテンプレート必須節が揃い、更新日、diagram phase 状態、レビュー履歴、変更履歴も `:11,15-31,1193-1262` に同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:141-203` に観測可能な WHEN／IF／THE SYSTEM SHALL 条件があり、staging への逐次変換、fatal 破棄、正常 stream の参照完全性検証もテスト可能に具体化されている (`:863,894-896`)。
+- prompts 自己完結性: N/A — diagram phase のレビューであり prompts は未生成。
+- 正本境界: N/A — sync phase 前で「反映済」行はなく、変更候補として Graph feature doc、context、ADR を管理している (`specs/24-gradle-multi-module-source-roots/index.md:1119-1191`)。
+- diagram phase gate: NEEDS_WORK — 前2回の図そのものへの指摘は解消済み。Analyzer-side streaming と未知 resolver failure／errorなし非ゼロexitの破棄経路は `:983-1005,1052-1072`、staging Graph の1-pass登録・fatal時の参照検証なし破棄・成功時だけの公開は `:1064-1100` に明示されている。ただし下記のD13本文不整合が残る。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:419-423` — `:419` は valid fatal request で「graph構築を行わない」、`:421` は成功結果をprocess終了・fatal不在確認後に「構築する」とする一方、`:422-423` は受信ごとにstaging Graphを構築し、終了後は公開または破棄だけを行う契約である。`:419` を「参照完全性検証・成功公開を行わない」、`:421` を「成功結果として公開しない」等へ直し、構築時点を staging への逐次登録で一意にする必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 16:49
+
+Verdict: PASS
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-62,958-1100`。統合モードを明記し、Design Doc・feature doc・context・ADRとの差分を変更提案として分類済み。図もD13の逐次受信、非公開staging Graph、fatal時破棄、成功時公開と整合する。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:210-241,666-668`。D1〜D30はすべて解決済みで、未確定事項は「なし」。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:670-683,1106-1110`。`context/project.md:66-74`の全targetと一致し、Core→AnalyzerはProtocol経由に限定。コマンド契約の変更候補も`specs/24-gradle-multi-module-source-roots/index.md:1175-1178`で分類済み。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1265`。`hooks/spec/validate_document.sh:21-44`の必須節をすべて備え、文書検証も成功。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:139-203`。入力、discovery、完全性、fatal、E2Eを観測可能なWHEN／IF／THE SYSTEM SHALL形式で規定。
+- prompts 自己完結性: N/A — diagram phase reviewであり、promptsは対象に含まれない。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:1119-1122`。sync phaseは未実行で「反映済」行はなく、durable成果は今後ハンドオフ予定。
+
+PASS
