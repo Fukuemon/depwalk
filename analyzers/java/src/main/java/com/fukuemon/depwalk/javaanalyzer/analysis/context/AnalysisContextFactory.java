@@ -114,13 +114,14 @@ public final class AnalysisContextFactory {
             commonEntries.add(Path.of(entry).toAbsolutePath().normalize());
         }
 
+        int externalBuildProjectCount = 0;
         for (DepwalkProjectModel project : model.getProjects()) {
             Path projectDir = project.getProjectDirectory().toPath().toAbsolutePath().normalize();
             if (!realPathWithin(projectDir, workspaceRoot)) {
-                // external included build は in-scope root 検証の前に識別し、
-                // 1 build 1 warning で除外する (解決済み artifact は classpath 側で利用できる)。
-                warnings.add(warning(JavaDiagnosticCode.JAVA_SOURCE_ROOT_EXCLUDED,
-                        "excluded external included build from analysis scope: project " + project.getProjectPath()));
+                // external included build は in-scope root 検証の前に識別して除外する
+                // (解決済み artifact は classpath 側で利用できる)。model は build 識別子を
+                // 持たないため、warning は run あたり 1 件へ集約する。
+                externalBuildProjectCount++;
                 continue;
             }
 
@@ -207,6 +208,12 @@ public final class AnalysisContextFactory {
                     List.copyOf(dependencyIds),
                     level.get(),
                     project.isPreviewEnabled()));
+        }
+
+        if (externalBuildProjectCount > 0) {
+            warnings.add(warning(JavaDiagnosticCode.JAVA_SOURCE_ROOT_EXCLUDED,
+                    "excluded " + externalBuildProjectCount
+                            + " project(s) of external included builds from the analysis scope"));
         }
 
         rejectContainedRoots(rootOwners.keySet(), JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS);
