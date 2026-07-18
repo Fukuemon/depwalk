@@ -103,10 +103,16 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 		if got := request["sourceRoots"]; !reflect.DeepEqual(got, wantRoots) {
 			t.Errorf("sourceRoots = %v, want order-preserving %v", got, wantRoots)
 		}
-		metadata := request["metadata"].(map[string]any)
-		gotClasspath := metadata["classpath"].([]any)
+		metadata, ok := request["metadata"].(map[string]any)
+		if !ok {
+			t.Fatalf("request metadata is not an object: %v", request["metadata"])
+		}
+		gotClasspath, ok := metadata["classpath"].([]any)
+		if !ok {
+			t.Fatalf("metadata classpath is not an array: %v", metadata["classpath"])
+		}
 		if len(gotClasspath) != len(manifest) {
-			t.Errorf("classpath = %d entries, want %d", len(gotClasspath), len(manifest))
+			t.Fatalf("classpath = %d entries, want %d", len(gotClasspath), len(manifest))
 		}
 		for i, entry := range manifest {
 			if gotClasspath[i] != entry {

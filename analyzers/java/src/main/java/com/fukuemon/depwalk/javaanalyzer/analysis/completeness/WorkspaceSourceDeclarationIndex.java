@@ -1,7 +1,9 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
+import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
+import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.TypeDeclaration;
@@ -37,8 +39,16 @@ public final class WorkspaceSourceDeclarationIndex {
         this.workspaceRoot = workspaceRoot;
     }
 
-    /** first pass で CU ごとに呼び、型宣言を索引へ登録する。 */
-    public void accept(CompilationUnit cu, String contextId) {
+    /**
+     * first pass で CU ごとに呼び、型宣言を索引へ登録する。
+     *
+     * <p>ContextScope の root 相対 path 検査は package 宣言と配置が一致しない
+     * source や複数 top-level type を検出できないため、parse 後の実 binary name
+     * で cross-context の重複を検証する (D6)。
+     *
+     * @throws AnalyzerFatalException 異なる context が同じ binary name を宣言する場合
+     */
+    public void accept(CompilationUnit cu, String contextId) throws AnalyzerFatalException {
         String path = cu.getStorage()
                 .map(storage -> RelativePaths.toRecordPath(
                         workspaceRoot.relativize(storage.getPath().toAbsolutePath().normalize()).toString()))
@@ -54,7 +64,14 @@ public final class WorkspaceSourceDeclarationIndex {
                 continue;
             }
             int line = type.getRange().map(r -> r.begin.line).orElse(1);
-            typesByBinaryName.putIfAbsent(binaryName, new TypeLocation(contextId, path, line));
+            TypeLocation existing =
+                    typesByBinaryName.putIfAbsent(binaryName, new TypeLocation(contextId, path, line));
+            if (existing != null && !existing.contextId().equals(contextId)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
+                        "analysis contexts " + existing.contextId() + " and " + contextId
+                                + " declare the same source binary name: " + binaryName);
+            }
         }
     }
 

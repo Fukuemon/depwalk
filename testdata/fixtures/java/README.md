@@ -6,7 +6,7 @@
 This fixture is designed as an analyzer test target, not a working
 application — do not add real business logic here.
 
-## Structure (6 covered scenarios)
+## Structure (4 covered scenarios)
 
 | Scenario                                              | File(s)                                                                   |
 | ----------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -14,7 +14,14 @@ application — do not add real business logic here.
 | Inheritance, override vs. no override                 | `project/.../Animal.java`, `Dog.java`, `Cat.java`, `AnimalCaller.java`    |
 | Jar-derived method lifted to a scope-internal subtype | `project/.../WidgetUsingLib.java` + `lib/fixture-lib.jar`                 |
 | Lambda call (`viaLambda: true`)                       | `project/.../LambdaUser.java`                                             |
-| Unparseable file (partial analysis continuation)      | `project/.../BrokenSyntax.java`                                           |
+
+Parse errors and unresolved in-scope calls are no longer covered as
+"continue with a partial graph" scenarios: since spec #24 (D15 / D20), an
+unparseable file fails the whole request with `JAVA_PARSE_ERROR` and an
+unresolved in-scope call fails it with `JAVA_INCOMPLETE_ANALYSIS`. Those
+fatal paths are asserted by the Java Analyzer's own tests, so this fixture
+holds only cleanly analyzable sources and `expected/diagnostics.json` is
+an empty array.
 
 Known caller/callee expectations live in `expected/call-edges.json` and
 `expected/diagnostics.json`, loaded and checked by the Go E2E test. These

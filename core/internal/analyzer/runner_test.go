@@ -72,6 +72,34 @@ func TestRunnerScenarios(t *testing.T) {
 	}
 }
 
+type failingWriter struct{}
+
+func (w *failingWriter) Write(p []byte) (int, error) {
+	return 0, fmt.Errorf("stderr forwarding failed")
+}
+
+// 転送先 writer が失敗しても stderr は EOF まで drain され、capture が欠けない。
+func TestRunnerDrainsStderrWhenForwardWriterFails(t *testing.T) {
+	t.Parallel()
+
+	scenarioDir := fixturePath(t, "success")
+	request := readRequest(t, scenarioDir)
+	runner := New(Command{
+		Path:   os.Args[0],
+		Args:   []string{"-test.run=TestHelperAnalyzerProcess", "--", "--helper-analyzer", scenarioDir},
+		Stderr: &failingWriter{},
+	})
+
+	result, err := runner.Run(request, func(protocol.Record) {})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	wantStderr := string(readFile(t, filepath.Join(scenarioDir, "stderr.txt")))
+	if result.Stderr != wantStderr {
+		t.Fatalf("Stderr = %q, want %q", result.Stderr, wantStderr)
+	}
+}
+
 func TestRunnerRejectsInvalidRequest(t *testing.T) {
 	t.Parallel()
 

@@ -124,6 +124,42 @@ class GradleCompatibilityMatrixTest {
         }
     }
 
+    @org.junit.jupiter.api.Test
+    void normalizesLegacySourceCompatibilityToCanonicalMajor() throws Exception {
+        String jdkHome = System.getProperty("depwalk.matrix.jdk17");
+        assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");
+        Path workspace = Files.createTempDirectory("depwalk-matrix-legacy-").toRealPath();
+        try {
+            Files.writeString(workspace.resolve("settings.gradle"), "rootProject.name = 'legacy'\n");
+            // release 未指定の Java 8 project は JavaVersion.toString() が "1.8" を
+            // 返すため、provider が canonical major "8" へ正規化することを固定する。
+            Files.writeString(workspace.resolve("build.gradle"), """
+                    plugins { id 'java' }
+                    java {
+                        sourceCompatibility = JavaVersion.VERSION_1_8
+                        targetCompatibility = JavaVersion.VERSION_1_8
+                    }
+                    """);
+            Path src = workspace.resolve("src/main/java/com/example");
+            Files.createDirectories(src);
+            Files.writeString(src.resolve("Legacy.java"), "package com.example; public class Legacy {}\n");
+            Files.writeString(workspace.resolve("gradle.properties"),
+                    "org.gradle.java.home=" + jdkHome + "\n");
+            ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
+            PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
+
+            DepwalkGradleModel model = new GradleModelDiscovery(new GradleToolingClient("8.14.5"), stderr)
+                    .discover(workspace);
+
+            assertEquals(1, model.getProjects().size());
+            assertEquals("8", model.getProjects().get(0).getSourceLanguageLevel());
+        } finally {
+            try (Stream<Path> paths = Files.walk(workspace)) {
+                paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+    }
+
     private static void assertRoot(DepwalkProjectModel project, Path workspace, String expectedRelative) {
         assertNotNull(project);
         List<String> roots = project.getMainJavaSourceDirectories().stream()

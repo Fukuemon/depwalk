@@ -75,6 +75,33 @@ class IncompleteAnalysisTest {
                 "production stderr carries only aggregate counts");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void callsUnderUnresolvableCallerDeclarationsRemainInTheCompletenessGate() throws Exception {
+        // caller 宣言 (parameter 型が未解決) が placeholder へ落ちる場合、その配下の
+        // call site は edge を出せないため emitted でなく primary diagnostic として
+        // fatal に残る (D14 / D20)。
+        write("com/example/C.java", """
+                package com.example;
+                public class C {
+                    void broken(Missing param) { helper(); }
+                    void helper() {}
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
+
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size());
+        assertEquals("JAVA_INCOMPLETE_ANALYSIS", errors.get(0).get("code"));
+        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        assertTrue(details.stream().anyMatch(d ->
+                        "unresolved-caller".equals(((Map<String, Object>) d.get("metadata")).get("reason"))),
+                () -> "expected an unresolved-caller primary diagnostic: " + details);
+    }
+
     @Test
     void cleanWorkspaceSucceedsWithZeroSilentOmission() throws Exception {
         write("com/example/Ok.java", """

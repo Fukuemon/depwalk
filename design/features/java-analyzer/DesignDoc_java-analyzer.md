@@ -1,6 +1,6 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-18 / Status: 完了 (spec #24 sync で Gradle multi-project discovery、完全性 gate、生成 member 対応を更新)
+> 最終更新: 2026-07-19 / Status: 完了 (spec #24 sync で Gradle multi-project discovery、完全性 gate、生成 member 対応を更新)
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 

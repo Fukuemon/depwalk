@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,12 +93,17 @@ func (r Runner) Run(request protocol.AnalysisRequest, onRecord func(protocol.Rec
 
 	stderrDone := make(chan []byte, 1)
 	go func() {
+		var buf bytes.Buffer
 		source := io.Reader(stderr)
 		if r.command.Stderr != nil {
 			source = io.TeeReader(stderr, r.command.Stderr)
 		}
-		content, _ := io.ReadAll(source)
-		stderrDone <- content
+		if _, err := buf.ReadFrom(source); err != nil {
+			// 転送先 writer の失敗で drain を止めると pipe が詰まり Analyzer が
+			// 終了できなくなるため、以降は転送せず EOF まで読み切る。
+			_, _ = buf.ReadFrom(stderr)
+		}
+		stderrDone <- buf.Bytes()
 	}()
 
 	// finish drains stderr to EOF before calling Wait so the pipe is fully
