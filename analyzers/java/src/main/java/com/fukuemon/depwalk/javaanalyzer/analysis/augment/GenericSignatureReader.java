@@ -168,6 +168,9 @@ public final class GenericSignatureReader {
         @Override
         public void visitInnerClassType(String name) {
             binaryName = binaryName + "$" + name;
+            // outer 型の型引数を inner の引数と混合しない。outer 引数は破棄し、
+            // 不足分は解決側の Object 補正へ委ねる (混合より erasure 側へ倒す)。
+            argumentSources.clear();
         }
 
         @Override
