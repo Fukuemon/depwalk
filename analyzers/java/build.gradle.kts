@@ -90,6 +90,9 @@ tasks.shadowJar {
     archiveVersion.set("")
     manifest {
         attributes["Main-Class"] = "com.fukuemon.depwalk.javaanalyzer.Main"
+        // Tooling API の native-platform load による JVM WARNING を抑止し、
+        // Analyzer stderr を depwalk 生成の固定行だけに保つ (output 隔離)。
+        attributes["Enable-Native-Access"] = "ALL-UNNAMED"
     }
 }
 
