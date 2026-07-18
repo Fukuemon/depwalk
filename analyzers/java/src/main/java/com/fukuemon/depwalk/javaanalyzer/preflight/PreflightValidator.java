@@ -48,13 +48,21 @@ public final class PreflightValidator {
         }
 
         Map<String, Object> metadata = request.metadata();
+        // classpath key は明示 sourceRoots 経路で必須 (空配列可)。自動 discovery
+        // 経路では context classpath を Gradle model から取得するため、任意の
+        // 共通追加 entry として扱う (spec #24 D6)。
+        boolean explicitSourceRoots = request.sourceRoots() != null;
         if (metadata == null || !metadata.containsKey(METADATA_CLASSPATH)) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_MISSING_CLASSPATH,
-                    "analysisRequest.metadata is missing required key \"classpath\"");
+            if (explicitSourceRoots) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_MISSING_CLASSPATH,
+                        "analysisRequest.metadata is missing required key \"classpath\"");
+            }
         }
 
-        List<String> classpath = readClasspath(metadata.get(METADATA_CLASSPATH));
+        List<String> classpath = metadata != null && metadata.containsKey(METADATA_CLASSPATH)
+                ? readClasspath(metadata.get(METADATA_CLASSPATH))
+                : List.of();
         for (String entry : classpath) {
             Path path = Path.of(entry);
             if (!Files.exists(path) || !Files.isReadable(path)) {
@@ -65,7 +73,9 @@ public final class PreflightValidator {
         }
 
         validateWorkspaceRoot(request.workspaceRoot());
-        validateLiftExcludePackages(metadata);
+        if (metadata != null) {
+            validateLiftExcludePackages(metadata);
+        }
 
         return new Validated(classpath);
     }

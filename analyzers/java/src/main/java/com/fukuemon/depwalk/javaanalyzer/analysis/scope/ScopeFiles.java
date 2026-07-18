@@ -65,7 +65,7 @@ public final class ScopeFiles {
      * glob 照合用に相対 path 文字列を {@code /} 区切りへ正規化した {@link Path} に変換する
      * (Windows の {@code \} 区切りを吸収する。{@code /} 区切り入力はそのまま)。
      */
-    static Path toMatchablePath(String rawRelativePath) {
+    public static Path toMatchablePath(String rawRelativePath) {
         return Path.of(RelativePaths.toRecordPath(rawRelativePath));
     }
 

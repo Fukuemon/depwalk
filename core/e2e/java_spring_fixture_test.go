@@ -23,6 +23,7 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 	for _, entry := range classpath {
 		metadataPairs = append(metadataPairs, "classpath="+entry)
 	}
+	metadataPairs = append(metadataPairs, "javaLanguageLevel=25")
 	metadata, err := analyze.BuildMetadata(metadataPairs)
 	if err != nil {
 		t.Fatalf("build Spring fixture analyzer metadata: %v", err)
@@ -33,6 +34,7 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 		RecordType:    protocol.RecordTypeAnalysisRequest,
 		RequestID:     "e2e-spring-fixture",
 		WorkspaceRoot: sourceRoot,
+		SourceRoots:   []string{"."},
 		Language:      protocol.LanguageJava,
 		Metadata:      metadata,
 	}
