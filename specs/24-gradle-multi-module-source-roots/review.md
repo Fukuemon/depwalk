@@ -96,3 +96,103 @@ Verdict: PASS
 - 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:717-720`。上位資料への「反映済」行はなく、track / sync 前の作業記録段階。
 
 PASS
+
+## Review 2026-07-18 12:12
+
+Verdict: NEEDS_WORK
+
+### 観点別評価
+
+- 上位文書整合: NEEDS_WORK — D18 の `methodSymbol.sourceLocation` は所有 source type の宣言位置を指すとするが、Protocol 正本では method の「定義位置」である。さらに D20 は未解決理由を持つ先行 diagnostic を無効化するため、ADR-0004 の観測可能性契約とも未整合。Gradle dependency resolution の外部 network・認証・cache 更新も `context/infrastructure.md` の現行契約との差分として未追跡。
+- 未解決論点: PASS — D1〜D20 の決定欄はすべて `解決済み` で、`未確定事項` は「なし」 (`specs/24-gradle-multi-module-source-roots/index.md:189-210,493-495`)。各 D18〜D20 に決定理由、トレードオフ、ADR 判断、決定日、決定者がある (`:448-491`)。
+- 実装対象明示: PASS — `core / traversal / output / analyzer-protocol / java-analyzer` の全正規 target と変更有無・責務を明記し、Core → Analyzer の Protocol 境界も維持している (`specs/24-gradle-multi-module-source-roots/index.md:497-510`; `context/project.md:66-74`)。
+- template 必須節: PASS — 必須 Level 2 節、機能仕様の必須小節、11フェーズ、更新日、変更履歴が揃っている (`specs/24-gradle-multi-module-source-roots/index.md:6-31,512-565,567-909`; `hooks/spec/validate_document.sh:21-44,79-109`)。
+- EARS acceptance: PASS — D18〜D20 を含む bytecode-only member、実 CLI E2E、call completeness fatal が観測可能な WHEN / IF / THE SYSTEM SHALL として定義され、対応する固定期待テストもある (`specs/24-gradle-multi-module-source-roots/index.md:152-180,693-709`)。
+- prompts 自己完結性: N/A — prompts は未生成で、現在は clarify review gate 待ち (`specs/24-gradle-multi-module-source-roots/index.md:25-30,759-791`)。
+- 正本境界: N/A — track / sync 前で「反映済」行はなく、変更点は handoff 候補として管理されている (`specs/24-gradle-multi-module-source-roots/index.md:793-858`)。
+
+### 指摘
+
+- High: D18 の bytecode-only member に所有 type の位置を `methodSymbol.sourceLocation` として入れるのは、Protocol の既存意味論と矛盾する。
+  - `specs/24-gradle-multi-module-source-roots/index.md:448-452` — source AST に member 宣言がないにもかかわらず、所有 type の宣言位置を member の `sourceLocation` に設定している。
+  - `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:92-95,115-125` — `methodSymbol.sourceLocation` は定義位置であり、位置を持たない symbol では省略可能。
+  - `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:183-190` — field 意味論の変更は breaking change。
+  - `specs/24-gradle-multi-module-source-roots/index.md:580-585,814-820` — spec は response schemaを変更しないとし、変更候補も metadata passthrough のみで、`SourceLocation` の意味変更を分類していない。
+  - 対応案: bytecode-only member の `sourceLocation` は省略し、owner type の位置を明示的な anchor metadata として表すか、Protocol の意味変更として versioning と sync 対象を再設計する。
+
+- High: D20 の全 record 破棄により、ADR-0004 が要求する動的・未解決理由の観測可能性が失われる。
+  - `specs/24-gradle-multi-module-source-roots/index.md:478-489` — primary diagnostic が残ると generic な `JAVA_INCOMPLETE_ANALYSIS` を返し、先行 diagnostic をすべて無効化する。error に残す情報は件数と最初の位置・call kind までで、元の unresolved reason は契約化されていない。
+  - `adr/0004-defer-runtime-call-tracing.md:27-32` — 静的に確定できない場合も候補・未解決理由を metadata / diagnostic で観測可能にし、動的機構の検出事実を残すことを決定している。
+  - `specs/24-gradle-multi-module-source-roots/index.md:41-55,850-858` — ADR-0004 との整合・更新要否が追跡されていない。
+  - 対応案: fatal error の metadata に理由別集計または決定的な unresolved detail を保持する契約を定めるか、ADR-0004 を更新対象として明示する。
+
+- Medium: Tooling API discovery が新たに要求し得る network・repository 認証・Gradle user cache 更新を、infrastructure 正本との差分として分類していない。
+  - `specs/24-gradle-multi-module-source-roots/index.md:351-361,611-616` — dependency download、repository 認証、Gradle user cache 書き込みを許容する。
+  - `context/infrastructure.md:15-18` — 外部インフラ依存を持たず、対象 source への read-only access のみ、secret / token 不要とする現行契約。
+  - `specs/24-gradle-multi-module-source-roots/index.md:842-848` — context 変更候補は architecture / toolchain / testing のみで、infrastructure がない。
+  - 対応案: `context/infrastructure.md` の runtime・認証・cache 副作用を sync 対象へ追加する。
+
+上位文書との矛盾・未分類差分があるため、clarify で上記を解消した後、`spec-lifecycle` の track / sync phase で Protocol feature doc、ADR-0004、`context/infrastructure.md` へ反映する必要がある。
+
+NEEDS_WORK
+
+## Review 2026-07-18 12:57
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:524-525` は Core が Java 固有 metadata を解釈しないとしつつ、CLI renderer に `JAVA_INCOMPLETE_ANALYSIS.metadata.unresolvedCalls` の専用解釈を要求する。これは Core を言語非依存に保つ `design/DesignDoc.md:163-166`、`context/architecture.md:15-17` と矛盾する。
+- 未解決論点: NEEDS_WORK — D1〜D23 は解決済み、未確定事項も「なし」だが (`specs/24-gradle-multi-module-source-roots/index.md:197-221,548-550`)、D22 の opaque passthrough と Java 固有 CLI 表示、および D23 の任意 build logic 実行と credential 非出力保証が両立する方式は未決定のままである。
+- 実装対象明示: NEEDS_WORK — target 一覧自体は `context/project.md:66-74` と一致する (`specs/24-gradle-multi-module-source-roots/index.md:552-565`)。ただし Java 固有 error code / metadata を Core CLI が解釈する `:524-525` は、明記された「Core に Java 固有解決を持ち込まない」境界 `:914` を越える。
+- template 必須節: PASS — 必須 Level 2 節は `specs/24-gradle-multi-module-source-roots/index.md:6-984` にすべて存在し、`hooks/spec/validate_document.sh` も成功した。更新日、フェーズ状況、レビュー、変更履歴は `:6-31,930-979` に同期されている。
+- EARS acceptance: NEEDS_WORK — D18〜D22 の bytecode-only member、owner location、実 binary E2E、完全性 fatal、unresolved detail は観測可能に具体化されている (`specs/24-gradle-multi-module-source-roots/index.md:157-188,752-778`)。一方、任意の build logic を実行し得る `:150,533-541` 状態で credential が stdout / stderr に現れないという絶対保証 `:152` は、Gradle build output の隔離・抑制・redaction 契約なしには検証可能な受け入れ基準になっていない。
+- prompts 自己完結性: N/A — prompts は未生成で、clarify review gate 待ちである (`specs/24-gradle-multi-module-source-roots/index.md:25-30,853-858`)。
+- 正本境界: N/A — sync phase 前で「反映済」行はなく、durable な内容は変更候補として管理されている (`specs/24-gradle-multi-module-source-roots/index.md:860-928`)。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:524-525` — CLI が `JAVA_INCOMPLETE_ANALYSIS` と `unresolvedCalls` を専用解釈すると、2つ目以降の Analyzer の failure 表示追加時に Core 変更が必要になる。Protocol 共通の言語非依存 failure-detail schemaを定義する、metadataを汎用表示する、または人間向け詳細表示をAnalyzer stderrへ委譲する、のいずれかに決める必要がある。現状の `ADR-0003 更新なし` (`:925`) とも両立しない。
+- `specs/24-gradle-multi-module-source-roots/index.md:150-152,533-541` — build logic は任意 code であり、credentialを自ら標準出力・標準エラーへ書ける。Tooling APIのbuild outputをどこへ接続するか、利用者へ転送しない範囲、例外messageのsanitize、悪意あるfixtureがdummy credentialを出力するnegative testを定義するか、保証を「depwalk生成logには出さない」へ限定する必要がある。
+- `specs/24-gradle-multi-module-source-roots/index.md:910-917` — sync候補が不足している。D23は `context/architecture.md` のState / Runtime Boundaryにも反映対象として追加すべきである。現行契約は対象repositoryへのread-only accessだけを前提とする (`context/architecture.md:39-48`)。
+- `specs/24-gradle-multi-module-source-roots/index.md:910-917` — `context/project.md` もsync対象に必要である。現行Quick Commandsは旧classpath前提の開発起動と単一fixture E2Eのまま (`context/project.md:46-58`) で、D3/D12/D19の自動discovery、明示時language metadata、required multi-module実CLI E2Eを反映していない。
+
+NEEDS_WORK
+
+## Review 2026-07-18 14:20
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:454-458` の `CallSiteId` は enclosing method ID を必須とするが、既存仕様は instance initializer / field initializer を constructor に畳み込む (`design/features/java-analyzer/DesignDoc_java-analyzer.md:127-142`)。1つの AST call site が複数 constructor caller に対応する場合の inventory 展開・ID・ledger cardinality が未定義で、取得不能時は正当な既存構文まで `JAVA_INTERNAL_ERROR` になる。また `methodSymbol.metadata` の Core graph 保持 (`specs/24-gradle-multi-module-source-roots/index.md:471-471,512-522,620-620`) は、現行 Protocol 正本の「Graph Symbol は保持せず、将来 issue で別途設計」 (`design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md:111-113`) と context の graph model 境界 (`context/architecture.md:14-15`) を変更するが、Graph feature doc を変更・sync 対象として追跡していない。clarify で境界を確定後、`spec-lifecycle` の sync phase で関連正本へ反映する必要がある。
+- 未解決論点: NEEDS_WORK — `specs/24-gradle-multi-module-source-roots/index.md:370-380` は provider bytecode level、bundled Tooling API 対応範囲、検証 wrapper versions を「ADR-0006 / toolchain に記録する」とするだけで具体値・決定者・期限がない一方、`specs/24-gradle-multi-module-source-roots/index.md:610-612` は未確定事項を「なし」としている。sync は決定の転記 phase であるため、D11 の互換性 matrix を clarify で確定するか、期限・決定者付き未確定事項として管理する必要がある。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:614-627` は `context/project.md:66-74` の全 target と一致し、各 target の変更有無・責務と Core → Analyzer の Protocol 境界を明示する。command 契約との差分も D27 (`specs/24-gradle-multi-module-source-roots/index.md:598-605`) で局所 smoke ではなく正本 sync 対象として説明されている。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1057` に validator が要求する全 Level 2 節と `## 備考` が存在し、11フェーズ (`:15-31`)、スコープ両 subsection (`:88-110`)、機能仕様の必須設計 topic (`:629-684`) も揃っている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:135-194` に WHEN / IF / THE SYSTEM SHALL の観測可能な基準があり、具体的な fixed set・exit status・record field・Tooling API bypass の検証項目へ展開されている (`:790-892`)。
+- prompts 自己完結性: N/A — prompts は未生成であり、実装分割も prompts 生成前の方針段階 (`specs/24-gradle-multi-module-source-roots/index.md:911-926`)。
+- 正本境界: N/A — `## 上位資料からの変更点` は clarify 由来の変更候補を記録した段階で、sync phase の「反映済」行はない (`specs/24-gradle-multi-module-source-roots/index.md:928-999`)。
+
+### 指摘 (NEEDS_WORK の場合のみ)
+
+- `specs/24-gradle-multi-module-source-roots/index.md:454-458` — field / instance initializer 内 call の semantic caller 展開を定義し、1 AST call site が複数 constructor に畳み込まれる場合の `CallSiteId`、inventory entry 数、ledger outcome 数を確定する。
+- `specs/24-gradle-multi-module-source-roots/index.md:471-471,512-522,945-978` — `methodSymbol.metadata` を Core graph `Symbol` に保持する変更について Graph feature doc を関連資料・上位文書整合・変更先へ追加し、Protocol / Graph / context の正本変更を sync phase で一貫して反映する。
+- `specs/24-gradle-multi-module-source-roots/index.md:370-380,610-612` — bundled Tooling API version、対応 Gradle wrapper 範囲、provider classfile target / daemon JVM matrix を D11 で決定する。後続決定なら未確定事項に期限・決定者を記録し、下流 phase を止める。
+
+NEEDS_WORK
+
+## Review 2026-07-18 15:43
+
+Verdict: PASS
+
+### 観点別評価 (PASS は必ず根拠 file:line / section を引用する)
+
+- 上位文書整合: PASS — `specs/24-gradle-multi-module-source-roots/index.md:33-62` で Design Doc、関連 feature doc、context、ADR の継承・補足・変更提案を明示し、`987-1059` で各 sync 先を追跡している。Core の言語非依存境界も `202-203, 679-680` で維持され、未追跡の矛盾はない。
+- 未解決論点: PASS — `specs/24-gradle-multi-module-source-roots/index.md:210-241` の D1〜D30 はすべて「解決済み」、`663-665` の未確定事項は「なし」。下流 phase は `26-31` で未着手のままである。
+- 実装対象明示: PASS — `specs/24-gradle-multi-module-source-roots/index.md:667-680` は `context/project.md:66-74` の全 target と一致し、変更対象と非変更対象、Core → Analyzer の Protocol 境界を明示している。コマンド契約との差分も `1044` で sync 対象として追跡している。
+- template 必須節: PASS — `specs/24-gradle-multi-module-source-roots/index.md:6-1126` にテンプレートおよび validator の全必須節・サブ節が存在し、`hooks/spec/validate_document.sh` も終了コード 0。更新日、フェーズ状況、レビュー履歴、変更履歴は `11, 19-31, 1061-1075, 1076-1121` で同期されている。
+- EARS acceptance: PASS — `specs/24-gradle-multi-module-source-roots/index.md:139-203` に WHEN / IF / THE SYSTEM SHALL の観測可能な基準があり、入力 validation、discovery、互換性、fatal、Graph、E2E の期待結果までテスト可能に定義されている。
+- prompts 自己完結性: N/A — prompts は未生成で、prompts phase はレビュー対象に含まれていない。実装分割・prompts 方針も `specs/24-gradle-multi-module-source-roots/index.md:970-985` で未着手として管理されている。
+- 正本境界: N/A — `specs/24-gradle-multi-module-source-roots/index.md:987-1059` に「反映済」行はなく sync phase 前である。冒頭 `3-4` と `61-62` でも durable 成果は sync phase で handoff すると明示されている。
+
+PASS
