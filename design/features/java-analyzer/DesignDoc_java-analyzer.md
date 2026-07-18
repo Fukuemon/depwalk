@@ -1,19 +1,19 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-15 / Status: 完了 (#21 実装・実測により SootUp / Spring DI 解決、Spring fixture、性能増分を更新)
+> 最終更新: 2026-07-18 / Status: 完了 (spec #24 sync で Gradle multi-project discovery、完全性 gate、生成 member 対応を更新)
 
-Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は契約を変更せず Java 側の実装方式を定める。
+Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 
 ## メタ
 
-| 項目           | 値                                                                                                                                                                                                                                                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                                                           |
-| 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項)                                   |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                                                                                                                             |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)、[ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) |
-| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)                                                                                                                                                                                         |
-| 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                                                        |
+| 項目           | 値                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                                                                                                                                |
+| 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項)                                                                                                        |
+| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)、[infrastructure](../../../context/infrastructure.md)                                                                                                                                                            |
+| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)、[ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md)、[ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md) |
+| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                                                                            |
+| 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                                                                                                                             |
 
 ## 背景・要件解釈
 
@@ -32,6 +32,8 @@ Phase1 の対象は Java/Spring Boot であり、Java Analyzer は `analyzer-pro
 - Core からの起動方法 (CLI flag / 環境変数による起動コマンド解決) の確定
 - 未解決 symbol / 部分解析の `diagnostic` 表現
 - #21 で行う SootUp 型階層補完、Interface Dispatch / Override 解決、Spring Bean / DI 解決、候補 edge 統合の契約
+- single / multi-project を同じ request で扱う Gradle build model discovery と明示 source root override
+- parse・resolution・生成 member を含む call inventory の完全性 gate
 
 ### やらないこと
 
@@ -68,10 +70,12 @@ metadata passthrough も同様の言語非依存原則に従う。Core は `--an
 
 Java 固有の `metadata` key:
 
-| key                   | 型          | 必須/任意                           | 意味                                                                                                                        |
-| --------------------- | ----------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `classpath`           | string 配列 | **必須** (key として。空配列は許容) | 依存 jar / classes dir の path。key 不在は `JAVA_MISSING_CLASSPATH` の `error`                                              |
-| `liftExcludePackages` | string 配列 | 任意                                | 引き上げ除外 package (帰属型決定規則)。指定時は既定値 (`java` / `javax` / `jakarta`) を置き換える。segment 単位 prefix 一致 |
+| key                   | 型          | 必須/任意                                                                               | 意味                                                                                                                        |
+| --------------------- | ----------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `classpath`           | string 配列 | 明示 `sourceRoots` 時は **必須** (空配列可)。自動 discovery 時は任意の共通 extra        | 依存 jar / classes dir の path。自動 discovery では model の compile classpath / classes output を使用する                  |
+| `javaLanguageLevel`   | string 配列 | 明示 `sourceRoots` 時は **必須** (要素 1)。自動 discovery 時は指定禁止                  | parser に渡す canonical source language level。Analyzer / daemon JVM から推測しない                                         |
+| `javaPreview`         | string 配列 | 明示 `sourceRoots` 時のみ任意 (要素 1 の `true` / `false`)。自動 discovery 時は指定禁止 | preview 構文の有効化。parser が対応する language level のみ許可                                                             |
+| `liftExcludePackages` | string 配列 | 任意                                                                                    | 引き上げ除外 package (帰属型決定規則)。指定時は既定値 (`java` / `javax` / `jakarta`) を置き換える。segment 単位 prefix 一致 |
 
 未知 key は protocol の規則どおり無視する。Core は本表を知らない (Analyzer 側のみが解釈する)。
 
@@ -83,15 +87,56 @@ JavaParser (AST 解析) + SymbolSolver (型解決) を用い、次の 3 つの `
 - `JavaParserTypeSolver` (対象プロジェクトの source root)
 - `JarTypeSolver` (依存 jar)
 
-classpath は `analysisRequest.metadata` の `classpath` key として **必須**とする (値としての空配列は許容し、依存を持たない純 Java プロジェクトを扱えるようにする)。key 自体が無い場合は `JAVA_MISSING_CLASSPATH` の `error` とする。
+classpath は明示 `sourceRoots` 経路で `analysisRequest.metadata.classpath` key を **必須**とする (空配列可)。自動 discovery 経路では custom tooling model が project ごとの compile classpath / classes output を提供し、request metadata の `classpath` があれば共通 extra として全 context へ追加する。`javaLanguageLevel` / `javaPreview` の自動 discovery 時指定は不正とする。
 
 `classpath` の各要素には依存 jar またはコンパイル済み classes directory を指定できる。#21 で自プロジェクトの bytecode を照会する場合は、解析対象プロジェクトの classes output directory (例: Gradle の `build/classes/java/main`) も既存の `classpath` 配列へ追加する。新しい metadata key は導入しない。SootUp は、source から得た binary name と一致する `.class` を classpath 上で照会し、自プロジェクトの class と依存 class を区別する。
 
 pre-flight 検査 (classpath key の有無 / 指定した jar または classes directory の存在・読み取り可否) は、解析開始前に一括で行う。明示された classpath entry の欠落・読み取り不能は `JAVA_MISSING_JAR` の fatal とし、`error` + 非ゼロ exit で即時停止する。明示された入力の欠落を部分解析へ降格すると、出力済みの `methodSymbol` / `callEdge` が「一見成功した出力」として観測されうるためである。
 
-`JAVA_SOOTUP_UNAVAILABLE` の継続可能 fallback は、pre-flight を通過した入力について SootUp が class file を解釈・索引化できない場合、または自プロジェクトの classes directory が classpath に指定されず source に対応する bytecode を取得できない場合に限定する。この場合は対象と原因を diagnostic に出力し、JavaParser の結果だけで解析を継続する。
+`JAVA_SOOTUP_UNAVAILABLE` の継続可能 fallback は、pre-flight を通過した入力について SootUp が class file を解釈・索引化できない場合、自動 discovery の model 由来 classes output が未作成の場合、または明示経路で自 project classes output 自体が classpath に指定されていない場合に限定する。この場合は対象と原因を diagnostic に出力し、JavaParser の結果だけで source-only 解析を継続する。利用者が classpath entry として明示した classes directory / jar、または model が解決済み compile classpath として返した entry の欠落・読取不能は `JAVA_MISSING_JAR` の fatal であり fallback しない。source-only で生成 member を救済できず primary call diagnostic が残れば、終端で `JAVA_INCOMPLETE_ANALYSIS` になる。
 
 #21 の SootUp 依存は `org.soot-oss:sootup.core:2.0.0`、`org.soot-oss:sootup.java.core:2.0.0`、`org.soot-oss:sootup.java.bytecode.frontend:2.0.0` に固定する。`sootup.callgraph` は D1 の責務境界に反するため追加しない。2.0.0 は実装前設計時点で Maven Central に公開されている安定版で、bytecode の `AnalysisInputLocation` / `View` に必要な最小 module を選んだ。
+
+### Source root discovery と解析 context
+
+`analysisRequest.sourceRoots` の有無で経路を排他的に選ぶ。
+
+| 経路           | 入力                                                                               | discovery / context                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 明示 override  | `sourceRoots` 1 件以上 + `classpath` + `javaLanguageLevel`、必要なら `javaPreview` | Gradle runtime を完全 bypass し、全 root と global classpath から単一 synthetic `SourceSetAnalysisContext` を構築する           |
+| 自動 discovery | `sourceRoots` 未指定                                                               | Gradle Tooling API で build model を取得し、各 Gradle project の `main` source set ごとに `SourceSetAnalysisContext` を構築する |
+
+自動 discovery は filesystem convention や root module の include 記述を独自解析しない。Gradle Tooling API `9.6.1` と、一時 init script から注入する bundled custom model provider を用いる。provider は project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無だけを返す。task 実行や source 生成は行わず、`test` と名前付き source set は明示 override で指定された場合を除き対象外とする。一時 provider / init script は workspace 外へ置く。
+
+provider は Gradle `7.6.5` API に対して build し Java 8 classfile とする。対象 Gradle は `7.6.5 <= version < 9.7.0`、Tooling API client と Analyzer build wrapper は `9.6.1`、wrapper がないbuildはbundled `9.6.1`を使い、Analyzer runtimeはJDK 25とする。Gradle daemon JVMは対象Gradleの互換条件に従って選び、project compile toolchainとsource language levelとは別軸にする。source language levelはcompile taskの`release`を優先し、なければ実効`sourceCompatibility`を用いる。`targetCompatibility`、Analyzer JVM、daemon JVM、project toolchainからparser levelを推測しない。固定CI anchorと安定failure reasonの詳細正本は [toolchain context](../../../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
+
+root は `/` separator の workspace 相対 path へ正規化する。明示root、またはworkspace内projectのsource setとして採用したroot / fileのrealpathがworkspace外へ出る場合はfatalとする。Tooling APIがworkspace外のexternal composite / included buildとして識別したbuildは、root validationより先に解析scopeから除外し、1 buildにつき1件の`JAVA_EXTERNAL_BUILD_EXCLUDED` warningを出す。modelが返す解決済みartifactは外部依存として利用できる。directory symlinkは再帰追跡しない。完全重複は先勝ちで除去し、一方が他方を包含するrootはrequest ambiguityとして拒否する。明示rootの欠落・非directory・読取不能はfatal、自動discoveryで存在しないrootは生成前sourceとみなし除外する。最終的なsource fileは絶対realpathで重複排除する。`include` / `exclude`と全locationは常に`workspaceRoot`座標で評価し、module / root IDはgraphに持ち込まない。
+
+各自動 context は model の project dependency で到達可能な context と自身の classpath だけを solver に接続する。明示経路は synthetic context の global classpath を用いる。source index を location の正本とし、solver origin と dependency reachability が一致するときだけ別 context の source へ対応付ける。
+
+### Parse・resolution・call 完全性
+
+全対象 Java file を workspace 相対 path の決定順で graph record 出力前に parse pre-flight する。1 件でも失敗した場合は最初の失敗 file の location、適用 language level、sanitize 済み parser messageを持つ `JAVA_PARSE_ERROR` を出力して非ゼロ終了し、v1 では部分 parse mode を提供しない。pre-flight の AST は file ごとに破棄し、成功後の通常解析で再 parse する。
+
+solver 前に resolution と独立した visitor で各 call expression / method reference / constructor invocation / initializer call を inventory 化する。`CallSiteId` は workspace 相対 path、start / end line・column、AST call kind からなる lexical site key と semantic caller method IDをcanonical順で連結した内部 identity とし、Protocol へは出力しない。全 call は内部 outcome ledger で次のいずれか1つへ終端しなければならない。
+
+- `emitted`: valid edge を出力した。
+- `excluded`: `external-target` または `lift-excluded-package` の列挙済み理由に該当する。
+- `diagnostic`: allowlist された resolution failure として候補・理由を保持した。
+
+未知の `RuntimeException` / `LinkageError` を広く捕捉して diagnostic へ降格しない。allowlist 外の resolver failure は `JAVA_INTERNAL_ERROR` の request fatal とする。1 call の symbol / edge / ledger 更新は原子的に行い、中途半端な record を出さない。instance initializer / field initializer の call は各 constructor caller へ、static initializer は `<clinit>` caller へ意味論上展開し、展開後の各 call を独立 `CallSiteId` として数える。
+
+source にない生成 member は、call site から要求された member だけを project bytecode member index で検索する。index は generator 固有の annotation 名に依存せず、compile classes output の signature / owner / kind を扱う。source-only member は `sourceLocation` を持つ。bytecode-only member は `sourceLocation` を省略し、`methodSymbol.metadata` に `declarationOrigin: "project-bytecode"`、`sourceAnchor: "owner-type"`、`ownerSourceLocation` を保持する。対応する edge は `calleeOrigin: "project-bytecode-member"` を持ち、Graph は nested metadata を deep copy する。owner source type がscope内にない生成type全体と、source call siteから直接参照されないJVM内部memberは索引対象外である。
+
+全救済後にも primary diagnostic outcome が残る場合、成功 graph を返さず `JAVA_INCOMPLETE_ANALYSIS` の request fatal とする。未解決 call は内部 `CallSiteId` 順で並べるが、ID 自体は Protocol へ出力しない。各共通 `error.details` には source location、元 diagnostic code / message、opaque metadata の reason / call kind / 判明済み target / candidate を自己完結形式で含め、top-level metadata の total / reasonCounts と一致させる。`silentOmission` は常に 0 でなければならない。
+
+### Gradle runtime と安全境界
+
+自動 discovery は利用者が信頼する Gradle build logic を利用者権限で評価する。repository 認証、credential provider、network、Gradle cache、daemon JVM 選択は Gradle に委譲され、任意の build logic の副作用を depwalk が sandbox するとは保証しない。明示 `sourceRoots` はこの runtime を完全に bypass する安全経路である。
+
+CLI help はこの副作用境界と明示overrideを常時説明する。自動discoveryを開始する各runでは、build評価前にAnalyzer stderrへ、settings / build script / pluginの評価、artifact repository、既存credential resolution、network、Gradle user cacheを利用し得ることと、明示overrideでbypassできることを安定した定型文で通知する。discovery開始・終了、使用Gradle version、project / root件数、安定failure categoryもstderrへ出すが、Gradle由来の自由文は出力しない。
+
+Gradle の stdout / stderr は Protocol / CLI 出力へ転送せず破棄する。例外は raw message、URL query、credential、絶対 path をそのまま返さず、分類済み code と sanitize 済み message / detail に変換する。非漏洩保証は depwalk が生成・転送する Protocol、CLI、log、test artifact に限定し、Gradle 自身や利用者 build logic の出力・副作用までは含めない。
 
 ### analysisMode の意味論
 
@@ -184,24 +229,32 @@ Bean 名は次の規則で導出する。
 
 `diagnostic` (解析継続):
 
-| code                        | severity         | 出る場面                                                                                                           |
-| --------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `JAVA_UNRESOLVED_SYMBOL`    | `warning`        | 呼び出し先の型が解決できず `callEdge` を張れない                                                                   |
-| `JAVA_PARSE_ERROR`          | `partialFailure` | ファイル単位で構文解析に失敗し、そのファイルを飛ばした                                                             |
-| `JAVA_ENTRYPOINT_NOT_FOUND` | `warning`        | `entrypoints` の method selector に一致する method が見つからない                                                  |
-| `JAVA_SOOTUP_UNAVAILABLE`   | `warning`        | pre-flight 通過後に SootUp が class file を解釈・索引化できない、または自プロジェクト bytecode が classpath にない |
-| `JAVA_RUNTIME_PROVIDED`     | `info`           | Spring Data / MyBatis が実行時に実装を提供するため意図的に解決しない                                               |
-| `JAVA_AMBIGUOUS_CANDIDATE`  | `warning`        | `@Qualifier` / `@Primary` 適用後も候補が複数残る                                                                   |
-| `JAVA_CONDITIONAL_BEAN`     | `info`           | 条件付き Bean を評価せず候補として保持する                                                                         |
+| code                           | severity  | 出る場面                                                                                                           |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `JAVA_UNRESOLVED_SYMBOL`       | `warning` | 呼び出し先の型が解決できず `callEdge` を張れない                                                                   |
+| `JAVA_ENTRYPOINT_NOT_FOUND`    | `warning` | `entrypoints` の method selector に一致する method が見つからない                                                  |
+| `JAVA_SOOTUP_UNAVAILABLE`      | `warning` | pre-flight 通過後に SootUp が class file を解釈・索引化できない、または自プロジェクト bytecode が classpath にない |
+| `JAVA_RUNTIME_PROVIDED`        | `info`    | Spring Data / MyBatis が実行時に実装を提供するため意図的に解決しない                                               |
+| `JAVA_AMBIGUOUS_CANDIDATE`     | `warning` | `@Qualifier` / `@Primary` 適用後も候補が複数残る                                                                   |
+| `JAVA_CONDITIONAL_BEAN`        | `info`    | 条件付き Bean を評価せず候補として保持する                                                                         |
+| `JAVA_EXTERNAL_BUILD_EXCLUDED` | `warning` | workspace外のexternal included buildを解析scopeから除外した                                                        |
 
 `error` (fatal / 非ゼロ exit):
 
-| code                     | 出る場面                                                                                                  |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `JAVA_MISSING_CLASSPATH` | `analysisRequest.metadata` に classpath の key が無い (値としての空配列は正当な入力であり error にしない) |
-| `JAVA_MISSING_JAR`       | classpath に指定された jar または classes directory が存在しない / 読めない (fatal、既存 code を再利用)   |
-| `JAVA_INVALID_REQUEST`   | `analysisRequest` が Java Analyzer として処理できない (未対応 `language` 等)                              |
-| `JAVA_INTERNAL_ERROR`    | 上記以外の継続不能な内部エラー                                                                            |
+| code                                 | 出る場面                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `JAVA_MISSING_CLASSPATH`             | 明示 `sourceRoots` request の `metadata` に classpath key が無い (空配列は正当な入力)                   |
+| `JAVA_MISSING_JAR`                   | classpath に指定された jar または classes directory が存在しない / 読めない (fatal、既存 code を再利用) |
+| `JAVA_INVALID_REQUEST`               | `analysisRequest` が Java Analyzer として処理できない (未対応 `language` 等)                            |
+| `JAVA_INTERNAL_ERROR`                | 上記以外の継続不能な内部エラー                                                                          |
+| `JAVA_PARSE_ERROR`                   | parse pre-flight で 1 件以上の file が失敗した                                                          |
+| `JAVA_INCOMPLETE_ANALYSIS`           | 全救済後も primary diagnostic outcome が残り、完全な成功 graph を保証できない                           |
+| `JAVA_INVALID_SOURCE_ROOT`           | 明示 root の欠落・非directory・読取不能、または root包含関係のambiguity                                 |
+| `JAVA_SOURCE_ROOT_OUTSIDE_WORKSPACE` | rootまたはin-scope fileのrealpathがworkspace外へ出る                                                    |
+| `JAVA_NO_SOURCE_ROOTS`               | discoveryと除外後に有効なsource rootが0件                                                               |
+| `JAVA_GRADLE_MODEL_ERROR`            | model非互換、必須field欠落、classpath解決、context対応、build評価に失敗した                             |
+| `JAVA_INVALID_LANGUAGE_LEVEL`        | 明示またはmodelのlanguage levelが欠落・invalid・曖昧                                                    |
+| `JAVA_UNSUPPORTED_LANGUAGE_LEVEL`    | JavaParserがlanguage level / previewに対応しない                                                        |
 
 jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲の型解決が失敗し、継続すると「未解決だらけの、一見成功した結果」が出て利用者が不完全なグラフを正と誤認するリスクが高いため。`diagnostic.sourceLocation` と `relatedMethodId` を可能な範囲で埋め、未解決の発生箇所を追跡できるようにする。
 
@@ -213,6 +266,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
   - `diagnostic` は両モードとも検出時に即時 flush する (中間保持しない)。
 - **AST の逐次破棄**: 解析済みファイルの AST を保持し続けない。保持するのは SymbolSolver の型解決キャッシュと、`callEdge` 出力に必要な最小限の情報 (`fullGraph` は逐次 flush 用、`reachableFromEntrypoints` は到達判定用の adjacency) に限る。
 - **計測の観測性**: 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol record としては出さない)。
+- **spec #24 の計測契約**: 明示 single-root、自動 single-project、自動 multi-project の3モードを、初回1回と warm 3回の中央値で測る。discovery / model / parse / resolution / graph の phase 別時間を記録するが、本 issue では数値 SLO を合否条件にしない。
 - **メモリ特性の扱い**: 上記の通り `fullGraph` と `reachableFromEntrypoints` はメモリ特性 (adjacency 保持の有無) が異なるため、baseline / 将来の数値目標はモード別に扱う。
 - **数値目標**: 未定。Phase1 実装時に fixture プロジェクトの実測値 (ファイル数 / 所要時間 / 最大 RSS) を baseline として記録し、その後に本 doc へ確定値を記録する。現時点は方式のみを Phase1 の必須仕様として確定し、数値目標は実測 baseline 取得後に本 doc へ追記する。
 - **baseline 実測値 (計測日 2026-07-12)**: `testdata/fixtures/java/project` (Java ソース 10 ファイル、うち 1 ファイルは意図的にパース不能) を `core/e2e` (`TestJavaAnalyzerFixtureE2E/PerformanceBaseline`) から実 jar (`analyzers/java/build/libs/java-analyzer.jar`, JDK 25 / Eclipse Temurin 25.0.3+9, Apple Silicon darwin/arm64) で解析した実測値。
@@ -298,8 +352,8 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 - 呼び出し先の型が解決できたとき、`methodSymbol` (caller / callee 双方) と、両者を参照する `callEdge` を出力する。
 - 呼び出し先が interface / 抽象メソッドであるとき、帰属型の決定規則で決まる帰属型のメソッドを callee として `callEdge` を出力し、`callEdge.metadata.dispatch` に dispatch 種別を標識する。
 - 呼び出し先メソッドの宣言サイトが scope 外で、その宣言型が引き上げ除外 package に属するとき、`methodSymbol` / `callEdge` を出力しない (解析失敗ではないため `diagnostic` も出さない)。
-- 呼び出し先の型が解決できないとき、`callEdge` を出力せず `diagnostic` として未解決を報告し、解析を継続する。
-- 個別ファイルがパース不能なとき、該当ファイルを `diagnostic` で報告し、他ファイルの解析を継続する (部分解析を許容する)。
+- allowlist された resolution failure は call outcome ledger に候補・理由を記録して解析を継続するが、全救済後も primary diagnostic が残る request は `JAVA_INCOMPLETE_ANALYSIS` で fatal にする。
+- 個別ファイルがパース不能なときは graph record を1件も確定せず、決定順で最初の parse failure を `JAVA_PARSE_ERROR` の location / message として返して fatal にする。
 - 解析を継続できない致命的な問題が起きたとき、`error` record を出力し、非ゼロ exit code で終了する。
 
 ### Interface Dispatch / Spring DI 解決フロー
@@ -341,6 +395,9 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 - `symbolKind` の割り当て (インスタンス初期化子・フィールド初期化子が constructor に畳み込まれること、lambda 内の呼び出しが囲みメソッドに帰属し `viaLambda: true` が立つこと)
 - 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、除外 package (既定値と `liftExcludePackages` による置き換え、segment 単位 prefix 一致)、`this` / `super` / static / `new` の各形、`metadata.dispatch` の値)
 - `diagnostic` / `error` の code と severity の対応、pre-flight 検査 (classpath key 不在 / 明示 classpath entry 欠落・読取不能 / `language != "java"`) が解析開始前に fatal になること
+- explicit / auto の排他 validation、root 正規化・重複・包含・realpath 境界、custom model、main source set、project dependency 到達性、context 別 language level / preview
+- parse pre-flight、allowlist 外 resolver fatal、atomic mutation、call inventory / outcome ledger、initializer caller 展開、`silentOmission == 0`、共通 failure details
+- call-site driven project bytecode member index、bytecode-only member の location 省略と owner metadata、Graph deep copy
 - `fullGraph` / `reachableFromEntrypoints` の出力範囲 (宣言列挙 ∪ call site 由来、entrypoints 空は全体扱い)
 
 **Go 側 process contract (fake analyzer / JVM 不要)**
@@ -354,8 +411,11 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 
 - 既知の caller / callee 集合と解析結果 graph の照合 (S1 / S2 の入力層)。CLI 出力レベルの照合は CLI interface spec (#22) 完了後に完成する
 - interface 注入を含むサンプルで、宣言型 (interface) のメソッドが callee に現れ `dispatch: interface` が立つこと (Phase1 の S4 前段)
-- パース不能ファイルを混ぜた fixture で、`diagnostic` が出つつ他ファイルの解析が継続すること
-- 未解決 symbol を含む fixture で、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` が出つつ解決済みの `callEdge` が揃うこと
+- パース不能ファイルを混ぜた fixture で、`JAVA_PARSE_ERROR` が決定順で最初のfailure detailを返し graph / diagnostic を公開しないこと
+- 未解決 symbol を含む fixture で、救済できない primary outcome が `JAVA_INCOMPLETE_ANALYSIS` の全 detail を返し、不完全 graph を成功させないこと
+- app / service / repository の3 project、変更した `projectDir`、custom source dir、project 間 call / DI を含む fixture で、自動 discovery と明示 override の graph が一致すること
+- test-only 透過 proxy を介して実 Core CLI と実 Analyzer jarを接続し、request、raw graph、CLI終了状態を required gate で照合すること
+- Gradle `7.6.5`〜`9.6.x` と daemon JVM anchor matrix、Gradle output discard、credential / URL / absolute path を含む negative fixture の非漏洩を検証すること
 - **Spring Boot fixture (#21、2026-07-15 追加済み)**: `testdata/fixtures/java/spring-project/` に単一 source root の Spring fixture を配置した。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 - **Lombok / MyBatis Mapper 拡張 (#21、決定済み 2026-07-14)**: 上記 fixture に、コンストラクタを明示せず Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) で生成するクラス (D7) と、MyBatis `@Mapper` インターフェース (D8) を含める。前者は自プロジェクトのコンパイル済み class を通じた constructor injection 解決を、後者は runtime-provided マーカー検出を検証する。決定経緯: [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 - **fixture build / classpath 契約 (#21、決定済み 2026-07-14)**: `testdata/fixtures/java/spring-project/` は独立した Gradle project とし、repository の `analyzers/java/gradlew -p` で build する。fixture の `build.gradle.kts` は Java toolchain 25、`options.release=21`、Spring Boot Autoconfigure 4.1.0、Spring Data Commons 4.1.0、MyBatis 3.5.19、Lombok 1.18.46 を固定する。`writeDepwalkClasspath` task が `build/classes/java/main` と `runtimeClasspath` の jar を絶対 path・辞書順・1 行 1 entry で `build/depwalk-classpath.txt` へ書き、Go E2E は全行を `analysisRequest.metadata.classpath` に渡す。Lombok の生成 constructor は `classes` task 後の `.class` で検証する。
@@ -372,3 +432,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #21  | 追記                              | 追加 sync phase (2026-07-14、clarify 再オープン分) で D7 (Lombok 生成コンストラクタは SootUp の自プロジェクト bytecode 照会で解決、解析対象はビルド済みが前提) / D8 (runtime-provided マーカーに MyBatis `@Mapper` を追加) を反映。決定経緯は [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
 | spec #21  | 追記                              | 実装前レビュー対応 (2026-07-14) で classpath の classes directory 入力契約、E3 と fatal pre-flight の境界、metadata key/value、Spring Bean 名・Qualifier・Primary 選択規則、dispatch/DI 解決フローを確定                                                                                                                                                                                                 |
 | spec #21  | 追記                              | 実装・実測 (2026-07-15) で Spring fixture の配置完了と、Issue #9 と同一 fixture による所要時間・最大 RSS の増分を性能方針へ記録                                                                                                                                                                                                                                                                          |
+| spec #24  | 追記                              | Gradle Tooling API discovery、明示 override、project/main context、language level、parse・call完全性、生成 member、failure detail、安全境界、E2E / matrix / 性能計測を反映。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                                                                   |

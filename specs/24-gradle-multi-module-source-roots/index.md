@@ -1,7 +1,7 @@
 # Gradle マルチモジュールの複数 source root を解析する
 
 > 本文書は Issue #24 の spec-lifecycle における作業記録である。
-> durable な Protocol、Java Analyzer、テスト契約は sync phase で feature doc / context へハンドオフする。
+> durable な Protocol、Graph、Java Analyzer、runtime / toolchain / test 契約は 2026-07-18 の sync phase で feature doc / context / ADR へハンドオフ済みである。以下の設計節は決定時スナップショットとして保持する。
 
 ## メタ情報
 
@@ -20,7 +20,7 @@
 | --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------- |
 | 1   | 起票                        | 完了       | 2026-07-15 | GitHub Issue #24 を確認済み                                                |
 | 2   | 下書き                      | レビュー済 | 2026-07-15 | 本 index.md をテンプレートから新規作成。spec-review PASS                   |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-15 | Design Doc / feature doc / context / ADR と矛盾なし。spec-review PASS      |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-18 | 上位正本へのhandoffと全sync指摘を反映。fresh-context review PASS           |
 | 4   | 論点整理                    | レビュー済 | 2026-07-15 | D1〜D9 を未決論点として抽出。spec-review PASS                              |
 | 5   | 論点解決                    | レビュー済 | 2026-07-18 | D1〜D30を解決。fresh-context review PASS                                   |
 | 6   | Interface / Routing 設計    | レビュー済 | 2026-07-18 | D13旧構築表現をstaging Graph方針へ統一。fresh-context review PASS          |
@@ -35,8 +35,8 @@
 正本 ([Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させるかを記録する。
 
 - PRD 更新要否: 不要。本プロジェクトは統合モードであり、Why / What は Design Doc に統合されている。
-- Design Doc 更新要否: 要。CoreとAnalyzerの責務境界および成功条件は維持し、Java Analyzerの主要依存へ自動discovery時だけ使用する条件付きGradle runtimeを追加する。詳細はJava Analyzer feature doc、infrastructure、ADR-0006へ委譲する。
-- ADR 起票要否: 要。D3 / D23 / D25のGradle Tooling API採用、build script評価、output隔離のruntime / security boundaryを、sync phaseでADR-0006として起票する。D13 / D20 / D22 / D24のstreaming後fatal invalidationと共通failure detailをADR-0001へ、D22 / D24のfatal時の未解決理由をADR-0004へ、D18のproject bytecode member索引をADR-0005へ追記する。D24はADR-0003の言語非依存境界を維持するため、ADR-0003の更新・廃止は行わない。
+- Design Doc 更新要否: 反映済み (2026-07-18)。CoreとAnalyzerの責務境界および成功条件は維持し、Java Analyzerの主要依存へ自動discovery時だけ使用する条件付きGradle runtimeを追加した。詳細はJava Analyzer feature doc、infrastructure、ADR-0006へ委譲した。
+- ADR 起票要否: 反映済み (2026-07-18)。Gradle Tooling API採用とruntime / security boundaryを[ADR-0006](../../adr/0006-adopt-gradle-tooling-api-discovery.md)として起票し、streaming後fatal invalidationと共通failure detailをADR-0001、fatal時の未解決理由をADR-0004、project bytecode member索引をADR-0005へ追記した。ADR-0003の更新・廃止は行っていない。
 
 | 上位文書                    | 節 / 該当箇所                                                                 | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                      |
 | --------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -59,8 +59,9 @@
 | ADR-0004                    | 動的・未解決callの候補と理由を観測可能にする                                  | 変更提案。D22 / D24のfatal error detailsで全未解決callの候補と理由を保持する                                                                           |
 | ADR-0005                    | JavaParser / SymbolSolver、SootUp、Spring DI、Core の責務境界                 | 変更提案。D18のcall site駆動project bytecode member索引をSootUp責務へ追加                                                                              |
 
-前回reviewで検出したarchitecture / project commandの差分はD26 / D27としてsync候補へ分類済みである。最新reviewのinitializer / Graph / Gradle互換性差分はD28〜D30で解決済みである。
-Protocol、Graph、Java Analyzer、context、ADRのdurableな追記内容はtrack phaseで反映先を分類済みであり、sync phaseで各上位文書へ反映する。
+前回reviewで検出したarchitecture / project commandの差分はD26 / D27、initializer / Graph / Gradle互換性差分はD28〜D30で解決し、2026-07-18 のsyncで上位資料へ反映済みである。
+
+durableな設計の正本は [Design Doc](../../design/DesignDoc.md)、[Analyzer Protocol feature doc](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)、[Graph feature doc](../../design/features/graph/DesignDoc_graph.md)、[Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)、[context](../../context/)、[ADR-0001](../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0004](../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../adr/0005-adopt-sootup-and-spring-di-resolution.md)、[ADR-0006](../../adr/0006-adopt-gradle-tooling-api-discovery.md)へハンドオフした。本specの解決済み論点・図・変更リストは決定経緯と決定時スナップショットである。
 
 ## 関連資料
 
@@ -71,11 +72,14 @@ Protocol、Graph、Java Analyzer、context、ADRのdurableな追記内容はtrac
 - [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md): source 解析、型解決、帰属型、性能、三層テスト
 - [context/architecture.md](../../context/architecture.md): Core / Analyzer の package・runtime・state boundary
 - [context/project.md](../../context/project.md): repository固有のQuick CommandsとE2E command contract
+- [context/toolchain.md](../../context/toolchain.md): Gradle / JVM互換性とsource language levelの4軸分離
 - [context/testing.md](../../context/testing.md): Protocol contract test と Java Analyzer 三層
+- [context/infrastructure.md](../../context/infrastructure.md): Gradle runtime、trusted build、credential / 非漏洩境界
 - [ADR-0001](../../adr/0001-analyzer-protocol-jsonl-spi.md): JSONL process SPI と versioning
 - [ADR-0003](../../adr/0003-analyzer-command-resolution.md): 言語非依存な Analyzer 起動・metadata passthrough
 - [ADR-0004](../../adr/0004-defer-runtime-call-tracing.md): 動的・未解決callの候補と理由の観測可能性
 - [ADR-0005](../../adr/0005-adopt-sootup-and-spring-di-resolution.md): JavaParser / SootUp / Spring DI の責務境界
+- [ADR-0006](../../adr/0006-adopt-gradle-tooling-api-discovery.md): Tooling API discovery、明示bypass、runtime / security / compatibility判断
 - [spec #21](../21-java-dispatch-spring-di/index.md): 単一 source root 制約から本 Issue を切り出した決定経緯
 - [Gradle Tooling API](https://docs.gradle.org/current/userguide/tooling_api.html): client / daemon / target Gradleの互換性契約
 - [Gradle Java Compatibility](https://docs.gradle.org/current/userguide/compatibility.html): Gradle versionごとのdaemon JVM対応範囲
@@ -330,7 +334,7 @@ EARS 風で振る舞いを記述する。
   - discoveryされたsource rootが存在するにもかかわらず非directory・読取不能の場合、またはin-scope projectのsource setがworkspace外pathを参照する場合は、同じfatal error境界を適用する。不完全なmoduleだけを飛ばして成功扱いにしない。
   - Tooling APIがworkspace外のexternal composite / included buildを識別した場合、そのbuildのsource rootはscopeへ含めず、`JAVA_EXTERNAL_BUILD_EXCLUDED` warningを1 buildにつき1件出力する。Gradle modelが解決済みartifactをclasspathとして返す場合は外部依存として利用できる。
   - symlink実体pathの完全重複と包含関係にはD5を適用する。同一実体root / fileは1件へ除去し、異なる実体rootの包含関係はfatalにする。record pathはD4どおり利用者が指定したworkspaceからの相対pathを維持する。
-  - model由来の解析対象project classes outputが未作成の場合は、該当contextに`JAVA_SOOTUP_UNAVAILABLE` warningを1件出し、JavaParserによるsource解析を継続する。自動buildやtask実行は行わない。
+  - model由来の解析対象project classes outputが未作成の場合、または明示経路で自project classes output自体がclasspathへ指定されていない場合は、該当contextに`JAVA_SOOTUP_UNAVAILABLE` warningを1件出し、JavaParserによるsource-only解析を継続する。自動buildやtask実行は行わない。source-onlyで生成memberを救済できずprimary diagnosticが残ればD20のrequest fatalにする。
   - 明示`metadata.classpath` entryと、modelが解決済みcompile classpathとして返した外部jar / classes directoryの欠落・読取不能は`JAVA_MISSING_JAR`のfatalを維持する。広範な型解決欠落を成功に見せないためである。
   - 未作成directoryとexternal buildを除外した結果、build全体で有効なsource rootが0件なら`JAVA_NO_SOURCE_ROOTS`のfatal errorとする。有効rootが存在するがinclude / exclude後のJava fileが0件である場合は、正当な空graphとして成功できる。
   - 決定理由: Gradleでは設定上のsource directoryが未作成でも異常とは限らない。一方、利用者が明示した入力や既存directoryの読取失敗、workspace escape、外部classpath欠落は解析完全性またはsecurity boundaryを壊すためfatalに分ける。
@@ -800,44 +804,44 @@ repository credentialはGradleの既存機構へ委譲し、depwalkのCLI / Prot
 
 ### エラーケース
 
-| #   | ケース                                                            | ユーザーへの見せ方                                 | リカバリ                                                     |
-| --- | ----------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| E1  | 明示source rootが存在しない                                       | `JAVA_INVALID_SOURCE_ROOT` fatal                   | 入力修正                                                     |
-| E2  | 既存source rootがdirectoryでない・読めない                        | `JAVA_INVALID_SOURCE_ROOT` fatal                   | 入力・権限を修正                                             |
-| E3  | 異なるrootが親子の包含関係にある                                  | pre-flightのfatal error                            | 重ならないsource rootへ指定を修正                            |
-| E4  | module間typeを解決できずcall edgeが欠落する                       | `JAVA_INCOMPLETE_ANALYSIS` fatal                   | classpath / source rootを修正し再実行                        |
-| E5  | model由来のproject classes outputが欠落する                       | `JAVA_SOOTUP_UNAVAILABLE` warning                  | source-only継続。必要ならbuild後再実行                       |
-| E6  | `sourceRoots`が空配列                                             | 解析開始前のinvalid request                        | fieldを省略するか1件以上指定する                             |
-| E7  | build model discoveryでrootを確定できない                         | 明示指定を案内するfatal error                      | `sourceRoots`を明示して再実行                                |
-| E8  | 明示rootが絶対path・空文字・`..`を含む                            | 解析開始前のinvalid request                        | workspace相対pathへ修正する                                  |
-| E9  | in-scope sourceまたはsymlinkがworkspace外                         | `JAVA_SOURCE_ROOT_OUTSIDE_WORKSPACE` fatal         | workspace内rootだけを指定する                                |
-| E10 | 対応範囲外Gradle / daemon JVM非互換 / Tooling API / model評価失敗 | 安定reason付きfatal error                          | Gradle / JVM設定を修正するか`--source-root`を指定して再実行  |
-| E11 | 1つのrootが複数の解析contextへ所属する                            | model ambiguityのfatal error                       | Gradle source set構成を修正                                  |
-| E12 | 異なるcontextに同じsource binary nameがある                       | record出力前のfatal error                          | package名または解析範囲を分離                                |
-| E13 | workspace外のexternal included buildを検出                        | `JAVA_EXTERNAL_BUILD_EXCLUDED` warning             | artifact利用または別workspaceで解析                          |
-| E14 | 除外後に有効source rootが0件                                      | `JAVA_NO_SOURCE_ROOTS` fatal                       | root明示またはbuild構成を修正                                |
-| E15 | custom modelの非互換・必須field欠落・転送失敗                     | `JAVA_GRADLE_MODEL_ERROR` fatal                    | Analyzer更新または明示override                               |
-| E16 | `main.compileClasspath`の解決に失敗                               | `JAVA_GRADLE_MODEL_ERROR` fatal                    | network・認証修正または明示override                          |
-| E17 | 明示rootでlanguage levelが欠落・invalid                           | `JAVA_INVALID_LANGUAGE_LEVEL` fatal                | metadataを1件指定                                            |
-| E18 | modelのlanguage levelが欠落・曖昧                                 | `JAVA_INVALID_LANGUAGE_LEVEL` fatal                | Gradle compile設定を修正                                     |
-| E19 | JavaParserがlevel / previewに未対応                               | `JAVA_UNSUPPORTED_LANGUAGE_LEVEL` fatal            | Analyzer更新または対応levelへ変更                            |
-| E20 | 既知のsymbol / type resolution failure                            | `JAVA_UNRESOLVED_SYMBOL` diagnostic                | 独立要素の解析と救済を継続                                   |
-| E21 | allowlist外のruntime exception / LinkageError                     | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzer修正・更新                             |
-| E22 | `error`または非ゼロexit前にrecord出力済み                         | request全体をfatalとして全record破棄               | fatal原因を修正して再実行                                    |
-| E23 | call siteが未分類または二重分類                                   | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
-| E24 | 全救済後もcall siteがprimary diagnosticに残る                     | 全未解決detail付き`JAVA_INCOMPLETE_ANALYSIS` fatal | metadataのreasonに従いbuild・classpath修正またはAnalyzer対応 |
-| E25 | 解析scope内のsource fileをparseできない                           | `JAVA_PARSE_ERROR` fatal                           | source修正またはAnalyzerのparser対応                         |
-| E26 | classes outputを所有contextへ一意に対応付け不能                   | `JAVA_GRADLE_MODEL_ERROR` fatal                    | Gradle modelまたはbuild構成を修正                            |
-| E27 | 解決結果のorigin欠落・依存到達性違反                              | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
-| E28 | call siteのidentity欠落・ID重複・ledger不整合                     | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
-| E29 | Gradle model取得時にbuild outputまたはraw例外が発生               | 安定categoryだけの`JAVA_GRADLE_MODEL_ERROR` fatal  | 通常Gradle CLIで詳細確認または明示override                   |
+| #   | ケース                                                                     | ユーザーへの見せ方                                 | リカバリ                                                     |
+| --- | -------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| E1  | 明示source rootが存在しない                                                | `JAVA_INVALID_SOURCE_ROOT` fatal                   | 入力修正                                                     |
+| E2  | 既存source rootがdirectoryでない・読めない                                 | `JAVA_INVALID_SOURCE_ROOT` fatal                   | 入力・権限を修正                                             |
+| E3  | 異なるrootが親子の包含関係にある                                           | pre-flightのfatal error                            | 重ならないsource rootへ指定を修正                            |
+| E4  | module間typeを解決できずcall edgeが欠落する                                | `JAVA_INCOMPLETE_ANALYSIS` fatal                   | classpath / source rootを修正し再実行                        |
+| E5  | model由来classes outputが未作成、または明示経路で自project classesを未指定 | `JAVA_SOOTUP_UNAVAILABLE` warning                  | source-only継続。必要ならbuild後またはclasses追加で再実行    |
+| E6  | `sourceRoots`が空配列                                                      | 解析開始前のinvalid request                        | fieldを省略するか1件以上指定する                             |
+| E7  | build model discoveryでrootを確定できない                                  | 明示指定を案内するfatal error                      | `sourceRoots`を明示して再実行                                |
+| E8  | 明示rootが絶対path・空文字・`..`を含む                                     | 解析開始前のinvalid request                        | workspace相対pathへ修正する                                  |
+| E9  | in-scope sourceまたはsymlinkがworkspace外                                  | `JAVA_SOURCE_ROOT_OUTSIDE_WORKSPACE` fatal         | workspace内rootだけを指定する                                |
+| E10 | 対応範囲外Gradle / daemon JVM非互換 / Tooling API / model評価失敗          | 安定reason付きfatal error                          | Gradle / JVM設定を修正するか`--source-root`を指定して再実行  |
+| E11 | 1つのrootが複数の解析contextへ所属する                                     | model ambiguityのfatal error                       | Gradle source set構成を修正                                  |
+| E12 | 異なるcontextに同じsource binary nameがある                                | record出力前のfatal error                          | package名または解析範囲を分離                                |
+| E13 | workspace外のexternal included buildを検出                                 | `JAVA_EXTERNAL_BUILD_EXCLUDED` warning             | artifact利用または別workspaceで解析                          |
+| E14 | 除外後に有効source rootが0件                                               | `JAVA_NO_SOURCE_ROOTS` fatal                       | root明示またはbuild構成を修正                                |
+| E15 | custom modelの非互換・必須field欠落・転送失敗                              | `JAVA_GRADLE_MODEL_ERROR` fatal                    | Analyzer更新または明示override                               |
+| E16 | `main.compileClasspath`の解決に失敗                                        | `JAVA_GRADLE_MODEL_ERROR` fatal                    | network・認証修正または明示override                          |
+| E17 | 明示rootでlanguage levelが欠落・invalid                                    | `JAVA_INVALID_LANGUAGE_LEVEL` fatal                | metadataを1件指定                                            |
+| E18 | modelのlanguage levelが欠落・曖昧                                          | `JAVA_INVALID_LANGUAGE_LEVEL` fatal                | Gradle compile設定を修正                                     |
+| E19 | JavaParserがlevel / previewに未対応                                        | `JAVA_UNSUPPORTED_LANGUAGE_LEVEL` fatal            | Analyzer更新または対応levelへ変更                            |
+| E20 | 既知のsymbol / type resolution failure                                     | `JAVA_UNRESOLVED_SYMBOL` diagnostic                | 独立要素の解析と救済を継続                                   |
+| E21 | allowlist外のruntime exception / LinkageError                              | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzer修正・更新                             |
+| E22 | `error`または非ゼロexit前にrecord出力済み                                  | request全体をfatalとして全record破棄               | fatal原因を修正して再実行                                    |
+| E23 | call siteが未分類または二重分類                                            | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
+| E24 | 全救済後もcall siteがprimary diagnosticに残る                              | 全未解決detail付き`JAVA_INCOMPLETE_ANALYSIS` fatal | metadataのreasonに従いbuild・classpath修正またはAnalyzer対応 |
+| E25 | 解析scope内のsource fileをparseできない                                    | `JAVA_PARSE_ERROR` fatal                           | source修正またはAnalyzerのparser対応                         |
+| E26 | classes outputを所有contextへ一意に対応付け不能                            | `JAVA_GRADLE_MODEL_ERROR` fatal                    | Gradle modelまたはbuild構成を修正                            |
+| E27 | 解決結果のorigin欠落・依存到達性違反                                       | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
+| E28 | call siteのidentity欠落・ID重複・ledger不整合                              | `JAVA_INTERNAL_ERROR` fatal                        | 全record破棄、Analyzerを修正                                 |
+| E29 | Gradle model取得時にbuild outputまたはraw例外が発生                        | 安定categoryだけの`JAVA_GRADLE_MODEL_ERROR` fatal  | 通常Gradle CLIで詳細確認または明示override                   |
 
 ### Fallback
 
 `sourceRoots`省略時はbuild model discovery、1件以上の明示時は明示値のみを使用する。
 discovery失敗時にdirectory走査や規約pathの推測へfallbackしない。
 未作成discovery rootとexternal build sourceだけを明示的に除外でき、既存rootの異常やworkspace escapeは部分解析へfallbackしない。
-model由来project classes output欠落時だけSootUpを無効化してsource解析を継続する。
+model由来project classes outputが未作成、または明示経路で自project classes output自体をclasspathへ指定していない場合だけ、`JAVA_SOOTUP_UNAVAILABLE` warning付きでSootUpを無効化してsource-only解析を継続する。利用者が明示したentryまたはmodelが解決済みcompile classpath entryの欠落・読取不能はfatalにする。
 解析中の例外はallowlist化したresolution failureだけを要素単位diagnosticへ降格し、未知例外を別level、別solver、file skipへfallbackしない。diagnosticがcall edge欠落を表す場合は全救済後に`JAVA_INCOMPLETE_ANALYSIS`へ集約する。
 sourceとして列挙済みのbinary nameでもworkspace全体の名前一致へfallbackしない。source memberへ再対応付けできない場合は、D16のorigin / context境界内にある`ProjectBytecodeMemberIndex`だけを照会する。そこにも一致memberがなく、根拠付きscope外除外にも確定できないcall siteは`JAVA_INCOMPLETE_ANALYSIS`でrequest全体をfatalにする。
 bytecode-only memberの救済をLombok等のannotation名別resolverへfallbackしない。generator非依存の共通索引で解決し、sourceから直接参照されないJVM内部memberをclasses outputから一括列挙しない。
@@ -1120,8 +1124,10 @@ sequenceDiagram
 ## 上位資料からの変更点
 
 本節の表をsync作業の唯一の網羅リストとする。`## 上位文書整合`は既存資料との整合確認記録であり、sync対象の列挙には使用しない。
-`source: clarify`はclarify phaseで記録済みの判断、`source: track`はdiagram phase以降の意味変更またはtrackで補った分類を表す。「なし」以外の全行は未反映の変更提案であり、sync phaseで上位文書へ反映して正本ハンドオフする。
-D1〜D30とdiagram reviewのdurableな変更候補は、PRD / Design Doc / feature doc / context / ADR別に分類済みである。
+`source: clarify`はclarify phaseで記録済みの判断、`source: track`はdiagram phase以降の意味変更またはtrackで補った分類を表す。「なし」以外の全行はsync前に確定した変更提案であり、2026-07-18のsyncで上位文書へ反映して正本ハンドオフした。
+D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc / context / ADR別に分類・反映済みである。
+
+> sync結果 (2026-07-18): 「なし」以外の全行を記載先へ反映済み。各表は以後、決定時の変更追跡記録として保持する。
 
 ### PRD への影響
 
@@ -1181,15 +1187,15 @@ D1〜D30とdiagram reviewのdurableな変更候補は、PRD / Design Doc / featu
 
 ### ADR の新規 / 更新
 
-| ADR ID              | 変更内容                                                                                                                                                                                                                                                                                                                                                                         | 理由                                                                                                                  |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| ADR-0001            | (source: clarify, D13/D20/D22/D24 + track, diagram review) transport streaming、Coreの非公開staging Graphへの1-pass変換、成功結果のrequest単位公開を分離する。Analyzerは全graphをbufferせず、Coreはwire DTO全件を保持しない。fatal requestではstaging Graphと先行diagnosticを破棄し、Protocol共通`error.details`だけを有効なfailure detailとして保持・汎用表示する責務を追記する | JSONL streamingとrequest原子性を維持しながら言語非依存に未解決理由を伝え、Analyzer / Core双方の重複bufferを避けるため |
-| ADR-0004            | (source: clarify, D22/D24) `JAVA_INCOMPLETE_ANALYSIS.error.details`で動的・未解決callの全候補と理由をfatal時も観測可能にする                                                                                                                                                                                                                                                     | 不完全graphを成功させない方針と既存の観測可能性契約を両立するため                                                     |
-| ADR-0003            | (source: clarify, D1/D3/D13/D14/D15/D16/D17/D18/D24) 更新・廃止なし。Coreの言語非依存とopaque metadata / 共通failure detail passthroughを継承                                                                                                                                                                                                                                    | Java固有のbytecode member解決やfailure code分岐をCoreへ持ち込まないため                                               |
-| ADR-0005            | (source: clarify, D18) SootUpの責務へcall site駆動のproject bytecode member索引を追加し、call graph生成はJava Analyzerに維持                                                                                                                                                                                                                                                     | generator非依存のcompiled-only member救済を既存JavaParser / SootUp境界へ位置付けるため                                |
-| ADR-0006 (新規予定) | (source: clarify, D3/D6/D7/D10/D11/D23/D25/D26/D30) Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider baseline / Java 8、daemon JVM委譲、CI anchor、custom provider、`main`限定、build評価、repository / credential委譲、network / cache、output隔離、exception sanitization、保証対象、trusted build、明示bypass、architecture参照境界を記録                               | runtime副作用、解析scope、型解決、filesystem / secret安全性、version compatibilityを横断判断として残すため            |
-| なし                | (source: clarify, D19) 実CLI E2Eのtest-only観測境界について新規・更新・廃止なし                                                                                                                                                                                                                                                                                                  | production architectureとProtocolの意思決定を変更しないため                                                           |
-| なし                | (source: clarify, D29) Graph Symbolへのopaque metadata保持について新規・更新・廃止なし                                                                                                                                                                                                                                                                                           | ADR-0001 / ADR-0002のProtocol・Core package境界を維持した属性追加であるため                                           |
+| ADR ID                                                           | 変更内容                                                                                                                                                                                                                                                                                                                                                                         | 理由                                                                                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ADR-0001                                                         | (source: clarify, D13/D20/D22/D24 + track, diagram review) transport streaming、Coreの非公開staging Graphへの1-pass変換、成功結果のrequest単位公開を分離する。Analyzerは全graphをbufferせず、Coreはwire DTO全件を保持しない。fatal requestではstaging Graphと先行diagnosticを破棄し、Protocol共通`error.details`だけを有効なfailure detailとして保持・汎用表示する責務を追記する | JSONL streamingとrequest原子性を維持しながら言語非依存に未解決理由を伝え、Analyzer / Core双方の重複bufferを避けるため |
+| ADR-0004                                                         | (source: clarify, D22/D24) `JAVA_INCOMPLETE_ANALYSIS.error.details`で動的・未解決callの全候補と理由をfatal時も観測可能にする                                                                                                                                                                                                                                                     | 不完全graphを成功させない方針と既存の観測可能性契約を両立するため                                                     |
+| ADR-0003                                                         | (source: clarify, D1/D3/D13/D14/D15/D16/D17/D18/D24) 更新・廃止なし。Coreの言語非依存とopaque metadata / 共通failure detail passthroughを継承                                                                                                                                                                                                                                    | Java固有のbytecode member解決やfailure code分岐をCoreへ持ち込まないため                                               |
+| ADR-0005                                                         | (source: clarify, D18) SootUpの責務へcall site駆動のproject bytecode member索引を追加し、call graph生成はJava Analyzerに維持                                                                                                                                                                                                                                                     | generator非依存のcompiled-only member救済を既存JavaParser / SootUp境界へ位置付けるため                                |
+| [ADR-0006](../../adr/0006-adopt-gradle-tooling-api-discovery.md) | (source: clarify, D3/D6/D7/D10/D11/D23/D25/D26/D30) Tooling API `9.6.1`、Gradle `7.6.5`〜`9.6.x`、provider baseline / Java 8、daemon JVM委譲、CI anchor、custom provider、`main`限定、build評価、repository / credential委譲、network / cache、output隔離、exception sanitization、保証対象、trusted build、明示bypass、architecture参照境界を記録                               | runtime副作用、解析scope、型解決、filesystem / secret安全性、version compatibilityを横断判断として残すため            |
+| なし                                                             | (source: clarify, D19) 実CLI E2Eのtest-only観測境界について新規・更新・廃止なし                                                                                                                                                                                                                                                                                                  | production architectureとProtocolの意思決定を変更しないため                                                           |
+| なし                                                             | (source: clarify, D29) Graph Symbolへのopaque metadata保持について新規・更新・廃止なし                                                                                                                                                                                                                                                                                           | ADR-0001 / ADR-0002のProtocol・Core package境界を維持した属性追加であるため                                           |
 
 ## レビュー
 
@@ -1212,68 +1218,82 @@ D1〜D30とdiagram reviewのdurableな変更候補は、PRD / Design Doc / featu
 | 2026-07-18 | PASS                     | D13・図・上位文書変更候補がstaging Graphの逐次構築・成功時公開・fatal時破棄で整合      | Phase 4 gate完了                  |
 | 2026-07-18 | NEEDS_WORK               | Java metadata正本先、Design Doc runtime依存、toolchainのJDK / source level分離が不足   | trackを保留し3論点を判断待ち      |
 | 2026-07-18 | PASS                     | 3指摘を解消し、D1〜D30とdiagram reviewの変更候補・sync先・正本境界が整合               | Phase 5 gate完了                  |
+| 2026-07-18 | NEEDS_WORK               | 固定CI matrix、安全通知、workspace外external build境界、sync review状態の補完が必要    | syncを保留し4指摘へ対応           |
+| 2026-07-18 | NEEDS_WORK               | matrix正本の循環、ADR-0006のD7境界、parse first-only契約の残存driftを解消する必要      | syncを保留し3指摘へ対応           |
+| 2026-07-18 | NEEDS_WORK               | 明示経路の自project classes未指定時fallbackと最新メタ情報を同期する必要                | syncを保留し2指摘へ対応           |
+| 2026-07-18 | NEEDS_WORK               | 内部CallSiteIdをfailure detailへ出力するように読めるfeature記述の修正が必要            | syncを保留し1指摘へ対応           |
+| 2026-07-18 | NEEDS_WORK               | Fallback節に残るmodel由来classes output欠落時だけという旧限定の修正が必要              | syncを保留し1指摘へ対応           |
+| 2026-07-18 | PASS                     | Fallbackを含むD1〜D30のdurable契約、正本リンク、メタ情報が上位資料と整合               | Phase 6 sync gate完了             |
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                                                                                                  |
-| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                                         |
-| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                             |
-| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                                    |
-| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                                        |
-| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                                        |
-| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                                      |
-| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                                |
-| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                                         |
-| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                                      |
-| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                                       |
-| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                                   |
-| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                                    |
-| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                              |
-| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                                 |
-| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                                 |
-| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                             |
-| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                                        |
-| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                                  |
-| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                             |
-| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                                          |
-| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                                           |
-| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                                         |
-| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                                          |
-| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                                   |
-| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                                 |
-| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                             |
-| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                                |
-| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                                |
-| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                             |
-| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                                      |
-| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                                       |
-| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                                    |
-| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期                        |
-| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                              |
-| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                               |
-| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期               |
-| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期              |
-| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                                       |
-| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                              |
-| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期                    |
-| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期                            |
-| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                              |
-| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                             |
-| 2026-07-18 | Codex  | diagram phaseでCLI起点flowchartとCore / Java Analyzer sequenceを生成し、D1〜D30の成功・fatal境界を可視化                                  |
-| 2026-07-18 | Codex  | diagram phaseのfresh-context review NEEDS_WORKを記録し、streaming / resolver fatal経路の判断待ちとして保留                                |
-| 2026-07-18 | Codex  | diagram指摘を選択Aで対応し、D13のAnalyzer streaming・Core暫定保持と未知resolver / process fatalの全record破棄を図とADR候補へ同期          |
-| 2026-07-18 | Codex  | diagram再reviewで前回指摘解消とGraph feature docの1-pass構築境界との新規不整合を記録し、方針判断待ちとして保留                            |
-| 2026-07-18 | Codex  | Graph境界をstaging方式で解決し、valid recordの1-pass変換、成功時公開、fatal時破棄、参照完全性検証をD13・図・sync候補へ同期                |
-| 2026-07-18 | Codex  | staging Graph再reviewで図とsync候補の整合を確認し、D13に残る旧構築表現2箇所の判断待ちとして保留                                           |
-| 2026-07-18 | Codex  | D13の旧構築表現を選択Aで修正し、受信中の非公開staging Graph構築と成功時公開・fatal時破棄へ統一                                            |
-| 2026-07-18 | Codex  | D13文面修正後のfresh-context review PASSを記録し、Interface / Routing設計をレビュー済へ更新                                               |
-| 2026-07-18 | Codex  | track phaseで上位資料への変更候補を一意のsync作業リストとして確定し、diagram review由来のGraph・architecture・testing・ADR-0001差分を分類 |
-| 2026-07-18 | Codex  | track phaseのfresh-context review NEEDS_WORKを記録し、metadata正本先・Design Doc runtime依存・toolchain分離の3論点判断待ちとして保留      |
-| 2026-07-18 | Codex  | track review論点1を選択Aで解決し、Java固有のclasspath・language level・preview意味論をJava Analyzer feature docのsync候補へ統合           |
-| 2026-07-18 | Codex  | track review論点2を選択Aで解決し、条件付きGradle runtimeと明示bypassをDesign Docのモジュール責務・主要依存のsync候補へ追加                |
-| 2026-07-18 | Codex  | track review論点3を選択Aで解決し、Analyzer JDK・daemon JVM・project toolchain・source level / previewの4軸分離をtoolchainのsync候補へ追加 |
-| 2026-07-18 | Codex  | track phaseのfresh-context再review PASSを記録し、Content / Data・Performance / Security・Test / Metrics設計をレビュー済へ更新             |
+| 日付       | 変更者 | 変更内容                                                                                                                                                           |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                                                                  |
+| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                                                      |
+| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                                                             |
+| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                                                                 |
+| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                                                                 |
+| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                                                               |
+| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                                                         |
+| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                                                                  |
+| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                                                               |
+| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                                                                |
+| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                                                            |
+| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                                                             |
+| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                       |
+| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                                                          |
+| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                                                          |
+| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                                                      |
+| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                                                                 |
+| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                                                           |
+| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
+| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                                                                   |
+| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                                                                    |
+| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                                                                  |
+| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                                                                   |
+| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                                                            |
+| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                                                          |
+| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
+| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                                                         |
+| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                                                         |
+| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                                                      |
+| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                                                               |
+| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                                                                |
+| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                                                             |
+| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期                                                 |
+| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                                                       |
+| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                                                        |
+| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期                                        |
+| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期                                       |
+| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                                                                |
+| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                                                       |
+| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期                                             |
+| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期                                                     |
+| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                                                       |
+| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
+| 2026-07-18 | Codex  | diagram phaseでCLI起点flowchartとCore / Java Analyzer sequenceを生成し、D1〜D30の成功・fatal境界を可視化                                                           |
+| 2026-07-18 | Codex  | diagram phaseのfresh-context review NEEDS_WORKを記録し、streaming / resolver fatal経路の判断待ちとして保留                                                         |
+| 2026-07-18 | Codex  | diagram指摘を選択Aで対応し、D13のAnalyzer streaming・Core暫定保持と未知resolver / process fatalの全record破棄を図とADR候補へ同期                                   |
+| 2026-07-18 | Codex  | diagram再reviewで前回指摘解消とGraph feature docの1-pass構築境界との新規不整合を記録し、方針判断待ちとして保留                                                     |
+| 2026-07-18 | Codex  | Graph境界をstaging方式で解決し、valid recordの1-pass変換、成功時公開、fatal時破棄、参照完全性検証をD13・図・sync候補へ同期                                         |
+| 2026-07-18 | Codex  | staging Graph再reviewで図とsync候補の整合を確認し、D13に残る旧構築表現2箇所の判断待ちとして保留                                                                    |
+| 2026-07-18 | Codex  | D13の旧構築表現を選択Aで修正し、受信中の非公開staging Graph構築と成功時公開・fatal時破棄へ統一                                                                     |
+| 2026-07-18 | Codex  | D13文面修正後のfresh-context review PASSを記録し、Interface / Routing設計をレビュー済へ更新                                                                        |
+| 2026-07-18 | Codex  | track phaseで上位資料への変更候補を一意のsync作業リストとして確定し、diagram review由来のGraph・architecture・testing・ADR-0001差分を分類                          |
+| 2026-07-18 | Codex  | track phaseのfresh-context review NEEDS_WORKを記録し、metadata正本先・Design Doc runtime依存・toolchain分離の3論点判断待ちとして保留                               |
+| 2026-07-18 | Codex  | track review論点1を選択Aで解決し、Java固有のclasspath・language level・preview意味論をJava Analyzer feature docのsync候補へ統合                                    |
+| 2026-07-18 | Codex  | track review論点2を選択Aで解決し、条件付きGradle runtimeと明示bypassをDesign Docのモジュール責務・主要依存のsync候補へ追加                                         |
+| 2026-07-18 | Codex  | track review論点3を選択Aで解決し、Analyzer JDK・daemon JVM・project toolchain・source level / previewの4軸分離をtoolchainのsync候補へ追加                          |
+| 2026-07-18 | Codex  | track phaseのfresh-context再review PASSを記録し、Content / Data・Performance / Security・Test / Metrics設計をレビュー済へ更新                                      |
+| 2026-07-18 | Codex  | sync phaseでDesign Doc、Protocol / Graph / Java Analyzer feature、context、ADR-0001 / 0004 / 0005へ反映し、ADR-0006を新規作成してdurable設計の正本をハンドオフ     |
+| 2026-07-18 | Codex  | sync phaseのfresh-context review NEEDS_WORKを記録し、固定CI matrix・安全通知・workspace外境界・メタ状態の4指摘対応を開始                                           |
+| 2026-07-18 | Codex  | sync reviewの4指摘を反映し、固定CI anchor / wrapper不在時 / 安定reason、安全通知のchannel / timing、external included build除外順、phase状態を上位正本とspecへ同期 |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、matrix詳細正本をtoolchainへ一本化、ADR-0006へD7境界を反映、parse failureをfirst-onlyへ統一                                        |
+| 2026-07-18 | Codex  | sync最終review NEEDS_WORKを記録し、明示経路で自project classes未指定ならsource-only、明示entry欠落ならfatalの境界と最新phase備考を同期                             |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、CallSiteIdはdetail順序決定だけに使いID自体はProtocolへ出さない公開境界へJava Analyzer featureを統一                               |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、Fallback節も明示経路の自project classes未指定時source-only・明示entry欠落時fatalへ統一                                            |
+| 2026-07-18 | Codex  | sync phaseのfresh-context review PASSを記録し、上位文書突合をレビュー済へ更新                                                                                      |
 
 ## 備考
 

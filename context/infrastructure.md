@@ -1,6 +1,6 @@
 # Infrastructure & Operations
 
-> 最終更新: 2026-06-27
+> 最終更新: 2026-07-18
 
 公開基盤・環境戦略・運用・セキュリティの契約。本書は **app 側が依存する contract** を定義する。infra 実体を別 repo で管理する場合はその境界も記す ([context/project.md](project.md) のリポジトリマップ)。
 
@@ -14,8 +14,9 @@
 
 ## Infrastructure Contract (app → infra)
 
-- 外部インフラ依存は持たない。対象ソースリポジトリへの **read-only アクセス**のみが前提 ([architecture.md](architecture.md) State Boundary)。
-- secret / token は不要 (外部サービス連携なし)。将来発生する場合は repo に実値を保存しない。
+- hosted service / depwalk 専用の外部インフラ依存は持たない。明示 `sourceRoots` 経路では Analyzer が対象 source / classpath を read-only で扱う。
+- Java の自動 discovery では条件付き runtime として Gradle build logic を利用者権限で評価する。Gradle repository、credential provider、network、cache、daemon JVM を利用し得るが、credential を depwalk の入力として受領・保存しない。明示 `sourceRoots` は Gradle runtime を完全 bypass する。
+- CLI helpは上記副作用と明示bypassを常時説明する。自動discoveryの各runではbuild評価前にAnalyzer stderrへ、settings / build script / plugin評価、artifact repository、既存credential resolution、network、Gradle user cacheを利用し得ることを安定した定型文で通知する。
 
 ## Environment Strategy
 
@@ -29,9 +30,13 @@
 ## Operations / Observability
 
 - 一次観測点は **CLI の標準出力 / 終了コード**。Core ↔ Analyzer の JSONL はテキストで観測可能 (デバッグ容易性 — Communication Protocol)。
+- Gradle の stdout / stderr は Protocol / CLI output へ転送せず破棄する。failure は分類済み code と sanitize 済み message / detail に変換し、raw exception、credential、URL query、絶対 path を出さない。
+- discoveryの開始・終了、使用Gradle version、検出project / root件数、安定failure categoryはAnalyzer自身のstderr観測情報として出力できる。Gradle由来の自由文とは区別する。
 - 監視基盤は持たない (常駐サービスがないため)。
 
 ## Security / Privacy
 
-- 解析対象は利用者自身のソースコード。外部送信は行わない。
+- 解析対象は利用者自身のソースコード。depwalk 自身は解析内容を外部サービスへ送信しない。ただし自動 discovery 中の dependency resolution による network 通信は Gradle の設定と repository 契約に従う。
 - 個人情報・認証・権限は扱わない。将来扱う場合の方針は該当 feature / spec に置く。
+- 自動 discovery は **trusted build** 前提であり、任意 build logic の副作用を sandbox しない。Analyzer 自身の read-only 契約と Gradle runtime 全体の副作用を区別する。
+- 非漏洩保証は depwalk が生成・転送する Protocol、CLI、log、test artifact に限定する。Gradle 自身や利用者 build logic が生成する output / cache / file / network side effect は保証範囲外とする。詳細判断は [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)。

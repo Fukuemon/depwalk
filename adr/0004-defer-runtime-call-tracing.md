@@ -31,6 +31,8 @@ Reflection、AspectJ Runtime、実行時 Proxy、実行時条件評価により�
 - 動的機構が存在することを検出できる場合は、その事実を diagnostic として残し、edge を黙って欠落させない。
 - 「実際に実行された経路」が必要になった場合は、静的解析の拡張ではなく Runtime Trace feature として別途設計する。
 
+spec #24 で成功 Graph の完全性境界を追加した。静的な救済を尽くしても primary diagnostic に残る call がある request は、部分 Graph を成功させず `JAVA_INCOMPLETE_ANALYSIS` で fatal にする。ただし、動的・未解決 call の全候補、理由、位置は Protocol 共通 `error.details` に決定順で保持し、Graph を破棄した後も観測可能にする。この変更は Runtime Trace を初期スコープへ追加するものではない。
+
 再検討条件は次のいずれかとする。
 
 - 静的解析で主要ユースケースの caller / callee 精度を満たせない。
@@ -75,3 +77,4 @@ Reflection、AspectJ Runtime、実行時 Proxy、実行時条件評価により�
 - [design/DesignDoc.md](../design/DesignDoc.md): Non Goals、Java Analyzer の段階導入
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): Phase 1 の既知の制約、Phase 2 / Phase 3
 - [specs/9-java-analyzer](../specs/9-java-analyzer/): Java Analyzer Phase 1 の決定記録
+- [specs/24-gradle-multi-module-source-roots](../specs/24-gradle-multi-module-source-roots/): 不完全解析を fatal にしつつ未解決 detail を保持する決定経緯
