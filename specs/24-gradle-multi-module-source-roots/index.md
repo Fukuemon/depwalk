@@ -1233,75 +1233,78 @@ D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc
 
 ## 変更履歴
 
-| 日付       | 変更者 | 変更内容                                                                                                                                                           |
-| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                                                                  |
-| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                                                      |
-| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                                                             |
-| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                                                                 |
-| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                                                                 |
-| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                                                               |
-| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                                                         |
-| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                                                                  |
-| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                                                               |
-| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                                                                |
-| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                                                            |
-| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                                                             |
-| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                       |
-| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                                                          |
-| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                                                          |
-| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                                                      |
-| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                                                                 |
-| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                                                           |
-| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
-| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                                                                   |
-| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                                                                    |
-| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                                                                  |
-| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                                                                   |
-| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                                                            |
-| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                                                          |
-| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
-| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                                                         |
-| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                                                         |
-| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                                                      |
-| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                                                               |
-| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                                                                |
-| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                                                             |
-| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期                                                 |
-| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                                                       |
-| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                                                        |
-| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期                                        |
-| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期                                       |
-| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                                                                |
-| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                                                       |
-| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期                                             |
-| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期                                                     |
-| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                                                       |
-| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                      |
-| 2026-07-18 | Codex  | diagram phaseでCLI起点flowchartとCore / Java Analyzer sequenceを生成し、D1〜D30の成功・fatal境界を可視化                                                           |
-| 2026-07-18 | Codex  | diagram phaseのfresh-context review NEEDS_WORKを記録し、streaming / resolver fatal経路の判断待ちとして保留                                                         |
-| 2026-07-18 | Codex  | diagram指摘を選択Aで対応し、D13のAnalyzer streaming・Core暫定保持と未知resolver / process fatalの全record破棄を図とADR候補へ同期                                   |
-| 2026-07-18 | Codex  | diagram再reviewで前回指摘解消とGraph feature docの1-pass構築境界との新規不整合を記録し、方針判断待ちとして保留                                                     |
-| 2026-07-18 | Codex  | Graph境界をstaging方式で解決し、valid recordの1-pass変換、成功時公開、fatal時破棄、参照完全性検証をD13・図・sync候補へ同期                                         |
-| 2026-07-18 | Codex  | staging Graph再reviewで図とsync候補の整合を確認し、D13に残る旧構築表現2箇所の判断待ちとして保留                                                                    |
-| 2026-07-18 | Codex  | D13の旧構築表現を選択Aで修正し、受信中の非公開staging Graph構築と成功時公開・fatal時破棄へ統一                                                                     |
-| 2026-07-18 | Codex  | D13文面修正後のfresh-context review PASSを記録し、Interface / Routing設計をレビュー済へ更新                                                                        |
-| 2026-07-18 | Codex  | track phaseで上位資料への変更候補を一意のsync作業リストとして確定し、diagram review由来のGraph・architecture・testing・ADR-0001差分を分類                          |
-| 2026-07-18 | Codex  | track phaseのfresh-context review NEEDS_WORKを記録し、metadata正本先・Design Doc runtime依存・toolchain分離の3論点判断待ちとして保留                               |
-| 2026-07-18 | Codex  | track review論点1を選択Aで解決し、Java固有のclasspath・language level・preview意味論をJava Analyzer feature docのsync候補へ統合                                    |
-| 2026-07-18 | Codex  | track review論点2を選択Aで解決し、条件付きGradle runtimeと明示bypassをDesign Docのモジュール責務・主要依存のsync候補へ追加                                         |
-| 2026-07-18 | Codex  | track review論点3を選択Aで解決し、Analyzer JDK・daemon JVM・project toolchain・source level / previewの4軸分離をtoolchainのsync候補へ追加                          |
-| 2026-07-18 | Codex  | track phaseのfresh-context再review PASSを記録し、Content / Data・Performance / Security・Test / Metrics設計をレビュー済へ更新                                      |
-| 2026-07-18 | Codex  | sync phaseでDesign Doc、Protocol / Graph / Java Analyzer feature、context、ADR-0001 / 0004 / 0005へ反映し、ADR-0006を新規作成してdurable設計の正本をハンドオフ     |
-| 2026-07-18 | Codex  | sync phaseのfresh-context review NEEDS_WORKを記録し、固定CI matrix・安全通知・workspace外境界・メタ状態の4指摘対応を開始                                           |
-| 2026-07-18 | Codex  | sync reviewの4指摘を反映し、固定CI anchor / wrapper不在時 / 安定reason、安全通知のchannel / timing、external included build除外順、phase状態を上位正本とspecへ同期 |
-| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、matrix詳細正本をtoolchainへ一本化、ADR-0006へD7境界を反映、parse failureをfirst-onlyへ統一                                        |
-| 2026-07-18 | Codex  | sync最終review NEEDS_WORKを記録し、明示経路で自project classes未指定ならsource-only、明示entry欠落ならfatalの境界と最新phase備考を同期                             |
-| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、CallSiteIdはdetail順序決定だけに使いID自体はProtocolへ出さない公開境界へJava Analyzer featureを統一                               |
-| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、Fallback節も明示経路の自project classes未指定時source-only・明示entry欠落時fatalへ統一                                            |
-| 2026-07-18 | Codex  | sync phaseのfresh-context review PASSを記録し、上位文書突合をレビュー済へ更新                                                                                      |
-| 2026-07-18 | Codex  | tasks phaseを開始し、Protocol、Core、Gradle discovery、解析context、call完全性、統合fixture、実CLI E2Eの7 promptへ分割                                             |
-| 2026-07-18 | Codex  | tasks phaseのセルフ検証とfresh-context review PASSを記録し、実装分割・最終レビューをレビュー済へ更新                                                               |
+| 日付       | 変更者 | 変更内容                                                                                                                                                                |
+| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-15 | Codex  | Issue #24からscaffoldを作成し、上位文書整合と未決論点D1〜D9を整理                                                                                                       |
+| 2026-07-15 | Codex  | scaffoldのfresh-context review PASSを記録し、下書き・上位文書突合・論点整理をレビュー済へ更新                                                                           |
+| 2026-07-15 | Codex  | clarify phaseを開始し、D1から1件ずつ判断する状態へ更新                                                                                                                  |
+| 2026-07-16 | Codex  | D1を解決し、optional sourceRoots、Analyzer discovery、明示override、推測fallback禁止を関連節へ同期                                                                      |
+| 2026-07-16 | Codex  | D2を解決し、sourceRootsをworkspace相対へ統一するpath・validation契約を関連節へ同期                                                                                      |
+| 2026-07-16 | Codex  | D3を解決し、Gradle Tooling API自動discovery、明示override、観測・安全境界、新規ADR予定を関連節へ同期                                                                    |
+| 2026-07-16 | Codex  | D4を解決し、workspaceRootをglob・locationの唯一の座標系とするscope・path契約を関連節へ同期                                                                              |
+| 2026-07-16 | Codex  | D5を解決し、完全重複rootの除去、包含rootの拒否、source fileの一意化を関連節へ同期                                                                                       |
+| 2026-07-16 | Codex  | D6を解決し、Gradle project / source set別contextと明示override時のglobal classpath境界を関連節へ同期                                                                    |
+| 2026-07-16 | Codex  | D7を解決し、rootのfatal / 除外境界、symlink検査、classes outputのsource-only fallbackを関連節へ同期                                                                     |
+| 2026-07-16 | Codex  | D8を解決し、single / discovery / multiの初回・warm性能計測とSLO非判定境界を関連節へ同期                                                                                 |
+| 2026-07-16 | Codex  | D9を解決し、3 module fixture、非標準layout、自動・明示経路の固定期待集合を関連節へ同期                                                                                  |
+| 2026-07-16 | Codex  | clarify phaseのfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                            |
+| 2026-07-17 | Codex  | 実プロジェクト検証で判明した設計漏れD10〜D13を追加し、clarify phaseを再開                                                                                               |
+| 2026-07-17 | Codex  | D10を解決し、自動discoveryを各projectの`main` source setへ限定する解析scopeを関連節へ同期                                                                               |
+| 2026-07-17 | Codex  | D11を解決し、custom tooling model providerの注入、model field、副作用、失敗境界を関連節へ同期                                                                           |
+| 2026-07-17 | Codex  | D12を解決し、Gradle実効source levelのcontext別適用、明示metadata、preview、fatal境界を関連節へ同期                                                                      |
+| 2026-07-17 | Codex  | D13を解決し、既知resolution failureの部分解析、未知fatal、先行record全破棄を関連節へ同期                                                                                |
+| 2026-07-17 | Codex  | D10〜D13追加後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                           |
+| 2026-07-18 | Codex  | 追加検証で判明したsource / bytecode帰属とsilent omissionをD14としてclarifyへ追加                                                                                        |
+| 2026-07-18 | Codex  | D14を選択Aで解決し、source優先帰属、call-site終端分類、未分類fatal、E2E完全性検査を関連節へ同期                                                                         |
+| 2026-07-18 | Codex  | D14のfresh-context review NEEDS_WORKを記録し、追加判断D15〜D17のためclarifyを保留                                                                                       |
+| 2026-07-18 | Codex  | D15を選択Bで解決し、parse pre-flight、`JAVA_PARSE_ERROR` fatal、partial mode非提供を関連節へ同期                                                                        |
+| 2026-07-18 | Codex  | D16を選択Aで解決し、solver origin、依存到達可能context、synthetic contextの再対応付け境界を関連節へ同期                                                                 |
+| 2026-07-18 | Codex  | D17を選択Aで解決し、solver前inventory、安定`CallSiteId`、内部outcome ledger、テスト観測境界を関連節へ同期                                                               |
+| 2026-07-18 | Codex  | D15〜D17反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                           |
+| 2026-07-18 | Codex  | 追加検証の未回収点をD18〜D20としてclarifyへ追加し、D18をgenerator非依存のproject bytecode member救済で解決                                                              |
+| 2026-07-18 | Codex  | D19を選択Aで解決し、実Core CLIと実Analyzer jarをtest-only透過proxyで接続するrequired E2E境界を関連節へ同期                                                              |
+| 2026-07-18 | Codex  | D20を選択Aで解決し、全救済後もprimary diagnosticに残るcallをrequest-level fatalにする完全性境界を関連節へ同期                                                           |
+| 2026-07-18 | Codex  | D18〜D20反映後のfresh-context review NEEDS_WORKを記録し、追加判断のためclarifyを保留                                                                                    |
+| 2026-07-18 | Codex  | review指摘をD21〜D23としてclarifyへ追加し、D21をmember定義位置省略・owner anchor metadata分離で解決                                                                     |
+| 2026-07-18 | Codex  | D22を選択Aで解決し、全未解決callの位置・reason・候補をfatal error metadataへ決定順で集約する契約を同期                                                                  |
+| 2026-07-18 | Codex  | D23を選択Aで解決し、Gradle build評価・repository / credential委譲・network / cache副作用と明示bypassを関連節へ同期                                                      |
+| 2026-07-18 | Codex  | D21〜D23反映後のfresh-context review NEEDS_WORKを記録し、追加判断D24〜D27のためclarifyを保留                                                                            |
+| 2026-07-18 | Codex  | D24を選択Aで解決し、Protocol共通`error.details`とAnalyzer固有codeに依存しないCore CLI汎用表示を関連節へ同期                                                             |
+| 2026-07-18 | Codex  | D25を選択Aで解決し、Gradle build output discard、raw例外sanitize、depwalk生成・転送outputに限定した非漏洩保証を関連節へ同期                                             |
+| 2026-07-18 | Codex  | D26を選択Aで解決し、architectureのRuntime / State BoundaryへGradle runtime要約とinfrastructure / ADR参照を追加する候補を同期                                            |
+| 2026-07-18 | Codex  | D27を選択Aで解決し、自動discovery・明示override・実CLI E2Eをproject command契約へ追加する候補を同期                                                                     |
+| 2026-07-18 | Codex  | D24〜D27反映後のfresh-context review NEEDS_WORKを記録し、追加判断D28〜D30のためclarifyを保留                                                                            |
+| 2026-07-18 | Codex  | D28を選択Aで解決し、initializer内callをlexical siteとsemantic callerごとのinventory / ledger entryへ展開する契約を同期                                                  |
+| 2026-07-18 | Codex  | D29を選択Aで解決し、Graph Symbolへのopaque metadata deep copyとGraph / Protocol / architectureのsync候補を同期                                                          |
+| 2026-07-18 | Codex  | D30を選択Aで解決し、Tooling API・target Gradle・provider bytecode・daemon JVM・CI anchorの互換性matrixを同期                                                            |
+| 2026-07-18 | Codex  | D28〜D30反映後のfresh-context review PASSを記録し、論点解決をレビュー済へ更新                                                                                           |
+| 2026-07-18 | Codex  | diagram phaseでCLI起点flowchartとCore / Java Analyzer sequenceを生成し、D1〜D30の成功・fatal境界を可視化                                                                |
+| 2026-07-18 | Codex  | diagram phaseのfresh-context review NEEDS_WORKを記録し、streaming / resolver fatal経路の判断待ちとして保留                                                              |
+| 2026-07-18 | Codex  | diagram指摘を選択Aで対応し、D13のAnalyzer streaming・Core暫定保持と未知resolver / process fatalの全record破棄を図とADR候補へ同期                                        |
+| 2026-07-18 | Codex  | diagram再reviewで前回指摘解消とGraph feature docの1-pass構築境界との新規不整合を記録し、方針判断待ちとして保留                                                          |
+| 2026-07-18 | Codex  | Graph境界をstaging方式で解決し、valid recordの1-pass変換、成功時公開、fatal時破棄、参照完全性検証をD13・図・sync候補へ同期                                              |
+| 2026-07-18 | Codex  | staging Graph再reviewで図とsync候補の整合を確認し、D13に残る旧構築表現2箇所の判断待ちとして保留                                                                         |
+| 2026-07-18 | Codex  | D13の旧構築表現を選択Aで修正し、受信中の非公開staging Graph構築と成功時公開・fatal時破棄へ統一                                                                          |
+| 2026-07-18 | Codex  | D13文面修正後のfresh-context review PASSを記録し、Interface / Routing設計をレビュー済へ更新                                                                             |
+| 2026-07-18 | Codex  | track phaseで上位資料への変更候補を一意のsync作業リストとして確定し、diagram review由来のGraph・architecture・testing・ADR-0001差分を分類                               |
+| 2026-07-18 | Codex  | track phaseのfresh-context review NEEDS_WORKを記録し、metadata正本先・Design Doc runtime依存・toolchain分離の3論点判断待ちとして保留                                    |
+| 2026-07-18 | Codex  | track review論点1を選択Aで解決し、Java固有のclasspath・language level・preview意味論をJava Analyzer feature docのsync候補へ統合                                         |
+| 2026-07-18 | Codex  | track review論点2を選択Aで解決し、条件付きGradle runtimeと明示bypassをDesign Docのモジュール責務・主要依存のsync候補へ追加                                              |
+| 2026-07-18 | Codex  | track review論点3を選択Aで解決し、Analyzer JDK・daemon JVM・project toolchain・source level / previewの4軸分離をtoolchainのsync候補へ追加                               |
+| 2026-07-18 | Codex  | track phaseのfresh-context再review PASSを記録し、Content / Data・Performance / Security・Test / Metrics設計をレビュー済へ更新                                           |
+| 2026-07-18 | Codex  | sync phaseでDesign Doc、Protocol / Graph / Java Analyzer feature、context、ADR-0001 / 0004 / 0005へ反映し、ADR-0006を新規作成してdurable設計の正本をハンドオフ          |
+| 2026-07-18 | Codex  | sync phaseのfresh-context review NEEDS_WORKを記録し、固定CI matrix・安全通知・workspace外境界・メタ状態の4指摘対応を開始                                                |
+| 2026-07-18 | Codex  | sync reviewの4指摘を反映し、固定CI anchor / wrapper不在時 / 安定reason、安全通知のchannel / timing、external included build除外順、phase状態を上位正本とspecへ同期      |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、matrix詳細正本をtoolchainへ一本化、ADR-0006へD7境界を反映、parse failureをfirst-onlyへ統一                                             |
+| 2026-07-18 | Codex  | sync最終review NEEDS_WORKを記録し、明示経路で自project classes未指定ならsource-only、明示entry欠落ならfatalの境界と最新phase備考を同期                                  |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、CallSiteIdはdetail順序決定だけに使いID自体はProtocolへ出さない公開境界へJava Analyzer featureを統一                                    |
+| 2026-07-18 | Codex  | sync再review NEEDS_WORKを記録し、Fallback節も明示経路の自project classes未指定時source-only・明示entry欠落時fatalへ統一                                                 |
+| 2026-07-18 | Codex  | sync phaseのfresh-context review PASSを記録し、上位文書突合をレビュー済へ更新                                                                                           |
+| 2026-07-18 | Codex  | tasks phaseを開始し、Protocol、Core、Gradle discovery、解析context、call完全性、統合fixture、実CLI E2Eの7 promptへ分割                                                  |
+| 2026-07-18 | Codex  | tasks phaseのセルフ検証とfresh-context review PASSを記録し、実装分割・最終レビューをレビュー済へ更新                                                                    |
+| 2026-07-18 | Claude | 実装prompt P1〜P6を完了 (PR #26)。各promptで実装→検証→commit→レビュー→指摘反映を実施し、Gradle 9.x削除API・symlink workspaceのpath破損・JVM WARNINGのstderr汚染等を修正 |
+| 2026-07-18 | Claude | provider compile artifactを7.6.4で確定 (7.6.5のAPI artifact未配布、patchはpublic API不変)。ユーザー承認済み。toolchain matrixとADR-0006へ補記                           |
+| 2026-07-18 | Claude | include / excludeのCLI flag追加はIssue #22のbranchで対応する方針をユーザー決定。#24ではworkspace相対globの意味論をAnalyzer実jar testで固定済み                          |
 
 ## 備考
 

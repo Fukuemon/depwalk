@@ -43,7 +43,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 - bundled Tooling API client と Analyzer build wrapper: `9.6.1`
 - target Gradle: `7.6.5 <= version < 9.7.0`
 - wrapper がない build: bundled version `9.6.1` を使用
-- custom provider: Gradle `7.6.5` API baseline、Java `--release 8`、classfile major 52
+- custom provider: Gradle `7.6.5` API baseline、Java `--release 8`、classfile major 52。compile に使う再配布 API artifact (`dev.gradleplugins:gradle-api`) は `7.6.4` が最終のため `7.6.4` へ compile する (patch release は public API 不変であり、`7.6.5` より新しい API 参照を混入させない契約はより強く満たされる。確定 2026-07-18、決定経緯は [spec #24](../specs/24-gradle-multi-module-source-roots/index.md))
 - Analyzer client JVM: JDK 25 固定
 - daemon JVM: target build の wrapper / Gradle 設定が選び、Gradle公式Java compatibility matrixに従う。depwalkはdownload・同梱・自動選択せず、Analyzer JDK 25を古いGradle daemonへ強制しない
 
