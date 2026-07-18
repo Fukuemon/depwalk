@@ -23,9 +23,10 @@ import (
 // CLI stdout / stderr / exit status in the same run for the auto-discovery,
 // explicit-override, and fatal paths.
 //
-// include / exclude は CLI flag として未実装のため本 E2E では扱わない。その
-// 観点は Analyzer 側の実 jar test (MultiModuleFixtureEquivalenceTest) が
-// workspace 相対 glob として固定済みである。
+// include / exclude は CLI flag として未実装のため本 E2E では扱わない
+// (flag 追加は Issue #22 の branch で対応する)。その観点は Analyzer 側の
+// 実 jar test (MultiModuleFixtureEquivalenceTest) が workspace 相対 glob
+// として固定済みである。
 //
 // step 4.4 / 4.5 / 4.6 (error なし非ゼロ exit・malformed stdout・参照不整合の
 // 非公開、fatal reason の維持、Java 非依存 generic failure fixture の共通
