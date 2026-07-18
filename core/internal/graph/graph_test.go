@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
@@ -29,7 +30,7 @@ func TestNodeReturnsRegisteredSymbol(t *testing.T) {
 	if !ok {
 		t.Fatal("Node(method:a) not found")
 	}
-	if got.Symbol != want {
+	if !reflect.DeepEqual(got.Symbol, want) {
 		t.Errorf("Node(method:a).Symbol = %#v, want %#v", got.Symbol, want)
 	}
 }

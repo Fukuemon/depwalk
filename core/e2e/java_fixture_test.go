@@ -264,7 +264,8 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	}
 
 	runner := analyzer.New(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
-	result, err := runner.Run(request)
+	var records []protocol.Record
+	result, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
 		t.Fatalf("failed to run the analyzer process: %v", err)
 	}
@@ -279,7 +280,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	}
 
 	var edges []protocol.CallEdge
-	for _, record := range result.Records {
+	for _, record := range records {
 		if edge, ok := record.(protocol.CallEdge); ok {
 			edges = append(edges, edge)
 		}

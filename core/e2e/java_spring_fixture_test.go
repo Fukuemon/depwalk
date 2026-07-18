@@ -40,7 +40,8 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 		t.Fatalf("Spring fixture analysisRequest is invalid: %v", err)
 	}
 	runner := analyzer.New(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
-	runResult, err := runner.Run(request)
+	var records []protocol.Record
+	runResult, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
 		t.Fatalf("run Spring fixture analyzer: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 	}
 
 	var edges []protocol.CallEdge
-	for _, record := range runResult.Records {
+	for _, record := range records {
 		if edge, ok := record.(protocol.CallEdge); ok {
 			edges = append(edges, edge)
 		}
@@ -127,7 +128,7 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 
 	t.Run("CoreGraphCallerCallee", func(t *testing.T) {
 		callGraph := graph.New()
-		for _, record := range runResult.Records {
+		for _, record := range records {
 			switch typed := record.(type) {
 			case protocol.MethodSymbol:
 				callGraph.AddNode(graph.NodeFromMethodSymbol(typed))
