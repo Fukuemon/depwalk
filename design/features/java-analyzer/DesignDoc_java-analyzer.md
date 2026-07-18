@@ -292,6 +292,16 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
   所要時間には JVM 起動、Spring DI / 候補 method 用 first pass、SootUp 型階層索引化が含まれる。fixture が 10 ファイルと小さいため、この 1 回の値だけから実プロジェクト規模の傾向や SLO を決定しない。SLO は既定どおり #22 完了時に、実プロジェクト規模の複数回計測を入力として確定する。
 
+- **#24 実装後の実測値 (計測日 2026-07-18)**: 明示 single-root、single-project 自動 discovery、multi-module 自動 discovery (3 module、`testdata/fixtures/java/multi-module-spring-project`) の 3 経路を、同一 checkout・同一 Gradle user home・warm daemon / cache 状態で実 jar により計測した。各経路は初回 1 回 + warm 3 回 (中央値)。環境: commit `ca92290`、JDK 25 (Eclipse Temurin 25.0.3+9)、target Gradle 9.6.1、macOS (Darwin 23.6.0) / Apple Silicon arm64。command は stdin へ `analysisRequest` を渡す `/usr/bin/time -l java -jar analyzers/java/build/libs/java-analyzer.jar`。single 経路の fixture は 2 file の一時 Gradle project。数値 SLO は設けず Issue #22 へ委ねる。
+
+  | 経路                            | 初回 wall | warm 中央値 | 最大 RSS (warm) | parse pre-flight (warm) | 完全性 metrics                         |
+  | ------------------------------- | --------- | ----------- | --------------- | ----------------------- | -------------------------------------- |
+  | 明示 single-root (2 file)       | 592ms     | 540ms       | 約 115 MiB      | 70ms                    | callSites=3 emitted=3 silentOmission=0 |
+  | single-project discovery        | 1,310ms   | 1,262ms     | 約 166 MiB      | 75ms                    | callSites=3 emitted=3 silentOmission=0 |
+  | multi-module discovery (5 file) | 2,927ms   | 2,783ms     | 約 386 MiB      | 114ms                   | callSites=2 emitted=2 silentOmission=0 |
+
+  discovery の増分 (single 比較で warm 約 +0.7s) は Tooling API 接続・provider 展開・model 取得と context 構築を含む。multi-module は context ごとの TypeSolver / SootUp 構築と Spring 依存 jar (11 classpath entry) の索引化で RSS が増える。unresolved symbol / bytecode-only member / error.details は全経路 0 件 (correctness gate を先に満たした状態で計測)。
+
 ### 帰属型の決定規則
 
 帰属型 (メソッドが属する型) は「宣言型を優先し、宣言が scope 外のときだけレシーバの静的型へ引き上げる」。
@@ -432,4 +442,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #21  | 追記                              | 追加 sync phase (2026-07-14、clarify 再オープン分) で D7 (Lombok 生成コンストラクタは SootUp の自プロジェクト bytecode 照会で解決、解析対象はビルド済みが前提) / D8 (runtime-provided マーカーに MyBatis `@Mapper` を追加) を反映。決定経緯は [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
 | spec #21  | 追記                              | 実装前レビュー対応 (2026-07-14) で classpath の classes directory 入力契約、E3 と fatal pre-flight の境界、metadata key/value、Spring Bean 名・Qualifier・Primary 選択規則、dispatch/DI 解決フローを確定                                                                                                                                                                                                 |
 | spec #21  | 追記                              | 実装・実測 (2026-07-15) で Spring fixture の配置完了と、Issue #9 と同一 fixture による所要時間・最大 RSS の増分を性能方針へ記録                                                                                                                                                                                                                                                                          |
-| spec #24  | 追記                              | Gradle Tooling API discovery、明示 override、project/main context、language level、parse・call完全性、生成 member、failure detail、安全境界、E2E / matrix / 性能計測を反映。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                                                                   |
+| spec #24  | 追記                              | Gradle Tooling API discovery、明示 override、project/main context、language level、parse・call完全性、生成 member、failure detail、安全境界、E2E / matrix / 性能計測を反映。実装後の 3 経路実測値 (2026-07-18) を性能方針へ追記。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)                                                                                              |
