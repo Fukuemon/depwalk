@@ -2,8 +2,8 @@ package com.fukuemon.depwalk.gradleprovider;
 
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ProjectDependency;
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
+import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.tasks.SourceSet;
@@ -13,7 +13,6 @@ import org.gradle.tooling.provider.model.ToolingModelBuilder;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -51,15 +50,16 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
             }
             SourceSetContainer sourceSets = javaExtension.getSourceSets();
             SourceSet main = sourceSets.findByName(MAIN_SOURCE_SET);
+            if (main == null) {
+                continue;
+            }
+            // names は project 横断で dedup、count は出現ごとの総数。
             for (SourceSet sourceSet : sourceSets) {
                 String name = sourceSet.getName();
                 if (!MAIN_SOURCE_SET.equals(name)) {
                     excludedSourceSetNames.add(name);
                     excludedSourceSetCount++;
                 }
-            }
-            if (main == null) {
-                continue;
             }
             projects.add(buildProjectModel(project, main));
         }
@@ -78,14 +78,21 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
         List<File> classesOutputDirectories =
                 new ArrayList<File>(main.getOutput().getClassesDirs().getFiles());
 
+        // ProjectDependency.getDependencyProject() は Gradle 9.0 で削除された
+        // ため、7.6〜9.6 の全対象で安定する resolution result の
+        // ProjectComponentIdentifier から project 依存を収集する。
         List<String> projectDependencyPaths = new ArrayList<String>();
         Configuration configuration =
                 project.getConfigurations().findByName(main.getCompileClasspathConfigurationName());
-        if (configuration != null) {
-            Set<String> seen = new LinkedHashSet<String>();
-            for (Dependency dependency : configuration.getAllDependencies()) {
-                if (dependency instanceof ProjectDependency) {
-                    seen.add(((ProjectDependency) dependency).getDependencyProject().getPath());
+        if (configuration != null && configuration.isCanBeResolved()) {
+            Set<String> seen = new TreeSet<String>();
+            for (ResolvedComponentResult component
+                    : configuration.getIncoming().getResolutionResult().getAllComponents()) {
+                if (component.getId() instanceof ProjectComponentIdentifier) {
+                    String path = ((ProjectComponentIdentifier) component.getId()).getProjectPath();
+                    if (!path.equals(project.getPath())) {
+                        seen.add(path);
+                    }
                 }
             }
             projectDependencyPaths.addAll(seen);
