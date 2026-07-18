@@ -84,6 +84,50 @@ class BytecodeOnlyMemberTest {
         assertEquals("project-bytecode-member", edgeMetadata.get("calleeOrigin"));
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void resolvesChainedCallsThroughSynthesizedMembers() throws Exception {
+        // D31: bytecode-only member の戻り値型が solver へ伝播し、連鎖呼び出し
+        // (owner.getName().isEmpty()) の外側も解決できる。
+        Path build = temp.resolve("chain-src");
+        write(build, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                    public String getName() { return "x"; }
+                }
+                """);
+        Path classes = temp.resolve("chain-classes");
+        Files.createDirectories(classes);
+        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "--release", "17",
+                "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
+        assertEquals(0, rc, "fixture compile failed");
+
+        Path workspace = temp.resolve("chain-workspace");
+        write(workspace, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    boolean use(Owner owner) { return owner.getName().isEmpty(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        // 内側の getName は bytecode-only member として emit される。
+        assertTrue(ran.byType("methodSymbol").stream()
+                .anyMatch(n -> "java:com.example.Owner#getName()".equals(n.get("methodId"))));
+        // 外側の isEmpty は String 上の外部 callee → external-target excluded で
+        // edge も diagnostic も残らず、全 call site が分類済みで成功する。
+        assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
+    }
+
     @Test
     void doesNotRescueAmbiguousOrForeignMembers() throws Exception {
         // owner type が scope 内 source に存在しない場合は救済せず fatal に残す。

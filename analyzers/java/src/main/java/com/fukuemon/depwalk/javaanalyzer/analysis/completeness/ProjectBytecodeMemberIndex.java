@@ -41,6 +41,18 @@ public final class ProjectBytecodeMemberIndex {
         return uniqueByArity(resolution, arity);
     }
 
+    /** 所有 class 自身の全 callable method (JVM 内部 member 除外)。合成候補の列挙用。 */
+    public List<SootUpTypeHierarchyIndex.MethodCandidate> declaredCallableMethods(String ownerBinaryName) {
+        SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveDeclaredCallableMethods(ownerBinaryName);
+        if (!resolution.isAvailable()) {
+            return List.of();
+        }
+        return resolution.candidates().stream()
+                .filter(candidate -> !isJvmInternalName(candidate.methodName()))
+                .filter(candidate -> !"<init>".equals(candidate.methodName()))
+                .toList();
+    }
+
     /** bytecode-only field の型を receiver 解決の補完としてだけ返す (node 化しない)。 */
     public Optional<String> fieldType(String ownerBinaryName, String fieldName) {
         return sootUpIndex.resolveDeclaredFieldType(ownerBinaryName, fieldName);

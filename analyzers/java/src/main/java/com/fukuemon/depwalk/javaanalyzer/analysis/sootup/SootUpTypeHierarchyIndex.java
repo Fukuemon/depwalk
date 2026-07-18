@@ -40,11 +40,23 @@ public final class SootUpTypeHierarchyIndex {
      * @param declaringType メソッドを実際に宣言する型の binary name
      * @param methodName メソッド名。constructor は {@code <init>}
      * @param parameterTypes erasure 済み引数型の binary name 配列
+     * @param returnType erasure 済み戻り値型の binary name。constructor / void は {@code void}
+     * @param isStatic static member かどうか
      */
-    public record MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
+    public record MethodCandidate(
+            String declaringType,
+            String methodName,
+            List<String> parameterTypes,
+            String returnType,
+            boolean isStatic) {
         /** 引数型配列を防御的コピーして候補を生成する。 */
         public MethodCandidate {
             parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        /** 戻り値型・static 性を使わない照会用の互換 constructor。 */
+        public MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
+            this(declaringType, methodName, parameterTypes, "void", false);
         }
     }
 
@@ -318,6 +330,15 @@ public final class SootUpTypeHierarchyIndex {
      * @return 一致した declared method の候補一覧、または unavailable
      */
     public Resolution resolveDeclaredCallableMethods(String declaringType, String methodName) {
+        return declaredCallableMethods(declaringType, methodName);
+    }
+
+    /** 宣言 class 自身の全 callable method (bridge / synthetic 除外)。 */
+    public Resolution resolveDeclaredCallableMethods(String declaringType) {
+        return declaredCallableMethods(declaringType, null);
+    }
+
+    private Resolution declaredCallableMethods(String declaringType, String methodName) {
         return guardQuery(declaringType, () -> {
             ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
             Optional<JavaSootClass> sootClass = view().getClass(classType);
@@ -325,7 +346,7 @@ public final class SootUpTypeHierarchyIndex {
                 return unavailable(declaringType, "class was not found in the supplied classpath");
             }
             List<MethodCandidate> methods = sootClass.get().getMethods().stream()
-                    .filter(method -> method.getName().equals(methodName))
+                    .filter(method -> methodName == null || method.getName().equals(methodName))
                     .filter(method -> !method.getModifiers().contains(MethodModifier.BRIDGE)
                             && !method.getModifiers().contains(MethodModifier.SYNTHETIC))
                     .map(this::toCandidate)
@@ -531,7 +552,9 @@ public final class SootUpTypeHierarchyIndex {
         return new MethodCandidate(
                 method.getDeclClassType().getFullyQualifiedName(),
                 method.getName(),
-                parameterTypesOf(method));
+                parameterTypesOf(method),
+                binaryNameOf(method.getReturnType()),
+                method.isStatic());
     }
 
     private static List<String> parameterTypesOf(JavaSootMethod method) {
