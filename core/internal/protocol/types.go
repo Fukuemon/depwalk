@@ -78,6 +78,7 @@ type AnalysisRequest struct {
 	RecordType    RecordType       `json:"recordType"`
 	RequestID     string           `json:"requestId"`
 	WorkspaceRoot string           `json:"workspaceRoot"`
+	SourceRoots   []string         `json:"sourceRoots,omitempty"`
 	Language      Language         `json:"language"`
 	Include       []string         `json:"include,omitempty"`
 	Exclude       []string         `json:"exclude,omitempty"`
@@ -161,6 +162,16 @@ type AnalyzerError struct {
 	Message       string          `json:"message"`
 	Source        *SourceLocation `json:"sourceLocation,omitempty"`
 	Metadata      Metadata        `json:"metadata,omitempty"`
+	Details       []FailureDetail `json:"details,omitempty"`
+}
+
+// FailureDetail is one language-agnostic structured detail of a fatal error.
+// Core consumers validate only the common fields and treat metadata as opaque.
+type FailureDetail struct {
+	Code     string          `json:"code"`
+	Message  string          `json:"message"`
+	Source   *SourceLocation `json:"sourceLocation,omitempty"`
+	Metadata Metadata        `json:"metadata,omitempty"`
 }
 
 func (AnalyzerError) record() {}

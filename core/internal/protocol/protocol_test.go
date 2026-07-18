@@ -81,6 +81,127 @@ func TestAnalysisRequestValidateRejectsNonRelativeScopePaths(t *testing.T) {
 	}
 }
 
+func TestAnalysisRequestValidateAcceptsSourceRoots(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		roots []string
+	}{
+		{name: "omitted", roots: nil},
+		{name: "single root", roots: []string{"src/main/java"}},
+		{name: "multiple roots", roots: []string{"module-a/src/main/java", "module-b/src/main/java"}},
+		{name: "workspace itself", roots: []string{"."}},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := withAnalysisRequest(func(r *AnalysisRequest) { r.SourceRoots = tt.roots })
+			if err := req.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestAnalysisRequestValidateRejectsInvalidSourceRoots(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		roots []string
+	}{
+		{name: "explicit empty array", roots: []string{}},
+		{name: "absolute path", roots: []string{"/workspace/src"}},
+		{name: "empty element", roots: []string{""}},
+		{name: "backslash separators", roots: []string{`module-a\src\main\java`}},
+		{name: "parent segment", roots: []string{"../other/src"}},
+		{name: "Windows drive path", roots: []string{"C:/repo/src"}},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := withAnalysisRequest(func(r *AnalysisRequest) { r.SourceRoots = tt.roots })
+			assertValidateError(t, req.Validate)
+		})
+	}
+}
+
+func TestAnalyzerErrorValidateAcceptsFailureDetails(t *testing.T) {
+	t.Parallel()
+
+	err := validAnalyzerError()
+	err.Details = []FailureDetail{
+		{
+			Code:    "JAVA_UNRESOLVED_SYMBOL",
+			Message: "could not resolve call target",
+			Source:  &SourceLocation{Path: "module-a/src/App.java", StartLine: 10},
+			Metadata: Metadata{
+				"callKind":   "virtual",
+				"candidates": []any{"com.example.A", "com.example.B"},
+				"unknownKey": nil,
+			},
+		},
+		{Code: "JAVA_UNRESOLVED_SYMBOL", Message: "another unresolved call"},
+	}
+	if got := err.Validate(); got != nil {
+		t.Fatalf("Validate() error = %v", got)
+	}
+}
+
+func TestAnalyzerErrorValidateRejectsInvalidFailureDetails(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		details []FailureDetail
+	}{
+		{name: "explicit empty details", details: []FailureDetail{}},
+		{name: "missing code", details: []FailureDetail{{Message: "message"}}},
+		{name: "missing message", details: []FailureDetail{{Code: "CODE"}}},
+		{
+			name: "invalid source location",
+			details: []FailureDetail{
+				{Code: "CODE", Message: "message", Source: &SourceLocation{Path: "/abs/App.java", StartLine: 1}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validAnalyzerError()
+			err.Details = tt.details
+			assertValidateError(t, err.Validate)
+		})
+	}
+}
+
+func TestMethodSymbolValidateAcceptsBytecodeOnlySymbol(t *testing.T) {
+	t.Parallel()
+
+	r := validMethodSymbol()
+	r.Source = nil
+	r.Metadata = Metadata{
+		"declarationOrigin": "projectClasses",
+		"ownerSourceLocation": map[string]any{
+			"path":      "module-a/src/main/java/com/example/Owner.java",
+			"startLine": float64(3),
+		},
+	}
+	if err := r.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 func TestAnalysisRequestValidateRejectsEntrypointsWithoutQualifiedName(t *testing.T) {
 	t.Parallel()
 

@@ -31,6 +31,14 @@ func (r AnalysisRequest) Validate() error {
 	if err := require("workspaceRoot", r.WorkspaceRoot); err != nil {
 		return err
 	}
+	if r.SourceRoots != nil && len(r.SourceRoots) == 0 {
+		return invalid("sourceRoots", "must not be an explicit empty array")
+	}
+	for i, root := range r.SourceRoots {
+		if err := validateRelativePath(fmt.Sprintf("sourceRoots[%d]", i), root); err != nil {
+			return err
+		}
+	}
 	if r.Language != LanguageJava {
 		return invalid("language", "must be java")
 	}
@@ -151,6 +159,29 @@ func (r AnalyzerError) Validate() error {
 	}
 	if r.Source != nil {
 		if err := r.Source.validate("sourceLocation"); err != nil {
+			return err
+		}
+	}
+	if r.Details != nil && len(r.Details) == 0 {
+		return invalid("details", "must contain at least one detail when present")
+	}
+	for i, detail := range r.Details {
+		if err := detail.validate(fmt.Sprintf("details[%d]", i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d FailureDetail) validate(field string) error {
+	if err := require(field+".code", d.Code); err != nil {
+		return err
+	}
+	if err := require(field+".message", d.Message); err != nil {
+		return err
+	}
+	if d.Source != nil {
+		if err := d.Source.validate(field + ".sourceLocation"); err != nil {
 			return err
 		}
 	}
