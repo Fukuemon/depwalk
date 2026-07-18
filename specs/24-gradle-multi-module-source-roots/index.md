@@ -244,6 +244,7 @@ EARS 風で振る舞いを記述する。
 | D28 | initializer内の1つのAST callを複数constructor callerへ畳み込むときinventory / ledgerをどう数えるか | A: lexical call siteとsemantic callerの組ごとにentryを展開し、callerを含むIDごとに1 outcomeを持つ                          | 解決済み |
 | D29 | bytecode-only memberのowner metadataをCore graphへ保持する変更をどの正本へ反映するか               | A: Graph feature docをsync対象へ追加し、`graph.Symbol`のopaque metadata passthroughを正式契約にする                        | 解決済み |
 | D30 | custom model providerとGradle / daemon JVMの互換性matrixをいつ・どの値で確定するか                 | A: clarifyでbundled Tooling API、対応wrapper範囲、provider classfile target、daemon JVM matrixを確定する                   | 解決済み |
+| D31 | Lombok等の生成memberを起点とする式の型伝播 (chained call / stream連鎖) をどう解決するか            | 未定: A) solver層でscope内source型へbytecode memberを合成 / B) project classes優先のsolver順序へ反転しsource再対応付け     | 未解決   |
 
 ## 解決済みの論点
 
