@@ -171,6 +171,8 @@ public final class Main {
     private static int reportInternalError(RecordWriter writer, PrintStream errStream, Throwable e) {
         String detail = e.getClass().getName() + ": " + e.getMessage();
         errStream.println("internal error during analysis: " + detail);
+        // 内部エラーの triage 用に stack trace を stderr へ出す (Protocol へは出さない)。
+        e.printStackTrace(errStream);
         try {
             writer.write(ErrorRecord.of(JavaErrorCode.JAVA_INTERNAL_ERROR.code(), "internal error during analysis: " + detail));
         } catch (IOException ignored) {

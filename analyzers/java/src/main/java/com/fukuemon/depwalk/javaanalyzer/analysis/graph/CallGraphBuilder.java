@@ -304,6 +304,15 @@ public final class CallGraphBuilder {
                 commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
+            // receiver 型を (bytecode field 補完込みで) 特定できて、その型が
+            // scope 内 source に存在しない場合、callee は scope 外であり
+            // 理由付き external-target として分類する (spec #24 D18)。
+            // 例: Lombok @Slf4j の log field 経由の Logger#info 呼び出し。
+            String receiverOwner = bytecodeRescueOwner(mce, ctx);
+            if (receiverOwner != null && declIndex.find(receiverOwner).isEmpty()) {
+                commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+                return;
+            }
             reportUnresolved(mce, ctx);
             commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
                     "unresolved-method-call", mce.getNameAsString());
@@ -606,6 +615,15 @@ public final class CallGraphBuilder {
         }
     }
 
+    /** attribution を経ない external-target の明示除外 commit (D18 の field 補完経路)。 */
+    private void commitExcludedExternal(Node callNode, CallSiteId.CallKind kind, WalkContext ctx) {
+        for (String caller : ledgerCallers(callNode, ctx)) {
+            ledger.commitExcluded(
+                    CallSiteInventory.of(callNode, currentPath, kind, caller),
+                    CallSiteOutcomeLedger.REASON_EXTERNAL_TARGET);
+        }
+    }
+
     private void commitDiagnostic(Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target) {
         for (String caller : ledgerCallers(callNode, ctx)) {
             ledger.commitDiagnostic(
@@ -757,6 +775,22 @@ public final class CallGraphBuilder {
         String packageName = e.getClass().getPackageName();
         if (packageName.startsWith("com.github.javaparser.resolution")) {
             return;
+        }
+        // JavaParser 内部 frame を起点とする汎用 RuntimeException
+        // (IllegalStateException / ConcurrentModificationException 等) も、
+        // resolve 呼び出し境界で発生する限り要素単位に隔離できる library 側
+        // resolution failure として扱う。JDK collection 内で顕在化するケース
+        // (HashMap iterator 等) があるため、JDK frame を除いた最初の frame で
+        // 発生元 library を判定する。
+        for (StackTraceElement frame : e.getStackTrace()) {
+            String className = frame.getClassName();
+            if (className.startsWith("java.") || className.startsWith("jdk.") || className.startsWith("sun.")) {
+                continue;
+            }
+            if (className.startsWith("com.github.javaparser.")) {
+                return;
+            }
+            break;
         }
         throw e;
     }
