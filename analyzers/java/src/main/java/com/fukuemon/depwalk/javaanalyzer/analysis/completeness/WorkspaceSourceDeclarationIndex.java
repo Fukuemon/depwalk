@@ -13,9 +13,10 @@ import java.util.Optional;
 
 /**
  * include / exclude 後の全 source から作る軽量な型宣言索引 (spec #24 D16 / D18)。
- * binary name → (所有 context, workspace 相対 location) だけを保持し、AST は
- * 保持しない。bytecode-only member 救済の「所有 source type が scope 内」判定と
- * owner source location の構築に使う。
+ * binary name → (所有 context, workspace 相対 location) を保持し、AST は保持しない。
+ * 正規化 method signature の索引は既存 {@code SourceMethodIndex} (methodId =
+ * 正規化 signature) が正本で、本 index は型の所有 context / 到達性の制約と
+ * owner source location の構築を担う (両者で spec step 1.2 の索引を構成する)。
  */
 public final class WorkspaceSourceDeclarationIndex {
 

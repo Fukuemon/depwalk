@@ -335,6 +335,26 @@ public final class SootUpTypeHierarchyIndex {
         });
     }
 
+    /**
+     * 宣言 class 自身の bytecode field の型 (binary name) を返す。bytecode-only
+     * field は receiver 型解決の補完にだけ使い、node 化しない (spec #24 step 3.6)。
+     */
+    public Optional<String> resolveDeclaredFieldType(String declaringType, String fieldName) {
+        try {
+            ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
+            Optional<JavaSootClass> sootClass = view().getClass(classType);
+            if (sootClass.isEmpty()) {
+                return Optional.empty();
+            }
+            return sootClass.get().getFields().stream()
+                    .filter(field -> field.getName().equals(fieldName))
+                    .map(field -> binaryNameOf(field.getType()))
+                    .findFirst();
+        } catch (RuntimeException | LinkageError e) {
+            return Optional.empty();
+        }
+    }
+
     private Resolution resolveConstructorsUncached(String declaringType) {
         return guardQuery(declaringType, () -> {
             ClassType classType = view().getIdentifierFactory().getClassType(declaringType);

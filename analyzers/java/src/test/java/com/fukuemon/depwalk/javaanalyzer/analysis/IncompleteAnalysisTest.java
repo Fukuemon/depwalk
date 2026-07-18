@@ -66,6 +66,11 @@ class IncompleteAnalysisTest {
         int sum = reasonCounts.values().stream().mapToInt(v -> ((Number) v).intValue()).sum();
         assertEquals(3, sum, "reasonCounts must agree with total");
 
+        // serialized byte 数 metric: details が空でなく、全 detail が payload に載る。
+        byte[] serialized = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsBytes(error);
+        assertTrue(serialized.length > 200, "serialized error record bytes = " + serialized.length);
+
         assertTrue(ran.stderr().contains("silentOmission=0") || !ran.stderr().contains("silentOmission"),
                 "production stderr carries only aggregate counts");
     }
