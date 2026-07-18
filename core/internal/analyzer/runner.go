@@ -100,26 +100,30 @@ func (r Runner) Run(request protocol.AnalysisRequest, onRecord func(protocol.Rec
 		stderrDone <- content
 	}()
 
-	finish := func(waitErr error) {
+	// finish drains stderr to EOF before calling Wait so the pipe is fully
+	// read when the process handle is released (os/exec requires reads to
+	// complete before Wait) and no trailing stderr output is lost.
+	finish := func() error {
 		result.Stderr = string(<-stderrDone)
+		waitErr := cmd.Wait()
 		result.ExitCode = exitCode(waitErr)
+		return waitErr
 	}
 
 	if _, err := stdin.Write(requestLine); err != nil {
 		_ = stdin.Close()
 		result = parseStdout(stdout, onRecord)
-		finish(cmd.Wait())
+		_ = finish()
 		return result, err
 	}
 	if err := stdin.Close(); err != nil {
 		result = parseStdout(stdout, onRecord)
-		finish(cmd.Wait())
+		_ = finish()
 		return result, err
 	}
 
 	result = parseStdout(stdout, onRecord)
-	waitErr := cmd.Wait()
-	finish(waitErr)
+	waitErr := finish()
 
 	if waitErr != nil && result.ExitCode == 0 {
 		return result, waitErr

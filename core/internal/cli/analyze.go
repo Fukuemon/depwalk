@@ -68,8 +68,10 @@ func newAnalyzeCommand() *cobra.Command {
 				if errors.As(err, &failure) {
 					renderAnalyzerFailure(cmd.ErrOrStderr(), failure)
 					// The full failure, summary first, is already rendered;
-					// suppress cobra's trailing duplicate summary.
+					// suppress cobra's trailing duplicate summary and the
+					// usage block that would follow it.
 					cmd.SilenceErrors = true
+					cmd.SilenceUsage = true
 				}
 				return err
 			}
