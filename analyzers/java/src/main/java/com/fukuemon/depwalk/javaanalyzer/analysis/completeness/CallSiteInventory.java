@@ -123,6 +123,8 @@ public final class CallSiteInventory {
             for (Node argument : ecis.getArguments()) {
                 walk(argument, path, enclosingType, callers);
             }
+            // qualified super (`expr.super(...)`) の outer 式内の call も登録する。
+            ecis.getExpression().ifPresent(expression -> walk(expression, path, enclosingType, callers));
             return;
         }
         recurse(node, path, enclosingType, callers);

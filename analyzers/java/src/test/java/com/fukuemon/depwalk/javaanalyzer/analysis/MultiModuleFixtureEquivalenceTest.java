@@ -42,7 +42,7 @@ class MultiModuleFixtureEquivalenceTest {
         fixture = Path.of("..", "..", "testdata", "fixtures", "java", "multi-module-spring-project")
                 .toAbsolutePath().normalize();
         Path manifest = fixture.resolve("build/depwalk-classpath.txt");
-        if (!Files.exists(manifest)) {
+        if (isStale(manifest)) {
             // fixture build (classes output + 明示 override 用 classpath manifest) は
             // test harness が起動する。Analyzer 自身は task を起動しない。
             try (ProjectConnection connection = GradleConnector.newConnector()
@@ -57,6 +57,29 @@ class MultiModuleFixtureEquivalenceTest {
             }
         }
         classpathManifest = Files.readAllLines(manifest).stream().filter(l -> !l.isBlank()).toList();
+    }
+
+    /** fixture source より古い manifest / classes での誤検証を防ぐ鮮度判定。 */
+    private boolean isStale(Path manifest) throws Exception {
+        if (!Files.exists(manifest)) {
+            return true;
+        }
+        long manifestTime = Files.getLastModifiedTime(manifest).toMillis();
+        try (java.util.stream.Stream<Path> paths = Files.walk(fixture)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String s = p.toString();
+                        return (s.endsWith(".java") || s.endsWith(".gradle"))
+                                && !s.contains("/build/") && !s.contains("/.gradle/");
+                    })
+                    .anyMatch(p -> {
+                        try {
+                            return Files.getLastModifiedTime(p).toMillis() > manifestTime;
+                        } catch (java.io.IOException e) {
+                            return true;
+                        }
+                    });
+        }
     }
 
     private record Run(int exitCode, List<Map<String, Object>> records, String stderr) {
@@ -160,12 +183,17 @@ class MultiModuleFixtureEquivalenceTest {
 
         assertEquals(0, run.exitCode(), run.stderr());
         // include glob は workspace 相対 path (module directory を含む) で判定される。
+        // sourceLocation を持たない record (bytecode-only member 等) も methodId の
+        // 所属 package で repository scope 内であることを検証する。
         for (Map<String, Object> method : methodSet(run)) {
             @SuppressWarnings("unchecked")
             Map<String, Object> location = (Map<String, Object>) method.get("sourceLocation");
             if (location != null) {
                 assertTrue(((String) location.get("path")).startsWith("repository/"),
                         "include repository/** must restrict the scope by path: " + method);
+            } else {
+                assertTrue(((String) method.get("methodId")).contains(".repository."),
+                        "location-less method outside the included module: " + method);
             }
         }
         Set<String> methods = methodSet(run).stream()
@@ -181,14 +209,20 @@ class MultiModuleFixtureEquivalenceTest {
                 .readValue(fixture.resolve("expected/graph.json").toFile(), Map.class);
         Map<String, Map<String, Object>> methodsById = methodSet(run).stream()
                 .collect(Collectors.toMap(m -> (String) m.get("methodId"), m -> m));
-        for (Map<String, Object> expectedMethod : (List<Map<String, Object>>) expected.get("methods")) {
+        List<Map<String, Object>> expectedMethods = (List<Map<String, Object>>) expected.get("methods");
+        List<Map<String, Object>> expectedEdges = (List<Map<String, Object>>) expected.get("edges");
+        // expected/graph.json は完全集合。件数一致で包含検査を集合一致へ引き上げる。
+        assertEquals(expectedMethods.size(), methodsById.size(), () -> methodsById.keySet().toString());
+        assertEquals(expectedEdges.size(), edgeSet(run).size(), () -> edgeSet(run).toString());
+        for (Map<String, Object> expectedMethod : expectedMethods) {
             String methodId = (String) expectedMethod.get("methodId");
             Map<String, Object> actual = methodsById.get(methodId);
             assertTrue(actual != null, () -> "missing " + methodId + " in " + methodsById.keySet());
             Map<String, Object> location = (Map<String, Object>) actual.get("sourceLocation");
+            assertTrue(location != null, () -> "method without sourceLocation: " + methodId);
             assertEquals(expectedMethod.get("sourceLocation"), location.get("path"), methodId);
         }
-        for (Map<String, Object> expectedEdge : (List<Map<String, Object>>) expected.get("edges")) {
+        for (Map<String, Object> expectedEdge : expectedEdges) {
             assertEdge(run, (String) expectedEdge.get("caller"), (String) expectedEdge.get("callee"),
                     (String) expectedEdge.get("resolution"));
         }

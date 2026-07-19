@@ -1339,6 +1339,7 @@ D1〜D30とdiagram reviewのdurableな変更は、PRD / Design Doc / feature doc
 | 2026-07-19 | Claude | D31 / D32の解決記録を解決済みの論点節・論点表・メタ情報へ同期                                                                                                                                                                      |
 | 2026-07-19 | Claude | PR #26マルチエージェントレビューの合意指摘を反映し、model由来classpathのfatal境界 (workspace内未build entryはwarning除外、external欠落はfatal維持) をD7へ精緻化                                                                    |
 | 2026-07-19 | Claude | PR #26未合意high指摘を反映: 型名scopeのstatic callへのinstance member合成・救済禁止、member救済のproject output origin検証 (D16) とSootUpのproject bytecode優先、included build rootのwarning報告 (provider modelへroot一覧を追加) |
+| 2026-07-19 | Claude | PR #26未合意medium / low指摘を反映: fatal stream時の参照検証skip、qualified super式走査、UOE隔離の発生元判定化、InvalidPathException境界、E2E / fixtureの集合一致検証と各テスト強化、feature doc / ADR-0006 / toolchainの実装同期  |
 
 ## 備考
 

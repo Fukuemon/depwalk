@@ -46,10 +46,10 @@ class IncompleteAnalysisTest {
         List<Map<String, Object>> details = (List<Map<String, Object>>) error.get("details");
         assertEquals(3, details.size(), "all primary diagnostics must be reported without truncation");
         // 決定順 (workspace 相対 path → 位置)。
-        assertTrue(((Map<String, Object>) details.get(0).get("sourceLocation")).get("path")
-                .equals("com/example/A.java"));
-        assertTrue(((Map<String, Object>) details.get(1).get("sourceLocation")).get("path")
-                .equals("com/example/B.java"));
+        assertEquals("com/example/A.java",
+                ((Map<String, Object>) details.get(0).get("sourceLocation")).get("path"));
+        assertEquals("com/example/B.java",
+                ((Map<String, Object>) details.get(1).get("sourceLocation")).get("path"));
         for (Map<String, Object> detail : details) {
             assertEquals("JAVA_UNRESOLVED_SYMBOL", detail.get("code"));
             Map<String, Object> metadata = (Map<String, Object>) detail.get("metadata");
@@ -65,14 +65,18 @@ class IncompleteAnalysisTest {
         Map<String, Object> reasonCounts = (Map<String, Object>) metadata.get("reasonCounts");
         int sum = reasonCounts.values().stream().mapToInt(v -> ((Number) v).intValue()).sum();
         assertEquals(3, sum, "reasonCounts must agree with total");
+        // fatal は先行 warning を無効化するため、SootUp 未利用 (source-only) の
+        // context 数を upstream cause として error metadata で自己完結に保持する。
+        assertEquals(1, ((Number) metadata.get("sootUpUnavailableContexts")).intValue());
 
         // serialized byte 数 metric: details が空でなく、全 detail が payload に載る。
         byte[] serialized = new com.fasterxml.jackson.databind.ObjectMapper()
                 .writeValueAsBytes(error);
         assertTrue(serialized.length > 200, "serialized error record bytes = " + serialized.length);
 
-        assertTrue(ran.stderr().contains("silentOmission=0") || !ran.stderr().contains("silentOmission"),
-                "production stderr carries only aggregate counts");
+        // ledger summary (集計行) は成功経路だけの出力。fatal 経路では出力しない。
+        assertFalse(ran.stderr().contains("silentOmission"),
+                "fatal path must not print the ledger summary: " + ran.stderr());
     }
 
     @SuppressWarnings("unchecked")

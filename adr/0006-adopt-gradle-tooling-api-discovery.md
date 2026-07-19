@@ -22,8 +22,8 @@ Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling A
 - provider は project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無だけを返す。Gradle task や source generation は実行しない。
 - `test` と名前付き source set は自動 discovery の対象外とする。
 - 各 project の `main` ごとに解析 context を作り、project dependency で到達可能な context と classpath だけを型解決へ接続する。
-- Tooling APIがworkspace外のexternal composite / included buildと識別したbuildはroot validation前にscopeから除外し、1 buildにつき1件の`JAVA_EXTERNAL_BUILD_EXCLUDED` warningを出す。解決済みartifactは外部依存として利用できる。一方、workspace内projectとして採用したsource root / fileのrealpathがworkspace外へ出る場合はfatalとする。
-- modelに宣言されたsource directoryが未作成なら生成前の空rootとして除外し、既存rootの非directory・読取不能はfatalにする。project classes outputが未作成、または明示経路で自project classes output自体が指定されていない場合は`JAVA_SOOTUP_UNAVAILABLE` warningでsource-only解析を継続する。ただし、利用者が明示したclasspath entryまたはmodelが解決済みcompile classpath entryの欠落・読取不能はfatalとする。
+- composite / included build のprojectはmodelの対象外 (root buildのproject階層だけを解析する)。workspace外のexternal included build projectと、providerが報告するincluded build rootは、いずれも`JAVA_SOURCE_ROOT_EXCLUDED` warningで除外を観測可能にし、黙示の脱落を残さない。解決済みartifactは外部依存として利用できる。一方、workspace内projectとして採用したsource root / fileのrealpathがworkspace外へ出る場合はfatalとする。
+- modelに宣言されたsource directoryが未作成なら生成前の空rootとして除外し、既存rootの非directory・読取不能はfatalにする。project classes outputが未作成、明示経路で自project classes output自体が指定されていない場合、またはmodel由来classpathのworkspace内project依存build outputが未buildの場合は`JAVA_SOOTUP_UNAVAILABLE` warningで該当bytecodeなしのsource解析を継続する (依存contextのsource rootがsolverへ入り型解決を補完する)。ただし、利用者が明示したclasspath entryまたはmodelが解決済みworkspace外external entryの欠落・読取不能はfatalとする。
 - provider は Gradle `7.6.5` API baseline に対してbuildしJava 8 classfileとする (compile 用の再配布 API artifact は `7.6.4` が最終のため `7.6.5` 相当として `7.6.4` を使用する。確定 2026-07-18)。対象Gradleは`7.6.5 <= version < 9.7.0`、wrapper不在時はbundled Tooling API `9.6.1`を使用する。固定CI anchorは`7.6.5 / daemon JDK 8`、`8.14.5 / daemon JDK 17`、`9.6.1 / daemon JDK 25`とし、詳細正本は [toolchain context](../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
 - `sourceRoots` が 1 件以上指定された request は Gradle Tooling API、daemon、一時 provider を完全に bypass し、明示 classpath / language level から単一 synthetic context を構築する。
 
@@ -31,7 +31,7 @@ Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling A
 
 CLI helpはこの副作用と明示bypassを常時説明し、自動discoveryの各runではbuild評価前にAnalyzer stderrへ、build logic評価、repository / credential resolution、network、cacheを利用し得ることを安定した定型文で通知する。discoveryの開始・終了と安定categoryは観測可能にするが、Gradle由来の自由文は転送しない。
 
-範囲外またはversion判定不能、provider load失敗、daemon JVM非互換は`JAVA_GRADLE_MODEL_ERROR`の安定reason `unsupported-gradle-version` / `provider-incompatible` / `daemon-jvm-incompatible`でfatalにする。明示`sourceRoots`経路はwrapper判定を含めmatrix全体をbypassする。
+範囲外またはversion判定不能、provider非互換、daemon JVM非互換は`JAVA_GRADLE_MODEL_ERROR`の安定reason `unsupported-gradle-version` / `provider-incompatible` / `daemon-jvm-incompatible`でfatalにする。reasonの分類粒度は判定できたphaseに従う: version / daemon JVMはmodel要求前のpre-flightで、provider非互換はmodel検証で判定する。provider load中にGradle側で顕在化した失敗は原因を特定できないため`model-request-failed` / `connection-failed`として報告し、詳細をraw exceptionから推測しない。wrapper不在のbuildは同梱`9.6.1`で評価されるため、意図しないGradle versionでのbuild評価を避けたい場合はwrapperの利用または明示`sourceRoots`を推奨する。明示`sourceRoots`経路はwrapper判定を含めmatrix全体をbypassする。
 
 ## 代替案
 
@@ -60,7 +60,7 @@ CLI helpはこの副作用と明示bypassを常時説明し、自動discoveryの
 
 ### 影響範囲
 
-- 対象モジュール / package: `java-analyzer`
+- 対象モジュール / package: `java-analyzer` (Tooling API / provider / discovery)、`analyzer-protocol` (optional `sourceRoots`)、`core` (言語非依存な repeatable `--source-root` flag と metadata passthrough)
 - 横断 contract: `design/DesignDoc.md`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/infrastructure.md`
 
 ## 実装・運用への反映

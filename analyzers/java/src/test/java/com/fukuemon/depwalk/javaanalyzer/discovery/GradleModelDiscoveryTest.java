@@ -22,6 +22,12 @@ class GradleModelDiscoveryTest {
     private final ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
     private final PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
 
+    @org.junit.jupiter.api.BeforeEach
+    void resetStderr() {
+        // instance field の buffer へテスト間で stderr が累積しないようにする。
+        stderrBuffer.reset();
+    }
+
     @Test
     void explicitSourceRootsBypassDiscoveryCompletely() {
         assertTrue(GradleModelDiscovery.isExplicitOverride(List.of("module-a/src/main/java")));

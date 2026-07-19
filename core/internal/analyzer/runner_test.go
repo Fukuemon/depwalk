@@ -183,6 +183,21 @@ func TestParseStdoutValidatesCallEdgesAfterFullStream(t *testing.T) {
 	}
 }
 
+func TestParseStdoutSkipsReferenceValidationOnFatalStream(t *testing.T) {
+	t.Parallel()
+
+	stdout := callEdgeJSONL("edge:1", "method:caller", "method:missing") +
+		`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"fatal"}` + "\n"
+
+	result := parseStdout(strings.NewReader(stdout), nil)
+	if result.AnalyzerError == nil {
+		t.Fatal("AnalyzerError = nil, want fatal error record")
+	}
+	if result.ValidationError != nil {
+		t.Fatalf("ValidationError = %v, want nil (fatal stream discards prior records)", result.ValidationError)
+	}
+}
+
 func assertStdoutValidationError(t *testing.T, stdout string, wantRecords int) {
 	t.Helper()
 

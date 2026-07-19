@@ -69,7 +69,7 @@ public final class AnalysisContextFactory {
         List<Path> classpathPaths = new ArrayList<>();
         List<Path> classesOutputs = new ArrayList<>();
         for (String entry : classpath) {
-            Path path = Path.of(entry).toAbsolutePath().normalize();
+            Path path = parseRequestPath(entry, "metadata.classpath entry").toAbsolutePath().normalize();
             classpathPaths.add(path);
             if (Files.isDirectory(path)) {
                 classesOutputs.add(path);
@@ -111,7 +111,7 @@ public final class AnalysisContextFactory {
 
         List<Path> commonEntries = new ArrayList<>();
         for (String entry : commonClasspath) {
-            commonEntries.add(Path.of(entry).toAbsolutePath().normalize());
+            commonEntries.add(parseRequestPath(entry, "metadata.classpath entry").toAbsolutePath().normalize());
         }
 
         int externalBuildProjectCount = 0;
@@ -263,7 +263,8 @@ public final class AnalysisContextFactory {
         Set<Path> seen = new LinkedHashSet<>();
         for (String value : sourceRoots) {
             if (value.isEmpty() || value.contains("\\") || value.startsWith("/")
-                    || Path.of(value).isAbsolute() || containsParentSegment(value)) {
+                    || parseRequestPath(value, "analysisRequest.sourceRoots element").isAbsolute()
+                    || containsParentSegment(value)) {
                 throw new AnalyzerFatalException(
                         JavaErrorCode.JAVA_INVALID_REQUEST,
                         "analysisRequest.sourceRoots element must be a workspace-relative path without .. segments");
@@ -352,6 +353,20 @@ public final class AnalysisContextFactory {
             }
         }
         return false;
+    }
+
+    /**
+     * request 由来の文字列を Path 化する。NUL 等を含む不正値の
+     * {@link java.nio.file.InvalidPathException} を internal error でなく
+     * invalid request として拒否する。
+     */
+    private static Path parseRequestPath(String value, String what) throws AnalyzerFatalException {
+        try {
+            return Path.of(value);
+        } catch (java.nio.file.InvalidPathException e) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST, what + " is not a valid filesystem path");
+        }
     }
 
     /**

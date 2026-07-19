@@ -18,7 +18,13 @@ import (
 // only records verification copies into the given capture directory. It never
 // synthesizes, reorders, re-serializes, or filters records.
 func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
-	captureDir, command := proxyHelperArgs(os.Args)
+	captureDir, command, malformed := proxyHelperArgs(os.Args)
+	if malformed {
+		// 引数不足のまま無言で return すると「空出力 + exit 0 の Analyzer」に
+		// 見え、空 graph の偽成功になるため非ゼロで落とす。
+		fmt.Fprintln(os.Stderr, "recording proxy: --proxy-capture requires <dir> <command...>")
+		os.Exit(97)
+	}
 	if captureDir == "" {
 		return
 	}
@@ -26,14 +32,18 @@ func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
 }
 
 // proxyHelperArgs extracts "--proxy-capture <dir> <command...>" after the
-// test-binary "--" separator; returns ("", nil) when not invoked as a helper.
-func proxyHelperArgs(args []string) (string, []string) {
+// test-binary "--" separator; returns ("", nil, false) when not invoked as a
+// helper and malformed=true when the flag is present without <dir> <command>.
+func proxyHelperArgs(args []string) (string, []string, bool) {
 	for i, arg := range args {
-		if arg == "--proxy-capture" && i+2 < len(args) {
-			return args[i+1], args[i+2:]
+		if arg == "--proxy-capture" {
+			if i+2 < len(args) {
+				return args[i+1], args[i+2:], false
+			}
+			return "", nil, true
 		}
 	}
-	return "", nil
+	return "", nil, false
 }
 
 // runRecordingProxy launches the real Analyzer command and relays all four
@@ -94,7 +104,8 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 // unit test: echoes stdin to stdout with a prefix line, writes one stderr
 // line, and exits 3.
 func TestProxyEchoChildHelperProcess(t *testing.T) {
-	if os.Getenv("DEPWALK_PROXY_ECHO_CHILD") != "1" {
+	// process 全体の env を汚す t.Setenv でなく、起動引数でシナリオを指定する。
+	if !hasArg(os.Args, "--proxy-echo-child") {
 		return
 	}
 	content, _ := io.ReadAll(os.Stdin)
@@ -103,17 +114,27 @@ func TestProxyEchoChildHelperProcess(t *testing.T) {
 	os.Exit(3)
 }
 
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRecordingProxyRelaysAllChannelsByteTransparently(t *testing.T) {
+	t.Parallel()
+
 	captureDir := t.TempDir()
 	var stdout, stderr strings.Builder
-	t.Setenv("DEPWALK_PROXY_ECHO_CHILD", "1")
 
 	exit := runRecordingProxy(
 		strings.NewReader("payload-bytes\n"),
 		&stdout,
 		&stderr,
 		captureDir,
-		[]string{os.Args[0], "-test.run=TestProxyEchoChildHelperProcess"},
+		[]string{os.Args[0], "-test.run=TestProxyEchoChildHelperProcess", "--", "--proxy-echo-child"},
 	)
 
 	if exit != 3 {

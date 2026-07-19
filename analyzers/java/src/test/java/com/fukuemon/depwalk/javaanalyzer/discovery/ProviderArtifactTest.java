@@ -22,9 +22,11 @@ class ProviderArtifactTest {
     @Test
     void bundledProviderContainsOnlyJava8ProviderClasses() throws Exception {
         List<String> classEntries = new ArrayList<>();
-        try (InputStream resource =
-                        getClass().getResourceAsStream("/gradle-model-provider/depwalk-gradle-model-provider.jar");
-                ZipInputStream zip = new ZipInputStream(resource)) {
+        InputStream resource =
+                getClass().getResourceAsStream("/gradle-model-provider/depwalk-gradle-model-provider.jar");
+        org.junit.jupiter.api.Assertions.assertNotNull(resource,
+                "provider jar is not bundled; run the model-provider jar packaging first");
+        try (resource; ZipInputStream zip = new ZipInputStream(resource)) {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
                 if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
                     continue;

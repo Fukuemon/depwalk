@@ -94,6 +94,15 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    void rejectsUnparseableSourceRootAsInvalidRequest() {
+        // NUL を含む値は InvalidPathException を漏らさず invalid request にする。
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
+                () -> AnalysisContextFactory.explicitContext(
+                        workspace, List.of("src\0bad"), List.of(), metadata("17")));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
     void rejectsExplicitEmptySourceRoots() {
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
                 () -> AnalysisContextFactory.explicitContext(

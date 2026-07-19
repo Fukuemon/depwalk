@@ -167,8 +167,12 @@ func parseStdout(stdout io.Reader, onRecord func(protocol.Record)) Result {
 		}
 		break
 	}
-	if err := references.validate(); err != nil {
-		result.setValidationError(err)
+	// fatal stream では先行 record を Core が全破棄するため、未完参照を別の
+	// validation failure として報告しない (Graph feature doc の fatal 契約)。
+	if result.AnalyzerError == nil {
+		if err := references.validate(); err != nil {
+			result.setValidationError(err)
+		}
 	}
 	return result
 }
