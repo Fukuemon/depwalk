@@ -233,6 +233,15 @@ public final class AnalysisContextFactory {
                             + " project(s) of external included builds from the analysis scope"));
         }
 
+        // composite / included build は v1 の model 対象外 (root build の project
+        // 階層だけを解析する)。黙って脱落させず 1 build につき 1 件 warning を出し、
+        // source を解析したい場合の明示 override を案内する。
+        for (File includedBuildRoot : model.getIncludedBuildRootDirectories()) {
+            warnings.add(warning(JavaDiagnosticCode.JAVA_SOURCE_ROOT_EXCLUDED,
+                    "excluded included build " + includedBuildRoot.getName()
+                            + " from the analysis scope; pass --source-root to analyze its sources explicitly"));
+        }
+
         rejectContainedRoots(rootOwners.keySet(), JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS);
 
         if (contexts.isEmpty() || rootOwners.isEmpty()) {

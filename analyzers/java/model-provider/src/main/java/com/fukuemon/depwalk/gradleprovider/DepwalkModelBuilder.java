@@ -65,11 +65,21 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
             projects.add(buildProjectModel(project, main));
         }
 
+        // composite / included build の project は本 model の対象外 (v1 scope)。
+        // 黙って脱落させず、Analyzer 側が warning と明示 override 案内を出せる
+        // よう root directory だけを報告する。
+        List<File> includedBuildRoots = new ArrayList<File>();
+        for (org.gradle.api.initialization.IncludedBuild included
+                : rootProject.getGradle().getIncludedBuilds()) {
+            includedBuildRoots.add(included.getProjectDir());
+        }
+
         return new DefaultDepwalkGradleModel(
                 rootProject.getProjectDir(),
                 projects,
                 new ArrayList<String>(excludedSourceSetNames),
-                excludedSourceSetCount);
+                excludedSourceSetCount,
+                includedBuildRoots);
     }
 
     private DefaultDepwalkProjectModel buildProjectModel(Project project, SourceSet main) {

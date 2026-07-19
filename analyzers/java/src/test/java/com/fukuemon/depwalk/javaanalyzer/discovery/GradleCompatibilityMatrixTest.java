@@ -125,6 +125,43 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    void reportsIncludedBuildRootsForExclusionWarnings() throws Exception {
+        String jdkHome = System.getProperty("depwalk.matrix.jdk17");
+        assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");
+        Path workspace = Files.createTempDirectory("depwalk-matrix-included-").toRealPath();
+        try {
+            Files.writeString(workspace.resolve("settings.gradle"), """
+                    rootProject.name = 'composite-root'
+                    includeBuild 'tooling-build'
+                    """);
+            Files.writeString(workspace.resolve("build.gradle"), "plugins { id 'java' }\n");
+            Path rootSrc = workspace.resolve("src/main/java/com/example");
+            Files.createDirectories(rootSrc);
+            Files.writeString(rootSrc.resolve("Root.java"), "package com.example; public class Root {}\n");
+            Path inner = workspace.resolve("tooling-build");
+            Files.createDirectories(inner);
+            Files.writeString(inner.resolve("settings.gradle"), "rootProject.name = 'tooling-build'\n");
+            Files.writeString(inner.resolve("build.gradle"), "plugins { id 'java' }\n");
+            Files.writeString(workspace.resolve("gradle.properties"),
+                    "org.gradle.java.home=" + jdkHome + "\n");
+            ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
+            PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
+
+            DepwalkGradleModel model = new GradleModelDiscovery(new GradleToolingClient("8.14.5"), stderr)
+                    .discover(workspace);
+
+            // included build の project は model に現れず、root は warning 用に報告される。
+            assertEquals(1, model.getProjects().size(), () -> model.getProjects().toString());
+            assertEquals(1, model.getIncludedBuildRootDirectories().size());
+            assertEquals("tooling-build", model.getIncludedBuildRootDirectories().get(0).getName());
+        } finally {
+            try (Stream<Path> paths = Files.walk(workspace)) {
+                paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+    }
+
+    @org.junit.jupiter.api.Test
     void normalizesLegacySourceCompatibilityToCanonicalMajor() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");

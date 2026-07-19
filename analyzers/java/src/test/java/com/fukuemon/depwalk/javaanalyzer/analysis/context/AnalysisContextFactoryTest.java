@@ -173,6 +173,50 @@ class AnalysisContextFactoryTest {
         assertEquals(JavaErrorCode.JAVA_MISSING_JAR, e.errorCode());
     }
 
+    @Test
+    void warnsForEachExcludedIncludedBuild() throws Exception {
+        Files.createDirectories(workspace.resolve("app/src/main/java"));
+        Path includedBuild = workspace.resolve("tooling-build");
+        Files.createDirectories(includedBuild);
+
+        var base = model(project(":app", workspace.resolve("app"),
+                List.of(workspace.resolve("app/src/main/java")), List.of()));
+        var withIncluded = new com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel() {
+            @Override
+            public java.io.File getBuildRootDirectory() {
+                return base.getBuildRootDirectory();
+            }
+
+            @Override
+            public List<? extends com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel> getProjects() {
+                return base.getProjects();
+            }
+
+            @Override
+            public List<String> getExcludedSourceSetNames() {
+                return List.of();
+            }
+
+            @Override
+            public int getExcludedSourceSetCount() {
+                return 0;
+            }
+
+            @Override
+            public List<java.io.File> getIncludedBuildRootDirectories() {
+                return List.of(includedBuild.toFile());
+            }
+        };
+
+        AnalysisContextFactory.Result result =
+                AnalysisContextFactory.discoveredContexts(workspace, withIncluded, List.of());
+
+        assertTrue(result.warnings().stream()
+                .anyMatch(w -> "JAVA_SOURCE_ROOT_EXCLUDED".equals(w.code())
+                        && w.message().contains("included build tooling-build")
+                        && w.message().contains("--source-root")));
+    }
+
     private com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel model(
             com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel... projects) {
         return new com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel() {

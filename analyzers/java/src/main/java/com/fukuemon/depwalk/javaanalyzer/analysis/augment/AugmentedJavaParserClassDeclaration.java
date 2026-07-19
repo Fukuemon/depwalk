@@ -44,7 +44,9 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         }
         // source AST に無い member を同一 context の classes output から合成する。
         // 一意な name + arity の場合だけ採用し、曖昧なら合成しない (D18 と同じ規則)。
+        // static context の解決 (staticOnly) では instance member を採用しない。
         return synthesizedInHierarchy(name, argumentsTypes.size())
+                .filter(synthesized -> !staticOnly || synthesized.isStatic())
                 .<SymbolReference<ResolvedMethodDeclaration>>map(SymbolReference::solved)
                 .orElse(solved);
     }

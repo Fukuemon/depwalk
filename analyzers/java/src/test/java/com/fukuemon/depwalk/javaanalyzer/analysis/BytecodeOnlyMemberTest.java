@@ -259,6 +259,96 @@ class BytecodeOnlyMemberTest {
                 .anyMatch(e -> "JAVA_INCOMPLETE_ANALYSIS".equals(e.get("code"))));
     }
 
+    @Test
+    void doesNotRescueMembersThatExistOnlyInExternalArtifacts() throws Exception {
+        // 同じ binary name の class が external jar にだけ存在する場合、その
+        // member を project bytecode として救済しない (D16: origin 検証)。
+        Path build = temp.resolve("jar-src");
+        write(build, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                    public String getName() { return "stale"; }
+                }
+                """);
+        Path classes = temp.resolve("jar-classes");
+        Files.createDirectories(classes);
+        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "--release", "17",
+                "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
+        assertEquals(0, rc, "fixture compile failed");
+        Path jar = temp.resolve("stale-owner.jar");
+        try (var out = new java.util.jar.JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new java.util.jar.JarEntry("com/example/Owner.class"));
+            out.write(Files.readAllBytes(classes.resolve("com/example/Owner.class")));
+            out.closeEntry();
+        }
+
+        Path workspace = temp.resolve("jar-workspace");
+        write(workspace, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    String use(Owner owner) { return owner.getName(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(jar.toString()), null, null, null, null);
+
+        assertTrue(ran.byType("callEdge").stream()
+                        .noneMatch(e -> "java:com.example.Owner#getName()".equals(e.get("calleeMethodId"))),
+                () -> "external-artifact member must not be rescued as project bytecode: " + ran.records());
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        assertTrue(ran.byType("error").stream()
+                .anyMatch(e -> "JAVA_INCOMPLETE_ANALYSIS".equals(e.get("code"))));
+    }
+
+    @Test
+    void doesNotSynthesizeInstanceMembersForStaticContextResolution() throws Exception {
+        // static 修飾の型名経由 call は、bytecode に同名・同 arity の instance
+        // member しか無い場合に合成せず、偽 edge でなく完全性 gate に残す。
+        Path build = temp.resolve("static-src");
+        write(build, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                    public void ping() {}
+                }
+                """);
+        Path classes = temp.resolve("static-classes");
+        Files.createDirectories(classes);
+        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "--release", "17",
+                "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
+        assertEquals(0, rc, "fixture compile failed");
+
+        Path workspace = temp.resolve("static-workspace");
+        write(workspace, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    static void use() { Owner.ping(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertTrue(ran.byType("callEdge").stream()
+                        .noneMatch(e -> "java:com.example.Owner#ping()".equals(e.get("calleeMethodId"))),
+                () -> "instance member must not resolve a static call: " + ran.records());
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        assertTrue(ran.byType("error").stream()
+                .anyMatch(e -> "JAVA_INCOMPLETE_ANALYSIS".equals(e.get("code"))));
+    }
+
     private void write(Path root, String relative, String source) throws Exception {
         Path file = root.resolve(relative);
         Files.createDirectories(file.getParent());

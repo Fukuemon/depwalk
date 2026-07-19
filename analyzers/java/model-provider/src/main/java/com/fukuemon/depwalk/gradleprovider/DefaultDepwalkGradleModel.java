@@ -18,16 +18,19 @@ public class DefaultDepwalkGradleModel implements Serializable {
     private final List<DefaultDepwalkProjectModel> projects;
     private final List<String> excludedSourceSetNames;
     private final int excludedSourceSetCount;
+    private final List<File> includedBuildRootDirectories;
 
     public DefaultDepwalkGradleModel(
             File buildRootDirectory,
             List<DefaultDepwalkProjectModel> projects,
             List<String> excludedSourceSetNames,
-            int excludedSourceSetCount) {
+            int excludedSourceSetCount,
+            List<File> includedBuildRootDirectories) {
         this.buildRootDirectory = buildRootDirectory;
         this.projects = projects;
         this.excludedSourceSetNames = excludedSourceSetNames;
         this.excludedSourceSetCount = excludedSourceSetCount;
+        this.includedBuildRootDirectories = includedBuildRootDirectories;
     }
 
     public File getBuildRootDirectory() {
@@ -44,5 +47,9 @@ public class DefaultDepwalkGradleModel implements Serializable {
 
     public int getExcludedSourceSetCount() {
         return excludedSourceSetCount;
+    }
+
+    public List<File> getIncludedBuildRootDirectories() {
+        return includedBuildRootDirectories;
     }
 }

@@ -16,6 +16,8 @@ public final class ProjectBytecodeMemberIndex {
 
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader signatureReader;
+    private final List<java.nio.file.Path> projectOutputDirs;
+    private final java.util.Map<String, Boolean> projectOutputCache = new java.util.HashMap<>();
     private final java.util.Map<String, List<SootUpTypeHierarchyIndex.MethodCandidate>> declaredCache =
             new java.util.HashMap<>();
 
@@ -24,14 +26,33 @@ public final class ProjectBytecodeMemberIndex {
     }
 
     /**
-     * @param classesOutputDirs generic Signature 属性の読み取りに使う自 context の
-     *     classes output (spec #24 D32)
+     * @param classesOutputDirs この context から見える project 所有の classes
+     *     output。member 救済の origin 検証 (D16) と generic Signature 属性の
+     *     読み取り (D32) に使う
      */
     public ProjectBytecodeMemberIndex(
             SootUpTypeHierarchyIndex sootUpIndex, List<java.nio.file.Path> classesOutputDirs) {
         this.sootUpIndex = sootUpIndex;
+        this.projectOutputDirs = List.copyOf(classesOutputDirs);
         this.signatureReader =
                 new com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader(classesOutputDirs);
+    }
+
+    /**
+     * owner class の classfile が project 所有の classes output に存在するかを
+     * 検証する (D16)。external artifact だけに存在する同名 class の member を
+     * project bytecode として救済しない。
+     */
+    private boolean inProjectOutput(String ownerBinaryName) {
+        return projectOutputCache.computeIfAbsent(ownerBinaryName, name -> {
+            String relative = name.replace('.', '/') + ".class";
+            for (java.nio.file.Path dir : projectOutputDirs) {
+                if (java.nio.file.Files.isRegularFile(dir.resolve(relative))) {
+                    return true;
+                }
+            }
+            return false;
+        });
     }
 
     /** 合成 member の generic 戻り値型 (Signature 属性が無ければ empty)。 */
@@ -47,7 +68,7 @@ public final class ProjectBytecodeMemberIndex {
      */
     public Optional<SootUpTypeHierarchyIndex.MethodCandidate> uniqueMethod(
             String ownerBinaryName, String methodName, int arity) {
-        if (isJvmInternalName(methodName)) {
+        if (isJvmInternalName(methodName) || !inProjectOutput(ownerBinaryName)) {
             return Optional.empty();
         }
         SootUpTypeHierarchyIndex.Resolution resolution =
@@ -58,6 +79,9 @@ public final class ProjectBytecodeMemberIndex {
     /** 所有 class に同 arity の constructor が一意に存在する場合だけ返す。 */
     public Optional<SootUpTypeHierarchyIndex.MethodCandidate> uniqueConstructor(
             String ownerBinaryName, int arity) {
+        if (!inProjectOutput(ownerBinaryName)) {
+            return Optional.empty();
+        }
         SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveConstructors(ownerBinaryName);
         return uniqueByArity(resolution, arity);
     }
@@ -68,6 +92,9 @@ public final class ProjectBytecodeMemberIndex {
     }
 
     private List<SootUpTypeHierarchyIndex.MethodCandidate> declaredCallableMethodsUncached(String ownerBinaryName) {
+        if (!inProjectOutput(ownerBinaryName)) {
+            return List.of();
+        }
         SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveDeclaredCallableMethods(ownerBinaryName);
         if (!resolution.isAvailable()) {
             return List.of();
@@ -80,6 +107,9 @@ public final class ProjectBytecodeMemberIndex {
 
     /** bytecode-only field の型を receiver 解決の補完としてだけ返す (node 化しない)。 */
     public Optional<String> fieldType(String ownerBinaryName, String fieldName) {
+        if (!inProjectOutput(ownerBinaryName)) {
+            return Optional.empty();
+        }
         return sootUpIndex.resolveDeclaredFieldType(ownerBinaryName, fieldName);
     }
 
