@@ -103,6 +103,14 @@ class MainTest {
         int exitCode = Main.run(inputStream(request), stdout, stderr);
 
         assertEquals(0, exitCode);
+        // 空 workspace では graph record を出さない (unknown field が余分な
+        // record 出力へ影響しないことを exit code だけでなく stdout でも固定)。
+        for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
+            if (!line.isBlank()) {
+                assertTrue(line.contains("\"recordType\":\"diagnostic\""),
+                        "unexpected non-diagnostic record: " + line);
+            }
+        }
     }
 
     @Test

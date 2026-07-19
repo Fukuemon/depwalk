@@ -131,7 +131,11 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 		}
 		assertCapturedGraphMatches(t, explicitCapture, expected)
 
-		// auto / explicit の raw graph 同値性 (edgeId 以外)。
+		// auto / explicit の raw graph 同値性 (edgeId 以外)。Auto subtest の
+		// capture が無い場合は依存失敗として skip し、紛らわしい二次失敗を避ける。
+		if _, err := os.Stat(filepath.Join(autoCapture, "stdout.jsonl")); err != nil {
+			t.Skipf("Auto subtest did not produce a capture: %v", err)
+		}
 		autoMethods, autoEdges := capturedGraph(t, autoCapture)
 		explicitMethods, explicitEdges := capturedGraph(t, explicitCapture)
 		if !reflect.DeepEqual(autoMethods, explicitMethods) {
@@ -209,6 +213,13 @@ type cliResult struct {
 // proxy, which launches the real Analyzer jar.
 func runCLI(t *testing.T, cliPath, captureDir, javaPath, jarPath string, args ...string) cliResult {
 	t.Helper()
+	// proxyCmd は手書き quote のため、path に二重引用符が入る環境では
+	// 組み立てが壊れる。黙って壊れず明示的に失敗させる。
+	for _, part := range []string{os.Args[0], captureDir, javaPath, jarPath} {
+		if strings.Contains(part, `"`) {
+			t.Fatalf("path containing a double quote is not supported by the proxy command quoting: %q", part)
+		}
+	}
 	proxyCmd := fmt.Sprintf(`"%s" -test.run=TestAnalyzerRecordingProxyHelperProcess -- --proxy-capture "%s" "%s" -jar "%s"`,
 		os.Args[0], captureDir, javaPath, jarPath)
 	cmd := exec.Command(cliPath, append([]string{"analyze"}, append(args, "--analyzer-cmd", proxyCmd)...)...)
@@ -365,6 +376,14 @@ func capturedGraph(t *testing.T, captureDir string) (map[string]string, []string
 func assertCapturedGraphMatches(t *testing.T, captureDir string, expected expectedMultiModuleGraph) {
 	t.Helper()
 	methods, edges := capturedGraph(t, captureDir)
+	// expected/graph.json は fixture の完全集合。件数一致で包含検査を
+	// 集合一致へ引き上げ、余剰 method / edge の混入も検出する。
+	if len(methods) != len(expected.Methods) {
+		t.Errorf("method count = %d, want exactly %d: %v", len(methods), len(expected.Methods), methods)
+	}
+	if len(edges) != len(expected.Edges) {
+		t.Errorf("edge count = %d, want exactly %d: %v", len(edges), len(expected.Edges), edges)
+	}
 	for _, method := range expected.Methods {
 		location, ok := methods[method.MethodID]
 		if !ok {

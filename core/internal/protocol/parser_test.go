@@ -164,6 +164,25 @@ func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
 	}
 }
 
+// JSON の明示 null は省略と同義に扱う (nil slice へ decode され自動 discovery
+// へ委譲する)。空配列 [] だけを invalid とする境界を意図的な契約として固定する。
+func TestParseRecordTreatsNullSourceRootsAsOmitted(t *testing.T) {
+	t.Parallel()
+
+	line := `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","sourceRoots":null}`
+	record, err := ParseRecord([]byte(line))
+	if err != nil {
+		t.Fatalf("ParseRecord() error = %v, want null to behave as omitted", err)
+	}
+	request, ok := record.(AnalysisRequest)
+	if !ok {
+		t.Fatalf("ParseRecord() type = %T, want AnalysisRequest", record)
+	}
+	if request.SourceRoots != nil {
+		t.Fatalf("SourceRoots = %v, want nil (auto discovery route)", request.SourceRoots)
+	}
+}
+
 func TestParseRecordRejectsInvalidSourceRootsAndDetails(t *testing.T) {
 	t.Parallel()
 

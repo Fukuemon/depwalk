@@ -121,6 +121,15 @@ func formatSourceLocation(location *protocol.SourceLocation) string {
 	if location.StartColumn != nil {
 		text = fmt.Sprintf("%s:%d", text, *location.StartColumn)
 	}
+	// end 位置を保持している record は範囲として併記する (Protocol は保持
+	// しているのに renderer が捨てると利用者へ届かないため)。
+	if location.EndLine != nil {
+		end := fmt.Sprintf("%d", *location.EndLine)
+		if location.EndColumn != nil {
+			end = fmt.Sprintf("%s:%d", end, *location.EndColumn)
+		}
+		text = fmt.Sprintf("%s-%s", text, end)
+	}
 	return text
 }
 

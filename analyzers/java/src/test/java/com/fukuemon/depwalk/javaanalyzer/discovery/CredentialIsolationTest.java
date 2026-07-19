@@ -72,10 +72,13 @@ class CredentialIsolationTest {
      * marker を含む test 入力 (gradle.properties / build.gradle) は検査対象外。
      */
     private static void assertNoMarkerInGeneratedArtifacts(Path workspace, String marker) throws Exception {
+        // 検査除外は workspace 直下の既知 test 入力 2 file に限定する (同名の
+        // 生成物が deeper path に現れた場合は漏洩として検出する)。
+        var knownInputs = java.util.Set.of(
+                workspace.resolve("gradle.properties"), workspace.resolve("build.gradle"));
         try (Stream<Path> paths = Files.walk(workspace)) {
             for (Path path : paths.filter(Files::isRegularFile).toList()) {
-                String name = path.getFileName().toString();
-                if (name.equals("gradle.properties") || name.equals("build.gradle")) {
+                if (knownInputs.contains(path)) {
                     continue;
                 }
                 byte[] content = Files.readAllBytes(path);

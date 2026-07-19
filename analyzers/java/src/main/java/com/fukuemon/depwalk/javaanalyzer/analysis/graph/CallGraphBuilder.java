@@ -272,6 +272,9 @@ public final class CallGraphBuilder {
             for (Node argument : ecis.getArguments()) {
                 walk(argument, ctx);
             }
+            // qualified super (`expr.super(...)`) の outer 式内の call も辿る
+            // (inventory の走査と対)。
+            ecis.getExpression().ifPresent(expression -> walk(expression, ctx));
             return;
         }
         recurseChildren(node, ctx);
@@ -836,19 +839,18 @@ public final class CallGraphBuilder {
      * Main の internal error 境界で処理される。
      */
     private static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
-        if (e instanceof UnsupportedOperationException) {
-            return;
-        }
         String packageName = e.getClass().getPackageName();
         if (packageName.startsWith("com.github.javaparser.resolution")) {
             return;
         }
         // JavaParser 内部 frame を起点とする汎用 RuntimeException
-        // (IllegalStateException / ConcurrentModificationException 等) も、
-        // resolve 呼び出し境界で発生する限り要素単位に隔離できる library 側
-        // resolution failure として扱う。JDK collection 内で顕在化するケース
-        // (HashMap iterator 等) があるため、JDK frame を除いた最初の frame で
-        // 発生元 library を判定する。
+        // (UnsupportedOperationException / IllegalStateException /
+        // ConcurrentModificationException 等) も、resolve 呼び出し境界で発生する
+        // 限り要素単位に隔離できる library 側 resolution failure として扱う。
+        // JDK collection 内で顕在化するケース (HashMap iterator 等) があるため、
+        // JDK frame を除いた最初の frame で発生元 library を判定する。depwalk
+        // 自身 (合成宣言等) を起点とする例外は analyzer 側バグとして伝播させ、
+        // unresolved diagnostic へ化けさせない。
         for (StackTraceElement frame : e.getStackTrace()) {
             String className = frame.getClassName();
             if (className.startsWith("java.") || className.startsWith("jdk.") || className.startsWith("sun.")) {

@@ -67,6 +67,31 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    void registersCallsInsideQualifiedSuperOuterExpression() throws Exception {
+        // qualified super (`expr.super(...)`) の outer 式内の method call も
+        // inventory へ登録される (walk が式を辿らないと黙示の脱落になる)。
+        CallSiteInventory inventory = inventoryOf("com/example/Qualified.java", """
+                package com.example;
+                public class Qualified {
+                    static class Outer {
+                        class Inner {}
+                    }
+                    static class Sub extends Outer.Inner {
+                        Sub(Outer outer) {
+                            pick(outer).super();
+                        }
+                        static Outer pick(Outer outer) { return outer; }
+                    }
+                }
+                """);
+
+        assertTrue(inventory.ids().stream().anyMatch(id ->
+                        id.callKind() == CallSiteId.CallKind.METHOD_CALL
+                                && id.callerMethodId().contains("Sub#<init>")),
+                () -> "outer expression call missing from the inventory: " + inventory.ids());
+    }
+
+    @Test
     void expandsInstanceFieldInitializerToEachConstructor() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/Init.java", """
                 package com.example;

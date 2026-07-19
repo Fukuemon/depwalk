@@ -76,7 +76,9 @@ class GradleCompatibilityMatrixTest {
             assertEquals(List.of(":service"), projects.get(":app").getProjectDependencyPaths());
             assertEquals(List.of(":repository"), projects.get(":service").getProjectDependencyPaths());
 
-            // task 非実行: model 取得で build output が生成されないこと。
+            // task 非実行: copyFixture は build/ を除外するため両 path とも
+            // discovery 前は不在 (前提)。model 取得後も不在のままであることが
+            // compile / task 非実行の検証になる。
             assertFalse(Files.exists(workspace.resolve("app/build/classes")),
                     "model request must not execute compile tasks");
             assertFalse(Files.exists(workspace.resolve("build/depwalk-classpath.txt")));

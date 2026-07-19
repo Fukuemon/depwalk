@@ -108,7 +108,10 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     @Override
     public ResolvedType getSpecifiedException(int index) {
-        throw new UnsupportedOperationException("synthesized bytecode member has no declared exceptions");
+        // 宣言済み例外は 0 件 (getNumberOfSpecifiedExceptions)。範囲外 index は
+        // 呼び出し側の契約違反であり、UOE で resolution failure に化けさせない。
+        throw new IndexOutOfBoundsException(
+                "synthesized bytecode member has no declared exceptions: index " + index);
     }
 
     @Override
@@ -138,9 +141,31 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     @Override
     public String toDescriptor() {
-        // JVM descriptor は erasure 済み binary name から決定的に構築できるが、
-        // 呼び出し経路が無い限り実装しない (使用箇所が現れたら実装する)。
-        throw new UnsupportedOperationException("descriptor of a synthesized bytecode member");
+        // JVM descriptor を erasure 済み binary name から決定的に構築する
+        // (UOE を投げると JavaParser 内部経路経由で resolution failure に化ける)。
+        StringBuilder descriptor = new StringBuilder("(");
+        for (String parameterType : candidate.parameterTypes()) {
+            descriptor.append(jvmTypeDescriptor(parameterType));
+        }
+        return descriptor.append(')').append(jvmTypeDescriptor(candidate.returnType())).toString();
+    }
+
+    private static String jvmTypeDescriptor(String binaryName) {
+        if (binaryName.endsWith("[]")) {
+            return "[" + jvmTypeDescriptor(binaryName.substring(0, binaryName.length() - 2));
+        }
+        return switch (binaryName) {
+            case "void" -> "V";
+            case "boolean" -> "Z";
+            case "byte" -> "B";
+            case "short" -> "S";
+            case "int" -> "I";
+            case "long" -> "J";
+            case "char" -> "C";
+            case "float" -> "F";
+            case "double" -> "D";
+            default -> "L" + binaryName.replace('.', '/') + ";";
+        };
     }
 
     @Override

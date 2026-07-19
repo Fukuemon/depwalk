@@ -1,1 +1,6 @@
-[]
+[
+  {
+    "code": "JAVA_SOOTUP_UNAVAILABLE",
+    "description": "明示経路で classpath に classes directory が無いため source-only 継続の warning が出る (D7)。Core が Analyzer diagnostic を成功結果へ伝播する経路の回帰。"
+  }
+]

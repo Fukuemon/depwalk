@@ -95,7 +95,8 @@ public final class GradleToolingClient implements ToolingClient {
         if (javaHome == null) {
             return Optional.empty();
         }
-        Path release = javaHome.toPath().resolve("release");
+        Path home = javaHome.toPath();
+        Path release = home.resolve("release");
         try {
             for (String line : Files.readAllLines(release)) {
                 if (!line.startsWith("JAVA_VERSION=")) {
@@ -105,7 +106,14 @@ public final class GradleToolingClient implements ToolingClient {
                 return parseJavaMajor(value);
             }
         } catch (IOException e) {
-            return Optional.empty();
+            // release file を持たない古い JDK 8 配布へ fallthrough。
+        }
+        // release file 不在でも JVM は起動しない (判定不能→fatal の契約は維持)。
+        // pre-9 の layout 標識 `lib/rt.jar` を持つ java home だけを 8 とみなす
+        // (8 未満の JVM は target Gradle の daemon 要件側で拒否される)。
+        if (Files.isRegularFile(home.resolve("lib").resolve("rt.jar"))
+                && Files.isRegularFile(home.resolve("bin").resolve("java"))) {
+            return Optional.of(8);
         }
         return Optional.empty();
     }

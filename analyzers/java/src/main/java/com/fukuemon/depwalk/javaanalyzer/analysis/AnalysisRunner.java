@@ -383,7 +383,13 @@ public final class AnalysisRunner {
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
         if (!primary.isEmpty()) {
-            throw incompleteAnalysis(primary);
+            // fatal は先行 warning record を無効化するため、SootUp を利用できず
+            // source-only で解析した context 数を upstream cause として error
+            // metadata へ自己完結に保持する (bytecode 救済欠如が原因の診断補助)。
+            long sootUpUnavailableContexts = contexts.stream()
+                    .filter(SourceSetAnalysisContext::sootUpUnavailable)
+                    .count();
+            throw incompleteAnalysis(primary, sootUpUnavailableContexts);
         }
 
         return new RunStats(
@@ -395,7 +401,7 @@ public final class AnalysisRunner {
     }
 
     private static IncompleteAnalysisException incompleteAnalysis(
-            Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary) {
+            Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary, long sootUpUnavailableContexts) {
         List<com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail> details = new ArrayList<>();
         Map<String, Long> reasonCounts = new java.util.TreeMap<>();
         for (Map.Entry<CallSiteId, CallSiteOutcomeLedger.Outcome> entry : primary.entrySet()) {
@@ -420,6 +426,9 @@ public final class AnalysisRunner {
         Map<String, Object> topMetadata = new LinkedHashMap<>();
         topMetadata.put("total", (long) details.size());
         topMetadata.put("reasonCounts", reasonCounts);
+        if (sootUpUnavailableContexts > 0) {
+            topMetadata.put("sootUpUnavailableContexts", sootUpUnavailableContexts);
+        }
         return new IncompleteAnalysisException(
                 "unresolved in-scope call sites remain after all resolvers and bytecode recovery",
                 details,
