@@ -155,6 +155,8 @@ class PreflightValidatorTest {
                 "analysisRequest",
                 "req-1",
                 workspaceRoot,
+                // classpath key の必須契約は明示 sourceRoots 経路のもの (discovery 経路では任意)。
+                List.of("."),
                 language,
                 null,
                 null,

@@ -10,8 +10,8 @@ public enum JavaDiagnosticCode {
     /** 呼び出し先の型が解決できず {@code callEdge} を張れない。 */
     JAVA_UNRESOLVED_SYMBOL("warning"),
 
-    /** ファイル単位で構文解析に失敗し、そのファイルを飛ばした。 */
-    JAVA_PARSE_ERROR("partialFailure"),
+    /** 未作成の discovery source directory や external included build を解析 scope から除外した。 */
+    JAVA_SOURCE_ROOT_EXCLUDED("warning"),
 
     /** {@code entrypoints} の method selector に一致する method が見つからない。 */
     JAVA_ENTRYPOINT_NOT_FOUND("warning"),

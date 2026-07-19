@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-11
+> 最終更新: 2026-07-18
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.md](project.md) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -11,7 +11,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - CLI → Core のみに依存する。
 - Core 内: `Traversal Engine` → `Graph Engine` → `Model`、`Output Engine` → `Graph Engine` / `Traversal Engine` / `Model`。Model は他に依存しない。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
-- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / 宣言位置、`CallSite`) を保持し、Protocol wire record → graph 値型の変換は graph 構築時 (Analyze Use Case 層) に 1 回だけ行う。wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
+- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を保持する。Analyze Use Case は valid Protocol record を非公開 staging Graph へ 1-pass 変換し、process 成功と stream 全体の参照完全性を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
 - Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
@@ -41,8 +41,9 @@ Go package や Java 実装 code を共有しない。
 - **マルチプロセス**: Core と Analyzer は **別プロセス**。STDIN / STDOUT 上の JSONL で通信する (DesignDoc「Communication Protocol」)。
 - Core は Go runtime で動く CLI binary として実装する。Analyzer は対象言語のランタイム上で動く (Java Analyzer → JVM)。
 - 解析は **静的解析**のみ。実行時情報・runtime trace には依存しない (Non Goals)。
+- Java Analyzer の source root 自動 discovery 時だけ、条件付き runtime として Gradle Tooling API、対象 build の Gradle daemon、workspace 外の一時 custom model provider が加わる。Gradle build logic は利用者権限で評価され network / credential provider / cache / 任意副作用を持ち得る。明示 `sourceRoots` はこの経路を完全 bypass する。詳細は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure](infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)。Core / Analyzer Protocol の言語非依存境界は変えない。
 
 ## State Boundary
 
-- 解析対象ソースは **読み取り専用**。depwalk は対象リポジトリを書き換えない。
-- 中間状態 (呼び出しグラフ) は Core のプロセス内に保持する。永続ストアは現時点で持たない。
+- Analyzer 自身は解析対象ソースを **読み取り専用**で扱い、depwalk が対象リポジトリを書き換えない。ただし自動 discovery では対象 build logic の評価に伴う Gradle runtime 全体の副作用を別境界として扱う。
+- 中間状態は request 専用の非公開 staging Graph として Core process 内に保持する。成功時だけ公開し、fatal / 非ゼロ exit 時は先行 diagnostic とともに破棄する。永続ストアは現時点で持たない。

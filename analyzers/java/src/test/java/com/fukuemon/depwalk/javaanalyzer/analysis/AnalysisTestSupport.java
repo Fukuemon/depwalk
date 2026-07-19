@@ -40,6 +40,8 @@ final class AnalysisTestSupport {
         request.put("recordType", "analysisRequest");
         request.put("requestId", "test-request");
         request.put("workspaceRoot", workspaceRoot.toAbsolutePath().toString());
+        // 確定 schema (spec #24 D1) への移行: unit test は明示 root 経路を使う。
+        request.put("sourceRoots", List.of("."));
         request.put("language", "java");
         if (include != null) {
             request.put("include", include);
@@ -75,6 +77,7 @@ final class AnalysisTestSupport {
     static Map<String, Object> classpathMetadata(String... jars) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("classpath", List.of(jars));
+        metadata.put("javaLanguageLevel", List.of("25"));
         return metadata;
     }
 }

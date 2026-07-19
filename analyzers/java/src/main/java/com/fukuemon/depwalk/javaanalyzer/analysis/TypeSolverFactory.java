@@ -43,12 +43,56 @@ public final class TypeSolverFactory {
      */
     public static CombinedTypeSolver create(
             Path workspaceRoot, List<String> classpathJars, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
+        return createForRoots(
+                List.of(workspaceRoot),
+                classpathJars.stream().map(Path::of).toList(),
+                languageLevel);
+    }
+
+    /**
+     * 複数 source root と classpath entry から合成 TypeSolver を生成する。
+     * source root は classpath (project classes output を含む) より先に登録し、
+     * source 宣言を bytecode より優先する (spec #24 D6)。
+     *
+     * @param sourceRoots {@link JavaParserTypeSolver} へ登録する package hierarchy 起点 (各 1 回)
+     * @param classpathEntries 検証済み jar / classes dir
+     * @param languageLevel 内部 parser の language level (メインパーサと一致させる)
+     * @return 合成 TypeSolver
+     * @throws IOException jar / classes dir の読み込みに失敗した場合
+     */
+    public static CombinedTypeSolver createForRoots(
+            List<Path> sourceRoots, List<Path> classpathEntries, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
+        return createForRoots(sourceRoots, classpathEntries, languageLevel, null);
+    }
+
+    /**
+     * bytecode member 合成付きの合成 TypeSolver を生成する (spec #24 D31)。
+     * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
+     * 同一 context classes output の bytecode-only member を fallback 合成する。
+     */
+    public static CombinedTypeSolver createForRoots(
+            List<Path> sourceRoots,
+            List<Path> classpathEntries,
+            ParserConfiguration.LanguageLevel languageLevel,
+            com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex bytecodeIndex)
+            throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
-        typeSolver.add(new JavaParserTypeSolver(workspaceRoot, typeSolverConfig));
-        List<Path> entries = classpathJars.stream()
-                .map(Path::of)
+        for (Path root : sourceRoots) {
+            JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);
+            typeSolver.add(bytecodeIndex != null
+                    ? new com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver(sourceSolver, bytecodeIndex)
+                    : sourceSolver);
+        }
+        // JavaParserTypeSolver が内部 parse した AST にも resolver を注入する。
+        // record の canonical constructor 解決 (JavaParserRecordDeclaration) は
+        // solver 内部 CU の Parameter#resolve() を呼ぶため、resolver 不在だと
+        // "Symbol resolution not configured" の IllegalStateException になる
+        // (#24 実プロジェクト検証で検出)。config は parse 時に参照されるため
+        // 循環参照でも post-hoc 設定で機能する。
+        typeSolverConfig.setSymbolResolver(new com.github.javaparser.symbolsolver.JavaSymbolSolver(typeSolver));
+        List<Path> entries = classpathEntries.stream()
                 .map(path -> path.toAbsolutePath().normalize())
                 .toList();
         for (Path entry : entries) {

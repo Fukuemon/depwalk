@@ -1,9 +1,11 @@
 package analyze
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
@@ -50,6 +52,48 @@ func TestRunPropagatesAnalyzerError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("Run() error = nil, want error for an analyzer error record")
+	}
+	var failure *AnalyzerFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("Run() error = %v, want *AnalyzerFailure", err)
+	}
+	if failure.Record.Code != "JAVA_FATAL" {
+		t.Fatalf("failure code = %q, want JAVA_FATAL", failure.Record.Code)
+	}
+}
+
+func TestRunKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
+	t.Parallel()
+
+	// The fake analyzer streams a dangling call edge before its fatal error
+	// record; the fatal reason must win over the reference-completeness
+	// protocol failure, and no partial result may be published.
+	result, err := Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      protocol.LanguageJava,
+		AnalyzerCmd:   fakeAnalyzerCommand(t, "dangling-edge-then-error"),
+		Getenv:        func(string) string { return "" },
+	})
+	var failure *AnalyzerFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("Run() error = %v, want *AnalyzerFailure keeping the fatal reason", err)
+	}
+	if result.Graph != nil || result.MethodCount != 0 || result.CallEdgeCount != 0 || result.Diagnostics != nil {
+		t.Fatalf("Result = %+v, want zero value on fatal failure", result)
+	}
+}
+
+func TestRunFailsOnReferenceIncompletenessAfterCleanExit(t *testing.T) {
+	t.Parallel()
+
+	_, err := Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      protocol.LanguageJava,
+		AnalyzerCmd:   fakeAnalyzerCommand(t, "dangling-edge-clean-exit"),
+		Getenv:        func(string) string { return "" },
+	})
+	if err == nil || !strings.Contains(err.Error(), "analyzer stdout did not follow the analyzer protocol") {
+		t.Fatalf("Run() error = %v, want a protocol failure for reference incompleteness on clean exit", err)
 	}
 }
 
@@ -112,6 +156,15 @@ func TestFakeAnalyzerHelperProcess(t *testing.T) {
 	case "analyzer-error":
 		fmt.Print(`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"boom"}` + "\n")
 		os.Exit(1)
+	case "dangling-edge-then-error":
+		fmt.Print(methodSymbolJSONL("method:caller", "example.Caller.run") +
+			callEdgeJSONL("edge:1", "method:caller", "method:missing") +
+			`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"boom"}` + "\n")
+		os.Exit(1)
+	case "dangling-edge-clean-exit":
+		fmt.Print(methodSymbolJSONL("method:caller", "example.Caller.run") +
+			callEdgeJSONL("edge:1", "method:caller", "method:missing"))
+		os.Exit(0)
 	case "bad-exit":
 		os.Exit(3)
 	default:

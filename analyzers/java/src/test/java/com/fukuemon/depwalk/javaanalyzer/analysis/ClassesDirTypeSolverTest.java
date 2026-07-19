@@ -65,7 +65,7 @@ class ClassesDirTypeSolverTest {
     }
 
     @Test
-    void missingTransitiveDependencyProducesDiagnosticWithoutTerminatingAnalysis(@TempDir Path tempDir) throws Exception {
+    void missingTransitiveDependencyFailsTheWholeRequest(@TempDir Path tempDir) throws Exception {
         Path dependencyClasses = tempDir.resolve("dependency-classes");
         Path libraryClasses = tempDir.resolve("library-classes");
         Files.createDirectories(dependencyClasses);
@@ -81,10 +81,11 @@ class ClassesDirTypeSolverTest {
                 null,
                 null);
 
-        assertEquals(0, ran.exitCode(), ran.stderr());
-        assertTrue(ran.byType("diagnostic").stream()
-                .anyMatch(record -> "JAVA_UNRESOLVED_SYMBOL".equals(record.get("code"))),
-                "missing transitive classes must be reported as an unresolved symbol");
+        // spec #24 D20: scope 内 call が未解決のまま残る request は成功にしない。
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        assertTrue(ran.byType("error").stream()
+                .anyMatch(record -> "JAVA_INCOMPLETE_ANALYSIS".equals(record.get("code"))),
+                "missing transitive classes must fail the request with JAVA_INCOMPLETE_ANALYSIS");
     }
 
     private static void compileBaseLib(Path classesDir) throws IOException {

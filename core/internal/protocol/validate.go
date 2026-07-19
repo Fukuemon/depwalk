@@ -31,6 +31,14 @@ func (r AnalysisRequest) Validate() error {
 	if err := require("workspaceRoot", r.WorkspaceRoot); err != nil {
 		return err
 	}
+	if err := rejectExplicitEmptyArray("sourceRoots", r.SourceRoots); err != nil {
+		return err
+	}
+	for i, root := range r.SourceRoots {
+		if err := validateRelativePath(fmt.Sprintf("sourceRoots[%d]", i), root); err != nil {
+			return err
+		}
+	}
 	if r.Language != LanguageJava {
 		return invalid("language", "must be java")
 	}
@@ -154,6 +162,29 @@ func (r AnalyzerError) Validate() error {
 			return err
 		}
 	}
+	if err := rejectExplicitEmptyArray("details", r.Details); err != nil {
+		return err
+	}
+	for i, detail := range r.Details {
+		if err := detail.validate(fmt.Sprintf("details[%d]", i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d FailureDetail) validate(field string) error {
+	if err := require(field+".code", d.Code); err != nil {
+		return err
+	}
+	if err := require(field+".message", d.Message); err != nil {
+		return err
+	}
+	if d.Source != nil {
+		if err := d.Source.validate(field + ".sourceLocation"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -182,6 +213,15 @@ func validateRecordHeader(schemaVersion string, recordType, want RecordType) err
 	}
 	if recordType != want {
 		return invalid("recordType", fmt.Sprintf("must be %s", want))
+	}
+	return nil
+}
+
+// rejectExplicitEmptyArray rejects a present-but-empty optional array while
+// allowing an omitted (nil) one.
+func rejectExplicitEmptyArray[T any](field string, values []T) error {
+	if values != nil && len(values) == 0 {
+		return invalid(field, "must not be an explicit empty array")
 	}
 	return nil
 }

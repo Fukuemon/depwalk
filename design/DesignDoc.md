@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-07-12 / Status: Draft
+> 最終更新: 2026-07-18 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -120,7 +120,7 @@ flowchart TD
     user["ユーザー / CI"] --> cli["CLI<br/>引数解析・実行制御"]
     cli --> core["Core (言語非依存)<br/>Graph Engine / Traversal / Output"]
     core <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge / diagnostics"| spi["Analyzer SPI<br/>(プラグイン境界)"]
-    spi --> ja["Java Analyzer (独立プロセス)<br/>JavaParser / SymbolSolver / SootUp"]
+    spi --> ja["Java Analyzer (独立プロセス)<br/>JavaParser / SymbolSolver / SootUp<br/>Gradle Tooling API (自動 discovery 時のみ)"]
     ja -->|"AST 解析・型解決・DI 解決"| src[("Java / Spring ソース")]
     core -->|"Console / JSON / DOT / Mermaid"| out["出力"]
 ```
@@ -129,15 +129,17 @@ flowchart TD
 
 各モジュールの責務・境界を示す。Core は呼び出しグラフの構築・探索・出力に責務を限定し、解析処理は一切持たない。言語ごとの差異は Analyzer に閉じ込める。
 
-| モジュール       | 責務                                                                                           | 公開境界           | 依存先                                |
-| ---------------- | ---------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
-| CLI              | 引数解析、実行制御、Core 呼び出し                                                              | コマンドライン I/F | Core                                  |
-| Graph Engine     | Node 管理 / Edge 管理 / Graph 生成                                                             | グラフ構造 API     | Model                                 |
-| Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                          | 探索 API           | Graph Engine                          |
-| Output Engine    | Console / JSON / DOT / Mermaid への出力                                                        | 出力 API           | Graph Engine, Traversal Engine, Model |
-| Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル)        | データ型           | なし                                  |
-| Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領 | Protocol (JSONL)   | Model                                 |
-| Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成                                       | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp    |
+| モジュール       | 責務                                                                                                                                   | 公開境界           | 依存先                                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| CLI              | 引数解析、実行制御、Core 呼び出し                                                                                                      | コマンドライン I/F | Core                                                                                                                      |
+| Graph Engine     | Node 管理 / Edge 管理 / Graph 生成                                                                                                     | グラフ構造 API     | Model                                                                                                                     |
+| Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                                                                  | 探索 API           | Graph Engine                                                                                                              |
+| Output Engine    | Console / JSON / DOT / Mermaid への出力                                                                                                | 出力 API           | Graph Engine, Traversal Engine, Model                                                                                     |
+| Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル)                                                | データ型           | なし                                                                                                                      |
+| Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領                                         | Protocol (JSONL)   | Model                                                                                                                     |
+| Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成。source root 未指定時は Gradle build model から解析 context を discovery する | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp。自動 discovery 時のみ Gradle Tooling API / Gradle daemon / 一時 custom model provider |
+
+Gradle runtime は Java Analyzer の **条件付き依存**である。`analysisRequest.sourceRoots` が指定された明示 override では Tooling API、Gradle daemon、一時 provider を起動せず完全に bypass する。自動 discovery の build 評価・互換性・安全境界は [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure context](../context/infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) を正本とし、Core / Analyzer Protocol の言語非依存境界と成功条件は変更しない。
 
 ```mermaid
 flowchart LR
@@ -219,10 +221,11 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 確定した技術判断・却下した代替案は [adr/](../adr/) を正本とする。本 doc では一覧のみ持つ。
 
-| ADR                                                       | 決定                                                         | 関連ドキュメント                                                                                       |
-| --------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)    | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI  | 本 doc「設計原則」「Communication Protocol」                                                           |
-| [ADR-0002](../adr/0002-core-implementation-foundation.md) | Core 実装基盤として Go / Go modules / Go 標準 command を採用 | [context/toolchain.md](../context/toolchain.md), [context/architecture.md](../context/architecture.md) |
+| ADR                                                           | 決定                                                                                                                  | 関連ドキュメント                                                                                                                          |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)        | Core 言語非依存 + Analyzer 独立プロセス / JSONL process SPI                                                           | 本 doc「設計原則」「Communication Protocol」                                                                                              |
+| [ADR-0002](../adr/0002-core-implementation-foundation.md)     | Core 実装基盤として Go / Go modules / Go 標準 command を採用                                                          | [context/toolchain.md](../context/toolchain.md), [context/architecture.md](../context/architecture.md)                                    |
+| [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) | Java Analyzer の自動 discovery に Gradle Tooling API と custom model provider を採用し、明示 override では完全 bypass | [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md), [context/infrastructure.md](../context/infrastructure.md) |
 
 ## Open Questions / Future Work
 

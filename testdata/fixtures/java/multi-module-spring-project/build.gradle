@@ -1,0 +1,29 @@
+// root project は Java plugin を適用しない (root に source が無いことの検証点)。
+// classpath manifest は明示 override 用の global classpath を生成する。
+subprojects {
+    apply plugin: 'java'
+    repositories { mavenCentral() }
+    dependencies {
+        implementation 'org.springframework:spring-context:5.3.39'
+    }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
+
+tasks.register('writeDepwalkClasspath') {
+    subprojects.each { p -> dependsOn(p.tasks.named('classes')) }
+    def outputFile = layout.buildDirectory.file('depwalk-classpath.txt')
+    outputs.file(outputFile)
+    doLast {
+        def entries = [] as Set
+        subprojects.each { p ->
+            entries.addAll(p.sourceSets.main.output.classesDirs.files)
+            entries.addAll(p.configurations.runtimeClasspath.files)
+        }
+        def sorted = entries.collect { it.absoluteFile.toPath().normalize().toString() }.unique().sort()
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.text = sorted.join('\n') + '\n'
+    }
+}
