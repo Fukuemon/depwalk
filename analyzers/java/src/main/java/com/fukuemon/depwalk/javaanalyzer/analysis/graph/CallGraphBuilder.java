@@ -322,6 +322,14 @@ public final class CallGraphBuilder {
         // D31: solver が合成した bytecode-only member は既存 D18 と同じ出力契約
         // (sourceLocation 省略 + owner metadata + calleeOrigin edge) で emit する。
         if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
+            // 型名 scope の static call を instance 合成 member で解決しない
+            // (usage 経路は staticOnly を持たないため、emit 前にここで検査する)。
+            if (!synthesized.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
+                reportUnresolved(mce, ctx);
+                commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                        "unresolved-method-call", mce.getNameAsString());
+                return;
+            }
             WorkspaceSourceDeclarationIndex.TypeLocation owner =
                     declIndex.find(synthesized.candidate().declaringType()).orElse(null);
             if (owner == null || !reachableContextIds.contains(owner.contextId())) {
@@ -681,9 +689,40 @@ public final class CallGraphBuilder {
         if (candidate == null) {
             return false;
         }
+        // 型名 scope の static call を instance member で救済しない (偽 edge 防止)。
+        if (!candidate.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
+            return false;
+        }
         emitBytecodeOnlyCall(mce, ctx, owner,
                 candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method");
         return true;
+    }
+
+    /**
+     * scope が値でなく型名 (static call の receiver) かを判定する。型として
+     * 解決できる scope のうち、値 (field / 変数) として解決できない単純名 /
+     * qualified name だけを型名とみなす。型が取れない scope は bytecode-only
+     * field 補完経路の instance receiver であり型名扱いしない。
+     */
+    private static boolean isTypeNameScope(com.github.javaparser.ast.expr.Expression scope) {
+        try {
+            scope.calculateResolvedType();
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+        try {
+            if (scope instanceof com.github.javaparser.ast.expr.NameExpr nameExpr) {
+                nameExpr.resolve();
+                return false;
+            }
+            if (scope instanceof com.github.javaparser.ast.expr.FieldAccessExpr fieldAccess) {
+                fieldAccess.resolve();
+                return false;
+            }
+        } catch (RuntimeException | LinkageError e) {
+            return true;
+        }
+        return false;
     }
 
     /** 解決失敗した object creation の bytecode-only constructor 救済。 */

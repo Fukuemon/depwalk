@@ -60,6 +60,9 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("gradle-compat")
     }
+    // MultiModuleFixtureEquivalenceTest 等の実 jar テストが最新実装の
+    // shadowJar を参照する (事前生成済み・stale な jar を検証しない)。
+    dependsOn(tasks.shadowJar)
 }
 
 // Gradle discovery compatibility matrix (context/toolchain.md の CI anchor)。

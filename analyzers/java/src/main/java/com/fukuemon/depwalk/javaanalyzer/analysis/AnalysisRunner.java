@@ -153,17 +153,28 @@ public final class AnalysisRunner {
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
-            List<String> entries = new ArrayList<>();
+            // project 所有の classes output (自 context + classpath 上の依存 project
+            // output) を external jar より先に登録し、同名 class は project bytecode
+            // を優先する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            List<Path> projectOutputs = new ArrayList<>(context.classesOutputs());
             for (Path path : context.classpath()) {
+                if (classesOutputOwners.containsKey(path) && !projectOutputs.contains(path)) {
+                    projectOutputs.add(path);
+                }
+            }
+            List<String> entries = new ArrayList<>();
+            for (Path path : projectOutputs) {
                 entries.add(path.toString());
             }
-            for (Path path : context.classesOutputs()) {
-                entries.add(path.toString());
+            for (Path path : context.classpath()) {
+                if (!classesOutputOwners.containsKey(path)) {
+                    entries.add(path.toString());
+                }
             }
             SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(entries);
             sootUpByContext.put(context.id(), index);
             bytecodeIndexByContext.put(context.id(),
-                    new ProjectBytecodeMemberIndex(index, context.classesOutputs()));
+                    new ProjectBytecodeMemberIndex(index, projectOutputs));
         }
 
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();

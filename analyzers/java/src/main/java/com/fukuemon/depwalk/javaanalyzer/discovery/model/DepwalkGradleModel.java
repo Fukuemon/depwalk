@@ -21,4 +21,14 @@ public interface DepwalkGradleModel {
 
     /** 解析対象へ含めなかった source set の総数 (project 横断)。 */
     int getExcludedSourceSetCount();
+
+    /**
+     * v1 scope 外として model へ含めなかった composite / included build の
+     * root directory。Analyzer は黙って脱落させず、1 build につき 1 件の
+     * warning と明示 override の案内を出す。旧 provider model との構造互換の
+     * ため default を持つ (bundled provider は常に実値を返す)。
+     */
+    default List<File> getIncludedBuildRootDirectories() {
+        return List.of();
+    }
 }
