@@ -1,0 +1,56 @@
+{
+  "description": "spec #24 P5 primary fixture の設計から固定した期待集合。auto discovery と明示 override の両経路が同一の集合を返す。",
+  "methods": [
+    {
+      "methodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "sourceLocation": "app/src/main/java/com/example/mm/app/OrderController.java"
+    },
+    {
+      "methodId": "java:com.example.mm.app.OrderController#<init>(com.example.mm.service.OrderService)",
+      "sourceLocation": "app/src/main/java/com/example/mm/app/OrderController.java"
+    },
+    {
+      "methodId": "java:com.example.mm.service.OrderService#process(java.lang.String)",
+      "sourceLocation": "modules/service/src/main/java/com/example/mm/service/OrderService.java"
+    },
+    {
+      "methodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "sourceLocation": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java"
+    },
+    {
+      "methodId": "java:com.example.mm.service.DefaultOrderService#<init>(com.example.mm.repository.OrderRepository)",
+      "sourceLocation": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java"
+    },
+    {
+      "methodId": "java:com.example.mm.repository.OrderRepository#save(java.lang.String)",
+      "sourceLocation": "repository/src/domain/java/com/example/mm/repository/OrderRepository.java"
+    },
+    {
+      "methodId": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "sourceLocation": "repository/src/domain/java/com/example/mm/repository/JpaOrderRepository.java"
+    }
+  ],
+  "edges": [
+    {
+      "caller": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "callee": "java:com.example.mm.service.OrderService#process(java.lang.String)"
+    },
+    {
+      "caller": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "callee": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "resolution": "unique",
+      "provenance": ["sootup", "spring-di"]
+    },
+    {
+      "caller": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "callee": "java:com.example.mm.repository.OrderRepository#save(java.lang.String)"
+    },
+    {
+      "caller": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "callee": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "resolution": "unique",
+      "provenance": ["sootup", "spring-di"]
+    }
+  ],
+  "ledger": { "silentOmission": 0 }
+}

@@ -2,6 +2,12 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
+import com.fukuemon.depwalk.javaanalyzer.discovery.DiscoveryFailure;
+import com.fukuemon.depwalk.javaanalyzer.discovery.GradleModelDiscovery;
+import com.fukuemon.depwalk.javaanalyzer.discovery.GradleToolingClient;
+import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsReporter;
 import com.fukuemon.depwalk.javaanalyzer.io.MetricsSummary;
 import com.fukuemon.depwalk.javaanalyzer.io.ProtocolObjectMapper;
@@ -68,22 +74,50 @@ public final class Main {
             }
 
             PreflightValidator.Validated validated;
+            AnalysisContextFactory.Result contexts;
             try {
                 validated = PreflightValidator.validate(request);
+                contexts = buildContexts(request, validated, errStream);
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
+                return 1;
+            } catch (DiscoveryFailure e) {
+                writer.write(ErrorRecord.of(
+                        JavaErrorCode.JAVA_GRADLE_MODEL_ERROR.code(),
+                        e.userMessage(),
+                        null,
+                        java.util.Map.of("reason", e.category().reason(), "phase", e.phase().label())));
                 return 1;
             }
 
             try {
-                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, validated.classpath(), writer);
+                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, contexts, writer);
+                errStream.println(stats.callSiteSummary());
                 Duration elapsed = Duration.between(start, Instant.now());
-                MetricsSummary summary = new MetricsSummary(stats.analyzedFileCount(), elapsed.toMillis(), stats.unresolvedCount());
+                MetricsSummary summary = new MetricsSummary(
+                        stats.analyzedFileCount(),
+                        elapsed.toMillis(),
+                        stats.parsePreflightMillis(),
+                        stats.contextBuildMillis(),
+                        stats.unresolvedCount());
                 MetricsReporter.report(errStream, summary);
                 return 0;
-            } catch (RuntimeException e) {
-                // 解析中の未捕捉 RuntimeException (SymbolSolver 例外 / UncheckedIOException 等) を
-                // 継続不能な内部エラーとして扱う。Error は意図的に catch しない。
+            } catch (IncompleteAnalysisException e) {
+                writer.write(new ErrorRecord(
+                        com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema.VERSION,
+                        ErrorRecord.RECORD_TYPE,
+                        JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
+                        e.getMessage(),
+                        null,
+                        e.metadata(),
+                        e.details()));
+                return 1;
+            } catch (AnalyzerFatalException e) {
+                writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
+                return 1;
+            } catch (RuntimeException | LinkageError e) {
+                // 解析中の未捕捉 RuntimeException と LinkageError (binary 非互換等) を
+                // 継続不能な内部エラーとして扱う (spec #24 step 4.2)。他の Error は catch しない。
                 return reportInternalError(writer, errStream, e);
             } catch (IOException e) {
                 // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
@@ -107,9 +141,38 @@ public final class Main {
         }
     }
 
-    private static int reportInternalError(RecordWriter writer, PrintStream errStream, Exception e) {
+    /**
+     * 明示 {@code sourceRoots} なら synthetic context、省略なら Gradle build model
+     * discovery (P2_02) から解析 context を構築する。明示 root は Tooling API
+     * runtime を完全 bypass する。
+     */
+    private static AnalysisContextFactory.Result buildContexts(
+            AnalysisRequest request, PreflightValidator.Validated validated, PrintStream errStream)
+            throws AnalyzerFatalException, DiscoveryFailure {
+        java.nio.file.Path workspaceRoot;
+        try {
+            // root 検証・相対化と同じ基準にするため real path を使う。
+            workspaceRoot = java.nio.file.Path.of(request.workspaceRoot()).toRealPath();
+        } catch (java.io.IOException e) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "failed to resolve the real path of analysisRequest.workspaceRoot");
+        }
+        if (GradleModelDiscovery.isExplicitOverride(request.sourceRoots())) {
+            return AnalysisContextFactory.explicitContext(
+                    workspaceRoot, request.sourceRoots(), validated.classpath(), request.metadata());
+        }
+        AnalysisContextFactory.rejectLanguageMetadataOnDiscovery(request.metadata());
+        DepwalkGradleModel model =
+                new GradleModelDiscovery(new GradleToolingClient(), errStream).discover(workspaceRoot);
+        return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
+    }
+
+    private static int reportInternalError(RecordWriter writer, PrintStream errStream, Throwable e) {
         String detail = e.getClass().getName() + ": " + e.getMessage();
         errStream.println("internal error during analysis: " + detail);
+        // 内部エラーの triage 用に stack trace を stderr へ出す (Protocol へは出さない)。
+        e.printStackTrace(errStream);
         try {
             writer.write(ErrorRecord.of(JavaErrorCode.JAVA_INTERNAL_ERROR.code(), "internal error during analysis: " + detail));
         } catch (IOException ignored) {

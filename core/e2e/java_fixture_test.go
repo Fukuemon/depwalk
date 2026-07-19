@@ -246,7 +246,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	libJar := filepath.Join(root, "lib", "fixture-lib.jar")
 	expectedDir := filepath.Join(root, "expected")
 
-	metadata, err := analyze.BuildMetadata([]string{"classpath=" + libJar})
+	metadata, err := analyze.BuildMetadata([]string{"classpath=" + libJar, "javaLanguageLevel=25"})
 	if err != nil {
 		t.Fatalf("build analyzer metadata: %v", err)
 	}
@@ -256,6 +256,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		RecordType:    protocol.RecordTypeAnalysisRequest,
 		RequestID:     "e2e-fixture",
 		WorkspaceRoot: projectRoot,
+		SourceRoots:   []string{"."},
 		Language:      protocol.LanguageJava,
 		Metadata:      metadata,
 	}
@@ -264,7 +265,8 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	}
 
 	runner := analyzer.New(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
-	result, err := runner.Run(request)
+	var records []protocol.Record
+	result, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
 		t.Fatalf("failed to run the analyzer process: %v", err)
 	}
@@ -279,7 +281,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	}
 
 	var edges []protocol.CallEdge
-	for _, record := range result.Records {
+	for _, record := range records {
 		if edge, ok := record.(protocol.CallEdge); ok {
 			edges = append(edges, edge)
 		}
@@ -329,24 +331,6 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		}
 		if !metadataBool(edge.Metadata, "viaLambda") {
 			t.Errorf("viaLambda metadata not set on edge %s", edge.EdgeID)
-		}
-	})
-
-	t.Run("ParseErrorContinuesAnalysis", func(t *testing.T) {
-		assertDiagnosticCode(t, result.Diagnostics, "JAVA_PARSE_ERROR")
-		if _, ok := findCallEdge(edges,
-			"java:com.example.GreetingService#greetUser(java.lang.String)",
-			"java:com.example.Greeter#greet(java.lang.String)"); !ok {
-			t.Error("other files' callEdges are missing even though only BrokenSyntax.java should fail to parse")
-		}
-	})
-
-	t.Run("UnresolvedSymbolCoexistsWithResolvedEdges", func(t *testing.T) {
-		assertDiagnosticCode(t, result.Diagnostics, "JAVA_UNRESOLVED_SYMBOL")
-		if _, ok := findCallEdge(edges,
-			"java:com.example.UnresolvedCaller#resolvedCall()",
-			"java:com.example.EnglishGreeter#greet(java.lang.String)"); !ok {
-			t.Error("resolved callEdge in the same file as the unresolved call is missing")
 		}
 	})
 

@@ -21,7 +21,8 @@ class MainTest {
     void preflightPassWithEmptyClasspathProducesZeroRecordsAndExitZero(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
-                + "\"language\":\"java\",\"metadata\":{\"classpath\":[]}}";
+                + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]}}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -29,7 +30,14 @@ class MainTest {
         int exitCode = Main.run(inputStream(request), stdout, stderr);
 
         assertEquals(0, exitCode);
-        assertTrue(stdout.toString(StandardCharsets.UTF_8).isEmpty(), "empty workspace has no scope files to analyze");
+        String stdoutContent = stdout.toString(StandardCharsets.UTF_8);
+        // 明示経路で classes output が無い場合の source-only warning だけを許可する。
+        for (String line : stdoutContent.split("\n")) {
+            if (!line.isBlank()) {
+                assertTrue(line.contains("JAVA_SOOTUP_UNAVAILABLE"),
+                        "empty workspace must emit no graph records: " + line);
+            }
+        }
         assertFalse(stderr.toString(StandardCharsets.UTF_8).isBlank(), "stderr should contain the metrics summary");
     }
 
@@ -37,7 +45,7 @@ class MainTest {
     void missingClasspathKeyProducesErrorRecordAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"language\":\"java\"}";
+                + "\"sourceRoots\":[\".\"],\"language\":\"java\"}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -54,7 +62,8 @@ class MainTest {
     void unsupportedLanguageProducesInvalidRequestErrorAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"language\":\"kotlin\",\"metadata\":{\"classpath\":[]}}";
+                + "\"language\":\"kotlin\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]}}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -69,7 +78,8 @@ class MainTest {
     void missingJarProducesMissingJarErrorAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"language\":\"java\",\"metadata\":{\"classpath\":[\"/does/not/exist.jar\"]}}";
+                + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[\"/does/not/exist.jar\"],\"javaLanguageLevel\":[\"25\"]}}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -84,7 +94,8 @@ class MainTest {
     void unknownFieldsInRequestAreIgnored(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
-                + "\"language\":\"java\",\"metadata\":{\"classpath\":[]},\"unknownField\":true}";
+                + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]},\"unknownField\":true}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -92,13 +103,21 @@ class MainTest {
         int exitCode = Main.run(inputStream(request), stdout, stderr);
 
         assertEquals(0, exitCode);
+        // 空 workspace では graph record を出さない (unknown field が余分な
+        // record 出力へ影響しないことを exit code だけでなく stdout でも固定)。
+        for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
+            if (!line.isBlank()) {
+                assertTrue(line.contains("\"recordType\":\"diagnostic\""),
+                        "unexpected non-diagnostic record: " + line);
+            }
+        }
     }
 
     @Test
     void stderrNeverContainsProtocolRecords() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"language\":\"java\"}"; // triggers JAVA_MISSING_CLASSPATH error on stdout
+                + "\"sourceRoots\":[\".\"],\"language\":\"java\"}"; // triggers JAVA_MISSING_CLASSPATH error on stdout
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -109,12 +128,9 @@ class MainTest {
     }
 
     @Test
-    void runtimeExceptionDuringAnalysisProducesInternalErrorRecordAndNonZeroExit(@TempDir Path workspace) throws IOException {
-        // Pre-flight validates workspaceRoot up front, so a nonexistent workspaceRoot
-        // is rejected there (JAVA_INVALID_REQUEST) rather than reaching the analysis phase. To still
-        // exercise an uncaught RuntimeException surviving from *inside* AnalysisRunner (e.g. an
-        // UncheckedIOException from file enumeration), make workspaceRoot pass pre-flight (it exists
-        // and is a directory) but unreadable, so Files.walk() inside ScopeFiles fails after pre-flight.
+    void unreadableSourceRootIsRejectedBeforeAnalysis(@TempDir Path workspace) throws IOException {
+        // 読取不能な明示 source root は、解析へ入る前の root 正規化
+        // (AnalysisContextFactory) が JAVA_INVALID_SOURCE_ROOTS で決定的に拒否する。
         Path unreadableDir = Files.createDirectory(workspace.resolve("unreadable"));
         Files.writeString(unreadableDir.resolve("Ok.java"), "package com.example; class Ok { }");
         boolean permissionChangeApplied = unreadableDir.toFile().setReadable(false, false);
@@ -125,7 +141,8 @@ class MainTest {
         try {
             String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                     + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(unreadableDir) + "\","
-                    + "\"language\":\"java\",\"metadata\":{\"classpath\":[]}}";
+                    + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]}}";
 
             ByteArrayOutputStream stdout = new ByteArrayOutputStream();
             ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -135,9 +152,7 @@ class MainTest {
             assertEquals(1, exitCode);
             String stdoutContent = stdout.toString(StandardCharsets.UTF_8);
             assertTrue(stdoutContent.contains("\"recordType\":\"error\""));
-            assertTrue(stdoutContent.contains("JAVA_INTERNAL_ERROR"));
-            String stderrContent = stderr.toString(StandardCharsets.UTF_8);
-            assertFalse(stderrContent.isBlank(), "stderr should contain exception class name and message");
+            assertTrue(stdoutContent.contains("JAVA_INVALID_SOURCE_ROOTS"));
         } finally {
             unreadableDir.toFile().setReadable(true, false);
         }
@@ -145,10 +160,10 @@ class MainTest {
 
     @Test
     void ioExceptionDuringOutputWriteIsReportedOnStderrAndReturnsNonZeroExit() {
-        // language=java, no metadata -> triggers a JAVA_MISSING_CLASSPATH error record write attempt.
+        // 明示 sourceRoots + metadata なし -> JAVA_MISSING_CLASSPATH の error record 書込を誘発する。
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"language\":\"java\"}";
+                + "\"sourceRoots\":[\".\"],\"language\":\"java\"}";
 
         java.io.OutputStream brokenOut = new java.io.OutputStream() {
             @Override
@@ -177,7 +192,8 @@ class MainTest {
 
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(workspace) + "\","
-                + "\"language\":\"java\",\"metadata\":{\"classpath\":[\"" + jsonPath(corruptJar) + "\"]}}";
+                + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[\"" + jsonPath(corruptJar) + "\"],\"javaLanguageLevel\":[\"25\"]}}";
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

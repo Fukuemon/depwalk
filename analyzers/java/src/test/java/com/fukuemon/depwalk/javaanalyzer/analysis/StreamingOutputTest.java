@@ -31,7 +31,8 @@ class StreamingOutputTest {
     void fullGraphFlushesEachFilesRecordsBeforeLaterFilesAreFullyProcessed() throws IOException {
         String requestJson = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(FIXTURE) + "\","
-                + "\"language\":\"java\",\"metadata\":{\"classpath\":[]}}";
+                + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]}}";
 
         RecordCapturingOutputStream stdout = new RecordCapturingOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

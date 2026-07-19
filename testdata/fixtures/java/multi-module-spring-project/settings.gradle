@@ -1,0 +1,5 @@
+// 3 module primary fixture (spec #24 P5): root は Java source を持たず、
+// :service は projectDir 変更、:repository は custom main source directory を持つ。
+rootProject.name = 'multi-module-spring-project'
+include ':app', ':service', ':repository'
+project(':service').projectDir = file('modules/service')

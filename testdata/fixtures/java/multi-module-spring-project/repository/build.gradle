@@ -1,0 +1,6 @@
+// custom main source directory と実効 sourceCompatibility 経由の language level を検証する。
+sourceSets.main.java.srcDirs = ['src/domain/java']
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}

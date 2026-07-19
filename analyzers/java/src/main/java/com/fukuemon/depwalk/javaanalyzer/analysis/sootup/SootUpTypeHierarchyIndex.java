@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.sootup;
 
 import sootup.core.inputlocation.AnalysisInputLocation;
+import sootup.core.model.MethodModifier;
 import sootup.core.model.SourceType;
 import sootup.core.typehierarchy.TypeHierarchy;
 import sootup.core.typehierarchy.ViewTypeHierarchy;
@@ -39,11 +40,23 @@ public final class SootUpTypeHierarchyIndex {
      * @param declaringType メソッドを実際に宣言する型の binary name
      * @param methodName メソッド名。constructor は {@code <init>}
      * @param parameterTypes erasure 済み引数型の binary name 配列
+     * @param returnType erasure 済み戻り値型の binary name。constructor / void は {@code void}
+     * @param isStatic static member かどうか
      */
-    public record MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
+    public record MethodCandidate(
+            String declaringType,
+            String methodName,
+            List<String> parameterTypes,
+            String returnType,
+            boolean isStatic) {
         /** 引数型配列を防御的コピーして候補を生成する。 */
         public MethodCandidate {
             parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        /** 戻り値型・static 性を使わない照会用の互換 constructor。 */
+        public MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
+            this(declaringType, methodName, parameterTypes, "void", false);
         }
     }
 
@@ -307,6 +320,62 @@ public final class SootUpTypeHierarchyIndex {
         });
     }
 
+    /**
+     * 宣言 class 自身の指定名 callable method を bytecode から列挙する
+     * (bridge / synthetic を除外)。bytecode-only member 救済 (spec #24 D18) の
+     * 照会用で、型階層は辿らない。
+     *
+     * @param declaringType 所有 class の binary name
+     * @param methodName 照会する method 名
+     * @return 一致した declared method の候補一覧、または unavailable
+     */
+    public Resolution resolveDeclaredCallableMethods(String declaringType, String methodName) {
+        return declaredCallableMethods(declaringType, methodName);
+    }
+
+    /** 宣言 class 自身の全 callable method (bridge / synthetic 除外)。 */
+    public Resolution resolveDeclaredCallableMethods(String declaringType) {
+        return declaredCallableMethods(declaringType, null);
+    }
+
+    private Resolution declaredCallableMethods(String declaringType, String methodName) {
+        return guardQuery(declaringType, () -> {
+            ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
+            Optional<JavaSootClass> sootClass = view().getClass(classType);
+            if (sootClass.isEmpty()) {
+                return unavailable(declaringType, "class was not found in the supplied classpath");
+            }
+            List<MethodCandidate> methods = sootClass.get().getMethods().stream()
+                    .filter(method -> methodName == null || method.getName().equals(methodName))
+                    .filter(method -> !method.getModifiers().contains(MethodModifier.BRIDGE)
+                            && !method.getModifiers().contains(MethodModifier.SYNTHETIC))
+                    .map(this::toCandidate)
+                    .sorted(candidateComparator())
+                    .toList();
+            return Resolution.available(methods);
+        });
+    }
+
+    /**
+     * 宣言 class 自身の bytecode field の型 (binary name) を返す。bytecode-only
+     * field は receiver 型解決の補完にだけ使い、node 化しない (spec #24 step 3.6)。
+     */
+    public Optional<String> resolveDeclaredFieldType(String declaringType, String fieldName) {
+        try {
+            ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
+            Optional<JavaSootClass> sootClass = view().getClass(classType);
+            if (sootClass.isEmpty()) {
+                return Optional.empty();
+            }
+            return sootClass.get().getFields().stream()
+                    .filter(field -> field.getName().equals(fieldName))
+                    .map(field -> binaryNameOf(field.getType()))
+                    .findFirst();
+        } catch (RuntimeException | LinkageError e) {
+            return Optional.empty();
+        }
+    }
+
     private Resolution resolveConstructorsUncached(String declaringType) {
         return guardQuery(declaringType, () -> {
             ClassType classType = view().getIdentifierFactory().getClassType(declaringType);
@@ -483,7 +552,9 @@ public final class SootUpTypeHierarchyIndex {
         return new MethodCandidate(
                 method.getDeclClassType().getFullyQualifiedName(),
                 method.getName(),
-                parameterTypesOf(method));
+                parameterTypesOf(method),
+                binaryNameOf(method.getReturnType()),
+                method.isStatic());
     }
 
     private static List<String> parameterTypesOf(JavaSootMethod method) {

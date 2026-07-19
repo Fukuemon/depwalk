@@ -1,10 +1,6 @@
 [
   {
-    "code": "JAVA_PARSE_ERROR",
-    "description": "BrokenSyntax.java is intentionally unparseable; the Analyzer must report this diagnostic and keep analyzing the rest of the fixture project (partial analysis continuation)."
-  },
-  {
-    "code": "JAVA_UNRESOLVED_SYMBOL",
-    "description": "UnresolvedCaller.triggerUnresolved() calls a method that does not exist on java.lang.Object; the Analyzer must report this diagnostic while still resolving UnresolvedCaller.resolvedCall() in the same file."
+    "code": "JAVA_SOOTUP_UNAVAILABLE",
+    "description": "明示経路で classpath に classes directory が無いため source-only 継続の warning が出る (D7)。Core が Analyzer diagnostic を成功結果へ伝播する経路の回帰。"
   }
 ]

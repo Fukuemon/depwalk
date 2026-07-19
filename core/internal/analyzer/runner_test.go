@@ -24,8 +24,8 @@ func TestRunnerScenarios(t *testing.T) {
 		wantValidation  bool
 	}{
 		{name: "success", wantRecords: 3},
-		{name: "diagnostic-only", wantRecords: 1, wantDiagnostics: 1},
-		{name: "error-record", wantRecords: 1, wantAnalyzerErr: true},
+		{name: "diagnostic-only", wantDiagnostics: 1},
+		{name: "error-record", wantAnalyzerErr: true},
 		{name: "non-zero-exit"},
 		{name: "invalid-stdout", wantValidation: true},
 	}
@@ -42,7 +42,8 @@ func TestRunnerScenarios(t *testing.T) {
 				Args: []string{"-test.run=TestHelperAnalyzerProcess", "--", "--helper-analyzer", scenarioDir},
 			})
 
-			result, err := runner.Run(request)
+			var records []protocol.Record
+			result, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
@@ -51,8 +52,8 @@ func TestRunnerScenarios(t *testing.T) {
 			if result.ExitCode != wantExitCode {
 				t.Fatalf("ExitCode = %d, want %d", result.ExitCode, wantExitCode)
 			}
-			if len(result.Records) != tt.wantRecords {
-				t.Fatalf("len(Records) = %d, want %d", len(result.Records), tt.wantRecords)
+			if len(records) != tt.wantRecords {
+				t.Fatalf("len(records) = %d, want %d", len(records), tt.wantRecords)
 			}
 			if len(result.Diagnostics) != tt.wantDiagnostics {
 				t.Fatalf("len(Diagnostics) = %d, want %d", len(result.Diagnostics), tt.wantDiagnostics)
@@ -71,11 +72,39 @@ func TestRunnerScenarios(t *testing.T) {
 	}
 }
 
+type failingWriter struct{}
+
+func (w *failingWriter) Write(p []byte) (int, error) {
+	return 0, fmt.Errorf("stderr forwarding failed")
+}
+
+// 転送先 writer が失敗しても stderr は EOF まで drain され、capture が欠けない。
+func TestRunnerDrainsStderrWhenForwardWriterFails(t *testing.T) {
+	t.Parallel()
+
+	scenarioDir := fixturePath(t, "success")
+	request := readRequest(t, scenarioDir)
+	runner := New(Command{
+		Path:   os.Args[0],
+		Args:   []string{"-test.run=TestHelperAnalyzerProcess", "--", "--helper-analyzer", scenarioDir},
+		Stderr: &failingWriter{},
+	})
+
+	result, err := runner.Run(request, func(protocol.Record) {})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	wantStderr := string(readFile(t, filepath.Join(scenarioDir, "stderr.txt")))
+	if result.Stderr != wantStderr {
+		t.Fatalf("Stderr = %q, want %q", result.Stderr, wantStderr)
+	}
+}
+
 func TestRunnerRejectsInvalidRequest(t *testing.T) {
 	t.Parallel()
 
 	runner := New(Command{Path: os.Args[0]})
-	_, err := runner.Run(protocol.AnalysisRequest{})
+	_, err := runner.Run(protocol.AnalysisRequest{}, nil)
 	if err == nil {
 		t.Fatal("Run() error = nil, want error")
 	}
@@ -144,24 +173,41 @@ func TestParseStdoutValidatesCallEdgesAfterFullStream(t *testing.T) {
 		methodSymbolJSONL("method:caller", "example.Caller.run") +
 		methodSymbolJSONL("method:callee", "example.Callee.run")
 
-	result := parseStdout(strings.NewReader(stdout))
+	var records []protocol.Record
+	result := parseStdout(strings.NewReader(stdout), func(record protocol.Record) { records = append(records, record) })
 	if result.ValidationError != nil {
 		t.Fatalf("ValidationError = %v, want nil", result.ValidationError)
 	}
-	if len(result.Records) != 3 {
-		t.Fatalf("len(Records) = %d, want 3", len(result.Records))
+	if len(records) != 3 {
+		t.Fatalf("len(records) = %d, want 3", len(records))
+	}
+}
+
+func TestParseStdoutSkipsReferenceValidationOnFatalStream(t *testing.T) {
+	t.Parallel()
+
+	stdout := callEdgeJSONL("edge:1", "method:caller", "method:missing") +
+		`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"fatal"}` + "\n"
+
+	result := parseStdout(strings.NewReader(stdout), nil)
+	if result.AnalyzerError == nil {
+		t.Fatal("AnalyzerError = nil, want fatal error record")
+	}
+	if result.ValidationError != nil {
+		t.Fatalf("ValidationError = %v, want nil (fatal stream discards prior records)", result.ValidationError)
 	}
 }
 
 func assertStdoutValidationError(t *testing.T, stdout string, wantRecords int) {
 	t.Helper()
 
-	result := parseStdout(strings.NewReader(stdout))
+	var records []protocol.Record
+	result := parseStdout(strings.NewReader(stdout), func(record protocol.Record) { records = append(records, record) })
 	if result.ValidationError == nil {
 		t.Fatal("ValidationError = nil, want error")
 	}
-	if len(result.Records) != wantRecords {
-		t.Fatalf("len(Records) = %d, want %d", len(result.Records), wantRecords)
+	if len(records) != wantRecords {
+		t.Fatalf("len(records) = %d, want %d", len(records), wantRecords)
 	}
 }
 
