@@ -3,11 +3,14 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/output"
 )
 
 func TestAnalyzeCommandBuildsGraphThroughFakeAnalyzer(t *testing.T) {
@@ -130,6 +133,285 @@ func TestAnalyzeCommandRejectsInvalidSourceRootBeforeAnalyzerLaunch(t *testing.T
 	}
 	if !strings.Contains(err.Error(), "sourceRoots") {
 		t.Fatalf("Execute() error = %v, want a sourceRoots validation error (before analyzer launch)", err)
+	}
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("ExitCode(error) = %d, want 2", got)
+	}
+}
+
+func TestAnalyzeCommandPassesQueryFlagsAndFiltersInOrder(t *testing.T) {
+	t.Parallel()
+
+	cmd := newAnalyzeCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		t.TempDir(),
+		"--language=java",
+		"--analyzer-cmd=" + fakeAnalyzerCommand(t, "query-with-filters"),
+		"--method=com.example.Service#find(java.lang.Long)",
+		"--direction=caller",
+		"--max-depth=0",
+		"--format=json",
+		"--include=src/**",
+		"--include=generated/**",
+		"--exclude=**/vendor/**",
+		"--exclude=**/*Test.java",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	var document struct {
+		Direction    string            `json:"direction"`
+		Start        string            `json:"start"`
+		Nodes        []json.RawMessage `json:"nodes"`
+		DepthCutoffs []json.RawMessage `json:"depthCutoffs"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &document); err != nil {
+		t.Fatalf("stdout is not query JSON: %v\n%s", err, stdout.String())
+	}
+	if document.Direction != "caller" || document.Start != "opaque-target" || len(document.Nodes) != 1 || len(document.DepthCutoffs) != 1 {
+		t.Fatalf("query output = %+v, want caller max-depth=0 from opaque-target", document)
+	}
+	wantFilters := "filters=src/**,generated/**|**/vendor/**,**/*Test.java"
+	if !strings.Contains(stderr.String(), wantFilters) {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), wantFilters)
+	}
+	if strings.Contains(stdout.String(), "diagnostic") || strings.Contains(stdout.String(), wantFilters) {
+		t.Fatalf("stdout = %q, want traversal result only", stdout.String())
+	}
+}
+
+func TestAnalyzeCommandUsesQueryDefaults(t *testing.T) {
+	t.Parallel()
+
+	cmd := newAnalyzeCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{
+		t.TempDir(),
+		"--language=java",
+		"--analyzer-cmd=" + fakeAnalyzerCommand(t, "query-single"),
+		"--method=com.example.Service#find(java.lang.Long)",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "com.example.Service.find") || !strings.Contains(stdout.String(), "com.example.Controller.call") {
+		t.Fatalf("stdout = %q, want default console/caller query output", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "analyzed ") {
+		t.Fatalf("stdout = %q, want no legacy summary during a method query", stdout.String())
+	}
+}
+
+func TestAnalyzeCommandRejectsInvalidQueryFlagValuesWithExit2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		flag     string
+		wantText []string
+	}{
+		{name: "direction", flag: "--direction=sideways", wantText: []string{"caller", "callee"}},
+		{name: "format", flag: "--format=yaml", wantText: output.RegisteredFormats()},
+		{name: "max-depth", flag: "--max-depth=-1", wantText: []string{"max-depth", ">= 0"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{
+				t.TempDir(),
+				"--language=java",
+				"--analyzer-cmd=/nonexistent/analyzer/binary",
+				tt.flag,
+			})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want input error")
+			}
+			if got := ExitCode(err); got != 2 {
+				t.Fatalf("ExitCode(error) = %d, want 2", got)
+			}
+			for _, want := range tt.wantText {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want allowed value %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestAnalyzeCommandRejectsInvalidFiltersBeforeAnalyzerLaunchWithExit2(t *testing.T) {
+	t.Parallel()
+
+	for _, flag := range []string{"--include=../outside/**", "--exclude=/absolute/**"} {
+		flag := flag
+		t.Run(flag, func(t *testing.T) {
+			t.Parallel()
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{
+				t.TempDir(),
+				"--language=java",
+				"--analyzer-cmd=/nonexistent/analyzer/binary",
+				flag,
+			})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want request validation error")
+			}
+			if got := ExitCode(err); got != 2 {
+				t.Fatalf("ExitCode(error) = %d, want 2", got)
+			}
+		})
+	}
+}
+
+func TestAnalyzeCommandSelectorErrorsUseExit2AndStderr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		scenario string
+		method   string
+		wants    []string
+	}{
+		{
+			name: "ambiguous", scenario: "query-overloaded", method: "com.example.Service#find",
+			wants: []string{"com.example.Service#find(java.lang.Long)", "com.example.Service#find(java.lang.String)"},
+		},
+		{name: "not-found", scenario: "query-single", method: "com.example.Missing#run", wants: []string{"did not match any method"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := newAnalyzeCommand()
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			cmd.SetArgs([]string{
+				t.TempDir(),
+				"--language=java",
+				"--analyzer-cmd=" + fakeAnalyzerCommand(t, tt.scenario),
+				"--method=" + tt.method,
+			})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want selector input error")
+			}
+			if got := ExitCode(err); got != 2 {
+				t.Fatalf("ExitCode(error) = %d, want 2", got)
+			}
+			for _, want := range tt.wants {
+				if !strings.Contains(stderr.String(), want) {
+					t.Errorf("stderr = %q, want %q", stderr.String(), want)
+				}
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty on selector error", stdout.String())
+			}
+		})
+	}
+}
+
+func TestAnalyzeCommandRuntimeFailuresUseExit1(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		scenario string
+		command  string
+	}{
+		{name: "launch", command: "/nonexistent/analyzer/binary"},
+		{name: "protocol", scenario: "invalid-protocol"},
+		{name: "analyzer-fatal", scenario: "analyzer-error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			command := tt.command
+			if command == "" {
+				command = fakeAnalyzerCommand(t, tt.scenario)
+			}
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{t.TempDir(), "--language=java", "--analyzer-cmd=" + command})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want runtime error")
+			}
+			if got := ExitCode(err); got != 1 {
+				t.Fatalf("ExitCode(error) = %d, want 1", got)
+			}
+		})
+	}
+}
+
+func TestAnalyzeCommandOutputFailureUsesExit1(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("stdout closed")
+	cmd := newAnalyzeCommand()
+	cmd.SetOut(writerFunc(func([]byte) (int, error) { return 0, want }))
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{
+		t.TempDir(),
+		"--language=java",
+		"--analyzer-cmd=" + fakeAnalyzerCommand(t, "query-single"),
+		"--method=com.example.Service#find(java.lang.Long)",
+	})
+
+	err := cmd.Execute()
+	if !errors.Is(err, want) {
+		t.Fatalf("Execute() error = %v, want wrapped output error", err)
+	}
+	if got := ExitCode(err); got != 1 {
+		t.Fatalf("ExitCode(error) = %d, want 1", got)
+	}
+}
+
+func TestAnalyzeCommandNoReachAndCutoffAreSuccessful(t *testing.T) {
+	t.Parallel()
+
+	for _, maxDepth := range []string{"", "--max-depth=0"} {
+		maxDepth := maxDepth
+		t.Run(maxDepth, func(t *testing.T) {
+			t.Parallel()
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			args := []string{
+				t.TempDir(),
+				"--language=java",
+				"--analyzer-cmd=" + fakeAnalyzerCommand(t, "query-single"),
+				"--method=com.example.Service#find(java.lang.Long)",
+				"--direction=callee",
+			}
+			if maxDepth != "" {
+				args = append(args, maxDepth)
+			}
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute() error = %v, want success", err)
+			}
+		})
+	}
+	if got := ExitCode(nil); got != 0 {
+		t.Fatalf("ExitCode(nil) = %d, want 0", got)
 	}
 }
 
@@ -289,6 +571,24 @@ func TestFakeAnalyzerHelperProcess(t *testing.T) {
 			`{"code":"DETAIL_CODE_B","message":"first detail","sourceLocation":{"path":"module-b/src/App.java","startLine":12},"metadata":{"kind":"virtual","candidates":["z","a"]}},` +
 			`{"code":"DETAIL_CODE_A","message":"second detail"}]}` + "\n")
 		os.Exit(1)
+	case "query-single":
+		fmt.Print(methodSymbolWithSignatureJSONL("opaque-caller", "com.example.Controller.call", "com.example.Controller#call()") +
+			methodSymbolWithSignatureJSONL("opaque-target", "com.example.Service.find", "com.example.Service#find(java.lang.Long)") +
+			callEdgeJSONL("opaque-edge", "opaque-caller", "opaque-target"))
+		os.Exit(0)
+	case "query-with-filters":
+		fmt.Print(methodSymbolWithSignatureJSONL("opaque-caller", "com.example.Controller.call", "com.example.Controller#call()") +
+			methodSymbolWithSignatureJSONL("opaque-target", "com.example.Service.find", "com.example.Service#find(java.lang.Long)") +
+			callEdgeJSONL("opaque-edge", "opaque-caller", "opaque-target") +
+			diagnosticWithMessageJSONL("filters="+requestStringArrayForHelper(stdin, "include")+"|"+requestStringArrayForHelper(stdin, "exclude")))
+		os.Exit(0)
+	case "query-overloaded":
+		fmt.Print(methodSymbolWithSignatureJSONL("opaque-long", "com.example.Service.find", "com.example.Service#find(java.lang.Long)") +
+			methodSymbolWithSignatureJSONL("opaque-string", "com.example.Service.find", "com.example.Service#find(java.lang.String)"))
+		os.Exit(0)
+	case "invalid-protocol":
+		fmt.Print("not-json\n")
+		os.Exit(0)
 	default:
 		os.Exit(2)
 	}
@@ -297,11 +597,15 @@ func TestFakeAnalyzerHelperProcess(t *testing.T) {
 // requestSourceRootsForHelper reports the analysisRequest.sourceRoots values
 // exactly as received on stdin, or "(absent)" when the field was omitted.
 func requestSourceRootsForHelper(stdin []byte) string {
+	return requestStringArrayForHelper(stdin, "sourceRoots")
+}
+
+func requestStringArrayForHelper(stdin []byte, field string) string {
 	var request map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(stdin), &request); err != nil {
 		return "(unparseable)"
 	}
-	value, ok := request["sourceRoots"]
+	value, ok := request[field]
 	if !ok {
 		return "(absent)"
 	}
@@ -341,6 +645,15 @@ func methodSymbolJSONL(methodID, qualifiedName string) string {
 	)
 }
 
+func methodSymbolWithSignatureJSONL(methodID, qualifiedName, signature string) string {
+	return fmt.Sprintf(
+		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":%q,"language":"java","symbolKind":"method","qualifiedName":%q,"signature":%q}`+"\n",
+		methodID,
+		qualifiedName,
+		signature,
+	)
+}
+
 func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
 	return fmt.Sprintf(
 		`{"schemaVersion":"1","recordType":"callEdge","edgeId":%q,"callerMethodId":%q,"calleeMethodId":%q}`+"\n",
@@ -353,3 +666,7 @@ func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
 func diagnosticJSONL() string {
 	return `{"schemaVersion":"1","recordType":"diagnostic","severity":"warning","code":"JAVA_UNRESOLVED_SYMBOL","message":"unresolved"}` + "\n"
 }
+
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
