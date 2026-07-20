@@ -205,6 +205,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | 出力形式 (Console/JSON/DOT/Mermaid)  | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了 (DOT / Mermaid 実装は Phase4) |
 | Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了                               |
 | Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了                               |
+| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                           | 完了 (実装は #22)                  |
 
 ### Engineering Context (How: 横断規約)
 

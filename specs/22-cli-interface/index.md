@@ -414,9 +414,9 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 
 ### Design Doc への影響
 
-| 対象節 | 変更内容 | 理由 |
-| ------ | -------- | ---- |
-|        |          |      |
+| 対象節                                                                   | 変更内容                                                                                                                 | 理由                                                       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `design/DesignDoc.md` Feature 設計一覧・`design/features/README.md` 一覧 | 新設 CLI feature doc (`design/features/cli/DesignDoc_cli.md`) の行を追加。状態=反映済 (2026-07-20 sync レビュー指摘対応) | 新設した durable 正本を landscape から辿れるようにするため |
 
 ### feature doc への影響
 
@@ -426,6 +426,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | `design/features/graph/DesignDoc_graph.md` (graph 値型節)                                           | `graph.Edge.Metadata` (opaque、Symbol 側と同じ deep copy 方針) の追加と JSON 出力への透過表出の明記。状態=反映済 (2026-07-20 sync。source: clarify D11)                                                                               | D11 決定の durable な設計成果のため                                                                               |
 | `design/features/output/DesignDoc_output.md` (`NodeView`/`EdgeView`・JSON schema・entry point 節)   | `NodeView`/`EdgeView` への Metadata 追加、JSON の `nodes[].metadata`/`edges[].metadata` (additive、omitempty)、`RegisteredFormats()` の公開 API 化。状態=反映済 (2026-07-20 sync。source: clarify D11/D11 拡張/D5 拡張)               | D11/D5 拡張決定の durable な設計成果のため                                                                        |
 | `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (`methodSymbol.metadata` 境界節) | `specs/21-java-dispatch-spring-di/index.md` D9 の「methodSymbol.metadata は両 issue 対象外」を override した経緯を境界記述に反映。状態=反映済 (2026-07-15、phase 6 レビュー指摘対応で先行実施。source: clarify D11 拡張)              | フレッシュコンテキストレビューで #21 由来の durable 記述との矛盾が検出されたため、sync phase を待たず先行して解消 |
+| `design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md` (`methodSymbol.metadata` 境界節) | 「Traversal と既存 Output schema は表出しない」を #22 D11 後の状態 (Output は JSON へ意味解釈なしに透過表出、正本: output feature doc) へ現状化。状態=反映済 (2026-07-20 sync レビュー指摘対応)                                       | context/testing.md と同型の文言が未現状化のまま残り、output feature doc と矛盾して読めるため                      |
 
 ### context への影響
 
@@ -504,6 +505,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-20 | Claude         | diagram spec-review 指摘対応 (NEEDS_WORK 2 件): Sequence の selector 照合・traversal.Traverse・output.Write の呼び出し元を CLI 層から analyze use case へ修正 (issue スコープ・architecture.md の責務配置に整合)。CLI 層は flag validation・stderr 表示・exit code 判別のみに限定し、Content/Data の配置記述を明確化。「CLI 層の追加」の緩い呼称 3 箇所を「本 spec の追加分」へ統一                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-07-20 | Claude         | diagram 再レビュー PASS。フロー / シーケンス phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 2026-07-20 | Claude         | sync phase (反映先はユーザー承認済み): `design/features/cli/DesignDoc_cli.md` を新設し CLI interface の durable 設計 (selector 書式 D1 / flag 体系 D2-D5・D12 / 責務配置 / exit code 体系 D8 / E2E 方針 D9) の正本をハンドオフ。graph feature doc へ `Edge.Metadata` (D11)、output feature doc へ `NodeView`/`EdgeView` Metadata・JSON additive フィールド・`RegisteredFormats()` 公開 (D5 拡張/D11) を反映。context/project.md Quick Commands に探索クエリ起動例、context/testing.md の E2E 具体引数確定と protocol contract 観点を現状化。spec 側は影響テーブルを反映済へ更新し、Interface 設計に決定時スナップショット注記を追加                                                                                                                                    |
+| 2026-07-20 | Claude         | sync spec-review 指摘対応 (NEEDS_WORK 4 件): (1) DesignDoc / features README の feature 一覧へ CLI feature doc の行を追加し Design Doc への影響テーブルに記録、(2) context/project.md・context/testing.md の最終更新を 2026-07-20 へ同期、(3) analyzer-protocol feature doc の「既存 Output schema は表出しない」を透過表出後の状態へ現状化、(4) context/testing.md L16/L20 の旧文言を CLI feature doc 正本リンク付きで現状化                                                                                                                                                                                                                                                                                                                                          |
 
 ## 備考
 
