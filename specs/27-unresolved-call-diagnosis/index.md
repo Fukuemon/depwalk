@@ -242,8 +242,8 @@ flowchart TD
     A[開発者が depwalk analyze を実行] --> B[Core が Java Analyzer を起動]
     B --> C{解析完了時に未解決 call が残るか}
     C -->|"残らない"| D[exit 0: graph 出力・traversal 実行]
-    C -->|"残る"| E["exit 1: JAVA_INCOMPLETE_ANALYSIS\nerror.details に全未解決 call と診断 metadata"]
-    E --> F["開発者が診断 metadata\n(resolutionPhase / exceptionClass /\nreceiver 式種別 / receiver 型取得成否)\nで要因クラスを機械集計"]
+    C -->|"残る"| E["exit 1: JAVA_INCOMPLETE_ANALYSIS<br/>error.details に全未解決 call と診断 metadata"]
+    E --> F["開発者が診断 metadata<br/>(resolutionPhase / exceptionClass /<br/>receiver 式種別 / receiver 型取得成否)<br/>で要因クラスを機械集計"]
     F --> G{要因クラスの対応方針}
     G -->|"救済ロジック欠落 (④⑤⑥⑧)"| H[本 spec の修正で救済し再解析]
     G -->|"上流の型推論限界で修正対象 (①②③⑦の一部)"| I[回避策を実装し再解析]
@@ -254,7 +254,7 @@ flowchart TD
 
 ### Sequence
 
-call site 1 件の解決パイプライン。`*` 付きが本 spec の変更点。
+call site 1 件の解決パイプライン。`*` 付きが本 spec の変更点。診断 metadata は解決失敗時点で内部記録し、その call site が最終的に primary diagnostic として終端した場合のみ `error.details.metadata` へ出力する (救済成功時は Protocol へ出さない。保持・破棄の実装詳細は P1 prompt で明示する)。
 
 ```mermaid
 sequenceDiagram
@@ -360,6 +360,7 @@ sequenceDiagram
 | ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | 2026-07-21 | PASS                            | 軽微3件: feature doc 参照が実装クラス名になっている / D3(c) に②が暗黙 / 実装分割フェーズ表同期          | 前2件を反映済み。フェーズ表の実装分割状態は track phase 移行時に同期 |
 | 2026-07-21 | PASS (スコープ変更後再レビュー) | 軽微3件: 上位文書整合の前文が research 前提の条件文 / テスト観点の D4 条件表現が古い / フェーズ10未同期 | 前2件を反映済み。フェーズ10は track phase 移行時に同期               |
+| 2026-07-21 | PASS (diagram phase)            | 軽微2件: flowchart ラベルの `\n` は `<br/>` が安全 / 診断 metadata の記録・出力タイミングの明示         | 2件とも反映済み                                                      |
 
 ## 変更履歴
 
