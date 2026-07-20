@@ -186,3 +186,11 @@ Verdict: PASS
 
 - 前回指摘 2 件の対応を確認: Sequence の selector 照合・Traverse・Write の呼び出し元が analyze use case へ修正され、context/architecture.md の use case orchestration 責務およびスコープ宣言と整合。Content/Data の責務記述も図と完全一致
 - 波及矛盾なし: Interface 設計の exit code 判別 (CLI 層)・テスト観点の配置・「本 spec の追加分」への呼称統一を確認
+
+## Review 2026-07-20 (fresh-context evaluator) — sync phase (3 回)
+
+1 回目: NEEDS_WORK (4 件) — CLI feature doc の写し (D1-D12/D8/D9) と graph=保持・output=表出の正本境界は正確と確認。指摘: (1) CLI feature doc が DesignDoc/features README の feature 一覧未登録・Design Doc への影響テーブル未記録、(2) context/project.md・context/testing.md の最終更新ヘッダ未同期、(3) analyzer-protocol feature doc の「Traversal と既存 Output schema は表出しない」が透過表出後の状態と矛盾、(4) testing.md L16/L20 の旧文言と spec 影響テーブルの齟齬 → すべて対応
+
+2 回目 (再レビュー): NEEDS_WORK (2 件) — 前回 4 件の解消を確認。対応自身が生んだメタ乖離: analyzer-protocol feature doc のヘッダ/変更点テーブル、design/DesignDoc.md のヘッダ → 対応
+
+3 回目 (再々レビュー): NEEDS_WORK (1 件) — メタ同期 2 件の解消と設計内容の無矛盾を確認。残指摘はレビューテーブル・review.md への sync レビュー記録漏れのみ → 本追記で対応
