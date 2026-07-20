@@ -16,19 +16,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                         |
-| --- | --------------------------- | ---------- | ---------- | ---------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換       |
-| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS              |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-21 | 矛盾未検出 (すべて継承 / 補足)。D2 の feature doc 補足は sync phase で反映   |
-| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                              |
-| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS   |
-| 6   | Interface / Routing 設計    | 未着手     |            | 本 issue は CLI/Protocol の外部インターフェース変更を想定しない (論点で確認) |
-| 7   | Content / Data 設計         | 未着手     |            |                                                                              |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                                              |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                              |
-| 10  | 実装分割                    | 未着手     |            |                                                                              |
-| 11  | レビュー済                  | 未着手     |            |                                                                              |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                       |
+| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換     |
+| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS            |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-21 | 矛盾未検出 (すべて継承 / 補足)。D2 の feature doc 補足は sync phase で反映 |
+| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                            |
+| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-21 | 外部 I/F 変更なし (D2 で確定)。diagram phase で解決パイプライン図を追加    |
+| 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                               |
+| 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                 |
+| 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                             |
+| 10  | 実装分割                    | 未着手     |            |                                                                            |
+| 11  | レビュー済                  | 未着手     |            |                                                                            |
 
 ## 上位文書整合
 
@@ -233,18 +233,68 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## フロー / シーケンス
 
-(`spec-diagrams` で生成。要因分類・診断フローが対象になり得る)
+対象は「開発者が実環境プロジェクトを解析し、未解決 call を診断・修正するまで」の流れ (flowchart) と、「call site 1 件の解決・救済・分類」の内部処理 (sequence)。修正対象の fallback (④⑤⑥⑧) と診断 metadata (D2) の位置づけを示す。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    A[開発者が depwalk analyze を実行] --> B[Core が Java Analyzer を起動]
+    B --> C{解析完了時に未解決 call が残るか}
+    C -->|"残らない"| D[exit 0: graph 出力・traversal 実行]
+    C -->|"残る"| E["exit 1: JAVA_INCOMPLETE_ANALYSIS\nerror.details に全未解決 call と診断 metadata"]
+    E --> F["開発者が診断 metadata\n(resolutionPhase / exceptionClass /\nreceiver 式種別 / receiver 型取得成否)\nで要因クラスを機械集計"]
+    F --> G{要因クラスの対応方針}
+    G -->|"救済ロジック欠落 (④⑤⑥⑧)"| H[本 spec の修正で救済し再解析]
+    G -->|"上流の型推論限界で修正対象 (①②③⑦の一部)"| I[回避策を実装し再解析]
+    G -->|"v1 scope 外"| J[ADR-0004 整合を明記して記録]
+    H --> A
+    I --> A
 ```
 
 ### Sequence
 
+call site 1 件の解決パイプライン。`*` 付きが本 spec の変更点。
+
 ```mermaid
 sequenceDiagram
+    actor Dev as 開発者
+    participant Core as Core CLI
+    participant AZ as Java Analyzer
+    participant RES as Source Resolver
+    participant IDX as Bytecode Member 索引
+
+    Dev->>Core: depwalk analyze
+    Core->>AZ: analysisRequest (stdin JSONL)
+    loop 各 call site (method call / method reference / explicit super / object creation)
+        AZ->>RES: source 型解決
+        alt 解決成功
+            RES-->>AZ: 解決済み target
+            AZ->>AZ: edge / 明示除外へ分類
+        else 解決失敗
+            RES-->>AZ: 失敗 (例外)
+            AZ->>AZ: *診断 metadata 記録 (resolutionPhase / exceptionClass / receiver 式種別 / receiver 型取得成否)
+            AZ->>IDX: *bytecode 救済 (④method reference / ⑤explicit super も対象に拡大、⑧cross-module member を含む)
+            alt 救済成功
+                IDX-->>AZ: member 情報
+                AZ->>AZ: edge / external-target へ分類
+            else 救済不能
+                IDX-->>AZ: 該当なし
+                alt *receiver 型不明かつ scope 外根拠あり (⑥)
+                    AZ->>AZ: external-target 除外へ分類
+                else 根拠なし
+                    AZ->>AZ: primary diagnostic として保持
+                end
+            end
+        end
+    end
+    alt primary diagnostic が 0 件
+        AZ-->>Core: methodSymbol / callEdge / diagnostic records
+        Core-->>Dev: exit 0 (graph / traversal / output)
+    else 1 件以上
+        AZ-->>Core: error: JAVA_INCOMPLETE_ANALYSIS (details に診断 metadata 付き全未解決 call)
+        Core-->>Dev: exit 1 (details の汎用表示)
+    end
 ```
 
 ## 実装分割
@@ -319,6 +369,7 @@ sequenceDiagram
 | 2026-07-21 | Fukuemon | clarify phase で D1〜D5 を確定し、実装分割タスク案・Testing・Interface 設計へ同期                                        |
 | 2026-07-21 | Fukuemon | spec-review PASS。軽微指摘 (feature doc 節名参照 / D3(c) への②明記) を反映                                               |
 | 2026-07-21 | Fukuemon | issue #27 を research → bug へ変換 (ユーザー判断)。対応実装まで本 spec のスコープへ拡大し、D5 改訂・実装分割 P5〜P9 追加 |
+| 2026-07-21 | Fukuemon | diagram phase で解析フロー flowchart と call site 解決パイプライン sequence を追加                                       |
 
 ## 備考
 
