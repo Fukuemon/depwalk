@@ -12,13 +12,18 @@ package analyze
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/output"
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
+	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
 // Options configures one depwalk analyze run.
@@ -38,6 +43,19 @@ type Options struct {
 	// AnalyzerMeta holds the raw --analyzer-meta key=value flag values, in
 	// the order they were given.
 	AnalyzerMeta []string
+	// Include and Exclude hold the raw workspace-relative glob values in the
+	// order they were given. Empty slices omit the corresponding request fields.
+	Include []string
+	Exclude []string
+	// Method selects the graph node to traverse. An empty value keeps the
+	// legacy summary-only behavior and ignores the remaining query fields.
+	Method string
+	// Direction and MaxDepth configure traversal for a method query.
+	Direction graph.Direction
+	MaxDepth  *int
+	// Format and Output select and receive the rendered traversal result.
+	Format output.Format
+	Output io.Writer
 	// AnalyzerStderr optionally receives the Analyzer stderr stream as it
 	// arrives, without interpretation, on both success and failure.
 	AnalyzerStderr io.Writer
@@ -59,6 +77,17 @@ type AnalyzerFailure struct {
 func (e *AnalyzerFailure) Error() string {
 	return fmt.Sprintf("analyzer reported a fatal error: %s: %s", e.Record.Code, e.Record.Message)
 }
+
+// InputError marks an error caused by values supplied for an analysis request
+// or method query. CLI callers use it to distinguish exit code 2 failures from
+// runtime failures without interpreting error text.
+type InputError struct {
+	Err error
+}
+
+func (e *InputError) Error() string { return e.Err.Error() }
+
+func (e *InputError) Unwrap() error { return e.Err }
 
 // Result is the outcome of a successful depwalk analyze run.
 type Result struct {
@@ -113,13 +142,20 @@ func Run(opts Options) (Result, error) {
 		RequestID:     requestID,
 		WorkspaceRoot: opts.WorkspaceRoot,
 		Language:      opts.Language,
+		AnalysisMode:  protocol.AnalysisModeFullGraph,
 		Metadata:      metadata,
 	}
 	if len(opts.SourceRoots) > 0 {
 		request.SourceRoots = opts.SourceRoots
 	}
+	if len(opts.Include) > 0 {
+		request.Include = opts.Include
+	}
+	if len(opts.Exclude) > 0 {
+		request.Exclude = opts.Exclude
+	}
 	if err := request.Validate(); err != nil {
-		return Result{}, err
+		return Result{}, &InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
 	}
 
 	runner := analyzer.New(analyzer.Command{
@@ -160,12 +196,78 @@ func Run(opts Options) (Result, error) {
 		return Result{}, fmt.Errorf("analyzer stdout did not follow the analyzer protocol: %w", runResult.ValidationError)
 	}
 
-	return Result{
+	result := Result{
 		Graph:         stagingGraph,
 		Diagnostics:   runResult.Diagnostics,
 		MethodCount:   methodCount,
 		CallEdgeCount: callEdgeCount,
-	}, nil
+	}
+	if opts.Method == "" {
+		return result, nil
+	}
+	if opts.Output == nil {
+		return Result{}, errors.New("analyze: output writer is required for a method query")
+	}
+
+	start, err := selectMethod(stagingGraph, opts.Method)
+	if err != nil {
+		return Result{}, err
+	}
+	requestForTraversal := traversal.Request{
+		StartID:   start.ID,
+		Direction: opts.Direction,
+		MaxDepth:  opts.MaxDepth,
+	}
+	traversalResult, err := traversal.Traverse(stagingGraph, requestForTraversal)
+	if err != nil {
+		return Result{}, fmt.Errorf("traverse method %q: %w", opts.Method, err)
+	}
+	if err := output.Write(opts.Output, opts.Format, output.Input{
+		Graph: stagingGraph, Result: traversalResult, Request: requestForTraversal,
+	}); err != nil {
+		return Result{}, fmt.Errorf("write %s output: %w", opts.Format, err)
+	}
+	return result, nil
+}
+
+func selectMethod(g *graph.Graph, selector string) (graph.Node, error) {
+	nodes := g.Nodes()
+	matches := make([]graph.Node, 0, 1)
+	if strings.Contains(selector, "(") {
+		for _, node := range nodes {
+			if node.Symbol.Signature == selector {
+				matches = append(matches, node)
+			}
+		}
+	} else {
+		separator := strings.LastIndex(selector, "#")
+		qualifiedName := ""
+		if separator > 0 && separator < len(selector)-1 {
+			qualifiedName = selector[:separator] + "." + selector[separator+1:]
+		}
+		for _, node := range nodes {
+			if qualifiedName != "" && node.Symbol.QualifiedName == qualifiedName {
+				matches = append(matches, node)
+			}
+		}
+	}
+
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if len(matches) == 0 {
+		return graph.Node{}, &InputError{Err: fmt.Errorf("method selector %q did not match any method", selector)}
+	}
+	candidates := make([]string, len(matches))
+	for i, node := range matches {
+		candidates[i] = node.Symbol.Signature
+	}
+	slices.Sort(candidates)
+	return graph.Node{}, &InputError{Err: fmt.Errorf(
+		"method selector %q is ambiguous; candidates: %s",
+		selector,
+		strings.Join(candidates, ", "),
+	)}
 }
 
 func newRequestID() (string, error) {

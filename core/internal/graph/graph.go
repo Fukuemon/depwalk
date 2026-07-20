@@ -104,6 +104,18 @@ func (g *Graph) Node(id string) (Node, bool) {
 	return n, ok
 }
 
+// Nodes returns a snapshot containing every registered node. No iteration
+// order is guaranteed. The returned slice may be modified by the caller;
+// nested pointer and map fields retain the same read-only ownership contract
+// as values returned by [Graph.Node].
+func (g *Graph) Nodes() []Node {
+	nodes := make([]Node, 0, len(g.nodes))
+	for _, node := range g.nodes {
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
 // Neighbors returns the edges adjacent to the node id in the given
 // direction: for [DirectionCallee] the edges the node calls, for
 // [DirectionCaller] the edges that call the node. Unknown IDs, leaf
