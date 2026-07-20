@@ -1,6 +1,7 @@
 package traversal
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
@@ -299,7 +300,7 @@ func TestResultIdenticalForBFSAndDFS(t *testing.T) {
 				t.Fatalf("cutoff sets differ: bfs=%v dfs=%v", bfs.DepthCutoffs, dfs.DepthCutoffs)
 			}
 			for id, cut := range bfs.DepthCutoffs {
-				if dfs.DepthCutoffs[id] != cut {
+				if !reflect.DeepEqual(dfs.DepthCutoffs[id], cut) {
 					t.Errorf("dfs DepthCutoffs[%q] = %+v, want %+v", id, dfs.DepthCutoffs[id], cut)
 				}
 			}
