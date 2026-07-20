@@ -78,6 +78,28 @@ func TestAddNodeIgnoresDuplicateID(t *testing.T) {
 	}
 }
 
+func TestNodesReturnsEveryRegisteredNodeWithFirstRegistration(t *testing.T) {
+	g := New()
+	g.AddNode(Node{ID: "opaque:b", Symbol: Symbol{QualifiedName: "example.B.run"}})
+	g.AddNode(Node{ID: "opaque:a", Symbol: Symbol{QualifiedName: "example.A.run"}})
+	g.AddNode(Node{ID: "opaque:a", Symbol: Symbol{QualifiedName: "example.Replaced.run"}})
+
+	got := g.Nodes()
+	if len(got) != 2 {
+		t.Fatalf("len(Nodes()) = %d, want 2", len(got))
+	}
+	byID := make(map[string]Node, len(got))
+	for _, node := range got {
+		byID[node.ID] = node
+	}
+	if byID["opaque:a"].Symbol.QualifiedName != "example.A.run" {
+		t.Errorf("Nodes()[opaque:a] = %#v, want first registration", byID["opaque:a"])
+	}
+	if _, ok := byID["opaque:b"]; !ok {
+		t.Error("Nodes() missing opaque:b")
+	}
+}
+
 func TestNeighborsReturnsCalleeEdges(t *testing.T) {
 	g := New()
 	g.AddNode(Node{ID: "method:a"})

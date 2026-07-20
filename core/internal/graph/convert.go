@@ -67,12 +67,14 @@ func copyMetadataValue(value any) any {
 }
 
 // EdgeFromCallEdge converts an Analyzer Protocol call edge to an [Edge]. The
-// call site is deep copied into a graph-owned value like the node conversion.
+// call site and opaque metadata are deep copied into graph-owned values like
+// the node conversion.
 func EdgeFromCallEdge(record protocol.CallEdge) Edge {
 	return Edge{
 		ID:       record.EdgeID,
 		CallerID: record.CallerMethodID,
 		CalleeID: record.CalleeMethodID,
 		CallSite: copySourceLocation(record.CallSite),
+		Metadata: copyMetadataObject(record.Metadata),
 	}
 }

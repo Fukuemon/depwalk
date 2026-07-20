@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-07-18 / Status: Draft
+> 最終更新: 2026-07-20 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
@@ -205,6 +205,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 | 出力形式 (Console/JSON/DOT/Mermaid)  | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了 (DOT / Mermaid 実装は Phase4) |
 | Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了                               |
 | Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了                               |
+| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                           | 完了 (実装は #22)                  |
 
 ### Engineering Context (How: 横断規約)
 

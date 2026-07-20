@@ -7,7 +7,7 @@
     {
       "methodId": "method:a",
       "qualifiedName": "A",
-      "signature": "()",
+      "signature": "A()",
       "minDepth": 0
     }
   ],

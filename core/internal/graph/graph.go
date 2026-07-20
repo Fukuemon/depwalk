@@ -40,12 +40,15 @@ type Symbol struct {
 }
 
 // Edge is a directed call edge identified by the Analyzer Protocol edgeId.
-// CallerID and CalleeID reference [Node] IDs.
+// CallerID and CalleeID reference [Node] IDs. Metadata is an optional
+// graph-owned opaque JSON object with the same omitted-versus-empty semantics
+// as [Symbol.Metadata].
 type Edge struct {
 	ID       string
 	CallerID string
 	CalleeID string
 	CallSite *protocol.SourceLocation
+	Metadata map[string]any
 }
 
 // Graph is an in-memory call graph. The zero value is not usable; create
@@ -99,6 +102,18 @@ func (g *Graph) AddEdge(e Edge) {
 func (g *Graph) Node(id string) (Node, bool) {
 	n, ok := g.nodes[id]
 	return n, ok
+}
+
+// Nodes returns a snapshot containing every registered node. No iteration
+// order is guaranteed. The returned slice may be modified by the caller;
+// nested pointer and map fields retain the same read-only ownership contract
+// as values returned by [Graph.Node].
+func (g *Graph) Nodes() []Node {
+	nodes := make([]Node, 0, len(g.nodes))
+	for _, node := range g.nodes {
+		nodes = append(nodes, node)
+	}
+	return nodes
 }
 
 // Neighbors returns the edges adjacent to the node id in the given

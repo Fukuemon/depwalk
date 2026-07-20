@@ -90,6 +90,31 @@ func TestConsoleWriteIsDeterministicForMapInput(t *testing.T) {
 	}
 }
 
+func TestConsoleIgnoresOpaqueMetadata(t *testing.T) {
+	withoutMetadata := consoleView("method:a",
+		[]NodeView{node("method:a", "A"), node("method:b", "B")},
+		[]EdgeView{edge("edge:ab", "method:a", "method:b")}, nil)
+	withMetadata := withoutMetadata
+	withMetadata.Start.Metadata = map[string]any{"declarationOrigin": "projectClasses"}
+	withMetadata.Nodes = append([]NodeView(nil), withoutMetadata.Nodes...)
+	withMetadata.Nodes[0].Metadata = map[string]any{"declarationOrigin": "projectClasses"}
+	withMetadata.Edges = append([]EdgeView(nil), withoutMetadata.Edges...)
+	withMetadata.Edges[0].Metadata = map[string]any{"resolution": "springDi"}
+
+	formatter := consoleFormatter{}
+	var want bytes.Buffer
+	if err := formatter.Format(&want, withoutMetadata); err != nil {
+		t.Fatalf("Format(without metadata) returned error: %v", err)
+	}
+	var got bytes.Buffer
+	if err := formatter.Format(&got, withMetadata); err != nil {
+		t.Fatalf("Format(with metadata) returned error: %v", err)
+	}
+	if got.String() != want.String() {
+		t.Errorf("Format() with metadata = %q, want unchanged %q", got.String(), want.String())
+	}
+}
+
 func TestConsoleSiblingOrderUsesMethodIDAsFinalNodeKey(t *testing.T) {
 	tree := newConsoleTree(siblingOrderView())
 	children := tree.children["method:root"]
@@ -98,6 +123,47 @@ func TestConsoleSiblingOrderUsesMethodIDAsFinalNodeKey(t *testing.T) {
 		if child.node.ID != want[i] {
 			t.Errorf("children[%d].ID = %q, want %q", i, child.node.ID, want[i])
 		}
+	}
+}
+
+func TestFormatNodeUsesNormalizedSignatureWithoutDuplicatingQualifiedName(t *testing.T) {
+	node := NodeView{
+		ID:            "java:com.example.UserService#findById(java.lang.Long)",
+		QualifiedName: "com.example.UserService.findById",
+		Signature:     "com.example.UserService#findById(java.lang.Long)",
+	}
+
+	got := formatNode(node, nil)
+	want := "com.example.UserService#findById(java.lang.Long)"
+	if got != want {
+		t.Errorf("formatNode() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatNodeFallsBackWhenSignatureIsUnavailable(t *testing.T) {
+	tests := []struct {
+		name string
+		node NodeView
+		want string
+	}{
+		{
+			name: "qualified name",
+			node: NodeView{ID: "method:a", QualifiedName: "example.Service.call"},
+			want: "example.Service.call",
+		},
+		{
+			name: "method id",
+			node: NodeView{ID: "method:missing"},
+			want: "method:missing",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatNode(tc.node, nil); got != tc.want {
+				t.Errorf("formatNode() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -130,7 +196,7 @@ func diamondView() View {
 	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 20}
 	view := consoleView("method:a",
 		[]NodeView{
-			{ID: "method:a", QualifiedName: "A", Signature: "()", Source: rootSource},
+			{ID: "method:a", QualifiedName: "A", Signature: "A()", Source: rootSource},
 			node("method:c", "C"), node("method:d", "D"), node("method:b", "B"),
 		},
 		[]EdgeView{
@@ -180,10 +246,10 @@ func siblingOrderView() View {
 	return consoleView("method:root",
 		[]NodeView{
 			node("method:root", "Root"),
-			{ID: "method:z", QualifiedName: "Child", Signature: "(B)"},
-			{ID: "method:b", QualifiedName: "Child", Signature: "(A)"},
-			{ID: "method:a", QualifiedName: "Child", Signature: "(A)"},
-			{ID: "method:first", QualifiedName: "Alpha", Signature: "()"},
+			{ID: "method:z", QualifiedName: "Child", Signature: "Child(B)"},
+			{ID: "method:b", QualifiedName: "Child", Signature: "Child(A)"},
+			{ID: "method:a", QualifiedName: "Child", Signature: "Child(A)"},
+			{ID: "method:first", QualifiedName: "Alpha", Signature: "Alpha()"},
 		},
 		[]EdgeView{
 			edge("edge:z", "method:root", "method:z"),
@@ -208,7 +274,7 @@ func consoleView(startID string, nodes []NodeView, edges []EdgeView, cutoffs []C
 }
 
 func node(id, name string) NodeView {
-	return NodeView{ID: id, QualifiedName: name, Signature: "()"}
+	return NodeView{ID: id, QualifiedName: name, Signature: name + "()"}
 }
 
 func edge(id, callerID, calleeID string) EdgeView {

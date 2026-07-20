@@ -37,6 +37,7 @@ type jsonNode struct {
 	Signature     string                   `json:"signature"`
 	MinDepth      int                      `json:"minDepth"`
 	Source        *protocol.SourceLocation `json:"sourceLocation,omitempty"`
+	Metadata      map[string]any           `json:"metadata,omitempty"`
 }
 
 type jsonEdge struct {
@@ -45,6 +46,7 @@ type jsonEdge struct {
 	CalleeMethodID string                   `json:"calleeMethodId"`
 	Cycle          bool                     `json:"cycle"`
 	CallSite       *protocol.SourceLocation `json:"callSite,omitempty"`
+	Metadata       map[string]any           `json:"metadata,omitempty"`
 }
 
 type jsonCutoff struct {
@@ -69,13 +71,13 @@ func newJSONDocument(view View) jsonDocument {
 	for _, node := range view.Nodes {
 		document.Nodes = append(document.Nodes, jsonNode{
 			MethodID: node.ID, QualifiedName: node.QualifiedName, Signature: node.Signature,
-			MinDepth: node.MinDepth, Source: node.Source,
+			MinDepth: node.MinDepth, Source: node.Source, Metadata: node.Metadata,
 		})
 	}
 	for _, edge := range view.Edges {
 		document.Edges = append(document.Edges, jsonEdge{
 			EdgeID: edge.ID, CallerMethodID: edge.CallerID, CalleeMethodID: edge.CalleeID,
-			Cycle: edge.Cycle, CallSite: edge.CallSite,
+			Cycle: edge.Cycle, CallSite: edge.CallSite, Metadata: edge.Metadata,
 		})
 	}
 	for _, cutoff := range view.Cutoffs {
