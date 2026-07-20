@@ -140,8 +140,11 @@ func (tree *consoleTree) writeChildren(w io.Writer, parentID, prefix string) err
 }
 
 func formatNode(node NodeView, location *protocol.SourceLocation) string {
-	label := node.QualifiedName + node.Signature
-	if node.QualifiedName == "" {
+	label := node.Signature
+	if label == "" {
+		label = node.QualifiedName
+	}
+	if label == "" {
 		label = node.ID
 	}
 	if location == nil {

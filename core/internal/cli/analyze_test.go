@@ -201,7 +201,7 @@ func TestAnalyzeCommandUsesQueryDefaults(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if !strings.Contains(stdout.String(), "com.example.Service.find") || !strings.Contains(stdout.String(), "com.example.Controller.call") {
+	if !strings.Contains(stdout.String(), "com.example.Service#find(java.lang.Long)") || !strings.Contains(stdout.String(), "com.example.Controller#call()") {
 		t.Fatalf("stdout = %q, want default console/caller query output", stdout.String())
 	}
 	if strings.Contains(stdout.String(), "analyzed ") {

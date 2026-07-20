@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。Issue #27 の実 OSS 検証で Console ラベルと実 Protocol signature の不整合を修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D2-D7) を参照する。
 
@@ -13,6 +13,7 @@ Output Engine の durable な feature 設計正本。Traversal result (到達 no
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                              |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                     |
 | 関連 spec      | [specs/7-output](../../../specs/7-output/)                                                                                                                                                                                        |
+| 関連 Issue     | [#27](https://github.com/Fukuemon/depwalk/issues/27) (実 OSS 検証で検出した Console ラベル重複の修正)                                                                                                                             |
 | 対象モジュール | `output` (`core/internal/output`)                                                                                                                                                                                                 |
 
 ## 背景・要件解釈
@@ -187,20 +188,20 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 
 #### 行の書式
 
-- node ラベル = `qualifiedName` + `signature`。
+- node ラベル = `signature`。`signature` が欠落する場合だけ `qualifiedName`、さらに欠落する場合は `methodId` へ fallback する。Analyzer Protocol の `signature` は overload を区別する正規化済み表現であり、Core は言語固有の区切り文字や引数部分を解析しない。
 - 位置情報: 子行は `edge.CallSite` (呼び出し箇所)、root は宣言位置 (`Symbol.Source`)。欠落時は位置表記を省略する。メソッドの宣言位置は Console では出さない (JSON が両方持つ)。
 
 ```text
-UserService.findById(Long)  [UserService.java:42]
-├─ UserController.getUser(Long)  [UserController.java:31]
-│  └─ ApiFilter.doFilter()  [ApiFilter.java:20]
-├─ AdminController.getUser(Long)  [AdminController.java:18]
-│  └─ ApiFilter.doFilter()  (既出)
-├─ UserBatch.execute()  [UserBatch.java:55]
+com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
+├─ com.example.UserController#getUser(java.lang.Long)  [UserController.java:31]
+│  └─ com.example.ApiFilter#doFilter()  [ApiFilter.java:20]
+├─ com.example.AdminController#getUser(java.lang.Long)  [AdminController.java:18]
+│  └─ com.example.ApiFilter#doFilter()  (既出)
+├─ com.example.UserBatch#execute()  [UserBatch.java:55]
 │  └─ … (depth limit: 2 edges cut)
-└─ CacheWarmer.warm()  [CacheWarmer.java:8]
-   └─ Scheduler.run()  [Scheduler.java:12]
-      └─ UserService.findById(Long)  (cycle)
+└─ com.example.CacheWarmer#warm()  [CacheWarmer.java:8]
+   └─ com.example.Scheduler#run()  [Scheduler.java:12]
+      └─ com.example.UserService#findById(java.lang.Long)  (cycle)
 ```
 
 ### JSON 出力 (schema と版管理)
@@ -217,7 +218,7 @@ UserService.findById(Long)  [UserService.java:42]
     {
       "methodId": "<methodId>",
       "qualifiedName": "com.example.UserService.findById",
-      "signature": "(java.lang.Long)",
+      "signature": "com.example.UserService#findById(java.lang.Long)",
       "minDepth": 0,
       "sourceLocation": {
         "path": "src/main/java/com/example/UserService.java",
@@ -273,7 +274,7 @@ UserService.findById(Long)  [UserService.java:42]
 | G-2 | 起点 node を他と区別できる                                                                              |
 | G-3 | `cycle` 注釈付き edge を他と区別できる                                                                  |
 | G-4 | `depthLimit` cutoff がある node に「続きがある」ことを示せる (cutoff 先の名前は出せない)                |
-| G-5 | node ラベルは `qualifiedName` + `signature` (Console と同じ語彙)                                        |
+| G-5 | node ラベルは `signature`、欠落時は `qualifiedName` → `methodId` の順に fallback (Console と同じ規則)   |
 | G-6 | 同一 Result から常に同一のバイト列を出力する (要素順序は id の辞書順)                                   |
 | G-7 | 外部ツール (Graphviz / Mermaid レンダラ) がパース可能な構文であること                                   |
 
@@ -310,7 +311,7 @@ flowchart TD
 
 - 各 formatter の出力を golden file と比較する unit test で担保する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result → 同一バイト列) を同時に検証する。
 - fixture ケース: 循環 (self-loop / 相互再帰 / 3 要素 SCC) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし (`Edges` も `Cutoffs` も空) / `maxDepth=0` (`Edges` 空 + `Cutoffs` 非空) / `maxDepth=0` + 起点 self-loop / `startNotFound`。
-- Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。
+- Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。実 Protocol と同じ完全な `signature` を入力しても `qualifiedName` と重複せず 1 回だけ表示され、`signature` 欠落時の fallback が機能すること。
 - JSON: `encoding/json` でパースできること (S3)。`targetMethodId` が `nodes[]` に存在しない (dangling) ことを caller / callee 両方向で検証すること。`cycle: false` が省略されないこと。
 - エラー境界: 未対応 format が出力を書き出す前に `error` になり、`startNotFound` / 到達なしが `error` にならないこと。
 - S3 の照合は **Output 層 (本 doc の unit / golden) と CLI 層 (CLI interface spec 完了後)** の 2 層からなる (S1/S2 と同じ分界)。
