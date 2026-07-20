@@ -29,7 +29,7 @@
 | 6   | Interface / Routing 設計    | レビュー済 | 2026-07-20 | CLI flag 体系表・exit code 配線・Request/Response 変換・D11 拡張の Node 側 JSON スキーマ影響を記述。phase 6 再レビュー PASS 後、2026-07-20 に #24 反映 (既存 flag 4 つ化・D12 flag 追加・AnalyzerFailure 経路との整合) で更新、同日再レビュー PASS         |
 | 7   | Content / Data 設計         | レビュー済 | 2026-07-20 | 永続ストアなし・package 配置方針を記述。CLI のため Content/Assets・UI Reuse は該当なし。レビュー PASS (1周目) 後、2026-07-20 に #24 反映 (graph.Symbol 側実装済み・E2E harness 再利用) で配置記述を現状化、同日再レビュー PASS                             |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-07-20 | Performance (SLO 確定は実装フェーズへ委譲)・Security/Privacy (既存読み取り専用方針の継承)・Error/Fallback を記述。再レビュー PASS 後、2026-07-20 に #24 反映 (エラーケース 8 追加・ケース 5 の対象を構造化 renderer に更新) で更新、同日再レビュー PASS    |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                                                                                                                                                                                                                            |
+| 9   | Test / Metrics 設計         | 進行中     | 2026-07-20 | テスト観点 (unit 6 対象 + CLI プロセス E2E、テストしないこと明示)・計測指標 (S1-S3 required gate、SLO 確定は実装フェーズ) を記述。機能仕様 Testing 節も記入。レビュー待ち                                                                                  |
 | 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                                                                                            |
 | 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                                                                                            |
 
@@ -194,7 +194,7 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ### Testing
 
-(clarify 以降で記述)
+- 検証の層構造は `context/testing.md` のテスト責務分担 (unit / protocol contract / E2E 2 層) を継承する。本 spec の追加分は unit (CLI flag パース・method selector 照合・exit code 判別・Metadata 透過) と CLI プロセス E2E (D9、os/exec + golden 照合) であり、protocol contract 層への追加はない (D12 の include/exclude は既存契約の利用のみ)。詳細は `## テスト / 評価方針` を参照。
 
 ## Interface 設計
 
@@ -283,11 +283,35 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ### テスト観点
 
-(clarify 以降で記述)
+検証境界は `context/testing.md` (unit / protocol contract / E2E 2 層) を継承する。fake は既存の手書き fake analyzer (`core/internal/cli` の `fakeAnalyzerCommand` パターン) を再利用し、mock ライブラリは導入しない。
+
+**Unit test (`core/internal/...`、fake analyzer ベース)**:
+
+| 対象                                       | 観点                                                                                                                                                                                                                                                                                                                                                                                          | 決定        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| CLI flag パース (`core/internal/cli`)      | `--direction`/`--format` の不正値で許容値一覧付きエラー + exit 2、`--max-depth` の負値エラー + exit 2、`--format` の値域が `output.RegisteredFormats()` 由来であること (ハードコードなし)                                                                                                                                                                                                     | D3-D5, D8   |
+| method selector 照合                       | 完全 signature 指定の一致、括弧省略で 1 件一致、複数一致 (オーバーロード) で候補の完全 signature 一覧 + exit 2、一致 0 件で exit 2。照合が qualifiedName/signature 走査で methodId 文字列形式に依存しないこと                                                                                                                                                                                 | D1, D7, D8  |
+| analyze use case (`core/internal/analyze`) | `AnalysisRequest.AnalysisMode` が常に fullGraph で明示されること、`Entrypoints` が空のままなこと、`--include`/`--exclude` が指定順のまま request へ透過されること・未指定時に request へ載らないこと (echo 系 fake analyzer で request 内容を検証、#24 の `echo-source-roots` パターン踏襲)                                                                                                   | D6, D7, D12 |
+| exit code 判別 (`core/internal/cli`)       | 0/1/2 の振り分け全経路: 成功 (結果空・cutoff 含む) → 0、`AnalyzerFailure`・出力書き込み失敗 → 1 (既存 `renderAnalyzerFailure` の表示を変えない)、flag 値域・曖昧性・startNotFound・`request.Validate()` の利用者起因エラー → 2 (invalid `--source-root`/`--include`/`--exclude` は Analyzer 起動前に拒否、既存 `TestAnalyzeCommandRejectsInvalidSourceRootBeforeAnalyzerLaunch` パターン踏襲) | D8 (拡張)   |
+| graph convert (`core/internal/graph`)      | `EdgeFromCallEdge` が `callEdge.metadata` を deep copy で保持すること (#24 の `NodeFromMethodSymbol` 側テストと対称)、metadata なし record で nil のままなこと                                                                                                                                                                                                                                | D11         |
+| output (`core/internal/output`)            | `NodeView`/`EdgeView` の Metadata が JSON へ omitempty で表出されること (metadata なしでフィールド不在 = 後方互換)、console が metadata を表出しないこと、`RegisteredFormats()` が登録済み format を返すこと。golden は package-local `testdata/golden/` の既存規約に従い更新                                                                                                                 | D5, D11     |
+
+**E2E (CLI プロセス層、`core/e2e`)**:
+
+- #24 整備の harness (`gradle_multiproject_cli_test.go` の `buildCoreCLI`/`runCLI`) を再利用し、os/exec でバイナリを実行して stdout/stderr/exit code を検証する (D9)。
+- S1 (caller) / S2 (callee): 既存 Java/Spring fixture の既知の呼び出し関係に対し `--method` + `--direction` の出力を console / json の golden file と完全一致で照合する。
+- S3 (機械パース性): json 出力は golden 一致に加えて `json.Unmarshal` 成功を検証する。
+- exit code: 成功 (0)、Analyzer fatal (1)、不正 flag 値・selector 不一致 (2) の 3 区分を CLI 出力レベルで検証する (D8)。
+- golden file は既存 fixture 規約 (`testdata/` 配下) に置き、具体 path は実装分割で確定する。
+- 既存のグラフレベル E2E (`analyze.Run` 直接呼び出し) は変更しない (2 層構成の維持、`context/testing.md`)。
+
+**テストしないこと**: include/exclude glob の評価意味論 (Analyzer 側の責務、#24 が実 jar test で固定済み)、metadata キー (`resolution`/`declaringType` 等) の意味解釈 (D11 のスキーマ非依存方針)、dot/mermaid formatter (CLI 非露出、D5)。
 
 ### 計測指標
 
-(clarify 以降で記述)
+- **リリース判定**: S1 / S2 / S3 の E2E 照合を required gate とする (`context/testing.md` のリリース判定基準と対応)。数値による機械的な合否判定はテストに組み込まない。
+- **SLO 数値目標の確定 (実装フェーズで実施)**: `## Performance / Security 設計 > Performance` で確定済みの方針に従い、実プロジェクト相当 fixture の複数回計測 (解析時間・最大 RSS) を D9 の E2E 整備と合わせて行う。#24 (D8) の経路別計測 (single 明示 / single discovery / multi discovery の初回値・warm 中央値) を入力とし、確定値は feature doc `java-analyzer` の性能方針節へ記録する (sync phase で反映)。
+- CLI 層固有の計測項目は追加しない (method selector 走査・traversal・output は既存実装の呼び出しで、新規の計算量オーダーを導入しないため。`## Performance / Security 設計` 参照)。
 
 ## フロー / シーケンス
 
@@ -410,6 +434,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-15 | Claude         | phase 8 再レビュー PASS (3回目)。フェーズ8を「レビュー済」に更新。Performance/Security 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-07-20 | Claude         | `feature/22` を `origin/develop` (#24 PR #26 マージ済み) へ rebase (feature doc analyzer-protocol の競合は #24 sync 後の新しい記述を採用)。rebase 後の再検証で 5 件の差分を検出し反映: (1) D12 (include/exclude の CLI flag 化) を追加 — spec #24 変更履歴 2026-07-18 のユーザー決定による引き継ぎスコープ。(2) D11 拡張の `graph.Symbol.Metadata` 側は #24 実装済みのため進捗注記を追加し残スコープを `graph.Edge` + output 層に更新。(3) 既存 flag に `--source-root` を追記 (D2 追記・flag 体系表・配置節)。(4) D8 に拡張追記 — #24 の `AnalyzerFailure` 構造化表示経路との整合と、`request.Validate()` の利用者起因エラーの exit 2 分類 (エラーケース 8 追加)。(5) D9 に追記 — #24 整備の os/exec CLI E2E harness を再利用。phase 5-8 を再オープンし再レビュー待ち |
 | 2026-07-20 | Claude         | 再検証更新分の spec-review PASS。phase 5-8 を「レビュー済」に更新し、非ブロッキング補足 (上位文書整合テーブルの Design Doc / java-analyzer feature doc / architecture.md への行番号参照が #24 マージ後の実体とずれ) を現状化。論点解決〜Performance/Security 設計 phase を再完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-07-20 | Claude         | phase 9 (Test / Metrics 設計): テスト観点 (unit: CLI flag パース / method selector 照合 / analyze use case / exit code 判別 / graph convert / output の 6 対象、E2E: #24 harness 再利用 + golden 照合 + exit code 3 区分、テストしないこと 3 件) と計測指標 (S1-S3 の E2E 照合を required gate、SLO 数値確定は実装フェーズで #24 経路別計測を入力に実施) を記述。機能仕様の Testing 節も記入。レビュー待ち                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 備考
 
