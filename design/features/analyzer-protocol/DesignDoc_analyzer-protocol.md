@@ -1,6 +1,6 @@
 # Feature 設計: Analyzer Protocol / SPI
 
-> 最終更新: 2026-07-18 / Status: 完了 (spec #24 sync で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で metadata の JSON 透過表出 (正本: output feature doc) を現状化。2026-07-18 spec #24 sync で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新)
 
 Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯と issue 単位の作業記録は [spec #8](../../../specs/8-analyzer-protocol/) を参照する。
 
@@ -237,11 +237,12 @@ Handshake / capability negotiation は Phase1 では採用しない。
 
 ## 上位資料からの変更点
 
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                          |
-| --------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PRD       | 継承                              | 統合 Design Doc の S5 / P1-P4 を具体化する。                                                                                                                                                                                                  |
-| DesignDoc | 追記                              | Analyzer Protocol / SPI feature の正本を本 doc に移す。                                                                                                                                                                                       |
-| context   | 追記                              | protocol contract test の横断観点を `context/testing.md` に反映する。                                                                                                                                                                         |
-| ADR       | 追記                              | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。                                                                                                                                                                 |
-| spec #21  | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正 (D9): #21 が利用する `callEdge.metadata` は #22 D11 が opaque passthrough として保持する。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) |
-| spec #24  | 追記                              | optional `sourceRoots`、request fatal の原子性、共通 `error.details`、optional symbol location、`methodSymbol.metadata` の Graph への opaque passthrough を反映。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)   |
+| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                                      |
+| --------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD       | 継承                              | 統合 Design Doc の S5 / P1-P4 を具体化する。                                                                                                                                                                                                              |
+| DesignDoc | 追記                              | Analyzer Protocol / SPI feature の正本を本 doc に移す。                                                                                                                                                                                                   |
+| context   | 追記                              | protocol contract test の横断観点を `context/testing.md` に反映する。                                                                                                                                                                                     |
+| ADR       | 追記                              | JSONL over STDIN/STDOUT、process SPI、versioning 方針を ADR-0001 に記録する。                                                                                                                                                                             |
+| spec #21  | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正 (D9): #21 が利用する `callEdge.metadata` は #22 D11 が opaque passthrough として保持する。gap の発見経緯: [spec #21 D9](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)             |
+| spec #24  | 追記                              | optional `sourceRoots`、request fatal の原子性、共通 `error.details`、optional symbol location、`methodSymbol.metadata` の Graph への opaque passthrough を反映。決定経緯は [spec #24](../../../specs/24-gradle-multi-module-source-roots/)               |
+| spec #22  | 追記                              | `methodSymbol.metadata` 境界節の「既存 Output schema は表出しない」を D11 後の状態 (Output は JSON へ意味解釈なしに透過表出、正本: [Output feature doc](../output/DesignDoc_output.md)) へ現状化。決定経緯は [spec #22](../../../specs/22-cli-interface/) |
