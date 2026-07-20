@@ -1,0 +1,3 @@
+com.example.mm.repository.JpaOrderRepository#save(java.lang.String)  [repository/src/domain/java/com/example/mm/repository/JpaOrderRepository.java:8]
+└─ com.example.mm.service.DefaultOrderService#process(java.lang.String)  [modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java:17]
+   └─ … (depth limit: 1 edges cut)

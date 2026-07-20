@@ -1,8 +1,8 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-19 / Status: 完了 (spec #24 sync で Gradle multi-project discovery、完全性 gate、生成 member 対応を更新)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 実装で経路別 SLO を確定)
 
-Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
+Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #22](../../../specs/22-cli-interface/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 
 ## メタ
 
@@ -12,7 +12,7 @@ Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言�
 | 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項)                                                                                                        |
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)、[infrastructure](../../../context/infrastructure.md)                                                                                                                                                            |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)、[ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md)、[ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md) |
-| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                                                                            |
+| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)、[specs/22-cli-interface](../../../specs/22-cli-interface/)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                |
 | 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                                                                                                                             |
 
 ## 背景・要件解釈
@@ -267,7 +267,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - **計測の観測性**: 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol record としては出さない)。
 - **spec #24 の計測契約**: 明示 single-root、自動 single-project、自動 multi-project の3モードを、初回1回と warm 3回の中央値で測る。discovery / model / parse / resolution / graph の phase 別時間を記録するが、本 issue では数値 SLO を合否条件にしない。
 - **メモリ特性の扱い**: 上記の通り `fullGraph` と `reachableFromEntrypoints` はメモリ特性 (adjacency 保持の有無) が異なるため、baseline / 将来の数値目標はモード別に扱う。
-- **数値目標**: 未定。Phase1 実装時に fixture プロジェクトの実測値 (ファイル数 / 所要時間 / 最大 RSS) を baseline として記録し、その後に本 doc へ確定値を記録する。現時点は方式のみを Phase1 の必須仕様として確定し、数値目標は実測 baseline 取得後に本 doc へ追記する。
+- **数値目標**: #22 の実測に基づく経路別 SLO を本節に定める。latency は warm wall 中央値の 1.5 倍を 0.5 秒単位で切り上げ、最大 RSS は warm 3 回の最大値の 1.25 倍を 64 MiB 単位で切り上げる。小規模 fixture では JVM 起動、Gradle daemon、cache 状態の比率が高いため、経路間で単一上限を共有しない。
 - **baseline 実測値 (計測日 2026-07-12)**: `testdata/fixtures/java/project` (計測当時は Java ソース 10 ファイル、うち 1 ファイルは意図的にパース不能。spec #24 D15 で parse error は request fatal となり、当該 file は fixture から削除済み — 本 baseline は #24 以前の部分解析前提の歴史値) を `core/e2e` (`TestJavaAnalyzerFixtureE2E/PerformanceBaseline`) から実 jar (`analyzers/java/build/libs/java-analyzer.jar`, JDK 25 / Eclipse Temurin 25.0.3+9, Apple Silicon darwin/arm64) で解析した実測値。
 
   | 指標           | 実測値                                      | 取得元                                                                      |
@@ -278,7 +278,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
   fixture 規模が小さい (10 ファイル) ため JVM 起動コストの寄与が大きく、この baseline は「小規模プロジェクトでの下限に近い値」として扱う。数値目標 (SLO) の確定は本 baseline を踏まえた別作業とする。
 
-- **数値目標の確定 (追跡メタデータ)**: 決定者 Fukuemon / 期限 #22 (CLI interface 結合) 完了時。現 baseline は小規模 fixture の floor 値であり、CLI から実プロジェクト規模を計測できるようになった時点でモード別に確定する。
+- **数値目標の確定 (追跡メタデータ)**: 2026-07-20 に #22 で確定済み。決定者 Fukuemon。対象値と見直し条件は本節の「#22 で確定した SLO」を参照する。
 - **#21 (SootUp / Spring 解析追加分) の受け入れ基準 (決定済み 2026-07-12)**: 数値の合否基準は定めない。同一 fixture での before/after (解析時間・最大 RSS) を計測し、本節へ増分を記録することを #21 の受け入れ基準とする。SLO (合否ライン) は #22 完了時の数値目標確定と合わせて決める。設計原則として、SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (eager な全クラス読み込みをしない)。本 doc を正本とする (決定経緯: [spec #21 D5](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
 
 - **#21 実装後の実測値 (計測日 2026-07-15)**: Issue #9 baseline と同じ `testdata/fixtures/java/project` を、実装後の実 jar で 1 回解析した。計測環境は JDK 25 / Eclipse Temurin 25.0.3+9、macOS 14.6.1、Apple Silicon darwin/arm64。実行コマンドは `DEPWALK_E2E_REQUIRED=1 go test ./e2e -run 'TestJavaAnalyzerFixtureE2E/PerformanceBaseline' -count=1 -v`。数値は合否判定に使わず、D5 の増分記録として扱う。
@@ -302,6 +302,18 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
   経路ごとに fixture が異なるため callSites は比較指標ではない (single 経路は `testdata/fixtures/java/project` 系の 3 call site、multi-module 経路は `multi-module-spring-project` の 2 call site。後者は実測で再確認済み)。
 
   discovery 時間は Tooling API 接続・provider 一時展開・Gradle configuration / classpath 解決・model 転送を含む合計で、stderr の `discoveryMs` (D8 の分離計測) をそのまま記録した。provider 展開や Gradle 内部の configuration / 転送の内訳は client 側から個別計測できないため、推測値は記録しない。multi-module の RSS 増分は context ごとの TypeSolver / SootUp 構築と Spring 依存 jar (11 classpath entry) の索引化による。unresolved symbol / bytecode-only member / error.details は全経路 0 件 (correctness gate を先に満たした状態で計測)。
+
+- **#22 で確定した SLO (計測日 2026-07-20)**: 実 CLI E2E の correctness gate が通った後、実 jar へ stdin で `analysisRequest` を渡し、`/usr/bin/time -lp` で wall time と最大 RSS を計測した。各経路は初回 1 回と warm 3 回を実行した。環境は commit `cbbafbb` 時点の Analyzer 実装、mise で固定した JDK 25 (Eclipse Temurin 25.0.3+9)、Gradle 9.6.1、macOS 14.6.1 (Darwin 23.6.0) / Apple Silicon arm64 である。single 経路には `testdata/fixtures/java/spring-project` (8 file)、multi 経路には `testdata/fixtures/java/multi-module-spring-project` (5 file、3 project) を使用した。
+
+  | 経路                      | 初回 wall | warm wall 3 回        | warm 中央値 | warm 最大 RSS                    | latency SLO | 最大 RSS SLO |
+  | ------------------------- | --------- | --------------------- | ----------- | -------------------------------- | ----------- | ------------ |
+  | 明示 single-root (8 file) | 1.78s     | 1.71s / 1.81s / 1.69s | 1.71s       | 418,873,344 bytes (約 399.5 MiB) | 3.0s 以下   | 512 MiB 以下 |
+  | single-project discovery  | 3.52s     | 3.00s / 2.52s / 2.73s | 2.73s       | 445,415,424 bytes (約 424.8 MiB) | 4.5s 以下   | 576 MiB 以下 |
+  | multi-module discovery    | 3.11s     | 2.51s / 2.64s / 2.49s | 2.51s       | 399,687,680 bytes (約 381.2 MiB) | 4.0s 以下   | 512 MiB 以下 |
+
+  warm の Analyzer `durationMs` 中央値は順に 1,622ms、2,625ms、2,437ms だった。全 run で `unresolvedSymbols=0`、`silentOmission=0` を確認した。single fixture は Spring DI と外部依存を含む 8 file、multi fixture は 5 file であるため、経路間の大小を discovery コストだけの比較には使わない。
+
+  この SLO は当該 fixture と計測環境に対する手動のリリース目標であり、時間や RSS の機械的なテスト gate にはしない。S1 から S3 の CLI E2E を required gate とする既存方針は維持する。fixture の規模、Analyzer runtime JDK、Gradle major、または解析方式を変更した場合は、同じ初回 1 回と warm 3 回の手順で再計測して目標値を見直す。
 
 ### solver 層の bytecode member 合成 (spec #24 D31)
 
@@ -453,3 +465,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #24  | 変更提案                          | PR #26 レビュー反映 (2026-07-19) で model 由来 classpath の fatal 境界を精緻化: workspace 内の project 依存 build output の未 build 欠落は `JAVA_SOOTUP_UNAVAILABLE` warning で除外して source 解析を継続し (依存 context の source が型解決を補完)、external artifact の欠落は `JAVA_MISSING_JAR` fatal を維持                                                                                                                        |
 | spec #24  | 変更提案                          | PR #26 未合意 high 指摘の反映 (2026-07-19): 型名 scope の static call へ instance member を合成・救済しない境界、member 救済の project output origin 検証 (D16) と SootUp の project bytecode 優先、composite / included build root の warning 報告 (provider model へ root 一覧を追加) を確定                                                                                                                                         |
 | spec #24  | 変更提案                          | PR #26 未合意 medium / low 指摘の反映 (2026-07-19): diagnostic / error code 表を実装へ同期 (`JAVA_SOURCE_ROOT_EXCLUDED` 集約、`JAVA_INVALID_SOURCE_ROOTS` / `JAVA_INVALID_REQUEST` へ統一)、qualified super の outer 式走査、`JAVA_INCOMPLETE_ANALYSIS` metadata への `sootUpUnavailableContexts` 追加、daemon JVM 判定の rt.jar fallback、metadata 要素数 1 の明文化、性能 baseline / callSites の注記                                |
+| spec #22  | 追記                              | CLI プロセス E2E の correctness gate 後に 3 経路を再計測し、warm 中央値と warm 最大 RSS から latency / 最大 RSS の SLO を確定。計測値、算出式、適用境界、見直し条件を性能方針へ反映 (2026-07-20)                                                                                                                                                                                                                                       |

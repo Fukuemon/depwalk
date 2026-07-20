@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "status": "ok",
+  "direction": "caller",
+  "start": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+  "nodes": [
+    {
+      "methodId": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "qualifiedName": "com.example.mm.repository.JpaOrderRepository.save",
+      "signature": "com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "minDepth": 0,
+      "sourceLocation": {
+        "path": "repository/src/domain/java/com/example/mm/repository/JpaOrderRepository.java",
+        "startLine": 8
+      }
+    },
+    {
+      "methodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "qualifiedName": "com.example.mm.service.DefaultOrderService.process",
+      "signature": "com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "minDepth": 1,
+      "sourceLocation": {
+        "path": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java",
+        "startLine": 15
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "java-edge-4",
+      "callerMethodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "cycle": false,
+      "callSite": {
+        "path": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java",
+        "startLine": 17
+      },
+      "metadata": {
+        "provenance": ["sootup", "spring-di"],
+        "resolution": "unique"
+      }
+    }
+  ],
+  "depthCutoffs": [
+    {
+      "edgeId": "java-edge-2",
+      "callerMethodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "targetMethodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "targetMinDepth": 2,
+      "callSite": {
+        "path": "app/src/main/java/com/example/mm/app/OrderController.java",
+        "startLine": 16
+      }
+    }
+  ]
+}

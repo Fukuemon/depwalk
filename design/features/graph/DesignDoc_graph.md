@@ -1,6 +1,6 @@
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-> 最終更新: 2026-07-18 / Status: 完了 (spec #24 sync で Symbol metadata と request 原子性を更新)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で Edge metadata の保持と JSON への透過表出を追加)
 
 Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D1) を参照する。
 
@@ -59,6 +59,7 @@ type Edge struct {
     CallerID string
     CalleeID string
     CallSite *protocol.SourceLocation // 呼び出し箇所 (optional)
+    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)
 }
 ```
 
@@ -66,7 +67,7 @@ type Edge struct {
 - **wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない**。graph が wire 表現に結合すると、Protocol の版更新が Core 内部モデルへ波及するため。
 - `SourceLocation` は `protocol` package の型を再利用する。この型は `path` / `startLine` 等の純粋な値のみで wire 専用フィールドを持たず、依存方向も `Graph Engine → Model` の範囲内に収まる。
 - `sourceLocation` / `callSite` は Protocol 上 optional であり、graph でも nil を許容する。表示時の省略規則は consumer (output feature doc) が定める。
-- `methodSymbol.metadata` は Graph が所有する opaque 属性として nested map / array を含め deep copy する。Graph / Traversal / Output は値の意味を解釈せず、既存の探索・出力 schema に自動では表出しない。bytecode-only symbol のように `sourceLocation` がない node も有効であり、owner の source anchor は metadata と sourceLocation を混同しない。
+- `methodSymbol.metadata` / `callEdge.metadata` は Graph が所有する opaque 属性として nested map / array を含め deep copy する (`Symbol.Metadata` / `Edge.Metadata`)。Graph / Traversal は値の意味を解釈しない。JSON 出力へは opaque なまま透過表出する (表出の正本は [output feature doc](../output/DesignDoc_output.md)。spec #22 D11 で決定)。console 等それ以外の既存出力表現には自動では表出しない。bytecode-only symbol のように `sourceLocation` がない node も有効であり、owner の source anchor は metadata と sourceLocation を混同しない。
 
 ### 構築と公開の原子性
 
@@ -110,10 +111,11 @@ flowchart TD
 
 ## 上位資料からの変更点
 
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                       |
-| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| PRD       | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                            |
-| DesignDoc | 追記                              | feature 一覧に Graph Engine の行を追加 (本 doc を正本として参照)                                                           |
-| context   | 追記                              | `context/architecture.md` Package Boundary に、Graph Engine が表示用属性を保持し変換を構築時に行う旨を補足 (正本は本 doc)  |
-| ADR       | 継承                              | ADR-0001 (Protocol/Model 境界) / ADR-0002 (Core package 境界) の範囲内。新規 ADR 不要                                      |
-| spec #24  | 追記                              | `Symbol.Metadata` の deep copy、非公開 staging Graph への1-pass変換、成功時公開、fatal時破棄、正常streamの参照完全性を反映 |
+| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                 |
+| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD       | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                                                                                      |
+| DesignDoc | 追記                              | feature 一覧に Graph Engine の行を追加 (本 doc を正本として参照)                                                                                                                                                     |
+| context   | 追記                              | `context/architecture.md` Package Boundary に、Graph Engine が表示用属性を保持し変換を構築時に行う旨を補足 (正本は本 doc)                                                                                            |
+| ADR       | 継承                              | ADR-0001 (Protocol/Model 境界) / ADR-0002 (Core package 境界) の範囲内。新規 ADR 不要                                                                                                                                |
+| spec #24  | 追記                              | `Symbol.Metadata` の deep copy、非公開 staging Graph への1-pass変換、成功時公開、fatal時破棄、正常streamの参照完全性を反映                                                                                           |
+| spec #22  | 追記                              | `Edge.Metadata` (`callEdge.metadata` の opaque 保持、Symbol 側と同じ deep copy 方針) を追加し、JSON 出力への透過表出 (正本: output feature doc) を明記 (D11。決定経緯: [spec #22](../../../specs/22-cli-interface/)) |

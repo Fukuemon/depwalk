@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-11 / Status: 完了 (DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D2-D7) を参照する。
 
@@ -13,6 +13,7 @@ Output Engine の durable な feature 設計正本。Traversal result (到達 no
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                              |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                     |
 | 関連 spec      | [specs/7-output](../../../specs/7-output/)                                                                                                                                                                                        |
+| 関連 Issue     | [#22](https://github.com/Fukuemon/depwalk/issues/22) (実 OSS 検証で検出した Console ラベル重複の修正)                                                                                                                             |
 | 対象モジュール | `output` (`core/internal/output`)                                                                                                                                                                                                 |
 
 ## 背景・要件解釈
@@ -37,13 +38,13 @@ Design Doc の Open Question Q3「Console 出力のツリー表現フォーマ�
 - DOT / Mermaid の具体構文 (ノード形状 / 色 / 線種) — Phase4 spec で確定する。
 - 探索の意味論 (正本は [traversal feature doc](../traversal/DesignDoc_traversal.md))。
 - graph が保持する属性の定義 (正本は [graph feature doc](../graph/DesignDoc_graph.md))。
-- CLI の引数名 / exit code / エラー表示先 (CLI interface spec の対象)。Output は `error` を返すところまでを責務とする。
+- CLI の引数名 / exit code / エラー表示先 (正本は [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
 
 ## 設計
 
 ### 公開 entry point と Formatter / View
 
-`output.Write` を唯一の公開 entry point とし、format 検証 → `View` 構築 → Formatter 選択 → 描画を担う。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らない。
+`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → Formatter 選択 → 描画を担う。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らない。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する。spec #22 D5 拡張で決定)。
 
 ```go
 // core/internal/output
@@ -89,6 +90,7 @@ type NodeView struct {
     Signature     string
     Source        *protocol.SourceLocation // nil なら位置情報なし
     MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
+    Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
 
 // EdgeView は 1 edge の Formatter 向け表現。
@@ -98,6 +100,7 @@ type EdgeView struct {
     CalleeID string
     Cycle    bool
     CallSite *protocol.SourceLocation // nil なら位置情報なし
+    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
 
 // CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
@@ -136,10 +139,12 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 | nodes[] の methodId / qualifiedName / signature                            | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`           |
 | nodes[].minDepth                                                           | `View.Nodes[].MinDepth`                                       |
 | nodes[].sourceLocation                                                     | `View.Nodes[].Source`                                         |
+| nodes[].metadata (JSON のみ、omitempty)                                    | `View.Nodes[].Metadata`                                       |
 | edge 両端 methodId (Console) / callerMethodId・calleeMethodId (JSON)       | `View.Edges[].CallerID` / `.CalleeID`                         |
 | edges[].edgeId                                                             | `View.Edges[].ID`                                             |
 | edge の callSite (Console 子行の位置 / JSON `callSite`)                    | `View.Edges[].CallSite`                                       |
 | cycle flag                                                                 | `View.Edges[].Cycle`                                          |
+| edges[].metadata (JSON のみ、omitempty)                                    | `View.Edges[].Metadata`                                       |
 | cutoff の到達側 endpoint (Console) / callerMethodId・calleeMethodId (JSON) | `View.Cutoffs[].CallerID` / `.CalleeID`                       |
 | cutoff 件数 (Console の `N edges cut`)                                     | `len(View.Cutoffs)` を対象 node 単位に集計                    |
 | depthCutoffs[].edgeId                                                      | `View.Cutoffs[].EdgeID`                                       |
@@ -183,20 +188,20 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 
 #### 行の書式
 
-- node ラベル = `qualifiedName` + `signature`。
+- node ラベル = `signature`。`signature` が欠落する場合だけ `qualifiedName`、さらに欠落する場合は `methodId` へ fallback する。Analyzer Protocol の `signature` は overload を区別する正規化済み表現であり、Core は言語固有の区切り文字や引数部分を解析しない。
 - 位置情報: 子行は `edge.CallSite` (呼び出し箇所)、root は宣言位置 (`Symbol.Source`)。欠落時は位置表記を省略する。メソッドの宣言位置は Console では出さない (JSON が両方持つ)。
 
 ```text
-UserService.findById(Long)  [UserService.java:42]
-├─ UserController.getUser(Long)  [UserController.java:31]
-│  └─ ApiFilter.doFilter()  [ApiFilter.java:20]
-├─ AdminController.getUser(Long)  [AdminController.java:18]
-│  └─ ApiFilter.doFilter()  (既出)
-├─ UserBatch.execute()  [UserBatch.java:55]
+com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
+├─ com.example.UserController#getUser(java.lang.Long)  [UserController.java:31]
+│  └─ com.example.ApiFilter#doFilter()  [ApiFilter.java:20]
+├─ com.example.AdminController#getUser(java.lang.Long)  [AdminController.java:18]
+│  └─ com.example.ApiFilter#doFilter()  (既出)
+├─ com.example.UserBatch#execute()  [UserBatch.java:55]
 │  └─ … (depth limit: 2 edges cut)
-└─ CacheWarmer.warm()  [CacheWarmer.java:8]
-   └─ Scheduler.run()  [Scheduler.java:12]
-      └─ UserService.findById(Long)  (cycle)
+└─ com.example.CacheWarmer#warm()  [CacheWarmer.java:8]
+   └─ com.example.Scheduler#run()  [Scheduler.java:12]
+      └─ com.example.UserService#findById(java.lang.Long)  (cycle)
 ```
 
 ### JSON 出力 (schema と版管理)
@@ -213,7 +218,7 @@ UserService.findById(Long)  [UserService.java:42]
     {
       "methodId": "<methodId>",
       "qualifiedName": "com.example.UserService.findById",
-      "signature": "(java.lang.Long)",
+      "signature": "com.example.UserService#findById(java.lang.Long)",
       "minDepth": 0,
       "sourceLocation": {
         "path": "src/main/java/com/example/UserService.java",
@@ -250,6 +255,7 @@ UserService.findById(Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持の正本) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味の正本は Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。spec #22 D11 で決定。
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
@@ -268,7 +274,7 @@ UserService.findById(Long)  [UserService.java:42]
 | G-2 | 起点 node を他と区別できる                                                                              |
 | G-3 | `cycle` 注釈付き edge を他と区別できる                                                                  |
 | G-4 | `depthLimit` cutoff がある node に「続きがある」ことを示せる (cutoff 先の名前は出せない)                |
-| G-5 | node ラベルは `qualifiedName` + `signature` (Console と同じ語彙)                                        |
+| G-5 | node ラベルは `signature`、欠落時は `qualifiedName` → `methodId` の順に fallback (Console と同じ規則)   |
 | G-6 | 同一 Result から常に同一のバイト列を出力する (要素順序は id の辞書順)                                   |
 | G-7 | 外部ツール (Graphviz / Mermaid レンダラ) がパース可能な構文であること                                   |
 
@@ -305,17 +311,18 @@ flowchart TD
 
 - 各 formatter の出力を golden file と比較する unit test で担保する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result → 同一バイト列) を同時に検証する。
 - fixture ケース: 循環 (self-loop / 相互再帰 / 3 要素 SCC) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし (`Edges` も `Cutoffs` も空) / `maxDepth=0` (`Edges` 空 + `Cutoffs` 非空) / `maxDepth=0` + 起点 self-loop / `startNotFound`。
-- Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。
+- Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。実 Protocol と同じ完全な `signature` を入力しても `qualifiedName` と重複せず 1 回だけ表示され、`signature` 欠落時の fallback が機能すること。
 - JSON: `encoding/json` でパースできること (S3)。`targetMethodId` が `nodes[]` に存在しない (dangling) ことを caller / callee 両方向で検証すること。`cycle: false` が省略されないこと。
 - エラー境界: 未対応 format が出力を書き出す前に `error` になり、`startNotFound` / 到達なしが `error` にならないこと。
 - S3 の照合は **Output 層 (本 doc の unit / golden) と CLI 層 (CLI interface spec 完了後)** の 2 層からなる (S1/S2 と同じ分界)。
 
 ## 上位資料からの変更点
 
-| 対象資料    | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                           |
-| ----------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| PRD         | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                |
-| DesignDoc   | 追記 / 変更提案                   | Q3 を解決済みへ更新 (本 doc が正本)。S3 の測定方法に 2 層照合を追記。モジュール責務の Output Engine 依存先に Traversal Engine を追加 (C4 図も) |
-| feature doc | 変更提案                          | [traversal feature doc](../traversal/DesignDoc_traversal.md) の Traversal result に `minDepth` の公開を追加 (additive)                         |
-| context     | 追記                              | `context/architecture.md` に Output → Traversal 依存を追加。`context/testing.md` に S3 の 2 層照合と package-local `testdata/` を補足          |
-| ADR         | 継承                              | ADR-0001 / ADR-0002 の範囲内。新規 ADR 不要 (出力 schema の版管理は本 doc が正本を持つ)                                                        |
+| 対象資料    | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                       |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PRD         | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                                                                                                            |
+| DesignDoc   | 追記 / 変更提案                   | Q3 を解決済みへ更新 (本 doc が正本)。S3 の測定方法に 2 層照合を追記。モジュール責務の Output Engine 依存先に Traversal Engine を追加 (C4 図も)                                                                                             |
+| feature doc | 変更提案                          | [traversal feature doc](../traversal/DesignDoc_traversal.md) の Traversal result に `minDepth` の公開を追加 (additive)                                                                                                                     |
+| context     | 追記                              | `context/architecture.md` に Output → Traversal 依存を追加。`context/testing.md` に S3 の 2 層照合と package-local `testdata/` を補足                                                                                                      |
+| ADR         | 継承                              | ADR-0001 / ADR-0002 の範囲内。新規 ADR 不要 (出力 schema の版管理は本 doc が正本を持つ)                                                                                                                                                    |
+| spec #22    | 追記                              | `NodeView`/`EdgeView` への opaque `Metadata` 追加と JSON の `nodes[].metadata`/`edges[].metadata` (additive、omitempty)、`RegisteredFormats()` の公開 API 化を反映 (D5 拡張 / D11。決定経緯: [spec #22](../../../specs/22-cli-interface/)) |

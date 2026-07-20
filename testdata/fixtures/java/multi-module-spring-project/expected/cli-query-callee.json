@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0",
+  "status": "ok",
+  "direction": "callee",
+  "start": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+  "nodes": [
+    {
+      "methodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "qualifiedName": "com.example.mm.app.OrderController.placeOrder",
+      "signature": "com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "minDepth": 0,
+      "sourceLocation": {
+        "path": "app/src/main/java/com/example/mm/app/OrderController.java",
+        "startLine": 15
+      }
+    },
+    {
+      "methodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "qualifiedName": "com.example.mm.service.DefaultOrderService.process",
+      "signature": "com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "minDepth": 1,
+      "sourceLocation": {
+        "path": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java",
+        "startLine": 15
+      }
+    },
+    {
+      "methodId": "java:com.example.mm.service.OrderService#process(java.lang.String)",
+      "qualifiedName": "com.example.mm.service.OrderService.process",
+      "signature": "com.example.mm.service.OrderService#process(java.lang.String)",
+      "minDepth": 1,
+      "sourceLocation": {
+        "path": "modules/service/src/main/java/com/example/mm/service/OrderService.java",
+        "startLine": 5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "java-edge-1",
+      "callerMethodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.service.OrderService#process(java.lang.String)",
+      "cycle": false,
+      "callSite": {
+        "path": "app/src/main/java/com/example/mm/app/OrderController.java",
+        "startLine": 16
+      },
+      "metadata": { "dispatch": "interface" }
+    },
+    {
+      "edgeId": "java-edge-2",
+      "callerMethodId": "java:com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "cycle": false,
+      "callSite": {
+        "path": "app/src/main/java/com/example/mm/app/OrderController.java",
+        "startLine": 16
+      },
+      "metadata": {
+        "provenance": ["sootup", "spring-di"],
+        "resolution": "unique"
+      }
+    }
+  ],
+  "depthCutoffs": [
+    {
+      "edgeId": "java-edge-3",
+      "callerMethodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.repository.OrderRepository#save(java.lang.String)",
+      "targetMethodId": "java:com.example.mm.repository.OrderRepository#save(java.lang.String)",
+      "targetMinDepth": 2,
+      "callSite": {
+        "path": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java",
+        "startLine": 17
+      }
+    },
+    {
+      "edgeId": "java-edge-4",
+      "callerMethodId": "java:com.example.mm.service.DefaultOrderService#process(java.lang.String)",
+      "calleeMethodId": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "targetMethodId": "java:com.example.mm.repository.JpaOrderRepository#save(java.lang.String)",
+      "targetMinDepth": 2,
+      "callSite": {
+        "path": "modules/service/src/main/java/com/example/mm/service/DefaultOrderService.java",
+        "startLine": 17
+      }
+    }
+  ]
+}

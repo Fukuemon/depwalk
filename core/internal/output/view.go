@@ -22,7 +22,7 @@ func buildView(in Input) View {
 	for _, edge := range in.Result.Edges {
 		view.Edges = append(view.Edges, EdgeView{
 			ID: edge.ID, CallerID: edge.CallerID, CalleeID: edge.CalleeID,
-			Cycle: in.Result.Cycles[edge.ID], CallSite: edge.CallSite,
+			Cycle: in.Result.Cycles[edge.ID], CallSite: edge.CallSite, Metadata: edge.Metadata,
 		})
 	}
 	for _, cutoff := range in.Result.DepthCutoffs {
@@ -54,6 +54,7 @@ func nodeView(g *graph.Graph, id string, minDepth int) NodeView {
 	view.QualifiedName = node.Symbol.QualifiedName
 	view.Signature = node.Symbol.Signature
 	view.Source = node.Symbol.Source
+	view.Metadata = node.Symbol.Metadata
 	return view
 }
 

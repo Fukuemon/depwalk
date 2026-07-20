@@ -15,7 +15,8 @@
       "qualifiedName": "M",
       "signature": "()",
       "minDepth": 1,
-      "sourceLocation": { "path": "m.go", "startLine": 10 }
+      "sourceLocation": { "path": "m.go", "startLine": 10 },
+      "metadata": { "declarationOrigin": "projectClasses" }
     },
     {
       "methodId": "method:z",
@@ -36,7 +37,8 @@
       "callerMethodId": "method:z",
       "calleeMethodId": "method:m",
       "cycle": true,
-      "callSite": { "path": "z.go", "startLine": 20 }
+      "callSite": { "path": "z.go", "startLine": 20 },
+      "metadata": { "resolution": "springDi" }
     }
   ],
   "depthCutoffs": [

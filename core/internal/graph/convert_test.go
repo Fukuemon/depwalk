@@ -107,6 +107,56 @@ func TestNodeFromMethodSymbolDistinguishesOmittedAndEmptyMetadata(t *testing.T) 
 	}
 }
 
+func TestEdgeFromCallEdgeDeepCopiesOpaqueMetadata(t *testing.T) {
+	record := protocol.CallEdge{
+		EdgeID: "edge:ab",
+		Metadata: protocol.Metadata{
+			"resolution": "springDi",
+			"provenance": map[string]any{
+				"bean":   "exampleService",
+				"source": "componentScan",
+			},
+			"candidates": []any{"method:b", map[string]any{"selected": true}},
+			"reason":     nil,
+		},
+	}
+
+	got := EdgeFromCallEdge(record)
+
+	want := map[string]any{
+		"resolution": "springDi",
+		"provenance": map[string]any{
+			"bean":   "exampleService",
+			"source": "componentScan",
+		},
+		"candidates": []any{"method:b", map[string]any{"selected": true}},
+		"reason":     nil,
+	}
+	if !reflect.DeepEqual(got.Metadata, want) {
+		t.Fatalf("Metadata = %#v, want %#v", got.Metadata, want)
+	}
+
+	// Mutating the protocol DTO's nested values must not change the
+	// graph-owned copy.
+	record.Metadata["provenance"].(map[string]any)["source"] = "mutated"
+	record.Metadata["candidates"].([]any)[1].(map[string]any)["selected"] = false
+	if !reflect.DeepEqual(got.Metadata, want) {
+		t.Fatalf("Metadata after DTO mutation = %#v, want unchanged %#v", got.Metadata, want)
+	}
+}
+
+func TestEdgeFromCallEdgeDistinguishesOmittedAndEmptyMetadata(t *testing.T) {
+	omitted := EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab"})
+	if omitted.Metadata != nil {
+		t.Fatalf("omitted metadata = %#v, want nil", omitted.Metadata)
+	}
+
+	empty := EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab", Metadata: protocol.Metadata{}})
+	if empty.Metadata == nil || len(empty.Metadata) != 0 {
+		t.Fatalf("empty metadata = %#v, want non-nil empty map", empty.Metadata)
+	}
+}
+
 func TestEdgeFromCallEdgeAllowsNilCallSite(t *testing.T) {
 	got := EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab"})
 	if got.CallSite != nil {
