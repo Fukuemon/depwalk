@@ -163,3 +163,11 @@ Verdict: PASS
 - 未解決論点: なし (D1-D12 全解決、phase 9-11 未着手と整合)
 - 実装対象明示・template 必須節・EARS・正本境界: いずれも PASS。メタ情報同期 (更新日・phase 5-8 降格・変更履歴) も確認
 - 非ブロッキング補足: 上位文書整合テーブルの行番号参照 2 件が #24 マージ後の実体とずれ (java-analyzer analysisMode 節は L141-152 へ移動、DesignDoc Phase 計画は L234-241)。次回更新時に現状化を推奨 → 同日対応済み
+
+## Review 2026-07-20 (fresh-context evaluator) — phase 9 Test / Metrics 設計
+
+Verdict: PASS
+
+- 上位文書整合: テスト観点が context/testing.md の検証境界 (mock 方針・golden 配置・E2E 2 層・S1-S3 リリース判定) と一致。SLO 引き継ぎは spec #24 D8 と正確に対応。参照した実装コード (fakeAnalyzerCommand / echo-source-roots / RejectsInvalidSourceRoot / buildCoreCLI / runCLI / NodeFromMethodSymbol deep copy test) すべて実在確認
+- 未解決論点・実装対象明示・template 必須節・EARS・正本境界: いずれも PASS。S1-S3 が golden 照合 / Unmarshal / exit code 3 区分の観測可能なテストに落ちていることを確認
+- 非ブロッキング補足 2 件 (sync phase 対応推奨): (1) context/testing.md L87 の「既存 Output schema は表出しない」を #22 後の状態へ現状化、(2) context への影響テーブルへ context/testing.md の更新予定行を追加 → (2) は同日対応済み、(1) は影響テーブルの追跡行として登録済み (sync phase で反映)
