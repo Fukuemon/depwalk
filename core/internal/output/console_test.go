@@ -90,6 +90,31 @@ func TestConsoleWriteIsDeterministicForMapInput(t *testing.T) {
 	}
 }
 
+func TestConsoleIgnoresOpaqueMetadata(t *testing.T) {
+	withoutMetadata := consoleView("method:a",
+		[]NodeView{node("method:a", "A"), node("method:b", "B")},
+		[]EdgeView{edge("edge:ab", "method:a", "method:b")}, nil)
+	withMetadata := withoutMetadata
+	withMetadata.Start.Metadata = map[string]any{"declarationOrigin": "projectClasses"}
+	withMetadata.Nodes = append([]NodeView(nil), withoutMetadata.Nodes...)
+	withMetadata.Nodes[0].Metadata = map[string]any{"declarationOrigin": "projectClasses"}
+	withMetadata.Edges = append([]EdgeView(nil), withoutMetadata.Edges...)
+	withMetadata.Edges[0].Metadata = map[string]any{"resolution": "springDi"}
+
+	formatter := consoleFormatter{}
+	var want bytes.Buffer
+	if err := formatter.Format(&want, withoutMetadata); err != nil {
+		t.Fatalf("Format(without metadata) returned error: %v", err)
+	}
+	var got bytes.Buffer
+	if err := formatter.Format(&got, withMetadata); err != nil {
+		t.Fatalf("Format(with metadata) returned error: %v", err)
+	}
+	if got.String() != want.String() {
+		t.Errorf("Format() with metadata = %q, want unchanged %q", got.String(), want.String())
+	}
+}
+
 func TestConsoleSiblingOrderUsesMethodIDAsFinalNodeKey(t *testing.T) {
 	tree := newConsoleTree(siblingOrderView())
 	children := tree.children["method:root"]

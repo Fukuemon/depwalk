@@ -90,6 +90,18 @@ func TestJSONDocumentPreservesOrderAndOptionalFields(t *testing.T) {
 	if cycle, ok := edges[0].(map[string]any)["cycle"]; !ok || cycle != false {
 		t.Errorf("cycle field = %v, present:%v; want explicit false", cycle, ok)
 	}
+	if _, ok := nodes[0].(map[string]any)["metadata"]; ok {
+		t.Error("metadata present for node with nil Metadata")
+	}
+	if _, ok := edges[0].(map[string]any)["metadata"]; ok {
+		t.Error("metadata present for edge with nil Metadata")
+	}
+	if got := nodes[1].(map[string]any)["metadata"]; !reflect.DeepEqual(got, map[string]any{"declarationOrigin": "projectClasses"}) {
+		t.Errorf("node metadata = %#v, want opaque value", got)
+	}
+	if got := edges[1].(map[string]any)["metadata"]; !reflect.DeepEqual(got, map[string]any{"resolution": "springDi"}) {
+		t.Errorf("edge metadata = %#v, want opaque value", got)
+	}
 }
 
 func TestJSONCutoffTargetIsDanglingInBothDirections(t *testing.T) {
@@ -260,12 +272,12 @@ func jsonGraphView() View {
 		Status: traversal.StatusOK, Direction: graph.DirectionCaller, Start: NodeView{ID: "method:a"},
 		Nodes: []NodeView{
 			{ID: "method:a", QualifiedName: "A", Signature: "()", MinDepth: 0},
-			{ID: "method:m", QualifiedName: "M", Signature: "()", Source: source, MinDepth: 1},
+			{ID: "method:m", QualifiedName: "M", Signature: "()", Source: source, MinDepth: 1, Metadata: map[string]any{"declarationOrigin": "projectClasses"}},
 			{ID: "method:z", QualifiedName: "Z", Signature: "()", MinDepth: 2},
 		},
 		Edges: []EdgeView{
 			{ID: "edge:a", CallerID: "method:m", CalleeID: "method:a", Cycle: false},
-			{ID: "edge:z", CallerID: "method:z", CalleeID: "method:m", Cycle: true, CallSite: callSite},
+			{ID: "edge:z", CallerID: "method:z", CalleeID: "method:m", Cycle: true, CallSite: callSite, Metadata: map[string]any{"resolution": "springDi"}},
 		},
 		Cutoffs: []CutoffView{
 			{EdgeID: "cut:a", CallerID: "method:outside-a", CalleeID: "method:z", TargetMethodID: "method:outside-a", TargetMinDepth: 3},

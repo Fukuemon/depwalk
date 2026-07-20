@@ -46,6 +46,7 @@ type NodeView struct {
 	Signature     string
 	Source        *protocol.SourceLocation
 	MinDepth      int
+	Metadata      map[string]any
 }
 
 // EdgeView describes one reached call edge.
@@ -55,6 +56,7 @@ type EdgeView struct {
 	CalleeID string
 	Cycle    bool
 	CallSite *protocol.SourceLocation
+	Metadata map[string]any
 }
 
 // CutoffView describes one call edge excluded by the traversal depth limit.
