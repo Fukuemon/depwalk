@@ -171,3 +171,11 @@ Verdict: PASS
 - 上位文書整合: テスト観点が context/testing.md の検証境界 (mock 方針・golden 配置・E2E 2 層・S1-S3 リリース判定) と一致。SLO 引き継ぎは spec #24 D8 と正確に対応。参照した実装コード (fakeAnalyzerCommand / echo-source-roots / RejectsInvalidSourceRoot / buildCoreCLI / runCLI / NodeFromMethodSymbol deep copy test) すべて実在確認
 - 未解決論点・実装対象明示・template 必須節・EARS・正本境界: いずれも PASS。S1-S3 が golden 照合 / Unmarshal / exit code 3 区分の観測可能なテストに落ちていることを確認
 - 非ブロッキング補足 2 件 (sync phase 対応推奨): (1) context/testing.md L87 の「既存 Output schema は表出しない」を #22 後の状態へ現状化、(2) context への影響テーブルへ context/testing.md の更新予定行を追加 → (2) は同日対応済み、(1) は影響テーブルの追跡行として登録済み (sync phase で反映)
+
+## Review 2026-07-20 (fresh-context evaluator) — diagram phase
+
+Verdict: NEEDS_WORK → 対応済み
+
+- Mermaid 構文は両図とも有効。エラーケース 1-8 と exit code 0/1/2 の分岐網羅、D5/D6/D7/D8/D11/D12 注記は本文と整合
+- 指摘 1: Sequence 図が traversal.Traverse / output.Write の呼び出しを CLI 層に置いており、スコープ「analyze use case から traversal / output への結合」(index.md やること) と context/architecture.md の use case orchestration 責務に矛盾 → use case 側 orchestration へ図を修正
+- 指摘 2: Content/Data の「method selector 照合結果の受け渡し」が図と噛み合わず曖昧 → use case が照合〜出力を orchestrate し、曖昧・不一致は種別付きエラーで CLI 層へ返す (CLI 層は表示と exit code 判別のみ) と明確化
