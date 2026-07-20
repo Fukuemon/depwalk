@@ -1,4 +1,4 @@
-com.example.mm.app.OrderController.placeOrdercom.example.mm.app.OrderController#placeOrder(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:15]
-├─ com.example.mm.service.DefaultOrderService.processcom.example.mm.service.DefaultOrderService#process(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:16]
+com.example.mm.app.OrderController#placeOrder(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:15]
+├─ com.example.mm.service.DefaultOrderService#process(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:16]
 │  └─ … (depth limit: 2 edges cut)
-└─ com.example.mm.service.OrderService.processcom.example.mm.service.OrderService#process(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:16]
+└─ com.example.mm.service.OrderService#process(java.lang.String)  [app/src/main/java/com/example/mm/app/OrderController.java:16]

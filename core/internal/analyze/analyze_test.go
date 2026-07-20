@@ -226,7 +226,7 @@ func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !strings.Contains(out.String(), "com.example.Service.find") || !strings.Contains(out.String(), "com.example.Controller.call") {
+	if !strings.Contains(out.String(), "com.example.Service#find(java.lang.Long)") || !strings.Contains(out.String(), "com.example.Controller#call()") {
 		t.Fatalf("console output = %q, want selected method and caller", out.String())
 	}
 }
