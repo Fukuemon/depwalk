@@ -23,7 +23,7 @@ Core の test framework は Go 標準の `testing` とする。
 - Mock は手書き fake / interface stub で開始する。
 - Golden fixture は `testdata/` 配下に置く。repo root の `testdata/` に加え、Go 慣習の **package-local `testdata/`** (例: `core/internal/output/testdata/golden/`) も可とする (単一 package に閉じる golden は package-local を優先する)。
 - `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
-- E2E の具体 CLI 引数、env 変数、対象選択は後続の CLI interface spec で確定する。
+- E2E の具体 CLI 引数・対象選択は確定済み (spec #22。flag 体系・exit code の正本は [CLI feature doc](../design/features/cli/DesignDoc_cli.md))。CLI 出力照合 (S1-S3) の完成は #22 の実装フェーズが担う。
 
 ### Java Analyzer 三層
 
@@ -84,7 +84,7 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - valid `error`、非ゼロ exit、parse / schema error が先行 graph record と diagnostic をすべて無効化し、staging Graph を公開しないこと。正常 stream だけが参照完全性を満たすこと。
 - 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと。
 - valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること。
-- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal と既存 Output schema は表出しないこと。
+- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal は表出せず、Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出すること (#22 D11。表出の正本は [output feature doc](../design/features/output/DesignDoc_output.md))。
 - `error.details` の共通 fieldを決定順で保持し、Analyzer 固有 code に分岐せず CLI が汎用表示できること。
 
 ## Gradle multi-project / 完全性の横断テスト
