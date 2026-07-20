@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-11 / Status: 完了 (DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D2-D7) を参照する。
 
@@ -37,13 +37,13 @@ Design Doc の Open Question Q3「Console 出力のツリー表現フォーマ�
 - DOT / Mermaid の具体構文 (ノード形状 / 色 / 線種) — Phase4 spec で確定する。
 - 探索の意味論 (正本は [traversal feature doc](../traversal/DesignDoc_traversal.md))。
 - graph が保持する属性の定義 (正本は [graph feature doc](../graph/DesignDoc_graph.md))。
-- CLI の引数名 / exit code / エラー表示先 (CLI interface spec の対象)。Output は `error` を返すところまでを責務とする。
+- CLI の引数名 / exit code / エラー表示先 (正本は [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
 
 ## 設計
 
 ### 公開 entry point と Formatter / View
 
-`output.Write` を唯一の公開 entry point とし、format 検証 → `View` 構築 → Formatter 選択 → 描画を担う。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らない。
+`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → Formatter 選択 → 描画を担う。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らない。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する。spec #22 D5 拡張で決定)。
 
 ```go
 // core/internal/output
@@ -89,6 +89,7 @@ type NodeView struct {
     Signature     string
     Source        *protocol.SourceLocation // nil なら位置情報なし
     MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
+    Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
 
 // EdgeView は 1 edge の Formatter 向け表現。
@@ -98,6 +99,7 @@ type EdgeView struct {
     CalleeID string
     Cycle    bool
     CallSite *protocol.SourceLocation // nil なら位置情報なし
+    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
 
 // CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
@@ -136,10 +138,12 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 | nodes[] の methodId / qualifiedName / signature                            | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`           |
 | nodes[].minDepth                                                           | `View.Nodes[].MinDepth`                                       |
 | nodes[].sourceLocation                                                     | `View.Nodes[].Source`                                         |
+| nodes[].metadata (JSON のみ、omitempty)                                    | `View.Nodes[].Metadata`                                       |
 | edge 両端 methodId (Console) / callerMethodId・calleeMethodId (JSON)       | `View.Edges[].CallerID` / `.CalleeID`                         |
 | edges[].edgeId                                                             | `View.Edges[].ID`                                             |
 | edge の callSite (Console 子行の位置 / JSON `callSite`)                    | `View.Edges[].CallSite`                                       |
 | cycle flag                                                                 | `View.Edges[].Cycle`                                          |
+| edges[].metadata (JSON のみ、omitempty)                                    | `View.Edges[].Metadata`                                       |
 | cutoff の到達側 endpoint (Console) / callerMethodId・calleeMethodId (JSON) | `View.Cutoffs[].CallerID` / `.CalleeID`                       |
 | cutoff 件数 (Console の `N edges cut`)                                     | `len(View.Cutoffs)` を対象 node 単位に集計                    |
 | depthCutoffs[].edgeId                                                      | `View.Cutoffs[].EdgeID`                                       |
@@ -250,6 +254,7 @@ UserService.findById(Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持の正本) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味の正本は Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。spec #22 D11 で決定。
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
@@ -312,10 +317,11 @@ flowchart TD
 
 ## 上位資料からの変更点
 
-| 対象資料    | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                           |
-| ----------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| PRD         | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                |
-| DesignDoc   | 追記 / 変更提案                   | Q3 を解決済みへ更新 (本 doc が正本)。S3 の測定方法に 2 層照合を追記。モジュール責務の Output Engine 依存先に Traversal Engine を追加 (C4 図も) |
-| feature doc | 変更提案                          | [traversal feature doc](../traversal/DesignDoc_traversal.md) の Traversal result に `minDepth` の公開を追加 (additive)                         |
-| context     | 追記                              | `context/architecture.md` に Output → Traversal 依存を追加。`context/testing.md` に S3 の 2 層照合と package-local `testdata/` を補足          |
-| ADR         | 継承                              | ADR-0001 / ADR-0002 の範囲内。新規 ADR 不要 (出力 schema の版管理は本 doc が正本を持つ)                                                        |
+| 対象資料    | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                                                                                                                                       |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PRD         | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                                                                                                            |
+| DesignDoc   | 追記 / 変更提案                   | Q3 を解決済みへ更新 (本 doc が正本)。S3 の測定方法に 2 層照合を追記。モジュール責務の Output Engine 依存先に Traversal Engine を追加 (C4 図も)                                                                                             |
+| feature doc | 変更提案                          | [traversal feature doc](../traversal/DesignDoc_traversal.md) の Traversal result に `minDepth` の公開を追加 (additive)                                                                                                                     |
+| context     | 追記                              | `context/architecture.md` に Output → Traversal 依存を追加。`context/testing.md` に S3 の 2 層照合と package-local `testdata/` を補足                                                                                                      |
+| ADR         | 継承                              | ADR-0001 / ADR-0002 の範囲内。新規 ADR 不要 (出力 schema の版管理は本 doc が正本を持つ)                                                                                                                                                    |
+| spec #22    | 追記                              | `NodeView`/`EdgeView` への opaque `Metadata` 追加と JSON の `nodes[].metadata`/`edges[].metadata` (additive、omitempty)、`RegisteredFormats()` の公開 API 化を反映 (D5 拡張 / D11。決定経緯: [spec #22](../../../specs/22-cli-interface/)) |
