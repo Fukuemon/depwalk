@@ -18,10 +18,8 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// analyzeFlags holds the --analyzer-cmd / --language / --analyzer-meta /
-// --source-root flag values for newAnalyzeCommand. The full CLI flag surface
-// (output format, traversal direction, depth limits, ...) is out of scope for
-// this initial wiring and is left to a later CLI interface spec.
+// analyzeFlags holds the complete flag surface for newAnalyzeCommand:
+// Analyzer launch inputs, source filters, and method query options.
 type analyzeFlags struct {
 	analyzerCmd  string
 	language     string
@@ -129,6 +127,12 @@ func newAnalyzeCommand() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		// Flag parsing happens before RunE, so classify parse/type failures here
+		// instead of relying on RunE's semantic validation.
+		cmd.SilenceUsage = true
+		return &analyze.InputError{Err: err}
+	})
 
 	cmd.Flags().StringVar(&flags.analyzerCmd, "analyzer-cmd", "", "Analyzer launch command (falls back to DEPWALK_ANALYZER_CMD)")
 	cmd.Flags().StringVar(&flags.language, "language", "", "source language passed through to the Analyzer request (required)")
