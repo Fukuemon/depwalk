@@ -30,7 +30,7 @@
 ### ステップ 1: Edge.Metadata の追加と保持
 
 1. テストを先に書く (TDD): `core/internal/graph/convert_test.go` に、`protocol.CallEdge.Metadata` が `Edge.Metadata` へ nested value 込みで deep copy されること (元 DTO の後変更が graph へ波及しないこと)、metadata なし record で `Edge.Metadata` が nil のままなことを検証するテストを追加する。既存の Node 側テスト `TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata` (同ファイル) と対称の構造にする。
-2. 実装する: `core/internal/graph/graph.go` の `Edge` 構造体に `Metadata map[string]any` を追加し、`core/internal/graph/convert.go` の `EdgeFromCallEdge` で既存の `copyMetadataObject` (同ファイル、#24 で導入済み) を使って保持する。
+2. 実装する: `core/internal/graph/graph.go` の `Edge` 構造体に `Metadata map[string]any` を追加し (型は既存の `Symbol.Metadata` と同一表記に揃える)、`core/internal/graph/convert.go` の `EdgeFromCallEdge` で既存の `copyMetadataObject` (同ファイル、#24 で導入済み) を使って保持する。
 3. `## 検証コマンド` を実行する。
 4. diff レビュー (`spec-review` または repo の標準レビュー手段) を回し、指摘を対応してから次へ。
 

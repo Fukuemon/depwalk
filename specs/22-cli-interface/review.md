@@ -196,3 +196,11 @@ Verdict: PASS
 3 回目 (再々レビュー): NEEDS_WORK (1 件) — メタ同期 2 件の解消と設計内容の無矛盾を確認。残指摘はレビューテーブル・review.md への sync レビュー記録漏れのみ → 本追記で対応
 
 4 回目 (最終確認): PASS — 変更履歴への記録行追加を確認。レビュー表・変更履歴・review.md の 3 節が 1:1 で整合。sync phase のレビューゲート通過
+
+## Review 2026-07-20 (fresh-context evaluator) — phase 10 実装分割 / prompts
+
+Verdict: PASS
+
+- prompts 5 本すべてで必須 10 セクション・実装アンチパターン注入・完了条件タスク化ルールを確認。spec 抜粋 (D1-D12・エラーケース表・テスト観点・EARS) が本文コピーされ、探索誘発表現なし
+- 分割・依存 (P1 graph → P2 output → P3 use case → P4 CLI → P5 E2E の直列) は変更ファイル衝突と依存 (View 構築が Edge.Metadata に依存) に照らして妥当。検証コマンドは Quick Commands と完全一致
+- 非ブロッキング補足 2 件: P1 の型表記 (Symbol 側と揃える注記を追加して対応)、P5 の golden 配置 (停止指示ありのため現状維持)
