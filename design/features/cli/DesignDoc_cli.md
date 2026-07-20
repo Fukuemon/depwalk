@@ -50,6 +50,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 - 括弧省略でメソッド名のみ: `com.example.UserService#findById`
 - 照合は graph node の symbol 情報 (`QualifiedName` / `Signature`) の走査で行い、Core は methodId の文字列形式に依存しない (言語非依存)。
 - signature 省略で同名メソッドが複数一致した場合は、候補の完全 signature 一覧を stderr に表示してエラー終了する (自動選択しない)。一致 1 件ならそれを採用する。
+- signature 省略時は、node の正規化済み `Signature` から引数部分を除いた `<型の binary name>#<メソッド名>` と完全一致させる。Core は nested class の `$` を `QualifiedName` 用の `.` へ変換しない。
 
 ## 責務配置
 
@@ -73,6 +74,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 - `os/exec` で build 済み depwalk バイナリを実プロセス起動し、stdout / stderr / exit code を検証する (spec #22 D9。harness は #24 整備の `buildCoreCLI`/`runCLI` を再利用)。
 - console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (S3)。
 - 既存のグラフレベル E2E (`analyze.Run` 直接呼び出し) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
+- method selector は完全 signature、signature 省略の一意一致 / overload 曖昧性に加え、nested class の binary name (`Outer$Inner#method`) を回帰検証する。
 
 ## 上位資料からの変更点
 

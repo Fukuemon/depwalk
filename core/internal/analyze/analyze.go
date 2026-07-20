@@ -240,13 +240,9 @@ func selectMethod(g *graph.Graph, selector string) (graph.Node, error) {
 			}
 		}
 	} else {
-		separator := strings.LastIndex(selector, "#")
-		qualifiedName := ""
-		if separator > 0 && separator < len(selector)-1 {
-			qualifiedName = selector[:separator] + "." + selector[separator+1:]
-		}
 		for _, node := range nodes {
-			if qualifiedName != "" && node.Symbol.QualifiedName == qualifiedName {
+			signatureName, _, hasArgumentList := strings.Cut(node.Symbol.Signature, "(")
+			if hasArgumentList && signatureName == selector {
 				matches = append(matches, node)
 			}
 		}

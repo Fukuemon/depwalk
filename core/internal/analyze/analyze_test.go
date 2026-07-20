@@ -231,6 +231,65 @@ func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	}
 }
 
+func TestSelectMethodMatchesNestedBinaryNameWithoutSignature(t *testing.T) {
+	t.Parallel()
+
+	g := graph.New()
+	g.AddNode(graph.Node{
+		ID: "opaque-nested",
+		Symbol: graph.Symbol{
+			QualifiedName: "com.example.Outer.Inner.run",
+			Signature:     "com.example.Outer$Inner#run()",
+		},
+	})
+
+	got, err := selectMethod(g, "com.example.Outer$Inner#run")
+	if err != nil {
+		t.Fatalf("selectMethod() error = %v", err)
+	}
+	if got.ID != "opaque-nested" {
+		t.Fatalf("selectMethod().ID = %q, want opaque-nested", got.ID)
+	}
+}
+
+func TestSelectMethodReportsNestedOverloadsWithoutSignature(t *testing.T) {
+	t.Parallel()
+
+	g := graph.New()
+	for _, node := range []graph.Node{
+		{
+			ID: "opaque-long",
+			Symbol: graph.Symbol{
+				QualifiedName: "com.example.Outer.Inner.run",
+				Signature:     "com.example.Outer$Inner#run(java.lang.Long)",
+			},
+		},
+		{
+			ID: "opaque-string",
+			Symbol: graph.Symbol{
+				QualifiedName: "com.example.Outer.Inner.run",
+				Signature:     "com.example.Outer$Inner#run(java.lang.String)",
+			},
+		},
+	} {
+		g.AddNode(node)
+	}
+
+	_, err := selectMethod(g, "com.example.Outer$Inner#run")
+	var inputErr *InputError
+	if !errors.As(err, &inputErr) {
+		t.Fatalf("selectMethod() error = %v, want *InputError", err)
+	}
+	for _, candidate := range []string{
+		"com.example.Outer$Inner#run(java.lang.Long)",
+		"com.example.Outer$Inner#run(java.lang.String)",
+	} {
+		if !strings.Contains(err.Error(), candidate) {
+			t.Errorf("error %q missing candidate %q", err, candidate)
+		}
+	}
+}
+
 func TestRunQueryPassesMaxDepthToTraversal(t *testing.T) {
 	t.Parallel()
 
