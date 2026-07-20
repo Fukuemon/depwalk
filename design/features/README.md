@@ -12,6 +12,7 @@
 | Graph (呼び出しグラフのデータモデル)         | [DesignDoc_graph.md](graph/DesignDoc_graph.md)                                     | Phase1                               | 完了 |
 | Traversal (Caller / Callee 探索)             | [DesignDoc_traversal.md](traversal/DesignDoc_traversal.md)                         | Phase1                               | 完了 |
 | Output (Console / JSON / DOT / Mermaid 出力) | [DesignDoc_output.md](output/DesignDoc_output.md)                                  | Phase1 (DOT / Mermaid 実装は Phase4) | 完了 |
+| CLI Interface (analyze コマンドの flag 体系) | [DesignDoc_cli.md](cli/DesignDoc_cli.md)                                           | Phase1 (実装は #22)                  | 完了 |
 
 各 feature は `design/features/<feature>/` ディレクトリに集約する。design doc は `DesignDoc_<feature>.md`、付随するコンテンツ正本は `<feature>/reference/` に置く。
 
