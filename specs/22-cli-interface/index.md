@@ -315,18 +315,73 @@ CLI ツールのため URL routing は存在しない。相当する概念は「
 
 ## フロー / シーケンス
 
-(`spec-diagrams` で生成。spec の主要操作を Mermaid 図に落とす)
+CLI 実行 (`depwalk analyze`) の 1 操作を描く。flowchart は利用者から見た分岐 (エラーケース 1-8 と exit code 0/1/2 の対応、D8)、sequence は Core 内部の配線 (Interface 設計の変換手順 1-5) を扱う。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    Start(("開発者 / CI が depwalk analyze を実行<br/>--language --method --direction<br/>--max-depth --format 等を指定")) --> FlagCheck{"flag 値は有効か<br/>(--direction / --format / --max-depth)"}
+    FlagCheck -->|"不正 (許容値一覧を stderr へ、ケース1-2)"| Exit2a["exit 2 (入力エラー)"]
+    FlagCheck -->|"有効"| RunUC["analyze use case を実行<br/>(Analyzer 起動・graph 構築)"]
+    RunUC -->|"request validation エラー<br/>(--source-root/--include/--exclude の<br/>不正 path/glob、ケース8)"| Exit2b["exit 2 (入力エラー)"]
+    RunUC -->|"Analyzer 起動失敗 / protocol 違反 /<br/>Analyzer fatal (構造化表示、ケース5)"| Exit1a["exit 1 (実行時エラー)"]
+    RunUC -->|"graph 構築成功"| HasMethod{"--method 指定あり?"}
+    HasMethod -->|"なし (後方互換、D2)"| Summary["現行サマリ (件数 1 行 + diagnostics)<br/>を出力"] --> Exit0a["exit 0 (成功)"]
+    HasMethod -->|"あり"| Match{"method selector 照合<br/>(graph node 走査、D1)"}
+    Match -->|"一致 0 件 (ケース4)"| Exit2c["exit 2 (入力エラー)"]
+    Match -->|"複数一致 (候補の完全 signature 一覧を<br/>stderr へ、ケース3)"| Exit2d["exit 2 (入力エラー)"]
+    Match -->|"1 件一致"| Trav["traversal.Traverse<br/>(--direction / --max-depth)"]
+    Trav --> Out["output.Write (--format: console / json)<br/>探索結果を stdout へ"]
+    Out -->|"書き込み失敗 (ケース6)"| Exit1b["exit 1 (実行時エラー)"]
+    Out -->|"成功 (結果空・cutoff 注釈含む、ケース7)"| Exit0b["exit 0 (成功)"]
 ```
 
 ### Sequence
 
 ```mermaid
 sequenceDiagram
+    actor User as 開発者 / CI
+    participant CLI as CLI 層<br/>(core/internal/cli)
+    participant UC as analyze use case<br/>(core/internal/analyze)
+    participant AZ as Analyzer<br/>(外部プロセス)
+    participant G as graph
+    participant T as traversal
+    participant O as output
+
+    User->>CLI: depwalk analyze [path] + flag 群
+    CLI->>CLI: flag 検証 (--format は output.RegisteredFormats() を参照、D5 拡張)
+    alt flag 値が不正 (ケース1-2)
+        CLI-->>User: 許容値一覧を stderr / exit 2
+    end
+    CLI->>UC: Options (SourceRoots / Include / Exclude を指定順のまま透過、D12)
+    UC->>UC: AnalysisRequest 組み立て (AnalysisMode=fullGraph 明示 D6、Entrypoints 空 D7) + request.Validate()
+    alt validation エラー (利用者起因の不正 path/glob、ケース8)
+        UC-->>CLI: エラー (CLI 層で種別判定、D8 拡張)
+        CLI-->>User: stderr / exit 2
+    end
+    UC->>AZ: analysisRequest (JSONL / STDIN)
+    AZ-->>UC: methodSymbol / callEdge / diagnostic (JSONL / STDOUT)
+    alt Analyzer 起動失敗 / protocol 違反 / fatal (ケース5)
+        UC-->>CLI: AnalyzerFailure 等
+        CLI-->>User: 構造化表示 renderAnalyzerFailure (stderr) / exit 1
+    end
+    UC->>G: convert (Symbol.Metadata / Edge.Metadata を deep copy 保持、D11)
+    G-->>UC: graph.Graph
+    UC-->>CLI: 構築結果 (graph)
+    CLI->>CLI: --method selector 照合 (全 Node.Symbol の qualifiedName/signature 走査、D1)
+    alt 一致 0 件 (ケース4) / 複数一致 (ケース3)
+        CLI-->>User: 見つからない旨 or 候補一覧を stderr / exit 2
+    end
+    CLI->>T: Traverse(graph, Request{StartID, Direction, MaxDepth})
+    T-->>CLI: Result (Status / Nodes / Depths / Edges / Cycles)
+    CLI->>O: Write(stdout, format, Input{Graph, Result, Request})
+    O-->>User: console / json (json は node/edge の metadata を omitempty 透過、D11)
+    alt 書き込み失敗 (ケース6)
+        CLI-->>User: stderr / exit 1
+    else 成功 (結果空・cutoff 注釈含む、ケース7)
+        CLI-->>User: exit 0
+    end
 ```
 
 ## 実装分割
@@ -439,6 +494,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-20 | Claude         | 再検証更新分の spec-review PASS。phase 5-8 を「レビュー済」に更新し、非ブロッキング補足 (上位文書整合テーブルの Design Doc / java-analyzer feature doc / architecture.md への行番号参照が #24 マージ後の実体とずれ) を現状化。論点解決〜Performance/Security 設計 phase を再完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-07-20 | Claude         | phase 9 (Test / Metrics 設計): テスト観点 (unit: CLI flag パース / method selector 照合 / analyze use case / exit code 判別 / graph convert / output の 6 対象、E2E: #24 harness 再利用 + golden 照合 + exit code 3 区分、テストしないこと 3 件) と計測指標 (S1-S3 の E2E 照合を required gate、SLO 数値確定は実装フェーズで #24 経路別計測を入力に実施) を記述。機能仕様の Testing 節も記入。レビュー待ち                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-07-20 | Claude         | phase 9 spec-review PASS。フェーズ9を「レビュー済」に更新。非ブロッキング補足対応として context への影響テーブルへ `context/testing.md` の更新予定 2 行 (E2E 2 層完成の反映・protocol contract 観点の現状化) を追加。Test/Metrics 設計 phase 完了                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-07-20 | Claude         | diagram: フロー / シーケンス節に Flowchart (CLI 実行起点、エラーケース 1-8 と exit code 0/1/2 の分岐、D8) と Sequence (CLI→use case→Analyzer→graph→traversal→output の配線、D1/D5-D8/D11/D12 の対応注記付き) を記述。レビュー待ち                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## 備考
 
