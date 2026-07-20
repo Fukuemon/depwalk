@@ -179,3 +179,10 @@ Verdict: NEEDS_WORK → 対応済み
 - Mermaid 構文は両図とも有効。エラーケース 1-8 と exit code 0/1/2 の分岐網羅、D5/D6/D7/D8/D11/D12 注記は本文と整合
 - 指摘 1: Sequence 図が traversal.Traverse / output.Write の呼び出しを CLI 層に置いており、スコープ「analyze use case から traversal / output への結合」(index.md やること) と context/architecture.md の use case orchestration 責務に矛盾 → use case 側 orchestration へ図を修正
 - 指摘 2: Content/Data の「method selector 照合結果の受け渡し」が図と噛み合わず曖昧 → use case が照合〜出力を orchestrate し、曖昧・不一致は種別付きエラーで CLI 層へ返す (CLI 層は表示と exit code 判別のみ) と明確化
+
+## Review 2026-07-20 (fresh-context evaluator) — diagram 再レビュー
+
+Verdict: PASS
+
+- 前回指摘 2 件の対応を確認: Sequence の selector 照合・Traverse・Write の呼び出し元が analyze use case へ修正され、context/architecture.md の use case orchestration 責務およびスコープ宣言と整合。Content/Data の責務記述も図と完全一致
+- 波及矛盾なし: Interface 設計の exit code 判別 (CLI 層)・テスト観点の配置・「本 spec の追加分」への呼称統一を確認
