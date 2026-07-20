@@ -154,3 +154,12 @@ Verdict: PASS
 - 変更履歴への記録漏れが解消
 - フェーズ表・レビュー表・変更履歴の3節 (状態・日付) が矛盾なく整合していることを確認
 - 新たな不整合なし。phase 8 (Performance/Security 設計) 完了
+
+## Review 2026-07-20 (fresh-context evaluator) — develop (#24) rebase 後の再検証更新分
+
+Verdict: PASS
+
+- 上位文書整合: D12 の出自 (spec #24 変更履歴 2026-07-18・E2E 引き継ぎコメント・feature doc analyzer-protocol の include/exclude 契約) と一致。実装コード現状 (graph.Symbol.Metadata #24 実装済み / EdgeFromCallEdge 未保持 / 既存 flag 4 つ / AnalyzerFailure 経路 / request.Validate() の検証実在) と D8 拡張・D11 進捗注記・D12 の記述が一致
+- 未解決論点: なし (D1-D12 全解決、phase 9-11 未着手と整合)
+- 実装対象明示・template 必須節・EARS・正本境界: いずれも PASS。メタ情報同期 (更新日・phase 5-8 降格・変更履歴) も確認
+- 非ブロッキング補足: 上位文書整合テーブルの行番号参照 2 件が #24 マージ後の実体とずれ (java-analyzer analysisMode 節は L141-152 へ移動、DesignDoc Phase 計画は L234-241)。次回更新時に現状化を推奨 → 同日対応済み
