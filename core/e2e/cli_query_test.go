@@ -146,6 +146,18 @@ func TestCLIQueryExitCodes(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid-flag-type", func(t *testing.T) {
+		result := runCLI(t, cliPath, t.TempDir(), javaPath, jarPath,
+			fixture,
+			"--language", "java",
+			"--method", "com.example.mm.app.OrderController#placeOrder(java.lang.String)",
+			"--max-depth", "abc",
+		)
+		if result.exitCode != 2 {
+			t.Fatalf("CLI exit = %d, want 2; stderr:\n%s", result.exitCode, result.stderr)
+		}
+	})
+
 	t.Run("selector-not-found", func(t *testing.T) {
 		result := runCLI(t, cliPath, t.TempDir(), javaPath, jarPath,
 			fixture,

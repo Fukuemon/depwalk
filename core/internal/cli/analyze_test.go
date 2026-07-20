@@ -220,6 +220,7 @@ func TestAnalyzeCommandRejectsInvalidQueryFlagValuesWithExit2(t *testing.T) {
 		{name: "direction", flag: "--direction=sideways", wantText: []string{"caller", "callee"}},
 		{name: "format", flag: "--format=yaml", wantText: output.RegisteredFormats()},
 		{name: "max-depth", flag: "--max-depth=-1", wantText: []string{"max-depth", ">= 0"}},
+		{name: "max-depth-type", flag: "--max-depth=abc", wantText: []string{"max-depth", "invalid syntax"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
