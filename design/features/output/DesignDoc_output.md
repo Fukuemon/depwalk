@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。Issue #27 の実 OSS 検証で Console ラベルと実 Protocol signature の不整合を修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D2-D7) を参照する。
 
@@ -13,7 +13,7 @@ Output Engine の durable な feature 設計正本。Traversal result (到達 no
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                              |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                     |
 | 関連 spec      | [specs/7-output](../../../specs/7-output/)                                                                                                                                                                                        |
-| 関連 Issue     | [#27](https://github.com/Fukuemon/depwalk/issues/27) (実 OSS 検証で検出した Console ラベル重複の修正)                                                                                                                             |
+| 関連 Issue     | [#22](https://github.com/Fukuemon/depwalk/issues/22) (実 OSS 検証で検出した Console ラベル重複の修正)                                                                                                                             |
 | 対象モジュール | `output` (`core/internal/output`)                                                                                                                                                                                                 |
 
 ## 背景・要件解釈
