@@ -7,10 +7,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/Fukuemon/depwalk/core/internal/analyze"
+	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/output"
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
@@ -23,6 +27,12 @@ type analyzeFlags struct {
 	language     string
 	analyzerMeta []string
 	sourceRoots  []string
+	method       string
+	direction    string
+	maxDepth     int
+	format       string
+	include      []string
+	exclude      []string
 }
 
 // analyzeLongHelp stays language-agnostic: it describes Analyzer-side source
@@ -46,12 +56,39 @@ func newAnalyzeCommand() *cobra.Command {
 		Long:  analyzeLongHelp,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Query output is the only content allowed on stdout. Suppress Cobra's
+			// usage block for all RunE failures; Cobra still renders ordinary error
+			// messages to stderr, while AnalyzerFailure keeps its custom renderer.
+			cmd.SilenceUsage = true
 			workspaceRoot, err := resolveWorkspaceRoot(args)
 			if err != nil {
 				return err
 			}
 			if flags.language == "" {
-				return errors.New("--language is required")
+				return &analyze.InputError{Err: errors.New("--language is required")}
+			}
+			if flags.direction != string(graph.DirectionCaller) && flags.direction != string(graph.DirectionCallee) {
+				return &analyze.InputError{Err: fmt.Errorf(
+					"invalid --direction %q: want %q or %q",
+					flags.direction,
+					graph.DirectionCaller,
+					graph.DirectionCallee,
+				)}
+			}
+			registeredFormats := output.RegisteredFormats()
+			if !slices.Contains(registeredFormats, flags.format) {
+				return &analyze.InputError{Err: fmt.Errorf(
+					"invalid --format %q: registered formats: %s",
+					flags.format,
+					strings.Join(registeredFormats, ", "),
+				)}
+			}
+			if flags.maxDepth < 0 {
+				return &analyze.InputError{Err: fmt.Errorf("invalid --max-depth %d: want >= 0", flags.maxDepth)}
+			}
+			var maxDepth *int
+			if cmd.Flags().Changed("max-depth") {
+				maxDepth = &flags.maxDepth
 			}
 
 			result, err := analyze.Run(analyze.Options{
@@ -60,6 +97,13 @@ func newAnalyzeCommand() *cobra.Command {
 				Language:       protocol.Language(flags.language),
 				AnalyzerCmd:    flags.analyzerCmd,
 				AnalyzerMeta:   flags.analyzerMeta,
+				Include:        flags.include,
+				Exclude:        flags.exclude,
+				Method:         flags.method,
+				Direction:      graph.Direction(flags.direction),
+				MaxDepth:       maxDepth,
+				Format:         output.Format(flags.format),
+				Output:         cmd.OutOrStdout(),
 				AnalyzerStderr: cmd.ErrOrStderr(),
 				Getenv:         os.Getenv,
 			})
@@ -79,7 +123,9 @@ func newAnalyzeCommand() *cobra.Command {
 			for _, diagnostic := range result.Diagnostics {
 				fmt.Fprintf(cmd.ErrOrStderr(), "diagnostic [%s] %s: %s\n", diagnostic.Severity, diagnostic.Code, diagnostic.Message)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "analyzed %d method(s), %d call edge(s)\n", result.MethodCount, result.CallEdgeCount)
+			if flags.method == "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "analyzed %d method(s), %d call edge(s)\n", result.MethodCount, result.CallEdgeCount)
+			}
 			return nil
 		},
 	}
@@ -88,6 +134,12 @@ func newAnalyzeCommand() *cobra.Command {
 	cmd.Flags().StringVar(&flags.language, "language", "", "source language passed through to the Analyzer request (required)")
 	cmd.Flags().StringArrayVar(&flags.analyzerMeta, "analyzer-meta", nil, "key=value metadata passed through to the Analyzer request (repeatable)")
 	cmd.Flags().StringArrayVar(&flags.sourceRoots, "source-root", nil, "workspace-relative source root passed through to the Analyzer request in the given order; bypasses Analyzer build-model discovery (repeatable)")
+	cmd.Flags().StringVar(&flags.method, "method", "", "method selector: <binary-type>#<method>[(<argument-types>)]")
+	cmd.Flags().StringVar(&flags.direction, "direction", string(graph.DirectionCaller), "traversal direction: caller or callee")
+	cmd.Flags().IntVar(&flags.maxDepth, "max-depth", 0, "maximum traversal depth (default: unlimited)")
+	cmd.Flags().StringVar(&flags.format, "format", string(output.FormatConsole), "output format registered by the output engine")
+	cmd.Flags().StringArrayVar(&flags.include, "include", nil, "workspace-relative source path glob to include (repeatable)")
+	cmd.Flags().StringArrayVar(&flags.exclude, "exclude", nil, "workspace-relative source path glob to exclude (repeatable)")
 
 	return cmd
 }

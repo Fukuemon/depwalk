@@ -1,6 +1,12 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"errors"
+
+	"github.com/spf13/cobra"
+
+	"github.com/Fukuemon/depwalk/core/internal/analyze"
+)
 
 func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
@@ -13,4 +19,16 @@ func newRootCommand() *cobra.Command {
 
 func Execute() error {
 	return newRootCommand().Execute()
+}
+
+// ExitCode maps command results to the process exit code contract.
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var inputErr *analyze.InputError
+	if errors.As(err, &inputErr) {
+		return 2
+	}
+	return 1
 }
