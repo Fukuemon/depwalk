@@ -15,11 +15,13 @@ import (
 func TestBuildViewResolvesSymbolsAndSortsCollections(t *testing.T) {
 	source := &protocol.SourceLocation{Path: "a.go", StartLine: 10}
 	callSite := &protocol.SourceLocation{Path: "z.go", StartLine: 20}
+	nodeMetadata := map[string]any{"declarationOrigin": "projectClasses"}
+	edgeMetadata := map[string]any{"resolution": "springDi"}
 	g := graph.New()
 	g.AddNode(graph.Node{ID: "method:z", Symbol: graph.Symbol{QualifiedName: "example.Z", Signature: "()"}})
-	g.AddNode(graph.Node{ID: "method:a", Symbol: graph.Symbol{QualifiedName: "example.A", Signature: "()", Source: source}})
+	g.AddNode(graph.Node{ID: "method:a", Symbol: graph.Symbol{QualifiedName: "example.A", Signature: "()", Source: source, Metadata: nodeMetadata}})
 	g.AddNode(graph.Node{ID: "method:m", Symbol: graph.Symbol{QualifiedName: "example.M", Signature: "()"}})
-	edgeZ := graph.Edge{ID: "edge:z", CallerID: "method:z", CalleeID: "method:m", CallSite: callSite}
+	edgeZ := graph.Edge{ID: "edge:z", CallerID: "method:z", CalleeID: "method:m", CallSite: callSite, Metadata: edgeMetadata}
 	edgeA := graph.Edge{ID: "edge:a", CallerID: "method:a", CalleeID: "method:m"}
 	cutZ := graph.Edge{ID: "cut:z", CallerID: "method:x", CalleeID: "method:z"}
 	cutA := graph.Edge{ID: "cut:a", CallerID: "method:x", CalleeID: "method:a", CallSite: callSite}
@@ -50,13 +52,13 @@ func TestBuildViewResolvesSymbolsAndSortsCollections(t *testing.T) {
 	if ids := nodeViewIDs(got.Nodes); !reflect.DeepEqual(ids, []string{"method:a", "method:m", "method:z"}) {
 		t.Errorf("View.Nodes IDs = %v, want sorted", ids)
 	}
-	if got.Nodes[0].QualifiedName != "example.A" || got.Nodes[0].Source != source || got.Nodes[0].MinDepth != 1 {
+	if got.Nodes[0].QualifiedName != "example.A" || got.Nodes[0].Source != source || got.Nodes[0].MinDepth != 1 || !reflect.DeepEqual(got.Nodes[0].Metadata, nodeMetadata) {
 		t.Errorf("View.Nodes[0] = %#v, want resolved method:a at depth 1", got.Nodes[0])
 	}
 	if ids := edgeViewIDs(got.Edges); !reflect.DeepEqual(ids, []string{"edge:a", "edge:z"}) {
 		t.Errorf("View.Edges IDs = %v, want sorted", ids)
 	}
-	if !got.Edges[1].Cycle || got.Edges[1].CallSite != callSite {
+	if !got.Edges[1].Cycle || got.Edges[1].CallSite != callSite || !reflect.DeepEqual(got.Edges[1].Metadata, edgeMetadata) {
 		t.Errorf("View.Edges[1] = %#v, want cycle edge with call site", got.Edges[1])
 	}
 	if ids := cutoffViewIDs(got.Cutoffs); !reflect.DeepEqual(ids, []string{"cut:a", "cut:z"}) {
@@ -103,7 +105,7 @@ func TestBuildViewAllowsMissingStartSymbol(t *testing.T) {
 	}
 
 	got := buildView(in)
-	if got.Start != (NodeView{ID: "method:missing"}) {
+	if !reflect.DeepEqual(got.Start, NodeView{ID: "method:missing"}) {
 		t.Errorf("View.Start = %#v, want ID-only start", got.Start)
 	}
 }
@@ -116,6 +118,13 @@ func TestWriteRejectsUnregisteredFormatBeforeWriting(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Errorf("Write(yaml) wrote %q, want no output", out.String())
+	}
+}
+
+func TestRegisteredFormatsReturnsRegisteredFormatNames(t *testing.T) {
+	want := []string{"console", "json"}
+	if got := RegisteredFormats(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("RegisteredFormats() = %v, want %v", got, want)
 	}
 }
 

@@ -16,3 +16,9 @@ func registeredFormats() []string {
 	slices.Sort(formats)
 	return formats
 }
+
+// RegisteredFormats returns the registered output format names in sorted
+// order. The returned slice is independent from the formatter registry.
+func RegisteredFormats() []string {
+	return registeredFormats()
+}
