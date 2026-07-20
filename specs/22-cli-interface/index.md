@@ -30,7 +30,7 @@
 | 7   | Content / Data 設計         | レビュー済 | 2026-07-20 | 永続ストアなし・package 配置方針を記述。CLI のため Content/Assets・UI Reuse は該当なし。レビュー PASS (1周目) 後、2026-07-20 に #24 反映 (graph.Symbol 側実装済み・E2E harness 再利用) で配置記述を現状化、同日再レビュー PASS                             |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-07-20 | Performance (SLO 確定は実装フェーズへ委譲)・Security/Privacy (既存読み取り専用方針の継承)・Error/Fallback を記述。再レビュー PASS 後、2026-07-20 に #24 反映 (エラーケース 8 追加・ケース 5 の対象を構造化 renderer に更新) で更新、同日再レビュー PASS    |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-07-20 | テスト観点 (unit 6 対象 + CLI プロセス E2E、テストしないこと明示)・計測指標 (S1-S3 required gate、SLO 確定は実装フェーズ) を記述。機能仕様 Testing 節も記入。同日レビュー PASS (非ブロッキング補足は context への影響テーブルへ登録済み)                   |
-| 10  | 実装分割                    | 未着手     |            |                                                                                                                                                                                                                                                            |
+| 10  | 実装分割                    | 進行中     | 2026-07-20 | prompts 5 本 (P1-P5 直列) を生成、実装タスク案・prompts 生成方針を記入。レビュー待ち                                                                                                                                                                       |
 | 11  | レビュー済                  | 未着手     |            |                                                                                                                                                                                                                                                            |
 
 ## 上位文書整合
@@ -392,13 +392,22 @@ sequenceDiagram
 
 ### 実装タスク案
 
-| Phase | 対象                 | 概要 | 依存 |
-| ----- | -------------------- | ---- | ---- |
-| P1    | (clarify 以降で記述) |      |      |
+prompts は `prompts/` 配下に生成済み。直列 5 phase 構成 (output の View 構築が `graph.Edge.Metadata` に依存するため P1/P2 は並列化しない)。
+
+| Phase | prompt                                        | 対象   | 概要                                                                                                          | 依存   |
+| ----- | --------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- | ------ |
+| P1    | `P1_01_core_graph-edge-metadata.md`           | core   | `graph.Edge.Metadata` の deep copy 保持 (D11)                                                                 | なし   |
+| P2    | `P2_01_output_metadata-registered-formats.md` | output | `NodeView`/`EdgeView` Metadata + JSON omitempty 表出、`RegisteredFormats()` 公開 (D11/D5 拡張)                | P1     |
+| P3    | `P3_01_core_analyze-query-orchestration.md`   | core   | use case の探索クエリ orchestration (selector 照合 / traverse / output、fullGraph 明示、include/exclude 透過) | P1, P2 |
+| P4    | `P4_01_core_cli-flags-exit-codes.md`          | core   | 6 flag 追加 (D2-D5/D12) と exit code 0/1/2 制御 (D8)                                                          | P3     |
+| P5    | `P5_01_core_cli-e2e-golden.md`                | core   | CLI プロセス E2E + golden 照合 (S1-S3、exit code 3 区分)、SLO 計測と feature doc 記録 (D9)                    | P4     |
 
 ### prompts 生成方針
 
-(clarify 以降で記述)
+- 各 prompt は `prompt-template.md` の必須 10 セクションを備えた自己完結文書とし、spec 該当節 (D1-D12・エラーケース表・テスト観点・EARS) を本文へ抜粋する (参照だけにしない)。
+- target は `context/project.md` の対象ドメイン (core / output) から選ぶ。traversal / analyzer-protocol / java-analyzer は変更なしのため prompt を作らない (SLO 記録は P5 が feature doc への追記として実施)。
+- D8 のエラー種別判定型の具体設計は P3 (種別付きエラー型の導入) と P4 (`errors.As` による判別) に委ねる (Interface 設計の「実装分割で確定」を引き継ぎ)。
+- 検証コマンドは `context/project.md` Quick Commands の標準 task を直書きする。実装サイクルは prompt 単位で 実装 → 検証 → commit → レビュー → 反映 を回す。
 
 ## 上位資料からの変更点
 
@@ -513,6 +522,7 @@ scaffold 時点では変更なし。clarify / track phase で論点が解決し�
 | 2026-07-20 | Claude         | sync 再レビュー指摘対応 (メタ情報同期 2 件): analyzer-protocol feature doc の最終更新ヘッダと「上位資料からの変更点」テーブルへ #22 現状化の行を追加、design/DesignDoc.md の最終更新ヘッダを 2026-07-20 へ同期                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-07-20 | Claude         | sync 再々レビュー指摘対応 (記録同期 1 件): レビューテーブルと review.md へ sync phase のレビュー記録 3 回分 (NEEDS_WORK 4 件 / 2 件 / 1 件と対応) を追記し、本行でその対応を変更履歴にも同期。sync phase 完了 (4 回目レビューで確認)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 2026-07-20 | Claude         | sync 最終確認レビュー PASS。upstream sync phase 完了 (CLI feature doc 新設・graph/output/analyzer-protocol feature doc・DesignDoc 一覧・context 2 文書へ反映済み)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-07-20 | Claude         | phase 10 (実装分割): prompts 5 本を生成 (P1 graph Edge.Metadata / P2 output Metadata+RegisteredFormats / P3 use case orchestration / P4 CLI flag+exit code / P5 CLI E2E+SLO、直列依存)。実装タスク案と prompts 生成方針を記入。レビュー待ち                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## 備考
 
