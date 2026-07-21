@@ -53,6 +53,12 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 
 	// 修正前の現状: 5 パターン由来の 10 件 (⑧ctor/getter ×2、⑤super、
 	// ①chain 4 件、④reference + 波及 collect、⑦var 経由 getter)。
+	// GenericChainCase (自己境界 generic builder + overload + lambda) は
+	// JavaParser 3.28.2 が解決に成功するため details へ現れない。件数固定は
+	// 「この形状を誤って未解決へ倒さない」ことの回帰ガードを兼ねる
+	// (①の真の再現形は P2_02 の実測診断で特定し、P4_04 で fixture へ追加する)。
+	// 現状の全 detail は resolver 例外を伴う失敗のため、exceptionClass は
+	// phase を問わず非空のクラス名になる前提で一律検査する。
 	if len(errorRecord.Details) != 10 {
 		t.Errorf("details = %d entries, want 10 (current pre-fix expectation): %+v",
 			len(errorRecord.Details), errorRecord.Details)

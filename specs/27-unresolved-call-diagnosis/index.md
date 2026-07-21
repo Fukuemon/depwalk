@@ -123,6 +123,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - **D2 (診断用の追加観測)**: `error.details.metadata` へ sanitize 済みの4項目 — `resolutionPhase` (どの解決段階で失敗したか) / `exceptionClass` (JavaParser 例外のクラス名のみ、message は含めない) / receiver 式種別 / receiver 型取得成否 — を追加する。Protocol schema は非破壊 (metadata は opaque な key-value のまま) で、#24 D24 の sanitize 制約 (source 本文・絶対 path・raw exception message 禁止) を維持する。これにより8分類 (D1) への機械的な振り分けと「未分類」残余の解消を可能にする。(決定日: 2026-07-20, source: clarify, 案A)
 - **D3 (対応方針の判定基準)**: 次の3基準で各要因クラスを判定する。(a) 自前実装の救済ロジック欠落 (④method reference / ⑤explicit super / ⑧Lombok cross-module 等、depwalk 側で閉じて修正できるもの) → **修正**。(b) scope 外 call なのに receiver 型不明で `external-target` 分類へ到達できないもの (⑥) → **修正 (分類ロジック改善)**。(c) 上流 (JavaParser) の型推論限界 (①②③⑦) → 回避策の実装コストと件数規模で修正 / v1 scope 外記録を個別判断し、scope 外とする場合は ADR-0004 の再検討条件との整合 (静的解析で主要ユースケースの精度を満たせないか) を明記して記録する。(決定日: 2026-07-20, source: clarify, 案A)
 - **D4 (最小再現 fixture の方針)**: 既存の `testdata/fixtures/java/multi-module-spring-project` fixture へ、上位パターン (⑧Lombok cross-module、⑦`var`+generic、①fluent chain、④method reference、⑤explicit super) の最小再現ケースを追加する。実測対象コードへ依存しない一般化した形で表現し、既存 E2E 基盤を再利用して修正後の回帰検証にもそのまま使う。既存 fixture の期待 graph / diagnostic 集合への影響は追加ケース分の期待値更新で吸収する。(決定日: 2026-07-20, source: clarify, 案A)
+  - **実装時の逸脱 (2026-07-21, P2_01, ユーザー追認待ち)**: (1) 完全性 gate は request 全体を fatal にするため、未解決ケースを既存 fixture の discovery 対象 workspace へ直接追加すると既存 required E2E (成功 graph / exit 0) と両立できない。このため fixture 配下の独立入れ子 build `patterns/` (root settings 非包含) として追加し、専用 E2E `TestUnresolvedCallPatternsCLI` で修正前の未解決 10 件と診断 metadata を固定した。既存期待 graph は不変。(2) ①fluent chain の「lambda / generic を含む builder 風 API」形は、一般化 2 形状 (通常 generic builder / 自己境界 generic builder + overload + lambda) とも JavaParser 3.28.2 が解決に成功し再現しなかったため、成功回帰ガードとして fixture に残し、真の再現形は P2_02 の実測診断で特定して P4_04 で追加する。①の chain 途中で receiver 型が失われ後続 call が未解決になる機構自体は ⑧ 起点の chain (FluentChainCase) で再現済み。
 - **D5 (対応の実施単位)**: 当初「集約 issue として起票」(2026-07-21, 案C) と決定したが、同日のユーザー判断で **後続 issue を起票せず、本 issue #27 / branch `feature-27` で対応まで実施する**方針へ変更した (issue #27 も `type:research` → `type:bug` へ変換済み)。「修正」判定の要因クラス (④method reference fallback / ⑤explicit super fallback / ⑥receiver 型不明時の external-target 判定 / ⑧Lombok cross-module 救済 / ①②③⑦JavaParser 型推論の回避策のうち修正と判定したもの) を本 spec の実装分割 (P4以降) として扱う。効果測定は同一 commit の実プロジェクト再計測で要因クラス別件数を追跡する。(決定日: 2026-07-21, source: clarify → ユーザー判断で改訂)
 
 ## 未確定事項
@@ -400,6 +401,7 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 | 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針) |
 | 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                    |
 | 2026-07-21 | Fukuemon | tasks phase レビュー PASS。軽微指摘 (P5_01 fixture prep / P4 並列注意) を反映し、全 phase レビュー済みへ                 |
+| 2026-07-21 | Fukuemon | 実装 P1_01 (診断 metadata) / P2_01 (patterns fixture + 専用 E2E) 完了。D4 実装時の逸脱 2 件を記録 (ユーザー追認待ち)     |
 
 ## 備考
 
