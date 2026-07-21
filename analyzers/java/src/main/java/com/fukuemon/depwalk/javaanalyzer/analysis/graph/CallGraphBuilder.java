@@ -320,7 +320,7 @@ public final class CallGraphBuilder {
             // candidate の戻り値型 (classfile 由来) で前進解決し、復元した owner
             // で救済 / external 分類を試みる。根拠のない型推測は行わない。
             if (receiverOwner == null && mce.getScope().isPresent()) {
-                String forwardOwner = chainForwardOwner(mce.getScope().get(), 0);
+                String forwardOwner = chainForwardOwner(mce.getScope().get(), ctx, 0);
                 if (forwardOwner != null) {
                     if (declIndex.find(forwardOwner).isEmpty()) {
                         commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
@@ -337,7 +337,7 @@ public final class CallGraphBuilder {
             // 引数先 functional interface が scope 外なら external-target へ分類
             // する。scope 内型が根拠に現れる場合は保守的に diagnostic に残す。
             if (receiverOwner == null
-                    && (chainRootIsExternal(mce, ctx) || lambdaParamReceiverIsExternal(mce))) {
+                    && (chainRootIsExternal(mce, ctx) || lambdaParamReceiverIsExternal(mce, ctx))) {
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
@@ -883,6 +883,8 @@ public final class CallGraphBuilder {
         if (samArity < 0) {
             // 周辺の型推論が壊れて SAM arity を推論できない場合でも、参照名が
             // owner の classfile 上で一意なら根拠として採用できる (spec #27 ④)。
+            // 名前一意のため arity 照合は省く (SAM arity 自体が取得不能な状況の
+            // ヒューリスティクスであり、一意でなければ採用しない保守側)。
             var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
                     .filter(method -> method.methodName().equals(mre.getIdentifier()))
                     .toList();
@@ -1023,7 +1025,7 @@ public final class CallGraphBuilder {
      * call の owner 型を復元する。候補が一意でない・classfile に根拠が無い
      * link があれば null (推測しない)。
      */
-    private String chainForwardOwner(Expression expr, int depth) {
+    private String chainForwardOwner(Expression expr, WalkContext ctx, int depth) {
         if (expr == null || depth > 16) {
             return null;
         }
@@ -1032,7 +1034,7 @@ public final class CallGraphBuilder {
             return direct;
         }
         if (expr instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
-            return chainForwardOwner(enclosed.getInner(), depth + 1);
+            return chainForwardOwner(enclosed.getInner(), ctx, depth + 1);
         }
         if (expr instanceof NameExpr nameExpr) {
             // 型が取れない local 変数は、宣言の initializer 式を同じ規則で前進
@@ -1043,22 +1045,41 @@ public final class CallGraphBuilder {
                 if (ast instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
                     Expression initializer = declarator.getInitializer().orElse(null);
                     if (initializer != null) {
-                        return chainForwardOwner(initializer, depth + 1);
+                        return chainForwardOwner(initializer, ctx, depth + 1);
                     }
                 }
-            } catch (RuntimeException | LinkageError e) {
                 return null;
+            } catch (RuntimeException | LinkageError e) {
+                // `var` の型推論が壊れていると resolve() 自体が失敗する。囲み
+                // callable 内で同名宣言が一意なら、その initializer を確定 AST
+                // として前進解決する (一意でなければ shadowing の誤追跡を避けて
+                // 不採用)。local に該当が無ければ囲み型の bytecode field 型で
+                // 補完する (既存 step 3.6 と同じ classfile 根拠)。
+                Expression initializer = uniqueLocalInitializer(nameExpr);
+                if (initializer != null) {
+                    return chainForwardOwner(initializer, ctx, depth + 1);
+                }
+                return enclosingBytecodeFieldType(nameExpr.getNameAsString(), ctx);
             }
-            return null;
+        }
+        if (expr instanceof FieldAccessExpr fieldAccess
+                && fieldAccess.getScope() instanceof ThisExpr) {
+            return enclosingBytecodeFieldType(fieldAccess.getNameAsString(), ctx);
         }
         if (!(expr instanceof MethodCallExpr link)) {
             return null;
         }
         Expression scope = link.getScope().orElse(null);
+        String receiverOwner;
         if (scope == null) {
-            return null;
+            // 暗黙 this の link は囲み型の classfile candidate で前進する
+            // (継承 member は declared methods に現れないため、その場合は null)。
+            receiverOwner = ctx.enclosingTypeNode() != null
+                    ? tryBinaryNameOfEnclosing(ctx.enclosingTypeNode())
+                    : null;
+        } else {
+            receiverOwner = chainForwardOwner(scope, ctx, depth + 1);
         }
-        String receiverOwner = chainForwardOwner(scope, depth + 1);
         if (receiverOwner == null) {
             return null;
         }
@@ -1076,6 +1097,57 @@ public final class CallGraphBuilder {
             return null;
         }
         return returnType;
+    }
+
+    /**
+     * 囲み callable (method / constructor / initializer / lambda body を含む
+     * 最内の宣言) の中で同名の local 宣言が一意なら、その initializer を返す。
+     */
+    private static Expression uniqueLocalInitializer(NameExpr nameExpr) {
+        Node callable = null;
+        for (Node node = nameExpr.getParentNode().orElse(null); node != null; node = node.getParentNode().orElse(null)) {
+            if (node instanceof MethodDeclaration
+                    || node instanceof ConstructorDeclaration
+                    || node instanceof InitializerDeclaration) {
+                callable = node;
+                break;
+            }
+        }
+        if (callable == null) {
+            return null;
+        }
+        List<com.github.javaparser.ast.body.VariableDeclarator> matches = callable
+                .findAll(com.github.javaparser.ast.body.VariableDeclarator.class).stream()
+                .filter(declarator -> declarator.getNameAsString().equals(nameExpr.getNameAsString()))
+                .toList();
+        if (matches.size() != 1) {
+            return null;
+        }
+        return matches.get(0).getInitializer().orElse(null);
+    }
+
+    /** 囲み型の bytecode field 型 (classfile 根拠の receiver 補完)。 */
+    private String enclosingBytecodeFieldType(String fieldName, WalkContext ctx) {
+        if (ctx.enclosingTypeNode() == null) {
+            return null;
+        }
+        String ownerType = tryBinaryNameOfEnclosing(ctx.enclosingTypeNode());
+        if (ownerType == null) {
+            return null;
+        }
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerType).orElse(null);
+        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+            return null;
+        }
+        return bytecodeIndex.fieldType(ownerType, fieldName).orElse(null);
+    }
+
+    private static String tryBinaryNameOfEnclosing(Node enclosingTypeNode) {
+        try {
+            return BinaryNames.forTypeLikeNode(enclosingTypeNode);
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
     }
 
     private static boolean isPrimitiveOrVoid(String binaryName) {
@@ -1096,6 +1168,12 @@ public final class CallGraphBuilder {
         if (candidate == null) {
             return false;
         }
+        // 型名 scope の static call を instance member で救済しない境界 (PR #26)
+        // を forward 経路でも対称に維持する (forward の owner は式評価由来で
+        // 型名 scope になり得ないが、guard の非対称を残さない)。
+        if (!candidate.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
+            return false;
+        }
         emitBytecodeOnlyCall(mce, ctx, owner,
                 candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method");
         return true;
@@ -1108,12 +1186,21 @@ public final class CallGraphBuilder {
      * 型も取れない場合は false (diagnostic に残す)。
      */
     private boolean chainRootIsExternal(MethodCallExpr mce, WalkContext ctx) {
-        Expression cursor = mce.getScope().orElse(null);
+        return rootIsExternal(mce.getScope().orElse(null), ctx);
+    }
+
+    /** 式の起点型を遡及し、scope 外と判定できる場合だけ true (規則 (i) の実体)。 */
+    private boolean rootIsExternal(Expression start, WalkContext ctx) {
+        Expression cursor = start;
         int guard = 0;
         while (cursor != null && guard++ < 64) {
             String erasure = tryTypeErasureOf(cursor);
             if (erasure != null) {
                 return declIndex.find(erasure).isEmpty();
+            }
+            if (cursor instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
+                cursor = enclosed.getInner();
+                continue;
             }
             if (cursor instanceof MethodCallExpr link) {
                 Expression inner = link.getScope().orElse(null);
@@ -1124,9 +1211,40 @@ public final class CallGraphBuilder {
                 cursor = inner;
                 continue;
             }
+            if (cursor instanceof NameExpr nameExpr) {
+                // var 等の型が取れない変数は、確定 AST の initializer を起点として
+                // 遡及を続ける (規則 (i) の「chain 起点」を代入 chain へ拡張)。
+                Expression initializer = declaredInitializerOf(nameExpr);
+                if (initializer != null) {
+                    cursor = initializer;
+                    continue;
+                }
+                // local に該当が無ければ囲み型の bytecode field 型で判定する。
+                String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), ctx);
+                return fieldType != null && declIndex.find(fieldType).isEmpty();
+            }
+            if (cursor instanceof FieldAccessExpr fieldAccess
+                    && fieldAccess.getScope() instanceof ThisExpr) {
+                String fieldType = enclosingBytecodeFieldType(fieldAccess.getNameAsString(), ctx);
+                return fieldType != null && declIndex.find(fieldType).isEmpty();
+            }
             return false;
         }
         return false;
+    }
+
+    /** NameExpr の宣言 (resolve または囲み callable 内の一意宣言) の initializer。 */
+    private static Expression declaredInitializerOf(NameExpr nameExpr) {
+        try {
+            ResolvedValueDeclaration value = nameExpr.resolve();
+            Node ast = value.toAst().orElse(null);
+            if (ast instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+                return declarator.getInitializer().orElse(null);
+            }
+            return null;
+        } catch (RuntimeException | LinkageError e) {
+            return uniqueLocalInitializer(nameExpr);
+        }
     }
 
     /**
@@ -1135,7 +1253,7 @@ public final class CallGraphBuilder {
      * 型、または代入先変数の宣言型 = functional interface の宣言元) が scope 外
      * 型なら true。scope 内 functional interface / 判定不能は false。
      */
-    private boolean lambdaParamReceiverIsExternal(MethodCallExpr mce) {
+    private boolean lambdaParamReceiverIsExternal(MethodCallExpr mce, WalkContext ctx) {
         if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
             return false;
         }
@@ -1155,8 +1273,13 @@ public final class CallGraphBuilder {
                 if (outerScope == null) {
                     return false; // 暗黙 this の受け手 = scope 内。
                 }
+                // 受け手が失敗 chain の途中でも、external 判定には member 解決は
+                // 不要で、起点型の遡及 (規則 (i) と同じ traversal) で判定できる。
                 String owner = tryTypeErasureOf(outerScope);
-                return owner != null && declIndex.find(owner).isEmpty();
+                if (owner != null) {
+                    return declIndex.find(owner).isEmpty();
+                }
+                return rootIsExternal(outerScope, ctx);
             }
             if (parent instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
                 try {
