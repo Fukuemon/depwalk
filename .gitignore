@@ -16,3 +16,4 @@ scripts/link.sh
 testdata/fixtures/java/multi-module-spring-project/**/build/
 testdata/fixtures/java/multi-module-spring-project/build/
 testdata/fixtures/java/multi-module-spring-project/.gradle/
+testdata/fixtures/java/multi-module-spring-project/patterns/.gradle/
