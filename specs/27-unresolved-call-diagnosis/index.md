@@ -28,7 +28,7 @@
 | 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                                                    |
 | 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                                      |
 | 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                                                  |
-| 10  | 実装分割                    | 進行中     | 2026-07-21 | P1〜P9 のタスク表を作成済み。prompts 生成 (tasks phase) は未着手                                |
+| 10  | 実装分割                    | 完了       | 2026-07-21 | prompts/ へ 9 prompt を生成 (hook 10節検査 全 OK)。レビュー待ち                                 |
 | 11  | レビュー済                  | 未着手     |            |                                                                                                 |
 
 ## 上位文書整合
@@ -319,6 +319,22 @@ sequenceDiagram
 - P1〜P2 は `java-analyzer` 内で閉じる実装 prompt、P3〜P4 は調査・レポート・判定の作業 prompt、P5〜P8 は要因クラス別の修正 prompt、P9 は再計測と sync の締め prompt として分ける
 - P2 (fixture) と P3 (実測再計測) は P1 完了後に並列実行できる。P5〜P8 は fixture (P2) と判定 (P4) 完了後に相互独立で並列実行できる
 
+### 生成済み prompts (2026-07-21, tasks phase)
+
+タスク案の P1〜P9 を `prompts/` 配下の 9 ファイルへ写像した。prompt phase 番号は依存順で振り直している。
+
+| ファイル (prompts/)                                 | タスク案 | 並列可                | 依存先            | 概要                                                |
+| --------------------------------------------------- | -------- | --------------------- | ----------------- | --------------------------------------------------- |
+| `P1_01_java-analyzer_diagnostic-metadata.md`        | P1       | -                     | なし              | 診断 metadata 4項目の実装                           |
+| `P2_01_java-analyzer_unresolved-fixture.md`         | P2       | P2_02                 | P1_01             | 最小再現 fixture 5 パターンと期待値                 |
+| `P2_02_java-analyzer_remeasure-classification.md`   | P3       | P2_01                 | P1_01             | 実プロジェクト再計測と 8 分類レポート (`report.md`) |
+| `P3_01_java-analyzer_disposition.md`                | P4       | -                     | P2_02             | D3 基準の対応方針判定 (ユーザー承認ゲート)          |
+| `P4_01_java-analyzer_reference-super-fallback.md`   | P5       | P4_02 / P4_03 / P4_04 | P2_01, P3_01      | ④⑤ method reference / explicit super の救済         |
+| `P4_02_java-analyzer_lombok-cross-module.md`        | P6       | P4_01 / P4_03 / P4_04 | P2_01, P3_01      | ⑧ cross-module 生成 member 救済の欠陥修正           |
+| `P4_03_java-analyzer_receiver-unknown-external.md`  | P7       | P4_01 / P4_02 / P4_04 | P2_01, P3_01      | ⑥ receiver 型不明時の external-target 判定          |
+| `P4_04_java-analyzer_type-inference-workarounds.md` | P8       | P4_01 / P4_02 / P4_03 | P2_01, P3_01      | ①②③⑦ 回避策 (P3_01 で修正判定分のみ)                |
+| `P5_01_java-analyzer_remeasure-sync.md`             | P9       | -                     | P4_01〜P4_04 全部 | 修正後再計測・ADR-0004 判定・spec / issue 締め      |
+
 ## 上位資料からの変更点
 
 本 spec で PRD / Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。`spec-track` / `spec-sync` で更新する。
@@ -380,6 +396,7 @@ sequenceDiagram
 | 2026-07-21 | Fukuemon | diagram phase で解析フロー flowchart と call site 解決パイプライン sequence を追加                                       |
 | 2026-07-21 | Fukuemon | track phase で上位資料からの変更点を最新化 (feature doc 3件 / context 変更なし確認 / ADR-0004 条件付き追記)              |
 | 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針) |
+| 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                    |
 
 ## 備考
 
