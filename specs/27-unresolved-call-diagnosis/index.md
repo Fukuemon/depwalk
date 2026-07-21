@@ -1,7 +1,8 @@
 # 実環境Gradle multi-projectの残存未解決callの診断と救済
 
 > 本文書は Issue #27 の spec-lifecycle における作業記録である。
-> 当初 `type:research` (要因分類レポート + 後続issue起票) として開始したが、2026-07-21 に `type:bug` の対応 issue へ変換し、診断 metadata 追加・救済ロジック修正・fixture 追加・再計測までを本 spec / branch で実施する。確定した durable な設計成果は sync phase で feature doc / context / ADR へハンドオフする。
+> 当初 `type:research` (要因分類レポート + 後続issue起票) として開始したが、2026-07-21 に `type:bug` の対応 issue へ変換し、診断 metadata 追加・救済ロジック修正・fixture 追加・再計測までを本 spec / branch で実施する。
+> durable な設計成果 (診断 metadata 契約 / 救済適用範囲 / fixture 方針) は 2026-07-21 の sync phase で [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済みであり、以後 feature doc が正本、本 spec の該当記述は決定時スナップショットである。ADR-0004 への追記要否のみ P9 (再計測) 後に判断する。
 
 ## メタ情報
 
@@ -16,19 +17,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                       |
-| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換     |
-| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS            |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-21 | 矛盾未検出 (すべて継承 / 補足)。D2 の feature doc 補足は sync phase で反映 |
-| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                            |
-| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS |
-| 6   | Interface / Routing 設計    | 完了       | 2026-07-21 | 外部 I/F 変更なし (D2 で確定)。diagram phase で解決パイプライン図を追加    |
-| 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                               |
-| 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                 |
-| 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                             |
-| 10  | 実装分割                    | 進行中     | 2026-07-21 | P1〜P9 のタスク表を作成済み。prompts 生成 (tasks phase) は未着手           |
-| 11  | レビュー済                  | 未着手     |            |                                                                            |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                         |
+| --- | --------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換                       |
+| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS                              |
+| 3   | 上位文書突合                | 完了       | 2026-07-21 | sync phase で feature doc へ正本ハンドオフ済み (D2/D3/D4)。ADR-0004 は P9 判定。レビュー待ち |
+| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                                              |
+| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS                   |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-21 | 外部 I/F 変更なし (D2 で確定)。diagram phase で解決パイプライン図を追加                      |
+| 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                                                 |
+| 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                                   |
+| 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                                               |
+| 10  | 実装分割                    | 進行中     | 2026-07-21 | P1〜P9 のタスク表を作成済み。prompts 生成 (tasks phase) は未着手                             |
+| 11  | レビュー済                  | 未着手     |            |                                                                                              |
 
 ## 上位文書整合
 
@@ -336,11 +337,11 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節                                                                        | 変更内容                                                                                                                                                                                                                                           | 理由                                                                                             |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| java-analyzer / `diagnostic / error code 体系`                                       | `error.details.metadata` へ sanitize 済み診断4項目 (`resolutionPhase` / `exceptionClass` / receiver 式種別 / receiver 型取得成否) を追加 (source: clarify D2)                                                                                      | 要因クラスの機械集計に必要。Protocol schema 非破壊・D24 sanitize 制約維持                        |
-| java-analyzer / `Parse・resolution・call 完全性`、`solver 層の bytecode member 合成` | bytecode 救済と external-target 分類の適用対象を method call だけでなく method reference / explicit `super(...)` へ拡大し (④⑤)、cross-module の生成 member 救済 (⑧) と receiver 型不明時の external-target 判定 (⑥) を追加 (source: clarify D3/D5) | 実測で判明した救済ロジック欠落の修正。帰属意味論・完全性 gate の枠組みは変えず適用範囲のみ広げる |
-| java-analyzer / `テスト観点`                                                         | `multi-module-spring-project` fixture へ上位パターン (①④⑤⑦⑧) の最小再現ケースと診断 metadata 期待値検証を追加 (source: clarify D4)                                                                                                                 | 救済修正の回帰検証と診断 metadata の sanitize 制約検証を E2E で担保する                          |
+| 対象 doc / 節                                                                        | 変更内容                                                                                                                                                                                                                                                                          | 理由                                                                                             |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| java-analyzer / `diagnostic / error code 体系`                                       | `error.details.metadata` へ sanitize 済み診断4項目 (`resolutionPhase` / `exceptionClass` / receiver 式種別 / receiver 型取得成否) を追加 (source: clarify D2) — **反映済 (2026-07-21 sync)**                                                                                      | 要因クラスの機械集計に必要。Protocol schema 非破壊・D24 sanitize 制約維持                        |
+| java-analyzer / `Parse・resolution・call 完全性`、`solver 層の bytecode member 合成` | bytecode 救済と external-target 分類の適用対象を method call だけでなく method reference / explicit `super(...)` へ拡大し (④⑤)、cross-module の生成 member 救済 (⑧) と receiver 型不明時の external-target 判定 (⑥) を追加 (source: clarify D3/D5) — **反映済 (2026-07-21 sync)** | 実測で判明した救済ロジック欠落の修正。帰属意味論・完全性 gate の枠組みは変えず適用範囲のみ広げる |
+| java-analyzer / `テスト観点`                                                         | `multi-module-spring-project` fixture へ上位パターン (①④⑤⑦⑧) の最小再現ケースと診断 metadata 期待値検証を追加 (source: clarify D4) — **反映済 (2026-07-21 sync)**                                                                                                                 | 救済修正の回帰検証と診断 metadata の sanitize 制約検証を E2E で担保する                          |
 
 ### context への影響
 
@@ -376,6 +377,7 @@ sequenceDiagram
 | 2026-07-21 | Fukuemon | issue #27 を research → bug へ変換 (ユーザー判断)。対応実装まで本 spec のスコープへ拡大し、D5 改訂・実装分割 P5〜P9 追加 |
 | 2026-07-21 | Fukuemon | diagram phase で解析フロー flowchart と call site 解決パイプライン sequence を追加                                       |
 | 2026-07-21 | Fukuemon | track phase で上位資料からの変更点を最新化 (feature doc 3件 / context 変更なし確認 / ADR-0004 条件付き追記)              |
+| 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針) |
 
 ## 備考
 
