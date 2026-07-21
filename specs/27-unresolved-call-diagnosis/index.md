@@ -2,14 +2,14 @@
 
 > 本文書は Issue #27 の spec-lifecycle における作業記録である。
 > 当初 `type:research` (要因分類レポート + 後続issue起票) として開始したが、2026-07-21 に `type:bug` の対応 issue へ変換し、診断 metadata 追加・救済ロジック修正・fixture 追加・再計測までを本 spec / branch で実施する。
-> durable な設計成果 (診断 metadata 契約 / 救済適用範囲 / fixture 方針) は 2026-07-21 の sync phase で [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済みであり、以後 feature doc が正本、本 spec の該当記述は決定時スナップショットである。ADR-0004 への追記要否のみ P9 (再計測) 後に判断する。
+> durable な設計成果 (診断 metadata 契約 / 救済適用範囲 / fixture 方針) は 2026-07-21 の sync phase で [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済みであり、以後 feature doc が正本、本 spec の該当記述は決定時スナップショットである。ADR-0004 は実装後の実測評価に基づき 2026-07-22 に「状態追記」で更新済み ([ADR-0004](../../adr/0004-defer-runtime-call-tracing.md#状態追記-spec-27-2026-07-21))。
 
 ## メタ情報
 
 - Issue: `#27`
 - ステータス: `In Progress`
 - 作成日: 2026-07-20
-- 更新日: 2026-07-21
+- 更新日: 2026-07-22
 - Branch: `feature-27`
 - Owner: Fukuemon
 
@@ -17,19 +17,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                            |
-| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換                          |
-| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS                                 |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-21 | sync phase で feature doc へ正本ハンドオフ済み (D2/D3/D4)。ADR-0004 は P9 判定。再レビュー PASS |
-| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                                                 |
-| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS                      |
-| 6   | Interface / Routing 設計    | 完了       | 2026-07-21 | 外部 I/F 変更なし (D2 で確定)。diagram phase で解決パイプライン図を追加                         |
-| 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                                                    |
-| 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                                      |
-| 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                                                  |
-| 10  | 実装分割                    | レビュー済 | 2026-07-21 | prompts/ へ 9 prompt を生成 (hook 10節検査 全 OK)。spec-review PASS                             |
-| 11  | レビュー済                  | レビュー済 | 2026-07-21 | tasks phase の fresh-context review PASS。軽微指摘2件反映済み。実装開始可能                     |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                             |
+| --- | --------------------------- | ---------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| 1   | 起票                        | 完了       | 2026-07-21 | Issue #27 を確認済み。2026-07-21 に research → bug (対応 issue) へ変換                           |
+| 2   | 下書き                      | レビュー済 | 2026-07-21 | スコープ変更 (対応まで本 spec で実施) を反映し、再レビュー PASS                                  |
+| 3   | 上位文書突合                | 完了       | 2026-07-22 | sync phase で feature doc へ正本ハンドオフ済み (D2/D3/D4)。ADR-0004 状態追記を反映。レビュー待ち |
+| 4   | 論点整理                    | レビュー済 | 2026-07-21 | D1〜D5 を抽出。spec-review PASS                                                                  |
+| 5   | 論点解決                    | レビュー済 | 2026-07-21 | D1〜D5 確定。D5 はユーザー判断で改訂 (本 spec で対応実施)。再レビュー PASS                       |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-21 | 外部 I/F 変更なし (D2 で確定)。diagram phase で解決パイプライン図を追加                          |
+| 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                                                     |
+| 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                                       |
+| 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                                                   |
+| 10  | 実装分割                    | レビュー済 | 2026-07-21 | prompts/ へ 9 prompt を生成 (hook 10節検査 全 OK)。spec-review PASS                              |
+| 11  | レビュー済                  | レビュー済 | 2026-07-21 | tasks phase の fresh-context review PASS。軽微指摘2件反映済み。実装開始可能                      |
 
 ## 上位文書整合
 
@@ -37,17 +37,17 @@
 
 - PRD 更新要否: 不要。本プロジェクトは統合モードであり、Why / What は Design Doc に統合されている。
 - Design Doc 更新要否: 不要。未解決 call の観測可能性は既存の成功条件 S1/S2 と ADR-0004 の枠内。診断 metadata 追加 (D2) と救済 fallback 修正は feature doc への補足として sync phase で反映する (「feature doc への影響」テーブル記載済み)。
-- ADR 起票要否: 不要 (新規起票なし)。JavaParser 上流限界による v1 scope 外記録が ADR-0004 の再検討条件に抵触するかは P4 / P9 (再計測) で最終化し、必要なら ADR-0004 への追記を sync phase で提案する。
+- ADR 起票要否: 不要 (新規起票なし)。ADR-0004 は状態追記で更新済み (反映済 2026-07-22)。決定・再検討条件の本文は変更していない。
 
-| 上位文書                    | 節 / 該当箇所                                                     | 整合方針 (継承 / 補足 / 変更提案)                                                        |
-| --------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Design Doc                  | 成功条件 S1/S2 (caller/callee 探索の網羅性)                       | 継承                                                                                     |
-| feature doc (java-analyzer) | 完全性 gate (`JAVA_INCOMPLETE_ANALYSIS`) / `error.details` の契約 | 継承。Protocol schema は変更しない前提で診断を深掘りする                                 |
-| feature doc (java-analyzer) | solver 層の bytecode member 合成の適用範囲                        | 補足。method reference / explicit super / cross-module Lombok 救済の欠落箇所を具体化する |
-| ADR-0004                    | 動的・未解決 call の候補と理由を観測可能にする方針、再検討条件    | 継承。本 issue は再検討条件に抵触するかを論点として扱う                                  |
-| context (architecture.md)   | Package Boundary (Core は Analyzer 固有の意味を解釈しない)        | 継承。診断 metadata 拡張は Java Analyzer 内部に閉じる想定                                |
+| 上位文書                    | 節 / 該当箇所                                                     | 整合方針 (継承 / 補足 / 変更提案)                                                               |
+| --------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Design Doc                  | 成功条件 S1/S2 (caller/callee 探索の網羅性)                       | 継承                                                                                            |
+| feature doc (java-analyzer) | 完全性 gate (`JAVA_INCOMPLETE_ANALYSIS`) / `error.details` の契約 | 継承。Protocol schema は変更しない前提で診断を深掘りする                                        |
+| feature doc (java-analyzer) | solver 層の bytecode member 合成の適用範囲                        | 補足。method reference / explicit super / cross-module Lombok 救済の欠落箇所を具体化する        |
+| ADR-0004                    | 動的・未解決 call の候補と理由を観測可能にする方針、再検討条件    | 継承。実測により再検討条件への非抵触を確認し、状態追記として ADR へ記録した (反映済 2026-07-22) |
+| context (architecture.md)   | Package Boundary (Core は Analyzer 固有の意味を解釈しない)        | 継承。診断 metadata 拡張は Java Analyzer 内部に閉じる想定                                       |
 
-> 矛盾は未検出。D2 (診断 metadata) と救済 fallback 修正の feature doc 反映、および ADR-0004 追記の要否判断 (P9) を sync phase で扱う。
+> 矛盾は未検出。D2 (診断 metadata) と救済 fallback 修正は feature doc へ反映済み、ADR-0004 は状態追記で反映済み (いずれも 2026-07-22 時点で完了)。
 
 ## 関連資料
 
@@ -125,7 +125,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 - **D2 (診断用の追加観測)**: `error.details.metadata` へ sanitize 済みの4項目 — `resolutionPhase` (どの解決段階で失敗したか) / `exceptionClass` (JavaParser 例外のクラス名のみ、message は含めない) / receiver 式種別 / receiver 型取得成否 — を追加する。Protocol schema は非破壊 (metadata は opaque な key-value のまま) で、#24 D24 の sanitize 制約 (source 本文・絶対 path・raw exception message 禁止) を維持する。これにより8分類 (D1) への機械的な振り分けと「未分類」残余の解消を可能にする。(決定日: 2026-07-20, source: clarify, 案A)
 - **D3 (対応方針の判定基準)**: 次の3基準で各要因クラスを判定する。(a) 自前実装の救済ロジック欠落 (④method reference / ⑤explicit super / ⑧Lombok cross-module 等、depwalk 側で閉じて修正できるもの) → **修正**。(b) scope 外 call なのに receiver 型不明で `external-target` 分類へ到達できないもの (⑥) → **修正 (分類ロジック改善)**。(c) 上流 (JavaParser) の型推論限界 (①②③⑦) → 回避策の実装コストと件数規模で修正 / v1 scope 外記録を個別判断し、scope 外とする場合は ADR-0004 の再検討条件との整合 (静的解析で主要ユースケースの精度を満たせないか) を明記して記録する。(決定日: 2026-07-20, source: clarify, 案A)
 - **D4 (最小再現 fixture の方針)**: 既存の `testdata/fixtures/java/multi-module-spring-project` fixture へ、上位パターン (⑧Lombok cross-module、⑦`var`+generic、①fluent chain、④method reference、⑤explicit super) の最小再現ケースを追加する。実測対象コードへ依存しない一般化した形で表現し、既存 E2E 基盤を再利用して修正後の回帰検証にもそのまま使う。既存 fixture の期待 graph / diagnostic 集合への影響は追加ケース分の期待値更新で吸収する。(決定日: 2026-07-20, source: clarify, 案A)
-  - **実装時の逸脱 (2026-07-21, P2_01, ユーザー追認待ち)**: (1) 完全性 gate は request 全体を fatal にするため、未解決ケースを既存 fixture の discovery 対象 workspace へ直接追加すると既存 required E2E (成功 graph / exit 0) と両立できない。このため fixture 配下の独立入れ子 build `patterns/` (root settings 非包含) として追加し、専用 E2E `TestUnresolvedCallPatternsCLI` で修正前の未解決 10 件と診断 metadata を固定した。既存期待 graph は不変。(2) ①fluent chain の「lambda / generic を含む builder 風 API」形は、一般化 2 形状 (通常 generic builder / 自己境界 generic builder + overload + lambda) とも JavaParser 3.28.2 が解決に成功し再現しなかったため、成功回帰ガードとして fixture に残し、真の再現形は P2_02 の実測診断で特定して P4_04 で追加する。①の chain 途中で receiver 型が失われ後続 call が未解決になる機構自体は ⑧ 起点の chain (FluentChainCase) で再現済み。
+  - **実装時の逸脱 (2026-07-21 記録、2026-07-22 確定)**: (1) 完全性 gate は request 全体を fatal にするため、未解決ケースを既存 fixture の discovery 対象 workspace へ直接追加すると既存 required E2E (成功 graph / exit 0) と両立できない。このため fixture 配下の独立入れ子 build `patterns/` (root settings 非包含) として追加し、専用 E2E `TestUnresolvedCallPatternsCLI` で修正前の未解決 10 件と診断 metadata を固定した。既存期待 graph は不変。correctness / spec-contract の2観点レビューで指摘なしを確認済みであり、**確定**とする。(2) ①fluent chain の「lambda / generic を含む builder 風 API」形は、一般化 2 形状 (通常 generic builder / 自己境界 generic builder + overload + lambda) とも JavaParser 3.28.2 が解決に成功し fixture では再現しなかった。真の再現形の特定は打ち切り、成功回帰ガードとして fixture に残す。実プロジェクトでの効果は P4_04 (chain 前進解決 + 起点遡及の一般化) の再計測で確認済み: Resilience4j の①/⑥ chain 波及バケットは修正前 173 件 → 最終 33 件まで減少しており、①の実質的な要因 (chain 途中の receiver 型消失) は解消できている。**確定**とする。
 - **D5 (対応の実施単位)**: 当初「集約 issue として起票」(2026-07-21, 案C) と決定したが、同日のユーザー判断で **後続 issue を起票せず、本 issue #27 / branch `feature-27` で対応まで実施する**方針へ変更した (issue #27 も `type:research` → `type:bug` へ変換済み)。「修正」判定の要因クラス (④method reference fallback / ⑤explicit super fallback / ⑥receiver 型不明時の external-target 判定 / ⑧Lombok cross-module 救済 / ①②③⑦JavaParser 型推論の回避策のうち修正と判定したもの) を本 spec の実装分割 (P4以降) として扱う。効果測定は同一 commit の実プロジェクト再計測で要因クラス別件数を追跡する。(決定日: 2026-07-21, source: clarify → ユーザー判断で改訂)
 
 ## 未確定事項
@@ -374,9 +374,9 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 
 ### ADR の新規 / 更新
 
-| ADR ID   | 変更内容                                                                                                                                                                | 理由                                                                                                    |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| ADR-0004 | (条件付き・P9 で判定) JavaParser 上流限界による v1 scope 外記録が確定した場合、`## 決定` 節の観測可能性の方針へ診断 metadata による要因クラス観測を追記 (source: track) | scope 外と判定した残存が ADR-0004 の再検討条件に抵触するかを再計測後に最終化し、判断の所在を ADR に残す |
+| ADR ID   | 変更内容                                                                                                                                                                                                                                                                                                                         | 理由                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| ADR-0004 | `## 決定` 節へ「状態追記 (spec #27、2026-07-21)」を追加: D2 の診断 metadata が観測可能性の方針を具体化したこと、実測 (97.7%〜98.7% 解決/scope外判定) により再検討条件に抵触しないと判断したこと、`allowIncompleteAnalysis` opt-in 緩和が Runtime Trace とは独立であることを記録 (source: P5_01 実装後) — **反映済 (2026-07-22)** | 決定自体は変更せず、実測に基づく判断根拠を ADR に残すことで将来の再検討時に同じ調査を繰り返さずに済む |
 
 ## レビュー
 
@@ -409,6 +409,7 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 | 2026-07-21 | Fukuemon | 実装 P1_01 (診断 metadata) / P2_01 (patterns fixture + 専用 E2E) 完了。D4 実装時の逸脱 2 件を記録 (ユーザー追認待ち)     |
 | 2026-07-21 | Fukuemon | P2_02〜P5_01 (再計測・P3_01対応方針承認・P4_01〜P4_04修正) 完了。R4j 350→143、追加検証 14,248→1,161 まで削減             |
 | 2026-07-21 | Fukuemon | ユーザー判断で完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を追加実装し、やること/成功条件へ反映      |
+| 2026-07-22 | Fukuemon | D4 実装時の逸脱2件を確定 (ユーザー指示によりレビュー結果と実測効果で判断)。ADR-0004 を状態追記で更新し spec 側を同期     |
 
 ## 備考
 
