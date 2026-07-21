@@ -318,7 +318,8 @@ public final class CallGraphBuilder {
             }
             reportUnresolved(mce, ctx);
             commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                    "unresolved-method-call", mce.getNameAsString());
+                    "unresolved-method-call", mce.getNameAsString(),
+                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, mce.getScope().orElse(null), "implicit-this"));
             return;
         }
 
@@ -330,7 +331,8 @@ public final class CallGraphBuilder {
             if (!synthesized.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
                 reportUnresolved(mce, ctx);
                 commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                        "unresolved-method-call", mce.getNameAsString());
+                        "unresolved-method-call", mce.getNameAsString(),
+                        diagnosticMetadata(PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null));
                 return;
             }
             WorkspaceSourceDeclarationIndex.TypeLocation owner =
@@ -387,7 +389,8 @@ public final class CallGraphBuilder {
             }
             reportUnresolved(oce, ctx);
             commitDiagnostic(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
-                    "unresolved-constructor-call", oce.getTypeAsString());
+                    "unresolved-constructor-call", oce.getTypeAsString(),
+                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, oce.getScope().orElse(null), "none"));
             return;
         }
         emitConstructorCall(resolved, oce, ctx, CallSiteId.CallKind.OBJECT_CREATION);
@@ -401,7 +404,8 @@ public final class CallGraphBuilder {
             rethrowUnlessIsolableResolutionFailure(e);
             reportUnresolved(ecis, ctx);
             commitDiagnostic(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
-                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super");
+                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super",
+                    diagnosticMetadata(PHASE_SOLVER_RESOLVE, e, null, ecis.isThis() ? "this" : "super"));
             return;
         }
         emitConstructorCall(resolved, ecis, ctx, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION);
@@ -448,7 +452,8 @@ public final class CallGraphBuilder {
             rethrowUnlessIsolableResolutionFailure(e);
             reportUnresolved(mre, ctx);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-method-reference", mre.getIdentifier());
+                    "unresolved-method-reference", mre.getIdentifier(),
+                    diagnosticMetadata(PHASE_SOLVER_RESOLVE, e, mre.getScope(), null));
             return;
         }
 
@@ -494,20 +499,23 @@ public final class CallGraphBuilder {
             if (!scopeType.isReferenceType()) {
                 reportUnresolved(mre, ctx);
                 commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString());
+                        "unresolved-constructor-reference", mre.getScope().toString(),
+                        diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null));
                 return;
             }
             scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
             if (scopeDecl == null) {
                 reportUnresolved(mre, ctx);
                 commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString());
+                        "unresolved-constructor-reference", mre.getScope().toString(),
+                        diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null));
                 return;
             }
         } catch (RuntimeException | LinkageError e) {
             reportUnresolved(mre, ctx);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-constructor-reference", mre.getScope().toString());
+                    "unresolved-constructor-reference", mre.getScope().toString(),
+                    diagnosticMetadata(PHASE_SOLVER_RESOLVE, e, mre.getScope(), null));
             return;
         }
 
@@ -522,7 +530,8 @@ public final class CallGraphBuilder {
         if (resolvedCtor == null) {
             reportUnresolved(mre, ctx);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "ambiguous-constructor-reference", mre.getScope().toString());
+                    "ambiguous-constructor-reference", mre.getScope().toString(),
+                    diagnosticMetadata(PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null));
             return;
         }
 
@@ -664,13 +673,61 @@ public final class CallGraphBuilder {
     }
 
     private void commitDiagnostic(Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target) {
+        commitDiagnostic(callNode, kind, ctx, reason, target, null);
+    }
+
+    private void commitDiagnostic(
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target,
+            Map<String, Object> diagnosticMetadata) {
         for (String caller : ledgerCallers(callNode, ctx)) {
             ledger.commitDiagnostic(
                     CallSiteInventory.of(callNode, currentPath, kind, caller),
                     JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
                     reason,
                     target,
-                    null);
+                    null,
+                    diagnosticMetadata);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 解決失敗の診断 metadata (spec #27 D2)
+    // ------------------------------------------------------------------
+
+    /** 診断 metadata の resolutionPhase 安定値。 */
+    static final String PHASE_SOLVER_RESOLVE = "solver-resolve";
+    static final String PHASE_BYTECODE_RESCUE = "bytecode-rescue";
+    static final String PHASE_SYNTHESIS_STATIC_GUARD = "member-synthesis-static-guard";
+    static final String PHASE_CONSTRUCTOR_REFERENCE_SELECTION = "constructor-reference-selection";
+
+    /**
+     * primary diagnostic へ添える sanitize 済み診断 4 項目 (spec #27 D2) を構築する。
+     * 含めるのは安定値だけ: 失敗した解決段階、resolver 例外のクラス名 (message は
+     * 含めない)、receiver 式種別 (AST 型名)、receiver 静的型の取得成否。
+     *
+     * @param phase 失敗した解決段階 ({@code PHASE_*})
+     * @param failure resolve 例外。例外を伴わない失敗 (候補選択の曖昧さ等) は null
+     * @param scope receiver 式。暗黙 this / receiver を持たない call は null
+     * @param implicitReceiverKind scope が null のときの receiver 種別表記
+     */
+    private Map<String, Object> diagnosticMetadata(
+            String phase, Throwable failure, Expression scope, String implicitReceiverKind) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("resolutionPhase", phase);
+        if (failure != null) {
+            metadata.put("exceptionClass", failure.getClass().getName());
+        }
+        metadata.put("receiverKind", scope != null ? scope.getClass().getSimpleName() : implicitReceiverKind);
+        metadata.put("receiverTypeResolved", scope != null ? receiverTypeResolves(scope) : true);
+        return metadata;
+    }
+
+    /** receiver 式の静的型を計算できるか (診断 metadata の receiverTypeResolved)。 */
+    private static boolean receiverTypeResolves(Expression scope) {
+        try {
+            return scope.calculateResolvedType().isReferenceType();
+        } catch (RuntimeException | LinkageError e) {
+            return false;
         }
     }
 
