@@ -59,6 +59,9 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	// (①の真の再現形は P2_02 の実測診断で特定し、P4_04 で fixture へ追加する)。
 	// 現状の全 detail は resolver 例外を伴う失敗のため、exceptionClass は
 	// phase を問わず非空のクラス名になる前提で一律検査する。
+	// P4_01 で ④⑤ の bytecode 救済経路が追加されたが、cross-module の index
+	// 欠陥 (⑧、P4_02 対象) が同じ土台のため件数は変わらず、phase だけが
+	// bytecode-rescue へ変わった (救済試行に到達している証跡)。
 	if len(errorRecord.Details) != 10 {
 		t.Errorf("details = %d entries, want 10 (current pre-fix expectation): %+v",
 			len(errorRecord.Details), errorRecord.Details)
@@ -76,13 +79,13 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	wants := []wantDetail{
 		{"CrossModuleLombokCase.java", "object-creation", "unresolved-constructor-call", "Item", "bytecode-rescue", "none", true},
 		{"CrossModuleLombokCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "NameExpr", true},
-		{"ExplicitSuperCase.java", "explicit-constructor-invocation", "unresolved-constructor-call", "super", "solver-resolve", "super", true},
+		{"ExplicitSuperCase.java", "explicit-constructor-invocation", "unresolved-constructor-call", "super", "bytecode-rescue", "super", true},
 		{"FluentChainCase.java", "object-creation", "unresolved-constructor-call", "Item", "bytecode-rescue", "none", true},
 		{"FluentChainCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "ObjectCreationExpr", true},
 		{"FluentChainCase.java", "method-call", "unresolved-method-call", "trim", "bytecode-rescue", "MethodCallExpr", false},
 		{"FluentChainCase.java", "method-call", "unresolved-method-call", "isEmpty", "bytecode-rescue", "MethodCallExpr", false},
 		{"MethodReferenceCase.java", "method-call", "unresolved-method-call", "collect", "bytecode-rescue", "MethodCallExpr", false},
-		{"MethodReferenceCase.java", "method-reference", "unresolved-method-reference", "getName", "solver-resolve", "TypeExpr", true},
+		{"MethodReferenceCase.java", "method-reference", "unresolved-method-reference", "getName", "bytecode-rescue", "TypeExpr", true},
 		{"VarGenericCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "NameExpr", true},
 	}
 	bareClassName := regexp.MustCompile(`^[\w.$]+$`)
