@@ -220,7 +220,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ### Fallback
 
-- ④⑤の resolve 失敗時 fallback、⑥の external-target 判定、⑧の cross-module 救済の各 fallback 実装が本 spec の対応対象 (実装分割 P5〜P7)。判定根拠の詳細は P4 で確定する。
+- ④⑤の resolve 失敗時 fallback (`prompts/P4_01`)、⑥の external-target 判定 (`prompts/P4_03`)、⑧の cross-module 救済 (`prompts/P4_02`) の各 fallback 実装が本 spec の対応対象。判定根拠の詳細は `prompts/P3_01` で確定する。実装済み (P4_01〜P4_04 は 2026-07-21 完了、詳細は `report.md` の再計測結果参照)。
 
 ## テスト / 評価方針
 
