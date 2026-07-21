@@ -28,8 +28,8 @@
 | 7   | Content / Data 設計         | 完了       | 2026-07-21 | 要因分類レポートの配置を確定                                                                    |
 | 8   | Performance / Security 設計 | 完了       | 2026-07-21 | 実測データの記載範囲を確定                                                                      |
 | 9   | Test / Metrics 設計         | 完了       | 2026-07-21 | fixture 検証・再計測指標を確定                                                                  |
-| 10  | 実装分割                    | 完了       | 2026-07-21 | prompts/ へ 9 prompt を生成 (hook 10節検査 全 OK)。レビュー待ち                                 |
-| 11  | レビュー済                  | 未着手     |            |                                                                                                 |
+| 10  | 実装分割                    | レビュー済 | 2026-07-21 | prompts/ へ 9 prompt を生成 (hook 10節検査 全 OK)。spec-review PASS                             |
+| 11  | レビュー済                  | レビュー済 | 2026-07-21 | tasks phase の fresh-context review PASS。軽微指摘2件反映済み。実装開始可能                     |
 
 ## 上位文書整合
 
@@ -322,6 +322,7 @@ sequenceDiagram
 ### 生成済み prompts (2026-07-21, tasks phase)
 
 タスク案の P1〜P9 を `prompts/` 配下の 9 ファイルへ写像した。prompt phase 番号は依存順で振り直している。
+P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイルと fixture 期待集合を更新するため、真に並列実行する場合は期待値更新の merge 衝突に注意する (逐次実行を推奨)。
 
 | ファイル (prompts/)                                 | タスク案 | 並列可                | 依存先            | 概要                                                |
 | --------------------------------------------------- | -------- | --------------------- | ----------------- | --------------------------------------------------- |
@@ -384,6 +385,7 @@ sequenceDiagram
 | 2026-07-21 | PASS (track phase 再レビュー)   | 指摘なし。前回4件すべて解消を確認                                                                       | -                                                                                                      |
 | 2026-07-21 | NEEDS_WORK (sync phase)         | 1件: feature doc のハンドオフ台帳 (上位資料からの変更点) に spec #27 行が未追加                         | 反映済み (spec #27 行を追加)。再レビューへ                                                             |
 | 2026-07-21 | PASS (sync phase 再レビュー)    | 指摘なし。台帳と本文の整合を確認                                                                        | -                                                                                                      |
+| 2026-07-21 | PASS (tasks phase)              | 軽微3件: P5_01 の全体 E2E に fixture prep が必要 / P4 系並列時の期待値衝突注意 / fixture task 名の許容  | 前2件を反映済み (P5_01 へ prep 追記、実装分割へ注意書き)。3件目は注記済みで対応不要                    |
 
 ## 変更履歴
 
@@ -397,6 +399,7 @@ sequenceDiagram
 | 2026-07-21 | Fukuemon | track phase で上位資料からの変更点を最新化 (feature doc 3件 / context 変更なし確認 / ADR-0004 条件付き追記)              |
 | 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針) |
 | 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                    |
+| 2026-07-21 | Fukuemon | tasks phase レビュー PASS。軽微指摘 (P5_01 fixture prep / P4 並列注意) を反映し、全 phase レビュー済みへ                 |
 
 ## 備考
 
