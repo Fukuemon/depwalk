@@ -149,11 +149,15 @@ class ExternalChainClassificationTest {
                 () -> "ambiguous forward resolution must keep the diagnostic for text(): " + details);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
-    void lambdaParamOfExternalFunctionalInterfaceIsClassifiedExternal() throws Exception {
-        // scope 外 (classes-only) API の generic functional 引数では lambda
-        // parameter の型変数を推論できず、後続 call が解決できない。引数先
-        // (ExtApi = scope 外) により external-target 除外になる。
+    void lambdaPassedToExternalMethodStaysDiagnosticEvenWhenReceiverIsExternal() throws Exception {
+        // PR review 指摘反映 (2026-07-22, 規則 (ii) 撤回の回帰ガード): 受け手
+        // method (ExtApi.each) の receiver 型が external (classes-only) でも、
+        // それだけを根拠に lambda parameter (value) の型を external と決め付け
+        // ない。value の実際の型 (functional interface の型引数) は不明なため、
+        // 保守的に diagnostic を維持する (in-scope 型を引数に取る external API
+        // の呼び出しで false exclusion を起こさないことの確認)。
         Path classes = compile("extfn-src", "extfn-classes",
                 Map.of("com/example/ext/ExtApi.java", """
                         package com.example.ext;
@@ -177,9 +181,48 @@ class ExternalChainClassificationTest {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
 
+        assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size());
+        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        assertTrue(details.stream().anyMatch(d ->
+                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                () -> "lambda param passed to an external method must keep the diagnostic for text(): " + details);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void lambdaAssignedToExternalFunctionalInterfaceIsClassifiedExternal() throws Exception {
+        // 規則 (ii) の維持範囲: lambda 自体が代入される変数の宣言型
+        // (functional interface 型そのもの) が external なら、lambda parameter
+        // の型もその関数型が定義する型引数で決まるため、external 判定の根拠として
+        // 使ってよい (受け手 method の receiver 型を見る旧経路とは異なり、
+        // functional interface 自体の宣言を直接見ている)。
+        Path classes = compile("extfn2-src", "extfn2-classes",
+                Map.of("com/example/ext/ExtConsumer.java", """
+                        package com.example.ext;
+                        public interface ExtConsumer<T> {
+                            void accept(T value);
+                        }
+                        """));
+
+        Path workspace = temp.resolve("lambda-assign-workspace");
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                import com.example.ext.ExtConsumer;
+                public class Caller {
+                    void run() {
+                        ExtConsumer<Object> fn = value -> value.text();
+                    }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         assertTrue(ran.stderr().contains("excluded[external-target]="),
-                () -> "lambda param call must be excluded as external-target: " + ran.stderr());
+                () -> "lambda assigned to an external functional interface type must be excluded: " + ran.stderr());
     }
 
     @SuppressWarnings("unchecked")
