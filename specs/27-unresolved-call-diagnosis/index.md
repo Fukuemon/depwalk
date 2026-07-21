@@ -411,6 +411,7 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 | 2026-07-21 | Fukuemon | ユーザー判断で完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を追加実装し、やること/成功条件へ反映                             |
 | 2026-07-22 | Fukuemon | D4 実装時の逸脱2件を確定 (ユーザー指示によりレビュー結果と実測効果で判断)。ADR-0004 を状態追記で更新し spec 側を同期                            |
 | 2026-07-22 | Fukuemon | PR #29 作成、multi-agent review (claude/codex/cursor) 実施。high 2件/medium 3件を修正 (詳細は report.md、最終値は R4j 197件 / 追加検証 1,545件) |
+| 2026-07-22 | Fukuemon | GitHub Codex インラインレビュー3件 (sanitize漏洩・type variable erasure・lambda規則(ii)) を修正。最終値 R4j 223件 / 追加検証 1,759件            |
 
 ## 備考
 
