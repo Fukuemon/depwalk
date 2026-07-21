@@ -416,6 +416,12 @@ public final class AnalysisRunner {
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
             }
+            // spec #27 D2: primary diagnostic として終端した call だけが、sanitize 済み
+            // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
+            // receiverTypeResolved) を details へ載せる。
+            if (outcome.diagnosticMetadata() != null) {
+                metadata.putAll(outcome.diagnosticMetadata());
+            }
             details.add(new com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail(
                     outcome.code(),
                     outcome.reason(),
