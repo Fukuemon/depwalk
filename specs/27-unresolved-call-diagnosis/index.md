@@ -74,6 +74,7 @@
 - 「修正」判定の要因クラス (④method reference fallback / ⑤explicit super fallback / ⑥receiver 型不明時の external-target 判定 / ⑧Lombok cross-module 救済、および D3(c) で修正と判断した JavaParser 上流限界の回避策) を本 branch で修正する。
 - 最小再現 fixture を追加し、修正の回帰検証を可能にする (D4)。
 - 修正後に実プロジェクト2件で再計測し、要因クラス別の件数推移を記録する。
+- 修正後も残る診断が実運用の妨げにならないよう、完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を実装する (ユーザー判断、2026-07-21 追加)。
 
 ### やらないこと
 
@@ -93,6 +94,7 @@
 - 診断用 metadata 4項目 (D2) が実装され、fixture で期待値検証されている。
 - 「修正」判定の要因クラスが本 branch で修正され、最小再現 fixture の回帰検証と実プロジェクト再計測で件数減少が確認されている。
 - JavaParser 上流限界による残存分は、仕様上の除外 / v1 scope 外として ADR-0004 との整合を明記して記録されている。
+- 完全性 gate の opt-in 緩和が実装され、既定挙動 (fatal) を変えずに実プロジェクトで graph を実用できることを確認済みである。
 
 ### 対象ユーザー / 操作主体
 
@@ -362,6 +364,7 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 | java-analyzer / `テスト観点`                                                         | `multi-module-spring-project` fixture へ上位パターン (①④⑤⑦⑧) の最小再現ケースと診断 metadata 期待値検証を追加 (source: clarify D4) — **反映済 (2026-07-21 sync)**                                                                                                                 | 救済修正の回帰検証と診断 metadata の sanitize 制約検証を E2E で担保する                          |
 | java-analyzer / `Parse・resolution・call 完全性`                                     | ⑥の external-target 判定規則の実体 (chain 前進解決 / 起点遡及 / lambda parameter 規則、P3_01 承認 + 実装で確定) を追記 (source: P4_03/P4_04 実装) — **反映済 (2026-07-21 実装後)**                                                                                                | 「詳細規則は実装で確定し本節へ追記する」の履行                                                   |
 | java-analyzer / `solver 層の bytecode member 合成`                                   | 採用境界の機構記述を「classpath 上の依存 project output」から「model の project 依存関係で到達可能な依存 project output」へ精緻化 (source: P4_02 実装 + レビュー指摘) — **反映済 (2026-07-21 実装後)**                                                                            | Gradle model が依存 project を jar として返す場合の欠陥修正 (⑧) と文言を一致させる               |
+| java-analyzer / `Parse・resolution・call 完全性`、`metadata 契約`、`テスト観点`      | `metadata.allowIncompleteAnalysis` による完全性 gate の opt-in 緩和 (既定 `false`) を追加。有効時は primary diagnostic が残っても exit 0 で graph を公開し、残存は診断として可視のまま維持 (source: ユーザー判断、2026-07-21 追加) — **反映済 (2026-07-21 実装後)**               | 実測残余 (2.3%/1.3%) があっても graph を実用できるようにする。gate 契約・帰属意味論は変更しない  |
 
 ### context への影響
 
@@ -404,6 +407,8 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 | 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                    |
 | 2026-07-21 | Fukuemon | tasks phase レビュー PASS。軽微指摘 (P5_01 fixture prep / P4 並列注意) を反映し、全 phase レビュー済みへ                 |
 | 2026-07-21 | Fukuemon | 実装 P1_01 (診断 metadata) / P2_01 (patterns fixture + 専用 E2E) 完了。D4 実装時の逸脱 2 件を記録 (ユーザー追認待ち)     |
+| 2026-07-21 | Fukuemon | P2_02〜P5_01 (再計測・P3_01対応方針承認・P4_01〜P4_04修正) 完了。R4j 350→143、追加検証 14,248→1,161 まで削減             |
+| 2026-07-21 | Fukuemon | ユーザー判断で完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を追加実装し、やること/成功条件へ反映      |
 
 ## 備考
 
