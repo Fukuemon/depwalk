@@ -118,6 +118,7 @@ spec ADR 行 (上位資料からの変更点、抜粋):
 ## 検証コマンド
 
 - `cd analyzers/java && ./gradlew test && ./gradlew shadowJar`
+- `./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project clean writeDepwalkClasspath` (全体 E2E の事前 fixture build)
 - `(cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)` (required E2E)
 - `cd core && go test ./... && go vet ./...`
 - `lefthook run pre-commit`
