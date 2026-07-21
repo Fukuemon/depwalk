@@ -2,7 +2,7 @@
 
 > 本文書は Issue #27 の spec-lifecycle における作業記録である。
 > 当初 `type:research` (要因分類レポート + 後続issue起票) として開始したが、2026-07-21 に `type:bug` の対応 issue へ変換し、診断 metadata 追加・救済ロジック修正・fixture 追加・再計測までを本 spec / branch で実施する。
-> durable な設計成果 (診断 metadata 契約 / 救済適用範囲 / fixture 方針) は 2026-07-21 の sync phase で [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済みであり、以後 feature doc が正本、本 spec の該当記述は決定時スナップショットである。ADR-0004 は実装後の実測評価に基づき 2026-07-22 に「状態追記」で更新済み ([ADR-0004](../../adr/0004-defer-runtime-call-tracing.md#状態追記-spec-27-2026-07-21))。
+> durable な設計成果 (診断 metadata 契約 / 救済適用範囲 / fixture 方針) は 2026-07-21 の sync phase で [Java Analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) へハンドオフ済みであり、以後 feature doc が正本、本 spec の該当記述は決定時スナップショットである。ADR-0004 は実装後の実測評価に基づき 2026-07-22 に「状態追記」で更新済み ([ADR-0004](../../adr/0004-defer-runtime-call-tracing.md) の `## 決定` 節末尾)。
 
 ## メタ情報
 
