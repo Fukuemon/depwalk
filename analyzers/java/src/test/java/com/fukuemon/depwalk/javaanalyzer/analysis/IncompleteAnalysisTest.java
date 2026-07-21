@@ -153,8 +153,10 @@ class IncompleteAnalysisTest {
         assertEquals(Boolean.FALSE, metadataOf(methodCall).get("receiverTypeResolved"));
         assertTrue(((String) metadataOf(methodCall).get("exceptionClass")).matches("[\\w.$]+"));
 
+        // spec #27 ④⑤ の救済追加後は、method reference / explicit super も
+        // bytecode 救済を試みてから diagnostic 化するため phase は bytecode-rescue。
         Map<String, Object> methodReference = detailByCallKind(details, "method-reference");
-        assertEquals("solver-resolve", metadataOf(methodReference).get("resolutionPhase"));
+        assertEquals("bytecode-rescue", metadataOf(methodReference).get("resolutionPhase"));
         assertEquals("TypeExpr", metadataOf(methodReference).get("receiverKind"));
         assertEquals(Boolean.FALSE, metadataOf(methodReference).get("receiverTypeResolved"));
 
@@ -163,7 +165,7 @@ class IncompleteAnalysisTest {
         assertEquals("none", metadataOf(objectCreation).get("receiverKind"));
 
         Map<String, Object> explicitSuper = detailByCallKind(details, "explicit-constructor-invocation");
-        assertEquals("solver-resolve", metadataOf(explicitSuper).get("resolutionPhase"));
+        assertEquals("bytecode-rescue", metadataOf(explicitSuper).get("resolutionPhase"));
         assertEquals("super", metadataOf(explicitSuper).get("receiverKind"));
     }
 
