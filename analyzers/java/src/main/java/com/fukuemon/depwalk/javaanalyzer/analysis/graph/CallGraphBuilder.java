@@ -642,6 +642,9 @@ public final class CallGraphBuilder {
             if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
                 // caller 宣言が resolve できない site は edge を出力できないため、
                 // emitted でなく primary diagnostic として完全性 gate に残す (D14 / D20)。
+                // spec #27 D2 の診断 metadata は「call 解決の失敗段階」を表すため、
+                // caller 宣言側の失敗であるこの経路には意図的に付けない
+                // (details の 4 項目は解決失敗系 reason にのみ載る)。
                 ledger.commitDiagnostic(
                         CallSiteInventory.of(callNode, currentPath, kind, caller),
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
@@ -708,7 +711,9 @@ public final class CallGraphBuilder {
      * @param phase 失敗した解決段階 ({@code PHASE_*})
      * @param failure resolve 例外。例外を伴わない失敗 (候補選択の曖昧さ等) は null
      * @param scope receiver 式。暗黙 this / receiver を持たない call は null
-     * @param implicitReceiverKind scope が null のときの receiver 種別表記
+     * @param implicitReceiverKind scope が null のときの receiver 種別表記。この場合の
+     *     receiverTypeResolved は「receiver 式の型取得に失敗していない」ことを表す
+     *     固定 true (取得対象の receiver 式が存在しないため、失敗ではない)
      */
     private Map<String, Object> diagnosticMetadata(
             String phase, Throwable failure, Expression scope, String implicitReceiverKind) {

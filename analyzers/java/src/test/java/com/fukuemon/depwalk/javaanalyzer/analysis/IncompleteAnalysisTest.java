@@ -56,11 +56,15 @@ class IncompleteAnalysisTest {
             assertTrue(metadata.containsKey("callKind"));
             assertTrue(metadata.containsKey("reason"));
             // spec #27 D2: 診断 metadata (解決段階 / 例外クラス名 / receiver 式種別 /
-            // receiver 型取得成否)。exceptionClass はクラス名のみで、message や
-            // source 断片を含む自由文であってはならない。
-            assertTrue(metadata.containsKey("resolutionPhase"), () -> "resolutionPhase missing: " + metadata);
-            assertTrue(metadata.containsKey("receiverKind"), () -> "receiverKind missing: " + metadata);
-            assertTrue(metadata.containsKey("receiverTypeResolved"), () -> "receiverTypeResolved missing: " + metadata);
+            // receiver 型取得成否)。call 解決の失敗段階を表すため、caller 宣言側の
+            // 失敗 (unresolved-caller) には載らない。exceptionClass はクラス名のみで、
+            // message や source 断片を含む自由文であってはならない (他 field は
+            // 既存の安定値契約 (reason / target / callKind) が sanitize を担保する)。
+            if (!"unresolved-caller".equals(metadata.get("reason"))) {
+                assertTrue(metadata.containsKey("resolutionPhase"), () -> "resolutionPhase missing: " + metadata);
+                assertTrue(metadata.containsKey("receiverKind"), () -> "receiverKind missing: " + metadata);
+                assertTrue(metadata.containsKey("receiverTypeResolved"), () -> "receiverTypeResolved missing: " + metadata);
+            }
             Object exceptionClass = metadata.get("exceptionClass");
             if (exceptionClass != null) {
                 assertTrue(((String) exceptionClass).matches("[\\w.$]+"),
