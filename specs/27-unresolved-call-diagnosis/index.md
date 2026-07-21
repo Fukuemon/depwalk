@@ -395,21 +395,22 @@ P4 系 4 本は責務独立だが、いずれも同じ E2E 期待値ファイル
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                                                                                 |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-20 | Fukuemon | scaffold phase で index.md を新規作成                                                                                    |
-| 2026-07-21 | Fukuemon | clarify phase で D1〜D5 を確定し、実装分割タスク案・Testing・Interface 設計へ同期                                        |
-| 2026-07-21 | Fukuemon | spec-review PASS。軽微指摘 (feature doc 節名参照 / D3(c) への②明記) を反映                                               |
-| 2026-07-21 | Fukuemon | issue #27 を research → bug へ変換 (ユーザー判断)。対応実装まで本 spec のスコープへ拡大し、D5 改訂・実装分割 P5〜P9 追加 |
-| 2026-07-21 | Fukuemon | diagram phase で解析フロー flowchart と call site 解決パイプライン sequence を追加                                       |
-| 2026-07-21 | Fukuemon | track phase で上位資料からの変更点を最新化 (feature doc 3件 / context 変更なし確認 / ADR-0004 条件付き追記)              |
-| 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針) |
-| 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                    |
-| 2026-07-21 | Fukuemon | tasks phase レビュー PASS。軽微指摘 (P5_01 fixture prep / P4 並列注意) を反映し、全 phase レビュー済みへ                 |
-| 2026-07-21 | Fukuemon | 実装 P1_01 (診断 metadata) / P2_01 (patterns fixture + 専用 E2E) 完了。D4 実装時の逸脱 2 件を記録 (ユーザー追認待ち)     |
-| 2026-07-21 | Fukuemon | P2_02〜P5_01 (再計測・P3_01対応方針承認・P4_01〜P4_04修正) 完了。R4j 350→143、追加検証 14,248→1,161 まで削減             |
-| 2026-07-21 | Fukuemon | ユーザー判断で完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を追加実装し、やること/成功条件へ反映      |
-| 2026-07-22 | Fukuemon | D4 実装時の逸脱2件を確定 (ユーザー指示によりレビュー結果と実測効果で判断)。ADR-0004 を状態追記で更新し spec 側を同期     |
+| 日付       | 変更者   | 変更内容                                                                                                                                        |
+| ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-20 | Fukuemon | scaffold phase で index.md を新規作成                                                                                                           |
+| 2026-07-21 | Fukuemon | clarify phase で D1〜D5 を確定し、実装分割タスク案・Testing・Interface 設計へ同期                                                               |
+| 2026-07-21 | Fukuemon | spec-review PASS。軽微指摘 (feature doc 節名参照 / D3(c) への②明記) を反映                                                                      |
+| 2026-07-21 | Fukuemon | issue #27 を research → bug へ変換 (ユーザー判断)。対応実装まで本 spec のスコープへ拡大し、D5 改訂・実装分割 P5〜P9 追加                        |
+| 2026-07-21 | Fukuemon | diagram phase で解析フロー flowchart と call site 解決パイプライン sequence を追加                                                              |
+| 2026-07-21 | Fukuemon | track phase で上位資料からの変更点を最新化 (feature doc 3件 / context 変更なし確認 / ADR-0004 条件付き追記)                                     |
+| 2026-07-21 | Fukuemon | sync phase で feature doc へ D2/D3/D4 の durable 成果をハンドオフ (診断 metadata 契約 / 救済適用範囲拡大 / fixture 方針)                        |
+| 2026-07-21 | Fukuemon | tasks phase で prompts/ 配下に 9 実装 prompt を生成し、実装分割節へ一覧・依存表を追記                                                           |
+| 2026-07-21 | Fukuemon | tasks phase レビュー PASS。軽微指摘 (P5_01 fixture prep / P4 並列注意) を反映し、全 phase レビュー済みへ                                        |
+| 2026-07-21 | Fukuemon | 実装 P1_01 (診断 metadata) / P2_01 (patterns fixture + 専用 E2E) 完了。D4 実装時の逸脱 2 件を記録 (ユーザー追認待ち)                            |
+| 2026-07-21 | Fukuemon | P2_02〜P5_01 (再計測・P3_01対応方針承認・P4_01〜P4_04修正) 完了。R4j 350→143、追加検証 14,248→1,161 まで削減                                    |
+| 2026-07-21 | Fukuemon | ユーザー判断で完全性 gate の opt-in 緩和 (`metadata.allowIncompleteAnalysis`) を追加実装し、やること/成功条件へ反映                             |
+| 2026-07-22 | Fukuemon | D4 実装時の逸脱2件を確定 (ユーザー指示によりレビュー結果と実測効果で判断)。ADR-0004 を状態追記で更新し spec 側を同期                            |
+| 2026-07-22 | Fukuemon | PR #29 作成、multi-agent review (claude/codex/cursor) 実施。high 2件/medium 3件を修正 (詳細は report.md、最終値は R4j 197件 / 追加検証 1,545件) |
 
 ## 備考
 
