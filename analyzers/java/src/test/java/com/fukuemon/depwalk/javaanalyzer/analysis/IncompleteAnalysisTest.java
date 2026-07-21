@@ -209,8 +209,23 @@ class IncompleteAnalysisTest {
                 () -> "resolved call must still be published: " + edges);
 
         List<Map<String, Object>> diagnostics = ran.byType("diagnostic");
-        assertTrue(diagnostics.stream().anyMatch(d -> "JAVA_UNRESOLVED_SYMBOL".equals(d.get("code"))),
-                () -> "the remaining unresolved call must stay visible as a diagnostic: " + diagnostics);
+        Map<String, Object> unresolvedDiagnostic = diagnostics.stream()
+                .filter(d -> "JAVA_UNRESOLVED_SYMBOL".equals(d.get("code")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "the remaining unresolved call must stay visible as a diagnostic: " + diagnostics));
+
+        // multi-agent review 指摘反映 (2026-07-22): allowIncompleteAnalysis 成功時
+        // でも D2 の診断 4 項目が streaming される diagnostic record に乗ること
+        // (従来は fatal 経路の error.details にしか乗らず、緩和時は要因分類が
+        // できなかった)。
+        Map<String, Object> diagnosticMetadata = (Map<String, Object>) unresolvedDiagnostic.get("metadata");
+        assertTrue(diagnosticMetadata != null && diagnosticMetadata.containsKey("resolutionPhase"),
+                () -> "diagnostic metadata must carry resolutionPhase even in the opt-in success path: "
+                        + unresolvedDiagnostic);
+        assertTrue(diagnosticMetadata.containsKey("receiverKind"), () -> "receiverKind missing: " + diagnosticMetadata);
+        assertTrue(diagnosticMetadata.containsKey("receiverTypeResolved"),
+                () -> "receiverTypeResolved missing: " + diagnosticMetadata);
 
         assertTrue(ran.stderr().contains("diagnostic[JAVA_UNRESOLVED_SYMBOL:unresolved-method-call]=1"),
                 () -> "callSiteSummary must report the remaining diagnostic count: " + ran.stderr());

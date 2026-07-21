@@ -25,14 +25,23 @@ class ExternalChainClassificationTest {
 
     @Test
     void chainWithExternalRootIsClassifiedExternal() throws Exception {
-        // Ext に存在しない make1() とその後続 text() は解決できない。chain 起点
-        // e (Ext = scope 外 classes-only 型) により、両 call とも external-target
-        // 除外になる (make1 は既存 D18 経路、text は chain 起点遡及規則)。
+        // Ext.make() は自己境界 generic 戻り値型 (<T extends Ext> T) で、target-type
+        // context が無い chain 途中の呼び出しでは JavaParser が解決に失敗する
+        // (実測パターンと同型: メソッド自体は classfile 上に実在する)。chain 起点
+        // e (Ext = scope 外 classes-only 型) から、forwardVerifyExternalChain が
+        // make() を classfile 上で一意に確認できるため、両 call とも
+        // external-target 除外になる (multi-agent review 指摘反映: 2026-07-22。
+        // 存在しないメソッド名で解決失敗を模擬すると forward 検証が前進できず
+        // 別の分類になるため、実在するメソッドで解決だけが失敗する形にした)。
         Path classes = compile("ext-src", "ext-classes",
                 Map.of("com/example/ext/Ext.java", """
                         package com.example.ext;
                         public class Ext {
-                            public Ext make() { return this; }
+                            @SuppressWarnings("unchecked")
+                            public <T extends Ext> T make() {
+                                return (T) this;
+                            }
+                            public String text() { return "x"; }
                         }
                         """));
 
@@ -41,7 +50,7 @@ class ExternalChainClassificationTest {
                 package com.example;
                 import com.example.ext.Ext;
                 public class Caller {
-                    String use(Ext e) { return e.make1().text(); }
+                    String use(Ext e) { return e.make().text(); }
                 }
                 """);
 
@@ -53,6 +62,42 @@ class ExternalChainClassificationTest {
                 () -> "chain with an external root must be excluded, not diagnosed: " + ran.byType("diagnostic"));
         assertTrue(ran.stderr().contains("excluded[external-target]=2"),
                 () -> "both chain links must be external-target: " + ran.stderr());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void chainWithExternalRootStaysDiagnosticWhenIntermediateLinkNotOnClasspath() throws Exception {
+        // multi-agent review 指摘反映 (2026-07-22): root が external というだけで
+        // 中間 link を無条件に external とみなさない。intermediate link
+        // (missingLink) が Ext の classfile に存在しない場合、forward 検証が前進
+        // できず diagnostic を維持することを確認する (false exclusion の回帰ガード)。
+        Path classes = compile("ext2-src", "ext2-classes",
+                Map.of("com/example/ext/Ext.java", """
+                        package com.example.ext;
+                        public class Ext {
+                        }
+                        """));
+
+        Path workspace = temp.resolve("chain-unknown-link-workspace");
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                import com.example.ext.Ext;
+                public class Caller {
+                    String use(Ext e) { return e.missingLink().text(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size());
+        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        assertTrue(details.stream().anyMatch(d ->
+                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                () -> "unverifiable intermediate link must keep text() as a diagnostic, not silently excluded: "
+                        + details);
     }
 
     @SuppressWarnings("unchecked")

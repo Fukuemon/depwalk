@@ -341,10 +341,11 @@ public final class CallGraphBuilder {
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
-            reportUnresolved(mce, ctx);
+            Map<String, Object> metadata = diagnosticMetadata(
+                    PHASE_BYTECODE_RESCUE, e, mce.getScope().orElse(null), "implicit-this");
+            reportUnresolved(mce, ctx, metadata);
             commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                    "unresolved-method-call", mce.getNameAsString(),
-                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, mce.getScope().orElse(null), "implicit-this"));
+                    "unresolved-method-call", mce.getNameAsString(), metadata);
             return;
         }
 
@@ -354,10 +355,11 @@ public final class CallGraphBuilder {
             // 型名 scope の static call を instance 合成 member で解決しない
             // (usage 経路は staticOnly を持たないため、emit 前にここで検査する)。
             if (!synthesized.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
-                reportUnresolved(mce, ctx);
+                Map<String, Object> guardMetadata =
+                        diagnosticMetadata(PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null);
+                reportUnresolved(mce, ctx, guardMetadata);
                 commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                        "unresolved-method-call", mce.getNameAsString(),
-                        diagnosticMetadata(PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null));
+                        "unresolved-method-call", mce.getNameAsString(), guardMetadata);
                 return;
             }
             WorkspaceSourceDeclarationIndex.TypeLocation owner =
@@ -412,10 +414,11 @@ public final class CallGraphBuilder {
                 commitEmitted(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx);
                 return;
             }
-            reportUnresolved(oce, ctx);
+            Map<String, Object> metadata =
+                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, oce.getScope().orElse(null), "none");
+            reportUnresolved(oce, ctx, metadata);
             commitDiagnostic(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
-                    "unresolved-constructor-call", oce.getTypeAsString(),
-                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, oce.getScope().orElse(null), "none"));
+                    "unresolved-constructor-call", oce.getTypeAsString(), metadata);
             return;
         }
         emitConstructorCall(resolved, oce, ctx, CallSiteId.CallKind.OBJECT_CREATION);
@@ -438,10 +441,11 @@ public final class CallGraphBuilder {
                 commitExcludedExternal(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx);
                 return;
             }
-            reportUnresolved(ecis, ctx);
+            Map<String, Object> metadata =
+                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, null, ecis.isThis() ? "this" : "super");
+            reportUnresolved(ecis, ctx, metadata);
             commitDiagnostic(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
-                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super",
-                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, null, ecis.isThis() ? "this" : "super"));
+                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super", metadata);
             return;
         }
         emitConstructorCall(resolved, ecis, ctx, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION);
@@ -497,10 +501,10 @@ public final class CallGraphBuilder {
                 commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
                 return;
             }
-            reportUnresolved(mre, ctx);
+            Map<String, Object> metadata = diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, mre.getScope(), null);
+            reportUnresolved(mre, ctx, metadata);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-method-reference", mre.getIdentifier(),
-                    diagnosticMetadata(PHASE_BYTECODE_RESCUE, e, mre.getScope(), null));
+                    "unresolved-method-reference", mre.getIdentifier(), metadata);
             return;
         }
 
@@ -563,25 +567,25 @@ public final class CallGraphBuilder {
         try {
             ResolvedType scopeType = mre.getScope().calculateResolvedType();
             if (!scopeType.isReferenceType()) {
-                reportUnresolved(mre, ctx);
+                Map<String, Object> metadata = diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null);
+                reportUnresolved(mre, ctx, metadata);
                 commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString(),
-                        diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null));
+                        "unresolved-constructor-reference", mre.getScope().toString(), metadata);
                 return;
             }
             scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
             if (scopeDecl == null) {
-                reportUnresolved(mre, ctx);
+                Map<String, Object> metadata = diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null);
+                reportUnresolved(mre, ctx, metadata);
                 commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString(),
-                        diagnosticMetadata(PHASE_SOLVER_RESOLVE, null, mre.getScope(), null));
+                        "unresolved-constructor-reference", mre.getScope().toString(), metadata);
                 return;
             }
         } catch (RuntimeException | LinkageError e) {
-            reportUnresolved(mre, ctx);
+            Map<String, Object> metadata = diagnosticMetadata(PHASE_SOLVER_RESOLVE, e, mre.getScope(), null);
+            reportUnresolved(mre, ctx, metadata);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-constructor-reference", mre.getScope().toString(),
-                    diagnosticMetadata(PHASE_SOLVER_RESOLVE, e, mre.getScope(), null));
+                    "unresolved-constructor-reference", mre.getScope().toString(), metadata);
             return;
         }
 
@@ -601,10 +605,11 @@ public final class CallGraphBuilder {
                 commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
                 return;
             }
-            reportUnresolved(mre, ctx);
+            Map<String, Object> metadata =
+                    diagnosticMetadata(PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null);
+            reportUnresolved(mre, ctx, metadata);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "ambiguous-constructor-reference", mre.getScope().toString(),
-                    diagnosticMetadata(PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null));
+                    "ambiguous-constructor-reference", mre.getScope().toString(), metadata);
             return;
         }
 
@@ -865,9 +870,8 @@ public final class CallGraphBuilder {
 
     /**
      * 解決失敗した method reference の bytecode-only member 救済 (spec #27 ④)。
-     * 参照先型が scope 内で到達可能な場合に、SAM arity (bound) と SAM arity - 1
-     * (unbound instance reference) の一意 member を検索する。両 arity に候補が
-     * ある場合は曖昧として救済しない。
+     * 参照先型が scope 内で到達可能な場合に、JLS 15.13.1 に沿った候補選択
+     * ({@link #selectMethodReferenceCandidate}) で救済する。
      */
     private boolean tryBytecodeMethodReferenceRescue(MethodReferenceExpr mre, WalkContext ctx) {
         String ownerBinaryName = methodReferenceOwner(mre);
@@ -878,39 +882,63 @@ public final class CallGraphBuilder {
         if (owner == null || !reachableContextIds.contains(owner.contextId())) {
             return false;
         }
-        int samArity = inferFunctionalInterfaceArity(mre);
-        com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate candidate;
-        if (samArity < 0) {
-            // 周辺の型推論が壊れて SAM arity を推論できない場合でも、参照名が
-            // owner の classfile 上で一意なら根拠として採用できる (spec #27 ④)。
-            // 名前一意のため arity 照合は省く (SAM arity 自体が取得不能な状況の
-            // ヒューリスティクスであり、一意でなければ採用しない保守側)。
-            var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
-                    .filter(method -> method.methodName().equals(mre.getIdentifier()))
-                    .toList();
-            candidate = byName.size() == 1 ? byName.get(0) : null;
-        } else {
-            var bound = bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity).orElse(null);
-            var unbound = samArity >= 1
-                    ? bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity - 1).orElse(null)
-                    : null;
-            if (bound != null && unbound != null) {
-                return false;
-            }
-            candidate = bound != null ? bound : unbound;
-        }
-        if (candidate == null) {
-            return false;
-        }
-        // 型名 scope (unbound / static) 以外の bound reference で static member を
-        // 採用しない (method call の型名 scope 保守境界と対)。
         boolean typeNameScope = mre.getScope() instanceof com.github.javaparser.ast.expr.TypeExpr;
-        if (candidate.isStatic() && !typeNameScope) {
+        int samArity = inferFunctionalInterfaceArity(mre);
+        var candidate = selectMethodReferenceCandidate(ownerBinaryName, mre.getIdentifier(), typeNameScope, samArity);
+        if (candidate == null) {
             return false;
         }
         emitBytecodeOnlyCall(mre, ctx, owner,
                 candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method", true);
         return true;
+    }
+
+    /**
+     * method reference の候補選択 (spec #27 ④、multi-agent review 指摘反映:
+     * 2026-07-22)。JLS 15.13.1 の 2 つの解釈だけを候補にする:
+     * <ul>
+     * <li>{@code Type::m} ({@code typeNameScope=true}): static なら arity=samArity、
+     *     instance (unbound reference) なら arity=samArity-1 のみが有効。両方に
+     *     候補があれば曖昧として不採用。</li>
+     * <li>{@code expr::m} ({@code typeNameScope=false}, bound reference): instance
+     *     の arity=samArity のみが有効 (static、または samArity-1 は無効)。</li>
+     * </ul>
+     * SAM arity を推論できない場合は、上記の (arity, static/instance) 検証ができ
+     * ないため、より保守的に「参照形式に矛盾しない (typeNameScope なら static も
+     * instance も許容、bound なら instance のみ) 名前一意の member」だけを採用する。
+     */
+    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
+            selectMethodReferenceCandidate(
+                    String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
+        if (samArity < 0) {
+            var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
+                    .filter(method -> method.methodName().equals(methodName))
+                    .filter(method -> typeNameScope || !method.isStatic())
+                    .toList();
+            return byName.size() == 1 ? byName.get(0) : null;
+        }
+        if (typeNameScope) {
+            var staticCandidate = uniqueMethodByArityAndStatic(ownerBinaryName, methodName, samArity, true);
+            var instanceCandidate = samArity >= 1
+                    ? uniqueMethodByArityAndStatic(ownerBinaryName, methodName, samArity - 1, false)
+                    : null;
+            if (staticCandidate != null && instanceCandidate != null) {
+                return null;
+            }
+            return staticCandidate != null ? staticCandidate : instanceCandidate;
+        }
+        return uniqueMethodByArityAndStatic(ownerBinaryName, methodName, samArity, false);
+    }
+
+    /** 名前・arity・static 性が一致する owner classfile 上の一意 member。 */
+    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
+            uniqueMethodByArityAndStatic(String ownerBinaryName, String methodName, int arity, boolean wantStatic) {
+        var matches = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
+                .filter(method -> method.methodName().equals(methodName))
+                .filter(method -> method.parameterTypes().size() == arity)
+                .filter(method -> method.isStatic() == wantStatic)
+                .toList();
+        return matches.size() == 1 ? matches.get(0) : null;
     }
 
     /**
@@ -1104,26 +1132,53 @@ public final class CallGraphBuilder {
      * 最内の宣言) の中で同名の local 宣言が一意なら、その initializer を返す。
      */
     private static Expression uniqueLocalInitializer(NameExpr nameExpr) {
-        Node callable = null;
-        for (Node node = nameExpr.getParentNode().orElse(null); node != null; node = node.getParentNode().orElse(null)) {
-            if (node instanceof MethodDeclaration
-                    || node instanceof ConstructorDeclaration
-                    || node instanceof InitializerDeclaration) {
-                callable = node;
+        String name = nameExpr.getNameAsString();
+        Node child = nameExpr;
+        Node parent = child.getParentNode().orElse(null);
+        while (parent != null) {
+            if (parent instanceof com.github.javaparser.ast.stmt.BlockStmt block) {
+                Expression initializer = declaratorBeforeInBlock(block, child, name);
+                if (initializer != null) {
+                    return initializer;
+                }
+            }
+            if (parent instanceof MethodDeclaration
+                    || parent instanceof ConstructorDeclaration
+                    || parent instanceof InitializerDeclaration
+                    || parent instanceof LambdaExpr) {
+                // callable / lambda 境界。ここまでで見つからなければ不採用
+                // (字句スコープ外の同名宣言を誤って結びつけない、保守側)。
+                return null;
+            }
+            child = parent;
+            parent = parent.getParentNode().orElse(null);
+        }
+        return null;
+    }
+
+    /**
+     * {@code block} 直下の文のうち、{@code child} (を祖先に持つ文) より前にある
+     * 同名 {@code VariableDeclarator} の initializer (multi-agent review 指摘
+     * 反映: 2026-07-22。前方参照は無効、かつ use を含まない兄弟文の宣言は
+     * 対象にしない)。
+     */
+    private static Expression declaratorBeforeInBlock(
+            com.github.javaparser.ast.stmt.BlockStmt block, Node child, String name) {
+        for (com.github.javaparser.ast.stmt.Statement statement : block.getStatements()) {
+            if (statement == child || statement.isAncestorOf(child)) {
                 break;
             }
+            if (statement instanceof com.github.javaparser.ast.stmt.ExpressionStmt exprStmt
+                    && exprStmt.getExpression()
+                            instanceof com.github.javaparser.ast.expr.VariableDeclarationExpr varDecl) {
+                for (com.github.javaparser.ast.body.VariableDeclarator declarator : varDecl.getVariables()) {
+                    if (declarator.getNameAsString().equals(name)) {
+                        return declarator.getInitializer().orElse(null);
+                    }
+                }
+            }
         }
-        if (callable == null) {
-            return null;
-        }
-        List<com.github.javaparser.ast.body.VariableDeclarator> matches = callable
-                .findAll(com.github.javaparser.ast.body.VariableDeclarator.class).stream()
-                .filter(declarator -> declarator.getNameAsString().equals(nameExpr.getNameAsString()))
-                .toList();
-        if (matches.size() != 1) {
-            return null;
-        }
-        return matches.get(0).getInitializer().orElse(null);
+        return null;
     }
 
     /** 囲み型の bytecode field 型 (classfile 根拠の receiver 補完)。 */
@@ -1182,21 +1237,31 @@ public final class CallGraphBuilder {
     /**
      * chain 起点遡及 (spec #27 ⑥ 規則 (i))。receiver が method call chain の
      * とき、chain を遡って最初に静的型が取れる式を探し、その型が scope 外
-     * (source 宣言索引に無い) なら true。scope 内型が現れた場合、または起点の
-     * 型も取れない場合は false (diagnostic に残す)。
+     * (source 宣言索引に無い) なら、root から現在の call までの中間 link を
+     * {@link #forwardVerifyExternalChain} で classfile 根拠 (project 限定でない
+     * full classpath) により前進検証できた場合だけ true。scope 内型が現れた場合、
+     * 起点の型も取れない場合、または中間 link を検証できない場合は false
+     * (diagnostic に残す、保守側)。
      */
     private boolean chainRootIsExternal(MethodCallExpr mce, WalkContext ctx) {
         return rootIsExternal(mce.getScope().orElse(null), ctx);
     }
 
-    /** 式の起点型を遡及し、scope 外と判定できる場合だけ true (規則 (i) の実体)。 */
+    /**
+     * 式の起点型を遡及し、根拠を伴って scope 外と判定できる場合だけ true
+     * (規則 (i) の実体、multi-agent review 指摘反映: 2026-07-22)。
+     */
     private boolean rootIsExternal(Expression start, WalkContext ctx) {
+        List<MethodCallExpr> links = new ArrayList<>();
         Expression cursor = start;
         int guard = 0;
         while (cursor != null && guard++ < 64) {
             String erasure = tryTypeErasureOf(cursor);
             if (erasure != null) {
-                return declIndex.find(erasure).isEmpty();
+                if (declIndex.find(erasure).isPresent()) {
+                    return false;
+                }
+                return forwardVerifyExternalChain(erasure, links);
             }
             if (cursor instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
                 cursor = enclosed.getInner();
@@ -1208,6 +1273,8 @@ public final class CallGraphBuilder {
                     // 暗黙 this 起点 = 囲み型 (scope 内) → 保守的に diagnostic。
                     return false;
                 }
+                // root 側 (先頭) が先に来るよう、遡る順とは逆に挿入する。
+                links.add(0, link);
                 cursor = inner;
                 continue;
             }
@@ -1221,16 +1288,68 @@ public final class CallGraphBuilder {
                 }
                 // local に該当が無ければ囲み型の bytecode field 型で判定する。
                 String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), ctx);
-                return fieldType != null && declIndex.find(fieldType).isEmpty();
+                if (fieldType == null || declIndex.find(fieldType).isPresent()) {
+                    return false;
+                }
+                return forwardVerifyExternalChain(fieldType, links);
             }
             if (cursor instanceof FieldAccessExpr fieldAccess
                     && fieldAccess.getScope() instanceof ThisExpr) {
                 String fieldType = enclosingBytecodeFieldType(fieldAccess.getNameAsString(), ctx);
-                return fieldType != null && declIndex.find(fieldType).isEmpty();
+                if (fieldType == null || declIndex.find(fieldType).isPresent()) {
+                    return false;
+                }
+                return forwardVerifyExternalChain(fieldType, links);
             }
             return false;
         }
         return false;
+    }
+
+    /**
+     * root 型 (scope 外と確定済み) から、root→現在の call の順に並んだ中間
+     * {@code links} を full classpath (project 限定でない) の classfile 情報で
+     * 前進検証する。各 link について owner 上の名前・arity が一意な宣言 method を
+     * 求め、その戻り値型を次の owner とする。いずれかの link で候補が一意に
+     * 求まらない、戻り値型が判明しない、または戻り値型が in-scope と判明した
+     * 場合は前進を打ち切り false (診断維持) を返す。全 link を通過できた場合の
+     * み true (root が external で、かつ中間区間もすべて external と確認できた)。
+     */
+    private boolean forwardVerifyExternalChain(String rootType, List<MethodCallExpr> links) {
+        String currentOwner = rootType;
+        for (MethodCallExpr link : links) {
+            var candidate = uniqueDeclaredMethodOnClasspath(
+                    currentOwner, link.getNameAsString(), link.getArguments().size());
+            if (candidate == null) {
+                return false;
+            }
+            String returnType = candidate.returnType();
+            if (returnType == null || isPrimitiveOrVoid(returnType) || returnType.endsWith("[]")) {
+                return false;
+            }
+            if (declIndex.find(returnType).isPresent()) {
+                return false;
+            }
+            currentOwner = returnType;
+        }
+        return true;
+    }
+
+    /**
+     * owner の classfile 上で名前・arity が一意な宣言 method (project 限定でない
+     * full classpath、{@link #sootUpIndex} 直接参照。継承 member はここでは
+     * 対象外 — 見つからなければ前進を打ち切る保守側)。
+     */
+    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
+            uniqueDeclaredMethodOnClasspath(String ownerBinaryName, String methodName, int arity) {
+        var resolution = sootUpIndex.resolveDeclaredCallableMethods(ownerBinaryName, methodName);
+        if (!resolution.isAvailable()) {
+            return null;
+        }
+        var matches = resolution.candidates().stream()
+                .filter(candidate -> candidate.parameterTypes().size() == arity)
+                .toList();
+        return matches.size() == 1 ? matches.get(0) : null;
     }
 
     /** NameExpr の宣言 (resolve または囲み callable 内の一意宣言) の initializer。 */
@@ -1438,6 +1557,17 @@ public final class CallGraphBuilder {
     }
 
     private void reportUnresolved(Node callNode, WalkContext ctx) {
+        reportUnresolved(callNode, ctx, null);
+    }
+
+    /**
+     * spec #27 D2 の診断 4 項目を streaming される {@code diagnostic} record へも
+     * 付与するオーバーロード (multi-agent review 指摘反映: 2026-07-22)。従来は
+     * ledger 経由の {@code error.details} (fatal 経路) にしか乗らず、
+     * {@code metadata.allowIncompleteAnalysis=true} で成功時に残る diagnostic
+     * には 4 項目が欠落していた。
+     */
+    private void reportUnresolved(Node callNode, WalkContext ctx, Map<String, Object> metadata) {
         accumulator.incrementUnresolved();
         String relatedMethodId = ctx.callerMethodIds().isEmpty() ? null : ctx.callerMethodIds().get(0);
         accumulator.addDiagnostic(Diagnostic.of(
@@ -1446,7 +1576,7 @@ public final class CallGraphBuilder {
                 "failed to resolve call: " + callNode,
                 sourceLocationOf(callNode),
                 relatedMethodId,
-                null));
+                metadata));
     }
 
     /**
