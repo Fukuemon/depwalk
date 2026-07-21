@@ -316,6 +316,15 @@ public final class CallGraphBuilder {
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
+            // spec #27 ⑥ (P3_01 承認規則): receiver 型が取れない call でも、
+            // (i) chain 起点の静的型が scope 外、または (ii) lambda parameter の
+            // 引数先 functional interface が scope 外なら external-target へ分類
+            // する。scope 内型が根拠に現れる場合は保守的に diagnostic に残す。
+            if (receiverOwner == null
+                    && (chainRootIsExternal(mce, ctx) || lambdaParamReceiverIsExternal(mce))) {
+                commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+                return;
+            }
             reportUnresolved(mce, ctx);
             commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
                     "unresolved-method-call", mce.getNameAsString(),
@@ -982,6 +991,89 @@ public final class CallGraphBuilder {
         emitBytecodeOnlyCall(oce, ctx, owner,
                 candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor");
         return true;
+    }
+
+    /**
+     * chain 起点遡及 (spec #27 ⑥ 規則 (i))。receiver が method call chain の
+     * とき、chain を遡って最初に静的型が取れる式を探し、その型が scope 外
+     * (source 宣言索引に無い) なら true。scope 内型が現れた場合、または起点の
+     * 型も取れない場合は false (diagnostic に残す)。
+     */
+    private boolean chainRootIsExternal(MethodCallExpr mce, WalkContext ctx) {
+        Expression cursor = mce.getScope().orElse(null);
+        int guard = 0;
+        while (cursor != null && guard++ < 64) {
+            String erasure = tryTypeErasureOf(cursor);
+            if (erasure != null) {
+                return declIndex.find(erasure).isEmpty();
+            }
+            if (cursor instanceof MethodCallExpr link) {
+                Expression inner = link.getScope().orElse(null);
+                if (inner == null) {
+                    // 暗黙 this 起点 = 囲み型 (scope 内) → 保守的に diagnostic。
+                    return false;
+                }
+                cursor = inner;
+                continue;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * lambda parameter 起点の external 判定 (spec #27 ⑥ 規則 (ii))。receiver が
+     * lambda parameter で、その lambda の引数先 (受け手 method call の receiver
+     * 型、または代入先変数の宣言型 = functional interface の宣言元) が scope 外
+     * 型なら true。scope 内 functional interface / 判定不能は false。
+     */
+    private boolean lambdaParamReceiverIsExternal(MethodCallExpr mce) {
+        if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
+            return false;
+        }
+        Node node = mce;
+        while ((node = node.getParentNode().orElse(null)) != null) {
+            if (!(node instanceof LambdaExpr lambda)) {
+                continue;
+            }
+            boolean declaresReceiver = lambda.getParameters().stream()
+                    .anyMatch(parameter -> parameter.getNameAsString().equals(name.getNameAsString()));
+            if (!declaresReceiver) {
+                continue; // 外側の lambda が宣言している可能性があるため遡上を続ける
+            }
+            Node parent = lambda.getParentNode().orElse(null);
+            if (parent instanceof MethodCallExpr outer) {
+                Expression outerScope = outer.getScope().orElse(null);
+                if (outerScope == null) {
+                    return false; // 暗黙 this の受け手 = scope 内。
+                }
+                String owner = tryTypeErasureOf(outerScope);
+                return owner != null && declIndex.find(owner).isEmpty();
+            }
+            if (parent instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+                try {
+                    String owner = BinaryNames.erasureOf(declarator.getType().resolve());
+                    return declIndex.find(owner).isEmpty();
+                } catch (RuntimeException | LinkageError e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /** 式の静的型 erasure。reference type として解決できなければ null。 */
+    private static String tryTypeErasureOf(Expression expression) {
+        try {
+            ResolvedType type = expression.calculateResolvedType().erasure();
+            if (!type.isReferenceType()) {
+                return null;
+            }
+            return BinaryNames.erasureOf(type);
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
     }
 
     /** 救済対象 method call の owner (receiver の static type、暗黙 this は囲み型)。 */
