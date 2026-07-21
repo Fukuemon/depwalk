@@ -130,7 +130,15 @@ source にない生成 member は、call site から要求された member だ�
 
 全救済後にも primary diagnostic outcome が残る場合、成功 graph を返さず `JAVA_INCOMPLETE_ANALYSIS` の request fatal とする。未解決 call は内部 `CallSiteId` 順で並べるが、ID 自体は Protocol へ出力しない。各共通 `error.details` には source location、元 diagnostic code / message、opaque metadata の reason / call kind / 判明済み target / candidate を自己完結形式で含め、top-level metadata の total / reasonCounts と一致させる。`silentOmission` は常に 0 でなければならない。
 
-**救済・除外分類の適用範囲拡大 (spec #27、2026-07-21 追加)**: bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。また receiver 型が取得できない call でも、静的に scope 外と判定できる根拠がある場合は primary diagnostic ではなく `external-target` 除外へ分類する (判定根拠の詳細規則は spec #27 の実装で確定し本節へ追記する)。outcome ledger の 3 終端と帰属意味論は変更しない。決定経緯: [spec #27 D3](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
+**救済・除外分類の適用範囲拡大 (spec #27、2026-07-21 追加)**: bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。決定経緯: [spec #27 D3](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
+
+**receiver 型不明時の external-target 判定規則 (spec #27 P4_03/P4_04 で確定、2026-07-21)**: receiver 型が取得できない call は、次の順で分類を試みてから diagnostic 化する。いずれも classfile / 確定 AST のみを根拠とし、推測による型付けは行わない。
+
+1. **chain の前進解決**: receiver chain の各 link を project bytecode candidate の戻り値型 (descriptor / generic Signature 由来) で前進解決し、owner 型を復元できたら通常の救済 / external 分類を適用する。候補が一意でない link・primitive / 配列戻り値・project 外 classfile の link では前進しない。暗黙 this link は囲み型、型不明の単純名は確定 AST の initializer (囲み callable 内で同名宣言が一意の場合のみ) または囲み型の bytecode field 型で補完する。
+2. **起点遡及の external 判定**: 前進解決できない場合、chain・変数 initializer・`this.field` を遡って最初に静的型が取れる起点を探し、その型が scope 外 (source 宣言索引に無い) なら `external-target` 除外へ分類する。起点が scope 内型・暗黙 this、または起点の型も取れない場合は保守的に diagnostic に残す。
+3. **lambda parameter 規則**: receiver が lambda parameter の場合、その lambda の引数先 (受け手 method call の receiver、または代入先変数の宣言型) を同じ起点遡及で判定し、scope 外なら `external-target` へ分類する。受け手が暗黙 this / scope 内型なら diagnostic に残す。
+
+SAM arity を推論できない method reference は、参照名が owner classfile 上で一意の場合だけ候補採用する (一意でなければ不採用の保守側)。
 
 ### Gradle runtime と安全境界
 
@@ -323,7 +331,7 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
 scope 内 source 型を solver が解決するとき、同一 context の classes output にしか存在しない一意な callable member (Lombok 等の生成 member) を解決時に合成する。call-site 駆動の救済 (生成 member 索引) だけでは式の型伝播 (chained call / stream 連鎖) を辿れないための拡張で、source 宣言と source 優先の帰属規則は変更しない。合成 member の出力は bytecode-only member と同じ契約 (定義位置省略 + owner metadata) に従う。generic 戻り値は classes output の Signature 属性から実型引数を復元する (spec #24 D32)。Signature が無い・読めない member と型変数は erasure (Object) へ degrade し、解析は失敗させない。決定経緯は [spec #24 D31](../../../specs/24-gradle-multi-module-source-roots/index.md#解決済みの論点)。
 
-合成・救済の選択境界 (PR #26 レビュー反映、2026-07-19): 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は owner class の classfile が project 所有 classes output (自 context + classpath 上の依存 project output) に存在する場合だけ採用し、external artifact だけに存在する同名 class の member を project bytecode として救済しない (D16 の origin 検証)。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
+合成・救済の選択境界 (PR #26 レビュー反映、2026-07-19 / spec #27 で機構を精緻化、2026-07-21): 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は owner class の classfile が project 所有 classes output (自 context + **model の project 依存関係で到達可能な依存 project の output**) に存在する場合だけ採用し、external artifact だけに存在する同名 class の member を project bytecode として救済しない (D16 の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
 
 cross-module 救済の欠陥修正 (spec #27、2026-07-21 追加): 実環境実測で、依存 context の source 型が持つ生成 member (Lombok constructor / getter 等) の cross-module 呼び出しが救済されず未解決になる欠陥を確認した。上記の設計意図 (依存 project output を含む採用境界) は変更せず、実装を設計どおり機能させる修正を spec #27 で行う。決定経緯: [spec #27 D1/D3](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
 
