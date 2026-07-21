@@ -1315,6 +1315,9 @@ public final class CallGraphBuilder {
      * 場合は前進を打ち切り false (診断維持) を返す。全 link を通過できた場合の
      * み true (root が external で、かつ中間区間もすべて external と確認できた)。
      */
+    /** SootUp の descriptor erasure で type variable が落ちる先 (JLS 4.6 の既定境界)。 */
+    private static final String ERASED_TYPE_VARIABLE_BOUND = "java.lang.Object";
+
     private boolean forwardVerifyExternalChain(String rootType, List<MethodCallExpr> links) {
         String currentOwner = rootType;
         for (MethodCallExpr link : links) {
@@ -1325,6 +1328,15 @@ public final class CallGraphBuilder {
             }
             String returnType = candidate.returnType();
             if (returnType == null || isPrimitiveOrVoid(returnType) || returnType.endsWith("[]")) {
+                return false;
+            }
+            // PR review 指摘反映 (2026-07-22): full classpath 経路 (uniqueDeclaredMethodOnClasspath)
+            // には project 限定の bytecodeIndex.genericReturnType 相当の generic Signature
+            // 読み取りが無く、境界なし type variable の戻り値は descriptor erasure で
+            // Object になる。in-scope な実際の型引数を見失ったまま前進すると false
+            // exclusion を再発するため、Object を「型変数の疑いあり、根拠不足」として
+            // 前進を打ち切る (保守側)。
+            if (ERASED_TYPE_VARIABLE_BOUND.equals(returnType)) {
                 return false;
             }
             if (declIndex.find(returnType).isPresent()) {
@@ -1367,10 +1379,18 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * lambda parameter 起点の external 判定 (spec #27 ⑥ 規則 (ii))。receiver が
-     * lambda parameter で、その lambda の引数先 (受け手 method call の receiver
-     * 型、または代入先変数の宣言型 = functional interface の宣言元) が scope 外
-     * 型なら true。scope 内 functional interface / 判定不能は false。
+     * lambda parameter 起点の external 判定 (spec #27 ⑥ 規則 (ii)、PR review
+     * 指摘反映で範囲を縮小: 2026-07-22)。receiver が lambda parameter で、
+     * lambda 自体が代入される変数の宣言型 (= functional interface 型そのもの)
+     * が scope 外なら true。scope 内 functional interface / 判定不能は false。
+     *
+     * <p>lambda を直接 method の引数として渡す形 (受け手 method call の
+     * receiver 型を根拠にする案) は撤回した: 受け手 method の receiver 型
+     * (例 {@code externalApi.each(...)} の {@code externalApi}) と、その
+     * method の functional interface parameter が実際に instantiate される型
+     * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできない
+     * (external な receiver を持つ method が in-scope 型を引数に取り得るため、
+     * false exclusion の原因になる)。
      */
     private boolean lambdaParamReceiverIsExternal(MethodCallExpr mce, WalkContext ctx) {
         if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
@@ -1387,19 +1407,6 @@ public final class CallGraphBuilder {
                 continue; // 外側の lambda が宣言している可能性があるため遡上を続ける
             }
             Node parent = lambda.getParentNode().orElse(null);
-            if (parent instanceof MethodCallExpr outer) {
-                Expression outerScope = outer.getScope().orElse(null);
-                if (outerScope == null) {
-                    return false; // 暗黙 this の受け手 = scope 内。
-                }
-                // 受け手が失敗 chain の途中でも、external 判定には member 解決は
-                // 不要で、起点型の遡及 (規則 (i) と同じ traversal) で判定できる。
-                String owner = tryTypeErasureOf(outerScope);
-                if (owner != null) {
-                    return declIndex.find(owner).isEmpty();
-                }
-                return rootIsExternal(outerScope, ctx);
-            }
             if (parent instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
                 try {
                     String owner = BinaryNames.erasureOf(declarator.getType().resolve());
@@ -1573,7 +1580,12 @@ public final class CallGraphBuilder {
         accumulator.addDiagnostic(Diagnostic.of(
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
-                "failed to resolve call: " + callNode,
+                // PR review 指摘反映 (2026-07-22): callNode.toString() は JavaParser が
+                // 再構築した source 断片 (literal を含む) であり、D24 sanitize 制約
+                // (error.details と同様に diagnostic record にも source 本文を含めない)
+                // に違反しうる。安定な AST ノード種別名だけを使い、位置は既存の
+                // sourceLocation フィールドに委ねる。
+                "failed to resolve " + callNode.getClass().getSimpleName(),
                 sourceLocationOf(callNode),
                 relatedMethodId,
                 metadata));
