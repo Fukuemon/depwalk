@@ -106,35 +106,38 @@ D3 基準の適用結果と、承認された判定:
 | P4_02 (⑧cross-module) 後                                              |              334 |                2,306 |
 | P4_03 (⑥external判定) 後                                              |              183 |                1,566 |
 | P4_04 (前進解決) 後                                                   |              143 |                1,203 |
-| 深掘り (起点遡及の一般化: var initializer / field / lambda 受け手) 後 | **143 (-59.1%)** |   **1,161 (-91.9%)** |
+| 深掘り (起点遡及の一般化: var initializer / field / lambda 受け手) 後 |              143 |                1,161 |
+| PR #29 レビュー対応 (⑥のforward検証追加、false exclusion防止) 後      | **197 (-43.7%)** |   **1,545 (-89.2%)** |
 
 fixture (`patterns/`) は auto discovery で exit 0 (10 件 → 0 件、全パターン救済) となり、E2E は成功期待の回帰ガードへ更新済み。
 
+**PR #29 レビュー対応による件数増加について**: multi-agent review (claude/codex/cursor) で、⑥の chain 起点遡及が「root が external というだけで中間の型不明区間を無条件に external とみなす」設計だと false exclusion (scope 内 edge の欠落) を起こしうる、との指摘 (high) を受けた。実際に外部 API が in-scope 型を返す builder chain 等で発生しうるため、root から現在の call までの中間 link を classfile 根拠 (project 限定でない full classpath) で前進検証し、確認できない区間は diagnostic に戻すよう修正した。これにより recall (件数削減率) は後退したが、false exclusion のリスクを排除し「実際に確認できたものだけを除外する」設計へ改めた。件数増加は主に ①/⑥ chain 波及・③ JDK fluent 後続バケットに集中しており、④⑧等の他バケットは変化していない。
+
 ### 残存の内訳 (v1 scope 外記録の対象候補)
 
-| バケット                          | Resilience4j | 追加検証プロジェクト | 特徴                                                                                                                      |
-| --------------------------------- | -----------: | -------------------: | ------------------------------------------------------------------------------------------------------------------------- |
-| ②/⑥ receiver 型不明 (NameExpr 等) |           30 |                  625 | 宣言型自体が解決できない変数 / lambda parameter (受け手が scope 内のため保守的に diagnostic 維持)                         |
-| ③ JDK fluent 後続                 |            3 |                  370 | chain 起点の型が取れず、前進解決の根拠 (一意 classfile 候補) も無い                                                       |
-| ①/⑥ chain 波及                    |           33 |                  108 | 同上 (起点が scope 内または型不明)                                                                                        |
-| ⑦/⑧ 生成 member 救済欠落          |           66 |                   85 | 候補が一意でない / classfile に根拠が無い残余。R4j 分は Lombok 非依存の未特定解決失敗を含む (最小再現 2 形状では再現せず) |
-| ④ method reference 残余           |           11 |                   15 | scope 型不明かつ名前一意でない参照                                                                                        |
-| 合計                              |          143 |         1,161 (最終) |                                                                                                                           |
+| バケット                          | Resilience4j | 追加検証プロジェクト | 特徴                                                                                                                                        |
+| --------------------------------- | -----------: | -------------------: | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| ①/⑥ chain 波及                    |           76 |                  157 | root は external と確定したが、中間 link を classfile 上で一意に確認できず forward 検証が前進できなかった区間 (PR #29 レビュー対応で保守化) |
+| ⑦/⑧ 生成 member 救済欠落          |           66 |                   85 | 候補が一意でない / classfile に根拠が無い残余。R4j 分は Lombok 非依存の未特定解決失敗を含む (最小再現 2 形状では再現せず)                   |
+| ②/⑥ receiver 型不明 (NameExpr 等) |           30 |                  627 | 宣言型自体が解決できない変数 / lambda parameter (受け手が scope 内のため保守的に diagnostic 維持)                                           |
+| ③ JDK fluent 後続                 |           14 |                  663 | 同上 (chain 起点の型が取れず、前進解決の根拠も無い区間)                                                                                     |
+| ④ method reference 残余           |           11 |                   15 | scope 型不明かつ名前一意でない参照                                                                                                          |
+| 合計                              |          197 |                1,545 |                                                                                                                                             |
 
-残存はいずれも「classfile / 静的根拠で解決・分類できない」もので、根拠のない型推測で false edge を作らない方針 (feature doc / ADR-0004) の保守側に位置する。深掘り (ユーザー判断 C) では起点遡及を var initializer / bytecode field / lambda 受け手へ一般化したが、残余の主体は **scope 内起点の解決失敗** (承認規則上、保守的に diagnostic 維持する側) であり、これ以上は「JavaParser が scope 内起点の resolve に失敗する未特定形状」の根本特定が必要。ADR-0004 の再検討条件 (「未解決が支配的」「主要ユースケースの精度を満たせない」) への抵触判定は P5_01 のユーザー承認で確定する。
+残存はいずれも「classfile / 静的根拠で解決・分類できない」もので、根拠のない型推測で false edge / false exclusion を作らない方針 (feature doc / ADR-0004) の保守側に位置する。PR #29 レビュー対応 (⑥への forward 検証追加) により、①/③/⑥ の各バケットは「root は external だが中間区間を classfile 根拠で確認できない」ケースを diagnostic 側へ寄せた分だけ増加している。ADR-0004 の再検討条件 (「未解決が支配的」「主要ユースケースの精度を満たせない」) への抵触判定は次節で扱う。
 
-### 全体に対する残余の比率と graph の精度 (2026-07-21 追加検証)
+### 全体に対する残余の比率と graph の精度 (2026-07-22 レビュー対応後の最終計測)
 
-修正後の追加検証プロジェクトで ledger の全 call site 内訳を直接計測した (`callSiteSummary` の `callSites` / `emitted` / `excluded[...]` / `diagnostic[...]`)。
+PR #29 レビュー対応後の追加検証プロジェクトで ledger の全 call site 内訳を直接計測した (`callSiteSummary` の `callSites` / `emitted` / `excluded[...]` / `diagnostic[...]`)。
 
 | 区分                                                             | 追加検証プロジェクト |   Resilience4j |
 | ---------------------------------------------------------------- | -------------------: | -------------: |
 | 全 call site                                                     |               50,437 |         10,994 |
 | edge 出力 (emitted)                                              |       26,137 (51.8%) |  5,665 (51.5%) |
-| scope 外として明示除外 (external-target + lift-excluded-package) |       23,139 (45.9%) |  5,186 (47.2%) |
-| **残存 diagnostic**                                              |     **1,161 (2.3%)** | **143 (1.3%)** |
+| scope 外として明示除外 (external-target + lift-excluded-package) |       22,755 (45.1%) |  5,132 (46.7%) |
+| **残存 diagnostic**                                              |     **1,545 (3.1%)** | **197 (1.8%)** |
 
-emitted と excluded は合わせて全体の 97.7%〜98.7% を占め、いずれも classfile / source 宣言索引の確定情報のみを根拠に判定している (推測による型付けは行わない設計のため precision は既存の完全性 gate 契約どおり維持)。残余 (2.3% / 1.3%) は「解決も scope 外判定もできない」もので、無理に判定すると false edge / false exclusion のリスクが生じるため diagnostic に残す設計判断を維持した。
+emitted は変化せず (レビュー対応は receiver 型不明時の分類にのみ影響し、解決済み call には影響しない)。excluded がわずかに減り (追加検証: 23,139→22,755、R4j: 5,186→5,132)、その分だけ diagnostic が増えている (追加検証: 1,161→1,545、R4j: 143→197)。これは「root が external というだけで中間区間を無条件に external 化しない」設計変更の直接的な効果であり、false exclusion を修正した分だけ diagnostic 側へ保守的に倒れたことを示す。emitted と excluded は合わせて全体の 96.9%〜98.2% を占め、いずれも classfile / source 宣言索引の確定情報のみを根拠に判定している。残余 (3.1% / 1.8%) は「解決も scope 外判定もできない」もので、無理に判定すると false edge / false exclusion のリスクが生じるため diagnostic に残す設計判断を維持した。
 
 ### 完全性 gate の opt-in 緩和 (`allowIncompleteAnalysis`)
 
