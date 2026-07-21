@@ -879,17 +879,24 @@ public final class CallGraphBuilder {
             return false;
         }
         int samArity = inferFunctionalInterfaceArity(mre);
+        com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate candidate;
         if (samArity < 0) {
-            return false;
+            // 周辺の型推論が壊れて SAM arity を推論できない場合でも、参照名が
+            // owner の classfile 上で一意なら根拠として採用できる (spec #27 ④)。
+            var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
+                    .filter(method -> method.methodName().equals(mre.getIdentifier()))
+                    .toList();
+            candidate = byName.size() == 1 ? byName.get(0) : null;
+        } else {
+            var bound = bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity).orElse(null);
+            var unbound = samArity >= 1
+                    ? bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity - 1).orElse(null)
+                    : null;
+            if (bound != null && unbound != null) {
+                return false;
+            }
+            candidate = bound != null ? bound : unbound;
         }
-        var bound = bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity).orElse(null);
-        var unbound = samArity >= 1
-                ? bytecodeIndex.uniqueMethod(ownerBinaryName, mre.getIdentifier(), samArity - 1).orElse(null)
-                : null;
-        if (bound != null && unbound != null) {
-            return false;
-        }
-        var candidate = bound != null ? bound : unbound;
         if (candidate == null) {
             return false;
         }
@@ -1023,6 +1030,26 @@ public final class CallGraphBuilder {
         String direct = tryTypeErasureOf(expr);
         if (direct != null) {
             return direct;
+        }
+        if (expr instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
+            return chainForwardOwner(enclosed.getInner(), depth + 1);
+        }
+        if (expr instanceof NameExpr nameExpr) {
+            // 型が取れない local 変数は、宣言の initializer 式を同じ規則で前進
+            // 解決する (var / 失敗 chain 由来の変数への波及を classfile 根拠で辿る)。
+            try {
+                ResolvedValueDeclaration value = nameExpr.resolve();
+                Node ast = value.toAst().orElse(null);
+                if (ast instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+                    Expression initializer = declarator.getInitializer().orElse(null);
+                    if (initializer != null) {
+                        return chainForwardOwner(initializer, depth + 1);
+                    }
+                }
+            } catch (RuntimeException | LinkageError e) {
+                return null;
+            }
+            return null;
         }
         if (!(expr instanceof MethodCallExpr link)) {
             return null;
