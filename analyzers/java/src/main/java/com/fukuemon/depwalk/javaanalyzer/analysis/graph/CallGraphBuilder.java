@@ -316,6 +316,22 @@ public final class CallGraphBuilder {
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
+            // spec #27 P4_04 (P3_01 承認): 解決失敗した receiver chain を bytecode
+            // candidate の戻り値型 (classfile 由来) で前進解決し、復元した owner
+            // で救済 / external 分類を試みる。根拠のない型推測は行わない。
+            if (receiverOwner == null && mce.getScope().isPresent()) {
+                String forwardOwner = chainForwardOwner(mce.getScope().get(), 0);
+                if (forwardOwner != null) {
+                    if (declIndex.find(forwardOwner).isEmpty()) {
+                        commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+                        return;
+                    }
+                    if (tryBytecodeMethodRescueWithOwner(mce, ctx, forwardOwner)) {
+                        commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+                        return;
+                    }
+                }
+            }
             // spec #27 ⑥ (P3_01 承認規則): receiver 型が取れない call でも、
             // (i) chain 起点の静的型が scope 外、または (ii) lambda parameter の
             // 引数先 functional interface が scope 外なら external-target へ分類
@@ -990,6 +1006,71 @@ public final class CallGraphBuilder {
         }
         emitBytecodeOnlyCall(oce, ctx, owner,
                 candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor");
+        return true;
+    }
+
+    /**
+     * chain の前進解決 (spec #27 P4_04)。receiver 式の静的型が取れない場合、
+     * chain を再帰的に遡り、各 link を bytecode candidate の戻り値型
+     * (classfile の descriptor / generic Signature 由来) で前進解決して現在の
+     * call の owner 型を復元する。候補が一意でない・classfile に根拠が無い
+     * link があれば null (推測しない)。
+     */
+    private String chainForwardOwner(Expression expr, int depth) {
+        if (expr == null || depth > 16) {
+            return null;
+        }
+        String direct = tryTypeErasureOf(expr);
+        if (direct != null) {
+            return direct;
+        }
+        if (!(expr instanceof MethodCallExpr link)) {
+            return null;
+        }
+        Expression scope = link.getScope().orElse(null);
+        if (scope == null) {
+            return null;
+        }
+        String receiverOwner = chainForwardOwner(scope, depth + 1);
+        if (receiverOwner == null) {
+            return null;
+        }
+        var candidate = bytecodeIndex
+                .uniqueMethod(receiverOwner, link.getNameAsString(), link.getArguments().size())
+                .orElse(null);
+        if (candidate == null) {
+            return null;
+        }
+        var generic = bytecodeIndex.genericReturnType(candidate).orElse(null);
+        String returnType = generic != null && !generic.typeVariable() && generic.arrayDims() == 0
+                ? generic.binaryName()
+                : candidate.returnType();
+        if (returnType == null || returnType.endsWith("[]") || isPrimitiveOrVoid(returnType)) {
+            return null;
+        }
+        return returnType;
+    }
+
+    private static boolean isPrimitiveOrVoid(String binaryName) {
+        return switch (binaryName) {
+            case "void", "boolean", "byte", "short", "char", "int", "long", "float", "double" -> true;
+            default -> false;
+        };
+    }
+
+    /** 復元済み owner を使う method call の bytecode 救済 (chain 前進解決用)。 */
+    private boolean tryBytecodeMethodRescueWithOwner(MethodCallExpr mce, WalkContext ctx, String ownerBinaryName) {
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
+        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+            return false;
+        }
+        var candidate = bytecodeIndex.uniqueMethod(ownerBinaryName, mce.getNameAsString(), mce.getArguments().size())
+                .orElse(null);
+        if (candidate == null) {
+            return false;
+        }
+        emitBytecodeOnlyCall(mce, ctx, owner,
+                candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method");
         return true;
     }
 

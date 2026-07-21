@@ -57,10 +57,11 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void chainWithInScopeRootStaysDiagnostic() throws Exception {
-        // Holder は scope 内 source 型。bytecode-only の make() は救済されるが、
-        // 戻り値型 Dep が classpath に無いため後続 text() は解決できない。
-        // chain 起点 h (Holder = scope 内) のため external へ倒さず diagnostic に残す。
+    void chainWithInScopeRootStaysDiagnosticWhenForwardResolutionIsAmbiguous() throws Exception {
+        // Holder は scope 内 source 型。make(String) / make(Integer) の同名同
+        // arity overload により bytecode 候補が一意に決まらず、chain の前進解決
+        // (P4_04) は行えない。chain 起点 h (Holder = scope 内) のため external へ
+        // 倒さず、make / text とも diagnostic に残す (保守側)。
         Path classes = compile("holder-src", "holder-classes",
                 Map.of(
                         "com/example/Dep.java", """
@@ -72,7 +73,8 @@ class ExternalChainClassificationTest {
                         "com/example/Holder.java", """
                                 package com.example;
                                 public class Holder {
-                                    public Dep make() { return null; }
+                                    public Dep make(String key) { return null; }
+                                    public Dep make(Integer key) { return null; }
                                 }
                                 """));
         Files.delete(classes.resolve("com/example/Dep.class"));
@@ -86,7 +88,7 @@ class ExternalChainClassificationTest {
         write(workspace, "com/example/Caller.java", """
                 package com.example;
                 public class Caller {
-                    String use(Holder h) { return h.make().text(); }
+                    String use(Holder h) { return h.make("k").text(); }
                 }
                 """);
 
@@ -99,7 +101,7 @@ class ExternalChainClassificationTest {
         List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
         assertTrue(details.stream().anyMatch(d ->
                         "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
-                () -> "in-scope chain root must keep the diagnostic for text(): " + details);
+                () -> "ambiguous forward resolution must keep the diagnostic for text(): " + details);
     }
 
     @Test
@@ -164,6 +166,55 @@ class ExternalChainClassificationTest {
         assertTrue(details.stream().anyMatch(d ->
                         "mystery".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
                 () -> "in-scope functional interface must keep the diagnostic: " + details);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void forwardResolvesChainThroughBytecodeReturnTypes() throws Exception {
+        // spec #27 P4_04: scope 内 chain の各 link を classfile の戻り値型で前進
+        // 解決する。Holder.make() / Dep.text() とも source に無い bytecode-only
+        // member で、make の戻り値型 Dep (classfile 由来) から text() を救済する。
+        Path classes = compile("fwd-src", "fwd-classes",
+                Map.of(
+                        "com/example/Dep.java", """
+                                package com.example;
+                                public class Dep {
+                                    public String text() { return "x"; }
+                                }
+                                """,
+                        "com/example/Holder.java", """
+                                package com.example;
+                                public class Holder {
+                                    public Dep make() { return null; }
+                                }
+                                """));
+
+        Path workspace = temp.resolve("fwd-workspace");
+        write(workspace, "com/example/Dep.java", """
+                package com.example;
+                public class Dep {
+                }
+                """);
+        write(workspace, "com/example/Holder.java", """
+                package com.example;
+                public class Holder {
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    String use(Holder h) { return h.make().text(); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        List<Map<String, Object>> edges = ran.byType("callEdge");
+        assertTrue(edges.stream().anyMatch(e ->
+                        "java:com.example.Dep#text()".equals(e.get("calleeMethodId"))),
+                () -> "chain forward resolution must rescue text(): " + edges);
     }
 
     private Path compile(String srcDir, String classesDir, Map<String, String> sources) throws Exception {
