@@ -1,8 +1,8 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 実装で経路別 SLO を確定)
+> 最終更新: 2026-07-21 / Status: 完了 (spec #27 の診断 metadata・救済適用範囲拡大を反映)
 
-Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #22](../../../specs/22-cli-interface/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
+Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #22](../../../specs/22-cli-interface/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/)、[spec #27](../../../specs/27-unresolved-call-diagnosis/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 
 ## メタ
 
@@ -12,7 +12,7 @@ Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言�
 | 関連 DesignDoc | [成功条件 S1/S2/S4/S5](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Java Analyzer](../../DesignDoc.md#モジュール責務)、[設計原則 P1-P4](../../DesignDoc.md#設計原則-design-principles)、[Future Work Phase1-3 / Open Questions Q2](../../DesignDoc.md#open-questions-未決事項)                                                                                                        |
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)、[infrastructure](../../../context/infrastructure.md)                                                                                                                                                            |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md)、[ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md)、[ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md)、[ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md) |
-| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)、[specs/22-cli-interface](../../../specs/22-cli-interface/)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)                                                                                                |
+| 関連 spec      | [specs/9-java-analyzer](../../../specs/9-java-analyzer/)、[specs/21-java-dispatch-spring-di](../../../specs/21-java-dispatch-spring-di/)、[specs/22-cli-interface](../../../specs/22-cli-interface/)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)、[specs/27-unresolved-call-diagnosis](../../../specs/27-unresolved-call-diagnosis/)            |
 | 対象モジュール | `java-analyzer` (Core 初回配線として `core` にも一部影響)                                                                                                                                                                                                                                                                                                                                             |
 
 ## 背景・要件解釈
@@ -129,6 +129,8 @@ solver 前に resolution と独立した visitor で各 call expression / method
 source にない生成 member は、call site から要求された member だけを project bytecode member index で検索する。index は generator 固有の annotation 名に依存せず、compile classes output の signature / owner / kind を扱う。source-only member は `sourceLocation` を持つ。bytecode-only member は `sourceLocation` を省略し、`methodSymbol.metadata` に `declarationOrigin: "project-bytecode"`、`sourceAnchor: "owner-type"`、`ownerSourceLocation` を保持する。対応する edge は `calleeOrigin: "project-bytecode-member"` を持ち、Graph は nested metadata を deep copy する。owner source type がscope内にない生成type全体と、source call siteから直接参照されないJVM内部memberは索引対象外である。
 
 全救済後にも primary diagnostic outcome が残る場合、成功 graph を返さず `JAVA_INCOMPLETE_ANALYSIS` の request fatal とする。未解決 call は内部 `CallSiteId` 順で並べるが、ID 自体は Protocol へ出力しない。各共通 `error.details` には source location、元 diagnostic code / message、opaque metadata の reason / call kind / 判明済み target / candidate を自己完結形式で含め、top-level metadata の total / reasonCounts と一致させる。`silentOmission` は常に 0 でなければならない。
+
+**救済・除外分類の適用範囲拡大 (spec #27、2026-07-21 追加)**: bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。また receiver 型が取得できない call でも、静的に scope 外と判定できる根拠がある場合は primary diagnostic ではなく `external-target` 除外へ分類する (判定根拠の詳細規則は spec #27 の実装で確定し本節へ追記する)。outcome ledger の 3 終端と帰属意味論は変更しない。決定経緯: [spec #27 D3](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
 
 ### Gradle runtime と安全境界
 
@@ -257,6 +259,8 @@ language levelの欠落・invalid・曖昧・JavaParser非対応 (preview含む)
 
 jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲の型解決が失敗し、継続すると「未解決だらけの、一見成功した結果」が出て利用者が不完全なグラフを正と誤認するリスクが高いため。`diagnostic.sourceLocation` と `relatedMethodId` を可能な範囲で埋め、未解決の発生箇所を追跡できるようにする。
 
+**未解決 call の診断 metadata (spec #27 D2、2026-07-21 追加)**: `JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目 — `resolutionPhase` (失敗した解決段階) / `exceptionClass` (resolver 例外のクラス名のみ、message は含めない) / receiver 式種別 / receiver 型取得成否 — を含める。診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする (決定経緯: [spec #27 D2](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点))。
+
 ### 性能方針
 
 - **モード別の streaming 方針**: `reachableFromEntrypoints` は entrypoints からの到達判定に解析完了までの adjacency 全体が必要であり、streaming と両立しない。このためモードごとに挙動を分ける。
@@ -320,6 +324,8 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 scope 内 source 型を solver が解決するとき、同一 context の classes output にしか存在しない一意な callable member (Lombok 等の生成 member) を解決時に合成する。call-site 駆動の救済 (生成 member 索引) だけでは式の型伝播 (chained call / stream 連鎖) を辿れないための拡張で、source 宣言と source 優先の帰属規則は変更しない。合成 member の出力は bytecode-only member と同じ契約 (定義位置省略 + owner metadata) に従う。generic 戻り値は classes output の Signature 属性から実型引数を復元する (spec #24 D32)。Signature が無い・読めない member と型変数は erasure (Object) へ degrade し、解析は失敗させない。決定経緯は [spec #24 D31](../../../specs/24-gradle-multi-module-source-roots/index.md#解決済みの論点)。
 
 合成・救済の選択境界 (PR #26 レビュー反映、2026-07-19): 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は owner class の classfile が project 所有 classes output (自 context + classpath 上の依存 project output) に存在する場合だけ採用し、external artifact だけに存在する同名 class の member を project bytecode として救済しない (D16 の origin 検証)。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
+
+cross-module 救済の欠陥修正 (spec #27、2026-07-21 追加): 実環境実測で、依存 context の source 型が持つ生成 member (Lombok constructor / getter 等) の cross-module 呼び出しが救済されず未解決になる欠陥を確認した。上記の設計意図 (依存 project output を含む採用境界) は変更せず、実装を設計どおり機能させる修正を spec #27 で行う。決定経緯: [spec #27 D1/D3](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
 
 ### 帰属型の決定規則
 
@@ -447,6 +453,7 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 - Gradle `7.6.5`〜`9.6.x` と daemon JVM anchor matrix、Gradle output discard、credential / URL / absolute path を含む negative fixture の非漏洩を検証すること
 - **Spring Boot fixture (#21、2026-07-15 追加済み)**: `testdata/fixtures/java/spring-project/` に単一 source root の Spring fixture を配置した。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。決定経緯: [spec #21](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
 - **Lombok / MyBatis Mapper 拡張 (#21、決定済み 2026-07-14)**: 上記 fixture に、コンストラクタを明示せず Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) で生成するクラス (D7) と、MyBatis `@Mapper` インターフェース (D8) を含める。前者は自プロジェクトのコンパイル済み class を通じた constructor injection 解決を、後者は runtime-provided マーカー検出を検証する。決定経緯: [spec #21 D7](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点) / [D8](../../../specs/21-java-dispatch-spring-di/index.md#解決済みの論点)。
+- **未解決 call パターン fixture (#27、決定済み 2026-07-21)**: `testdata/fixtures/java/multi-module-spring-project/` へ、実環境実測の上位未解決パターン (lambda / generic を含む fluent chain、`var` + generic メソッド戻り値、method reference、explicit `super(...)`、cross-module の Lombok 生成 member 呼び出し) の最小再現ケースを追加する。救済修正後の回帰検証と、`JAVA_INCOMPLETE_ANALYSIS` 時の診断 metadata 4 項目 (sanitize 制約含む) の期待値検証に使う。決定経緯: [spec #27 D4](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点)。
 - **fixture build / classpath 契約 (#21、決定済み 2026-07-14)**: `testdata/fixtures/java/spring-project/` は独立した Gradle project とし、repository の `analyzers/java/gradlew -p` で build する。fixture の `build.gradle.kts` は Java toolchain 25、`options.release=21`、Spring Boot Autoconfigure 4.1.0、Spring Data Commons 4.1.0、MyBatis 3.5.19、Lombok 1.18.46 を固定する。`writeDepwalkClasspath` task が `build/classes/java/main` と `runtimeClasspath` の jar を絶対 path・辞書順・1 行 1 entry で `build/depwalk-classpath.txt` へ書き、Go E2E は全行を `analysisRequest.metadata.classpath` に渡す。Lombok の生成 constructor は `classes` task 後の `.class` で検証する。
 
 ## 上位資料からの変更点
