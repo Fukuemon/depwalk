@@ -100,6 +100,8 @@ public final class AnalysisRunner {
      * @param request workspace、解析 mode、entrypoint、metadata を含む検証済み解析要求
      * @param contextResult 構築済みの解析 context と非 fatal warning
      * @param writer JSONL protocol record の出力先
+     * @param allowIncompleteAnalysis true のとき、全救済後も残る primary diagnostic があっても
+     *     request を fatal にせず、解決済み graph と診断を公開する ({@code metadata.allowIncompleteAnalysis}、spec #27)
      * @return 解析したファイル数、未解決件数、pre-flight 時間
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
@@ -107,7 +109,8 @@ public final class AnalysisRunner {
     public static RunStats run(
             AnalysisRequest request,
             AnalysisContextFactory.Result contextResult,
-            RecordWriter writer) throws IOException, AnalyzerFatalException, IncompleteAnalysisException {
+            RecordWriter writer,
+            boolean allowIncompleteAnalysis) throws IOException, AnalyzerFatalException, IncompleteAnalysisException {
         // source root は real path で保持されるため、record path / glob の基準も
         // real path の workspaceRoot に揃える (symlink を含む workspace 対策)。
         Path workspaceRoot;
@@ -397,7 +400,7 @@ public final class AnalysisRunner {
         // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
-        if (!primary.isEmpty()) {
+        if (!primary.isEmpty() && !allowIncompleteAnalysis) {
             // fatal は先行 warning record を無効化するため、SootUp を利用できず
             // source-only で解析した context 数を upstream cause として error
             // metadata へ自己完結に保持する (bytecode 救済欠如が原因の診断補助)。
@@ -406,6 +409,12 @@ public final class AnalysisRunner {
                     .count();
             throw incompleteAnalysis(primary, sootUpUnavailableContexts);
         }
+        // allowIncompleteAnalysis=true (spec #27): primary diagnostic が残っても
+        // request を fatal にせず success として完了する。解決済み edge / 明示除外は
+        // 通常どおり公開され、残存 primary diagnostic は各 call site の検出時点で
+        // 既に streaming 済みの diagnostic record (reportUnresolved 経由) と、
+        // callSiteSummary の diagnostic[...] 集計で確認できる。graph が部分的で
+        // あることを隠さない。
 
         return new RunStats(
                 analyzedFileCount,
