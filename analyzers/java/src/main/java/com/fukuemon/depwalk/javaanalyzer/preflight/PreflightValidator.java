@@ -19,6 +19,7 @@ public final class PreflightValidator {
     private static final String LANGUAGE_JAVA = "java";
     private static final String METADATA_CLASSPATH = "classpath";
     private static final String METADATA_LIFT_EXCLUDE_PACKAGES = "liftExcludePackages";
+    private static final String METADATA_ALLOW_INCOMPLETE_ANALYSIS = "allowIncompleteAnalysis";
 
     private PreflightValidator() {
     }
@@ -28,8 +29,11 @@ public final class PreflightValidator {
      * 再 cast せず本 record の値を使う。
      *
      * @param classpath {@code metadata.classpath} の検証済み jar / classes dir path 一覧
+     * @param allowIncompleteAnalysis {@code metadata.allowIncompleteAnalysis} の検証済み値 (既定 false)。
+     *     true のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、
+     *     解決済み graph と診断を確認可能な形で公開する (spec #27)
      */
-    public record Validated(List<String> classpath) {
+    public record Validated(List<String> classpath, boolean allowIncompleteAnalysis) {
     }
 
     /**
@@ -73,11 +77,37 @@ public final class PreflightValidator {
         }
 
         validateWorkspaceRoot(request.workspaceRoot());
+        boolean allowIncompleteAnalysis = false;
         if (metadata != null) {
             validateLiftExcludePackages(metadata);
+            allowIncompleteAnalysis = readAllowIncompleteAnalysis(metadata);
         }
 
-        return new Validated(classpath);
+        return new Validated(classpath, allowIncompleteAnalysis);
+    }
+
+    /**
+     * {@code allowIncompleteAnalysis} は key 不在なら既定値 false (完全性 gate は従来どおり fatal)。
+     * 指定時は要素 1 の {@code ["true"]} / {@code ["false"]} でなければ {@code JAVA_INVALID_REQUEST}
+     * で fatal とする (spec #27、javaPreview と同じ boolean flag 表現規約)。
+     */
+    private static boolean readAllowIncompleteAnalysis(Map<String, Object> metadata) throws AnalyzerFatalException {
+        if (!metadata.containsKey(METADATA_ALLOW_INCOMPLETE_ANALYSIS)) {
+            return false;
+        }
+        Object raw = metadata.get(METADATA_ALLOW_INCOMPLETE_ANALYSIS);
+        if (raw instanceof List<?> rawList && rawList.size() == 1) {
+            Object value = rawList.get(0);
+            if ("true".equals(value)) {
+                return true;
+            }
+            if ("false".equals(value)) {
+                return false;
+            }
+        }
+        throw new AnalyzerFatalException(
+                JavaErrorCode.JAVA_INVALID_REQUEST,
+                "analysisRequest.metadata.allowIncompleteAnalysis must be [\"true\"] or [\"false\"]");
     }
 
     /**

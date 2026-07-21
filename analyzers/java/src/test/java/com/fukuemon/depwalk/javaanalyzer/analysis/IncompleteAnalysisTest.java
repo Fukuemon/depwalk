@@ -182,6 +182,60 @@ class IncompleteAnalysisTest {
         return (Map<String, Object>) detail.get("metadata");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void allowIncompleteAnalysisPublishesPartialGraphInsteadOfFatal() throws Exception {
+        // spec #27: metadata.allowIncompleteAnalysis=["true"] のとき、primary
+        // diagnostic が残っても request を fatal にせず、解決済み graph (edge /
+        // node) と診断を公開する。graph の部分性は診断で観測可能なまま。
+        write("com/example/A.java", """
+                package com.example;
+                public class A {
+                    void first() { MissingOne.go(); }
+                    void ok() { helper(); }
+                    void helper() {}
+                }
+                """);
+
+        Map<String, Object> metadata = new java.util.LinkedHashMap<>(AnalysisTestSupport.classpathMetadata());
+        metadata.put("allowIncompleteAnalysis", List.of("true"));
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        assertTrue(ran.byType("error").isEmpty(), () -> "no fatal error expected: " + ran.byType("error"));
+
+        List<Map<String, Object>> edges = ran.byType("callEdge");
+        assertTrue(edges.stream().anyMatch(e -> e.get("calleeMethodId").toString().endsWith("#helper()")),
+                () -> "resolved call must still be published: " + edges);
+
+        List<Map<String, Object>> diagnostics = ran.byType("diagnostic");
+        assertTrue(diagnostics.stream().anyMatch(d -> "JAVA_UNRESOLVED_SYMBOL".equals(d.get("code"))),
+                () -> "the remaining unresolved call must stay visible as a diagnostic: " + diagnostics);
+
+        assertTrue(ran.stderr().contains("diagnostic[JAVA_UNRESOLVED_SYMBOL:unresolved-method-call]=1"),
+                () -> "callSiteSummary must report the remaining diagnostic count: " + ran.stderr());
+    }
+
+    @Test
+    void allowIncompleteAnalysisRejectsMalformedValue() throws Exception {
+        write("com/example/Ok.java", """
+                package com.example;
+                public class Ok {
+                    void run() { helper(); }
+                    void helper() {}
+                }
+                """);
+
+        Map<String, Object> metadata = new java.util.LinkedHashMap<>(AnalysisTestSupport.classpathMetadata());
+        metadata.put("allowIncompleteAnalysis", List.of("yes"));
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size());
+        assertEquals("JAVA_INVALID_REQUEST", errors.get(0).get("code"));
+    }
+
     @Test
     void cleanWorkspaceSucceedsWithZeroSilentOmission() throws Exception {
         write("com/example/Ok.java", """
