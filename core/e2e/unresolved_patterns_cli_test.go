@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -13,16 +12,18 @@ import (
 
 // TestUnresolvedCallPatternsCLI は spec #27 D4 の未解決 call パターン fixture
 // (testdata/fixtures/java/multi-module-spring-project/patterns/) を実 Core CLI +
-// 実 Analyzer jar の auto discovery で解析し、現行実装の未解決状態
-// (JAVA_INCOMPLETE_ANALYSIS) と診断 metadata 4 項目 (spec #27 D2) を固定する。
+// 実 Analyzer jar の auto discovery で解析する。
+//
+// P2_01 時点では 5 パターン (①fluent chain / ④method reference / ⑤explicit
+// super / ⑦var+generic / ⑧cross-module Lombok) が JAVA_INCOMPLETE_ANALYSIS の
+// 未解決 10 件として固定されていた。P4_01 (④⑤の救済 fallback) と P4_02
+// (⑧: Gradle model が依存 project を jar として classpath へ返す場合に依存
+// output が external artifact 扱いになる欠陥の修正) により全件が救済され、
+// 本テストは「全パターンが bytecode-only member 契約 (D21) で edge 化される」
+// 成功期待の回帰ガードへ更新された。
 //
 // patterns/ は root fixture の settings.gradle に含まれない独立 build であり、
 // TestGradleMultiProjectCLI の成功 graph 期待には影響しない。
-//
-// 【P4 系 prompt への注記】この期待値は「修正前の現状」を固定したもの。
-// P4_01 (④⑤) / P4_02 (⑧) / P4_03 (⑥) / P4_04 (①⑦) の救済修正が入ったら、
-// 該当パターンの期待を成功側 (edge / 除外) へ更新し、最終的に fixture 全体が
-// exit 0 になることを目指す (①⑦ が scope 外判定なら未解決期待を残す)。
 func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -33,106 +34,65 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	capture := t.TempDir()
 	result := runCLI(t, cliPath, capture, javaPath, jarPath, fixture, "--language", "java")
 
-	if result.exitCode == 0 {
-		t.Fatalf("CLI exit = 0, want non-zero while rescue gaps remain; stdout:\n%s", result.stdout)
+	if result.exitCode != 0 {
+		t.Fatalf("CLI exit = %d, want 0 after the spec #27 rescues; stderr:\n%s", result.exitCode, result.stderr)
 	}
 
 	records := capturedRecords(t, capture)
-	var errorRecord *protocol.AnalyzerError
+	edges := map[string][]protocol.CallEdge{}
 	for _, record := range records {
-		if typed, ok := record.(protocol.AnalyzerError); ok {
-			errorRecord = &typed
-		}
-	}
-	if errorRecord == nil {
-		t.Fatal("expected a JAVA_INCOMPLETE_ANALYSIS error record")
-	}
-	if errorRecord.Code != "JAVA_INCOMPLETE_ANALYSIS" {
-		t.Fatalf("error code = %q, want JAVA_INCOMPLETE_ANALYSIS", errorRecord.Code)
-	}
-
-	// 修正前の現状: 5 パターン由来の 10 件 (⑧ctor/getter ×2、⑤super、
-	// ①chain 4 件、④reference + 波及 collect、⑦var 経由 getter)。
-	// GenericChainCase (自己境界 generic builder + overload + lambda) は
-	// JavaParser 3.28.2 が解決に成功するため details へ現れない。件数固定は
-	// 「この形状を誤って未解決へ倒さない」ことの回帰ガードを兼ねる
-	// (①の真の再現形は P2_02 の実測診断で特定し、P4_04 で fixture へ追加する)。
-	// 現状の全 detail は resolver 例外を伴う失敗のため、exceptionClass は
-	// phase を問わず非空のクラス名になる前提で一律検査する。
-	// P4_01 で ④⑤ の bytecode 救済経路が追加されたが、cross-module の index
-	// 欠陥 (⑧、P4_02 対象) が同じ土台のため件数は変わらず、phase だけが
-	// bytecode-rescue へ変わった (救済試行に到達している証跡)。
-	if len(errorRecord.Details) != 10 {
-		t.Errorf("details = %d entries, want 10 (current pre-fix expectation): %+v",
-			len(errorRecord.Details), errorRecord.Details)
-	}
-
-	type wantDetail struct {
-		pathSuffix           string
-		callKind             string
-		reason               string
-		target               string
-		resolutionPhase      string
-		receiverKind         string
-		receiverTypeResolved bool
-	}
-	wants := []wantDetail{
-		{"CrossModuleLombokCase.java", "object-creation", "unresolved-constructor-call", "Item", "bytecode-rescue", "none", true},
-		{"CrossModuleLombokCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "NameExpr", true},
-		{"ExplicitSuperCase.java", "explicit-constructor-invocation", "unresolved-constructor-call", "super", "bytecode-rescue", "super", true},
-		{"FluentChainCase.java", "object-creation", "unresolved-constructor-call", "Item", "bytecode-rescue", "none", true},
-		{"FluentChainCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "ObjectCreationExpr", true},
-		{"FluentChainCase.java", "method-call", "unresolved-method-call", "trim", "bytecode-rescue", "MethodCallExpr", false},
-		{"FluentChainCase.java", "method-call", "unresolved-method-call", "isEmpty", "bytecode-rescue", "MethodCallExpr", false},
-		{"MethodReferenceCase.java", "method-call", "unresolved-method-call", "collect", "bytecode-rescue", "MethodCallExpr", false},
-		{"MethodReferenceCase.java", "method-reference", "unresolved-method-reference", "getName", "bytecode-rescue", "TypeExpr", true},
-		{"VarGenericCase.java", "method-call", "unresolved-method-call", "getName", "bytecode-rescue", "NameExpr", true},
-	}
-	bareClassName := regexp.MustCompile(`^[\w.$]+$`)
-	for _, want := range wants {
-		found := false
-		for _, detail := range errorRecord.Details {
-			if detail.Source == nil || !strings.HasSuffix(detail.Source.Path, want.pathSuffix) {
-				continue
+		switch typed := record.(type) {
+		case protocol.AnalyzerError:
+			t.Fatalf("unexpected analyzer error record: %+v", typed)
+		case protocol.Diagnostic:
+			if typed.Code == "JAVA_UNRESOLVED_SYMBOL" {
+				t.Errorf("no unresolved diagnostics expected after the rescues: %+v", typed)
 			}
-			metadata := detail.Metadata
-			if metadata["callKind"] != want.callKind || metadata["target"] != want.target {
-				continue
-			}
-			found = true
-			if metadata["reason"] != want.reason {
-				t.Errorf("%s %s: reason = %v, want %s", want.pathSuffix, want.target, metadata["reason"], want.reason)
-			}
-			// spec #27 D2: sanitize 済み診断 4 項目。
-			if metadata["resolutionPhase"] != want.resolutionPhase {
-				t.Errorf("%s %s: resolutionPhase = %v, want %s",
-					want.pathSuffix, want.target, metadata["resolutionPhase"], want.resolutionPhase)
-			}
-			if metadata["receiverKind"] != want.receiverKind {
-				t.Errorf("%s %s: receiverKind = %v, want %s",
-					want.pathSuffix, want.target, metadata["receiverKind"], want.receiverKind)
-			}
-			if metadata["receiverTypeResolved"] != want.receiverTypeResolved {
-				t.Errorf("%s %s: receiverTypeResolved = %v, want %v",
-					want.pathSuffix, want.target, metadata["receiverTypeResolved"], want.receiverTypeResolved)
-			}
-			exceptionClass, _ := metadata["exceptionClass"].(string)
-			if !bareClassName.MatchString(exceptionClass) {
-				t.Errorf("%s %s: exceptionClass = %q, want a bare class name (no message)",
-					want.pathSuffix, want.target, exceptionClass)
-			}
-			break
-		}
-		if !found {
-			t.Errorf("missing expected detail %s %s (%s)", want.pathSuffix, want.target, want.callKind)
+		case protocol.CallEdge:
+			edges[typed.CalleeMethodID] = append(edges[typed.CalleeMethodID], typed)
 		}
 	}
 
-	// sanitize 制約 (spec #24 D24 / #27 D2): 絶対 path が details に混入しない。
-	for _, detail := range errorRecord.Details {
-		if detail.Source != nil && filepath.IsAbs(detail.Source.Path) {
-			t.Errorf("detail source path must be workspace-relative: %q", detail.Source.Path)
+	// 各パターンの救済結果: cross-module の生成 member が bytecode-only 契約
+	// (calleeOrigin=project-bytecode-member) で edge 化される。
+	itemCtor := "java:com.example.pat.lib.Item#<init>(java.lang.String,int)"
+	itemGetName := "java:com.example.pat.lib.Item#getName()"
+	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
+
+	// ⑧ constructor + ⑦ var 経由 + ① chain 起点 + ④ reference で計 4 caller が
+	// getName へ到達し、ctor は ⑧ と ① の 2 caller。
+	if got := len(edges[itemCtor]); got < 2 {
+		t.Errorf("Item ctor edges = %d, want >= 2 (⑧ cross-module / ① chain 起点): %v", got, edges[itemCtor])
+	}
+	if got := len(edges[itemGetName]); got < 3 {
+		t.Errorf("Item getName edges = %d, want >= 3 (⑧ / ⑦ var / ④ reference): %v", got, edges[itemGetName])
+	}
+	if got := len(edges[baseTaskCtor]); got != 1 {
+		t.Errorf("BaseTask ctor edges = %d, want 1 (⑤ explicit super): %v", got, edges[baseTaskCtor])
+	}
+	for _, callee := range []string{itemCtor, itemGetName, baseTaskCtor} {
+		for _, edge := range edges[callee] {
+			if edge.Metadata["calleeOrigin"] != "project-bytecode-member" {
+				t.Errorf("edge to %s must follow the bytecode-only contract (D21): %+v", callee, edge)
+			}
 		}
+	}
+
+	// ④ method reference の救済 edge は viaMethodReference 標識を持つ。
+	foundReference := false
+	for _, edge := range edges[itemGetName] {
+		if edge.Metadata["viaMethodReference"] == true {
+			foundReference = true
+		}
+	}
+	if !foundReference {
+		t.Errorf("rescued method reference edge must carry viaMethodReference: %v", edges[itemGetName])
+	}
+
+	// 完全性 gate: 全 call site が分類され、未解決ゼロで成功する。
+	stderrText := capturedText(t, capture, "stderr.txt")
+	if !strings.Contains(stderrText, "silentOmission=0") {
+		t.Errorf("ledger summary must report silentOmission=0:\n%s", stderrText)
 	}
 }
 

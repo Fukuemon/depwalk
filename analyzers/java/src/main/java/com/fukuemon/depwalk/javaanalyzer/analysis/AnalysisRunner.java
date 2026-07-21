@@ -153,10 +153,25 @@ public final class AnalysisRunner {
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
-            // project 所有の classes output (自 context + classpath 上の依存 project
-            // output) を external jar より先に登録し、同名 class は project bytecode
-            // を優先する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            // project 所有の classes output (自 context + 依存 project の output) を
+            // external jar より先に登録し、同名 class は project bytecode を優先
+            // する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            // 依存 project の output は classpath の形に依存せず model の project
+            // 依存関係から解決する (spec #27 ⑧: Gradle model は依存 project を jar
+            // として classpath へ返すことがあり、classpath 照合だけでは依存 output
+            // が external artifact 扱いになって cross-module 救済が拒否されていた)。
             List<Path> projectOutputs = new ArrayList<>(context.classesOutputs());
+            for (String dependencyId : reachableDependencyIds(context, contextById)) {
+                SourceSetAnalysisContext dependency = contextById.get(dependencyId);
+                if (dependency == null) {
+                    continue;
+                }
+                for (Path output : dependency.classesOutputs()) {
+                    if (!projectOutputs.contains(output)) {
+                        projectOutputs.add(output);
+                    }
+                }
+            }
             for (Path path : context.classpath()) {
                 if (classesOutputOwners.containsKey(path) && !projectOutputs.contains(path)) {
                     projectOutputs.add(path);
