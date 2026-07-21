@@ -1,0 +1,7 @@
+// 未解決 call パターン fixture (spec #27 D4): 実環境実測の上位パターンを
+// 一般化した最小再現。root fixture の settings.gradle には含めない独立 build
+// とし、既存 Auto / Explicit E2E の成功 graph 期待を変えずに、専用 E2E
+// (TestUnresolvedCallPatternsCLI) が auto discovery で JAVA_INCOMPLETE_ANALYSIS
+// と診断 metadata を検証する。
+rootProject.name = 'unresolved-call-patterns'
+include ':lib', ':consumer'
