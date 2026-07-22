@@ -40,6 +40,16 @@ spec #24 で成功 Graph の完全性境界を追加した。静的な救済を�
 - 利用者が「実行され得る候補」ではなく「特定環境・入力で実際に実行された経路」を要求する。
 - Runtime Trace の収集・機密情報・性能コストを受け入れる運用要件が定まる。
 
+### 状態追記 (spec #27、2026-07-21)
+
+決定内容自体は変更しない、実測に基づく状態の追記として記録する。
+
+**未解決理由の観測可能性を具体化した (D2)**: `error.details.metadata` へ sanitize 済みの診断 4 項目 (`resolutionPhase` / `exceptionClass` / receiver 式種別 / receiver 型取得成否) を追加した。本 ADR の決定「候補と未解決理由を `metadata` / `diagnostic` で観測可能にする」を、要因クラスへ機械的に分類できる粒度まで具体化したもの。詳細は [feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) の `diagnostic / error code 体系`。
+
+**再検討条件を実測で評価し、抵触しないと判断した**: 実環境の Gradle multi-project 2 件 (Resilience4j、追加検証プロジェクト) で bytecode 救済・external-target 判定の欠陥修正後に再計測したところ、全 call site のうち 97.7%〜98.7% が解決済みまたは根拠を伴う scope 外判定で分類され、未解決として残る diagnostic は 1.3%〜2.3% だった。残余は「chain / lambda の起点が scope 内で、かつ classfile / 確定 AST の根拠で解決も scope 外判定もできない」形状に収束しており、Proxy / Reflection 由来ではなく、件数比率も「支配的」とは言えない。したがって現時点で本 ADR の再検討条件のいずれにも抵触しないと判断する。詳細な計測値と要因分類は [spec #27 report](../specs/27-unresolved-call-diagnosis/report.md) を参照する。
+
+**完全性 gate の opt-in 緩和を追加した (Runtime Trace とは独立)**: 上記の残余があっても実プロジェクトで graph を実用できるよう、`metadata.allowIncompleteAnalysis` (既定 `false`) を追加した。有効時は primary diagnostic が残っていても request を fatal にせず、解決済み edge / 明示除外を含む graph を成功として公開する。残存分は診断としてそのまま可視であり (`silentOmission == 0` を維持)、根拠のない型推測や実行時観測を一切追加しない。この機構は「未解決を隠して精度を偽装する」ものではなく、決定に既にある「候補と未解決理由を観測可能にする」方針の運用面の緩和 (fatal ではなく advisory として扱う選択肢) であり、再検討条件 4 (Runtime Trace の運用要件が定まる) には該当しない。詳細は [feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) の完全性 gate の節。
+
 ## 代替案
 
 - 初期リリースから Java Agent / JFR による Runtime Trace を実装する。
@@ -78,3 +88,4 @@ spec #24 で成功 Graph の完全性境界を追加した。静的な救済を�
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): Phase 1 の既知の制約、Phase 2 / Phase 3
 - [specs/9-java-analyzer](../specs/9-java-analyzer/): Java Analyzer Phase 1 の決定記録
 - [specs/24-gradle-multi-module-source-roots](../specs/24-gradle-multi-module-source-roots/): 不完全解析を fatal にしつつ未解決 detail を保持する決定経緯
+- [specs/27-unresolved-call-diagnosis](../specs/27-unresolved-call-diagnosis/): 診断 metadata の具体化、実測による再検討条件の評価、完全性 gate の opt-in 緩和の決定経緯

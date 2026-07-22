@@ -32,20 +32,32 @@ public final class CallSiteOutcomeLedger {
      * @param reason EXCLUDED / DIAGNOSTIC の安定 reason
      * @param target 判明している場合のみ: 呼出先の自己完結な表現
      * @param candidates 判明している場合のみ: 候補の自己完結な表現 (決定順)
+     * @param diagnosticMetadata DIAGNOSTIC のみ: sanitize 済み診断項目 (spec #27 D2)。
+     *     primary diagnostic として終端した場合だけ {@code error.details.metadata} へ
+     *     合流し、救済成功 (EMITTED) 時は Protocol へ出力されない
      */
-    public record Outcome(OutcomeKind kind, String code, String reason, String target, List<String> candidates) {
+    public record Outcome(
+            OutcomeKind kind,
+            String code,
+            String reason,
+            String target,
+            List<String> candidates,
+            Map<String, Object> diagnosticMetadata) {
 
         static Outcome emitted() {
-            return new Outcome(OutcomeKind.EMITTED, null, null, null, null);
+            return new Outcome(OutcomeKind.EMITTED, null, null, null, null, null);
         }
 
         static Outcome excluded(String reason) {
-            return new Outcome(OutcomeKind.EXCLUDED, null, reason, null, null);
+            return new Outcome(OutcomeKind.EXCLUDED, null, reason, null, null, null);
         }
 
-        static Outcome diagnostic(String code, String reason, String target, List<String> candidates) {
+        static Outcome diagnostic(
+                String code, String reason, String target, List<String> candidates,
+                Map<String, Object> diagnosticMetadata) {
             return new Outcome(OutcomeKind.DIAGNOSTIC, code, reason, target,
-                    candidates == null ? null : List.copyOf(candidates));
+                    candidates == null ? null : List.copyOf(candidates),
+                    diagnosticMetadata == null ? null : Map.copyOf(diagnosticMetadata));
         }
     }
 
@@ -71,7 +83,18 @@ public final class CallSiteOutcomeLedger {
 
     /** primary diagnostic を確定する (完全性 gate の対象)。 */
     public void commitDiagnostic(CallSiteId id, String code, String reason, String target, List<String> candidates) {
-        commit(id, Outcome.diagnostic(code, reason, target, candidates));
+        commitDiagnostic(id, code, reason, target, candidates, null);
+    }
+
+    /**
+     * sanitize 済み診断項目付きで primary diagnostic を確定する (spec #27 D2)。
+     * {@code diagnosticMetadata} には source 本文・絶対 path・raw exception message を
+     * 含めてはならない (呼び出し側が安定値だけを渡す)。
+     */
+    public void commitDiagnostic(
+            CallSiteId id, String code, String reason, String target, List<String> candidates,
+            Map<String, Object> diagnosticMetadata) {
+        commit(id, Outcome.diagnostic(code, reason, target, candidates, diagnosticMetadata));
     }
 
     private void commit(CallSiteId id, Outcome outcome) {

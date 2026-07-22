@@ -100,6 +100,8 @@ public final class AnalysisRunner {
      * @param request workspace、解析 mode、entrypoint、metadata を含む検証済み解析要求
      * @param contextResult 構築済みの解析 context と非 fatal warning
      * @param writer JSONL protocol record の出力先
+     * @param allowIncompleteAnalysis true のとき、全救済後も残る primary diagnostic があっても
+     *     request を fatal にせず、解決済み graph と診断を公開する ({@code metadata.allowIncompleteAnalysis}、spec #27)
      * @return 解析したファイル数、未解決件数、pre-flight 時間
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
@@ -107,7 +109,8 @@ public final class AnalysisRunner {
     public static RunStats run(
             AnalysisRequest request,
             AnalysisContextFactory.Result contextResult,
-            RecordWriter writer) throws IOException, AnalyzerFatalException, IncompleteAnalysisException {
+            RecordWriter writer,
+            boolean allowIncompleteAnalysis) throws IOException, AnalyzerFatalException, IncompleteAnalysisException {
         // source root は real path で保持されるため、record path / glob の基準も
         // real path の workspaceRoot に揃える (symlink を含む workspace 対策)。
         Path workspaceRoot;
@@ -153,10 +156,25 @@ public final class AnalysisRunner {
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
-            // project 所有の classes output (自 context + classpath 上の依存 project
-            // output) を external jar より先に登録し、同名 class は project bytecode
-            // を優先する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            // project 所有の classes output (自 context + 依存 project の output) を
+            // external jar より先に登録し、同名 class は project bytecode を優先
+            // する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            // 依存 project の output は classpath の形に依存せず model の project
+            // 依存関係から解決する (spec #27 ⑧: Gradle model は依存 project を jar
+            // として classpath へ返すことがあり、classpath 照合だけでは依存 output
+            // が external artifact 扱いになって cross-module 救済が拒否されていた)。
             List<Path> projectOutputs = new ArrayList<>(context.classesOutputs());
+            for (String dependencyId : reachableDependencyIds(context, contextById)) {
+                SourceSetAnalysisContext dependency = contextById.get(dependencyId);
+                if (dependency == null) {
+                    continue;
+                }
+                for (Path output : dependency.classesOutputs()) {
+                    if (!projectOutputs.contains(output)) {
+                        projectOutputs.add(output);
+                    }
+                }
+            }
             for (Path path : context.classpath()) {
                 if (classesOutputOwners.containsKey(path) && !projectOutputs.contains(path)) {
                     projectOutputs.add(path);
@@ -382,7 +400,7 @@ public final class AnalysisRunner {
         // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
-        if (!primary.isEmpty()) {
+        if (!primary.isEmpty() && !allowIncompleteAnalysis) {
             // fatal は先行 warning record を無効化するため、SootUp を利用できず
             // source-only で解析した context 数を upstream cause として error
             // metadata へ自己完結に保持する (bytecode 救済欠如が原因の診断補助)。
@@ -391,6 +409,12 @@ public final class AnalysisRunner {
                     .count();
             throw incompleteAnalysis(primary, sootUpUnavailableContexts);
         }
+        // allowIncompleteAnalysis=true (spec #27): primary diagnostic が残っても
+        // request を fatal にせず success として完了する。解決済み edge / 明示除外は
+        // 通常どおり公開され、残存 primary diagnostic は各 call site の検出時点で
+        // 既に streaming 済みの diagnostic record (reportUnresolved 経由) と、
+        // callSiteSummary の diagnostic[...] 集計で確認できる。graph が部分的で
+        // あることを隠さない。
 
         return new RunStats(
                 analyzedFileCount,
@@ -415,6 +439,12 @@ public final class AnalysisRunner {
             }
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
+            }
+            // spec #27 D2: primary diagnostic として終端した call だけが、sanitize 済み
+            // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
+            // receiverTypeResolved) を details へ載せる。
+            if (outcome.diagnosticMetadata() != null) {
+                metadata.putAll(outcome.diagnosticMetadata());
             }
             details.add(new com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail(
                     outcome.code(),
