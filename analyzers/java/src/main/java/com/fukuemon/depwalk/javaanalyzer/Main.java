@@ -91,7 +91,8 @@ public final class Main {
             }
 
             try {
-                AnalysisRunner.RunStats stats = AnalysisRunner.run(request, contexts, writer);
+                AnalysisRunner.RunStats stats =
+                        AnalysisRunner.run(request, contexts, writer, validated.allowIncompleteAnalysis());
                 errStream.println(stats.callSiteSummary());
                 Duration elapsed = Duration.between(start, Instant.now());
                 MetricsSummary summary = new MetricsSummary(
