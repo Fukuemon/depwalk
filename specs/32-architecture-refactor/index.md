@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 解決済み。残り D2〜D7                        |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1〜D2 解決済み。残り D3〜D7                    |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -122,7 +122,6 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 | #   | 論点                                                                                            | 決定候補                                                    | 決定 |
 | --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---- |
-| D2  | output の位置づけ (presenter として独立層にするか Infrastructure (`platform`) に含めるか)       | A) `platform` に含める B) presenter 層として独立            | 未決 |
 | D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化              | 未決 |
 | D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue                   | 未決 |
 | D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール                   | 未決 |
@@ -137,12 +136,15 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - `core/internal/` 直下を `domain/` (graph / traversal)、`app/` (analyze)、`platform/` (protocol / analyzer / cli、output は D2 で確定) の 3 層ディレクトリでグルーピングする。package 名 (import 末尾) は従来の責務名を維持する
   - `usecase` / `infra` という機械的層名は避け、Go コミュニティで通用する語彙 (`app` = アプリケーションサービス層、`platform` = 技術基盤層) を使う。層名とクリーンアーキテクチャ用語の対応は architecture.md と各層 README で明文化する
   - 依存方向は `platform` → `app` → `domain` の内向き単方向 (業務ルール 1)。lint (D5) はディレクトリ prefix 単位でルール化する
+- **D2: output の位置づけ → A) `platform/output` (presenter 層は設けない)** (2026-07-23, Fukuemon)
+  - output は「外界への書き出し形式」という技術詳細として `platform` に含める。依存先は `domain` のみ (現状の `output -> protocol` import は本 issue で除去)
+  - package 1 つのために 4 層目 (presenter) を作らない (先回りした共通化の回避)。将来 formatter が肥大化した場合に分離を再検討する
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D2〜D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D2〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D3〜D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
@@ -152,7 +154,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 | ------------------- | :------: | ------------------------------------------------------------------ |
 | `core`              |    ◯     | `core/internal` の層別再編、cli 迂回参照の整理、Go lint 組み込み   |
 | `traversal`         |    ◯     | Domain 相当層への配置替え (ロジック変更なし)                       |
-| `output`            |    ◯     | 層配置の確定 (D2)、`protocol` 依存の除去                           |
+| `output`            |    ◯     | `platform/output` へ配置 (D2 確定)、`protocol` 依存の除去          |
 | `analyzer-protocol` |    ◯     | wire 表現の境界隔離、変換層の設計 (D6)。Protocol schema 自体は不変 |
 | `java-analyzer`     |    ◯     | `javaanalyzer` 配下のパッケージ再編、依存検査手段の導入判断 (D3)   |
 
@@ -220,7 +222,7 @@ core/internal/
 └── platform/       # 技術基盤層 (infra 相当。外部ライブラリ隔離)
     ├── protocol/   # JSONL wire DTO / parse / validate
     ├── analyzer/   # Analyzer process 制御
-    ├── output/     # formatter (D2 で位置確定)
+    ├── output/     # formatter (D2 確定: 依存は domain のみ)
     └── cli/        # Cobra command
 ```
 
@@ -347,6 +349,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)   |
 | 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映 |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用) |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)     |
 
 ## 備考
 
