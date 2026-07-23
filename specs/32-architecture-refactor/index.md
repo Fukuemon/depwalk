@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 未着手     |            |                                                 |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 解決済み。残り D2〜D7                        |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -120,27 +120,29 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) から引き継ぎ。D5〜D7 は scaffold で追加。
 
-| #   | 論点                                                                                            | 決定候補                                                                                    | 決定 |
-| --- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---- |
-| D1  | Core の層ディレクトリ命名 (domain/usecase/infra の機械的層名か Go 慣習寄りの命名か)             | A) `domain`/`usecase`/`infra` 直下配置 B) Go 慣習寄り (責務名を保ち層は README/lint で表現) | 未決 |
-| D2  | output の位置づけ (presenter として独立層にするか Infrastructure に含めるか)                    | A) Infra に含める B) presenter 層として独立                                                 | 未決 |
-| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化                                              | 未決 |
-| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue                                                   | 未決 |
-| D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール                                                   | 未決 |
-| D6  | wire 変換層の配置 (protocol DTO → domain model の写像をどの package が持つか)                   | 現状 analyze が担う変換責務の置き場所を層構造に合わせて確定                                 | 未決 |
-| D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示                                                        | 未決 |
+| #   | 論点                                                                                            | 決定候補                                                    | 決定 |
+| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---- |
+| D2  | output の位置づけ (presenter として独立層にするか Infrastructure (`platform`) に含めるか)       | A) `platform` に含める B) presenter 層として独立            | 未決 |
+| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化              | 未決 |
+| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue                   | 未決 |
+| D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール                   | 未決 |
+| D6  | wire 変換層の配置 (protocol DTO → domain model の写像をどの package が持つか)                   | 現状 analyze が担う変換責務の置き場所を層構造に合わせて確定 | 未決 |
+| D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示                        | 未決 |
 
 ## 解決済みの論点
 
 (clarify で確定したものをここに移動する)
 
--
+- **D1: Core の層ディレクトリ命名 → B) Go 慣習寄りの層名 `domain` / `app` / `platform` を採用** (2026-07-23, Fukuemon)
+  - `core/internal/` 直下を `domain/` (graph / traversal)、`app/` (analyze)、`platform/` (protocol / analyzer / cli、output は D2 で確定) の 3 層ディレクトリでグルーピングする。package 名 (import 末尾) は従来の責務名を維持する
+  - `usecase` / `infra` という機械的層名は避け、Go コミュニティで通用する語彙 (`app` = アプリケーションサービス層、`platform` = 技術基盤層) を使う。層名とクリーンアーキテクチャ用語の対応は architecture.md と各層 README で明文化する
+  - 依存方向は `platform` → `app` → `domain` の内向き単方向 (業務ルール 1)。lint (D5) はディレクトリ prefix 単位でルール化する
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D1〜D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D2〜D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D2〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
@@ -206,7 +208,24 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### コンテンツ配置 / package / route
 
-- (設計 phase で確定: Go / Java の package 配置図)
+- Core (Go) の層別配置 (D1 決定。output の最終位置は D2、変換層の位置は D6 で確定):
+
+```text
+core/internal/
+├── domain/         # ドメイン層 (他層に依存しない)
+│   ├── graph/      # graph model (wire 非依存)
+│   └── traversal/  # caller/callee 探索
+├── app/            # アプリケーションサービス層 (usecase 相当)
+│   └── analyze/    # analyze orchestration
+└── platform/       # 技術基盤層 (infra 相当。外部ライブラリ隔離)
+    ├── protocol/   # JSONL wire DTO / parse / validate
+    ├── analyzer/   # Analyzer process 制御
+    ├── output/     # formatter (D2 で位置確定)
+    └── cli/        # Cobra command
+```
+
+- package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
+- Java Analyzer の package 配置図は D7 で確定
 
 ## Performance / Security 設計
 
@@ -299,15 +318,19 @@ sequenceDiagram
 
 ### context への影響
 
-| 対象 doc / 節               | 変更内容 | 理由 |
-| --------------------------- | -------- | ---- |
-| (設計確定後に track で記録) |          |      |
+| 対象 doc / 節                      | 変更内容                                                                                        | 理由                      |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------- |
+| architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 | D1 決定 (source: clarify) |
+| project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                            | D1 決定 (source: clarify) |
+| (残りは設計確定後に track で記録)  |                                                                                                 |                           |
 
 ### ADR の新規 / 更新
 
-| ADR ID                      | 変更内容 | 理由 |
-| --------------------------- | -------- | ---- |
-| (設計確定後に track で記録) |          |      |
+| ADR ID                            | 変更内容                                                                            | 理由                      |
+| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
+| 新規 (番号は起票時採番)           | 層別ディレクトリ再編と Go 慣習寄り層名 (`domain`/`app`/`platform`) の採用判断を記録 | D1 決定 (source: clarify) |
+| ADR-0002 追補                     | 初期 directory / package 構成の記述を新 ADR 参照へ追補                              | D1 決定 (source: clarify) |
+| (残りは設計確定後に track で記録) |                                                                                     |                           |
 
 ## レビュー
 
@@ -323,6 +346,7 @@ sequenceDiagram
 | ---------- | ----------------------- | ------------------------------------------------ |
 | 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)   |
 | 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映 |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用) |
 
 ## 備考
 
