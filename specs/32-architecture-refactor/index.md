@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D5 / D6 解決済み。残り D3 / D4 / D7   |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D5 / D6 / D7 解決済み。残り D3 / D4   |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -120,11 +120,10 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) から引き継ぎ。D5〜D7 は scaffold で追加。
 
-| #   | 論点                                                                                            | 決定候補                                       | 決定 |
-| --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
-| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化 | 未決 |
-| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue      | 未決 |
-| D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示           | 未決 |
+| #   | 論点                                                                                     | 決定候補                                       | 決定 |
+| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
+| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)               | A) ArchUnit B) 規約文書のみで運用し別 issue 化 | 未決 |
+| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか) | A) 1 spec 内で PR 分割 B) epic + 子 issue      | 未決 |
 
 ## 解決済みの論点
 
@@ -146,12 +145,18 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - golangci-lint を dev ツールとして導入し、depguard で層別 (ディレクトリ prefix 単位) の import 禁止ルールを宣言する: `domain` は `app` / `platform` を deny、`app` は `platform` を deny
   - 既存 quality gate (lefthook pre-commit / CI) に組み込む。バージョンは固定して再現性を保つ
   - ルール定義の詳細 (`.golangci.yml` の具体構成) は実装 phase で確定
+- **D7: Java Analyzer の層構造 → A) パイプライン段階 + 外部ライブラリ隔離** (2026-07-23, Fukuemon)
+  - `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`discovery` は引き続き Gradle Tooling API の隔離境界とする
+  - `analysis` 配下を「実行順の段階別 package」+「外部ライブラリ adapter package」で再編する。段階の実行順は `pipeline` (Runner) だけが知る
+  - SootUp 型の漏れ (現状 `graph` / `augment` / `completeness` / `spring` / `AnalysisRunner` に散在) を adapter package (`sootup` 等) の境界内に封じ、JavaParser / SymbolSolver も同様に扱う
+  - Core (3 層) と命名思想が非対称になることは許容し、意図 (Analyzer は変換パイプラインである) を README / architecture.md で説明する
+  - クラス単位の最終配置図は diagram phase で確定する
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D3 / D4 / D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D3 / D4 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
@@ -235,7 +240,7 @@ core/internal/
 ```
 
 - package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
-- Java Analyzer の package 配置図は D7 で確定
+- Java Analyzer の構造原理 (D7 確定): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下を「実行順の段階別 package + 外部ライブラリ adapter package (`sootup` / `javaparser` 等)」へ再編し、段階の実行順は `pipeline` (Runner) だけが知る。クラス単位の配置図は diagram phase で確定
 
 ## Performance / Security 設計
 
@@ -325,6 +330,7 @@ sequenceDiagram
 | 対象 doc / 節                     | 変更内容                                                                            | 理由                      |
 | --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
 | graph / データ構造・変換          | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 | D6 決定 (source: clarify) |
+| java-analyzer / 内部構成          | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                         | D7 決定 (source: clarify) |
 | (残りは設計確定後に track で記録) |                                                                                     |                           |
 
 ### context への影響
@@ -363,6 +369,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)             |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI) |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)      |
 
 ## 備考
 
