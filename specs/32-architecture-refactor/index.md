@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D6 解決済み。残り D3 / D4 / D5 / D7   |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D5 / D6 解決済み。残り D3 / D4 / D7   |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -124,7 +124,6 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 | --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
 | D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化 | 未決 |
 | D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue      | 未決 |
-| D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール      | 未決 |
 | D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示           | 未決 |
 
 ## 解決済みの論点
@@ -143,12 +142,16 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - `app/analyze` は domain 型を返す port interface を定義し、`platform/protocol` (adapter) が wire → domain 変換を担って port を実装する。変換関数の現在地 (`graph/convert.go` の `NodeFromMethodSymbol` 等) は platform 側へ移す
   - 依存方向は `platform` → `app` → `domain` の内向き単方向を例外なしで成立させる (app から protocol への import も除去)
   - 配線は `cli` でのコンストラクタ注入による**手動 DI** とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない (独自の変換層のみ。ADR-0002 の依存最小方針と整合)
+- **D5: Go 側の依存方向 lint → A) golangci-lint + depguard** (2026-07-23, Fukuemon)
+  - golangci-lint を dev ツールとして導入し、depguard で層別 (ディレクトリ prefix 単位) の import 禁止ルールを宣言する: `domain` は `app` / `platform` を deny、`app` は `platform` を deny
+  - 既存 quality gate (lefthook pre-commit / CI) に組み込む。バージョンは固定して再現性を保つ
+  - ルール定義の詳細 (`.golangci.yml` の具体構成) は実装 phase で確定
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D3 / D4 / D5 / D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D3 / D4 / D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
@@ -194,7 +197,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 ### Testing
 
 - 既存テストスイート (Go unit / Java unit / E2E / golden) がテスト本体のロジック変更なしで全件 PASS することを挙動不変の検証基準とする
-- 依存方向 lint を quality gate (lefthook pre-commit / CI) に組み込み、禁止 import を機械検出する
+- 依存方向 lint (golangci-lint + depguard、D5 確定) を quality gate (lefthook pre-commit / CI) に組み込み、禁止 import を機械検出する
 
 ## Interface 設計
 
@@ -331,6 +334,7 @@ sequenceDiagram
 | architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 | D1 決定 (source: clarify) |
 | project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                            | D1 決定 (source: clarify) |
 | architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新  | D6 決定 (source: clarify) |
+| engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記              | D5 決定 (source: clarify) |
 | (残りは設計確定後に track で記録)  |                                                                                                 |                           |
 
 ### ADR の新規 / 更新
@@ -358,6 +362,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)         |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)             |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI) |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)         |
 
 ## 備考
 
