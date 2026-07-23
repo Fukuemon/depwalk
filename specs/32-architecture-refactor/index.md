@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D5 / D6 / D7 解決済み。残り D3 / D4   |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1〜D3 / D5〜D7 解決済み。残り D4               |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -120,10 +120,9 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) から引き継ぎ。D5〜D7 は scaffold で追加。
 
-| #   | 論点                                                                                     | 決定候補                                       | 決定 |
-| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
-| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)               | A) ArchUnit B) 規約文書のみで運用し別 issue 化 | 未決 |
-| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか) | A) 1 spec 内で PR 分割 B) epic + 子 issue      | 未決 |
+| #   | 論点                                                                                     | 決定候補                                  | 決定 |
+| --- | ---------------------------------------------------------------------------------------- | ----------------------------------------- | ---- |
+| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか) | A) 1 spec 内で PR 分割 B) epic + 子 issue | 未決 |
 
 ## 解決済みの論点
 
@@ -151,12 +150,16 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - SootUp 型の漏れ (現状 `graph` / `augment` / `completeness` / `spring` / `AnalysisRunner` に散在) を adapter package (`sootup` 等) の境界内に封じ、JavaParser / SymbolSolver も同様に扱う
   - Core (3 層) と命名思想が非対称になることは許容し、意図 (Analyzer は変換パイプラインである) を README / architecture.md で説明する
   - クラス単位の最終配置図は diagram phase で確定する
+- **D3: Java 側の依存検査 → A) ArchUnit を採用** (2026-07-23, Fukuemon)
+  - ArchUnit を test 依存として追加し、「adapter package 以外から `sootup.*` / `com.github.javaparser.*` / `org.gradle.tooling.*` を import 禁止」等のルールを JUnit テストとして記述する
+  - 既存の `./gradlew test` (quality gate 組み込み済み) で実行されるため、新しい gate 配線は不要。Go 側 (depguard) と対の機械検査が揃う (業務ルール 5)
+  - 具体的なルールセットは diagram phase の配置図確定後に定義する。例外シナリオ 3 (別 issue 分離) は不採用
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D3 / D4 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D4 (上表)。clarify (論点解決 phase) で確定する。決定者は Fukuemon、期限は clarify phase 内 ([requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
@@ -168,7 +171,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 | `traversal`         |    ◯     | Domain 相当層への配置替え (ロジック変更なし)                                 |
 | `output`            |    ◯     | `platform/output` へ配置 (D2 確定)、`protocol` 依存の除去                    |
 | `analyzer-protocol` |    ◯     | wire → domain 変換を platform 側に集約 (D6 確定)。Protocol schema 自体は不変 |
-| `java-analyzer`     |    ◯     | `javaanalyzer` 配下のパッケージ再編、依存検査手段の導入判断 (D3)             |
+| `java-analyzer`     |    ◯     | `javaanalyzer` 配下のパッケージ再編、ArchUnit による依存検査 (D3 確定)       |
 
 ## 機能仕様
 
@@ -203,6 +206,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 - 既存テストスイート (Go unit / Java unit / E2E / golden) がテスト本体のロジック変更なしで全件 PASS することを挙動不変の検証基準とする
 - 依存方向 lint (golangci-lint + depguard、D5 確定) を quality gate (lefthook pre-commit / CI) に組み込み、禁止 import を機械検出する
+- Java 側は ArchUnit (D3 確定) を JUnit テストとして追加し、既存の `./gradlew test` で外部ライブラリ隔離・段階間依存を検査する
 
 ## Interface 設計
 
@@ -341,6 +345,7 @@ sequenceDiagram
 | project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                            | D1 決定 (source: clarify) |
 | architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新  | D6 決定 (source: clarify) |
 | engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記              | D5 決定 (source: clarify) |
+| engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記            | D3 決定 (source: clarify) |
 | (残りは設計確定後に track で記録)  |                                                                                                 |                           |
 
 ### ADR の新規 / 更新
@@ -370,6 +375,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI) |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)         |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)      |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                         |
 
 ## 備考
 
