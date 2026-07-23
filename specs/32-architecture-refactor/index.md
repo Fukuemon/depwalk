@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1〜D2 解決済み。残り D3〜D7                    |
+| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1 / D2 / D6 解決済み。残り D3 / D4 / D5 / D7   |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -120,13 +120,12 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) から引き継ぎ。D5〜D7 は scaffold で追加。
 
-| #   | 論点                                                                                            | 決定候補                                                    | 決定 |
-| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---- |
-| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化              | 未決 |
-| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue                   | 未決 |
-| D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール                   | 未決 |
-| D6  | wire 変換層の配置 (protocol DTO → domain model の写像をどの package が持つか)                   | 現状 analyze が担う変換責務の置き場所を層構造に合わせて確定 | 未決 |
-| D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示                        | 未決 |
+| #   | 論点                                                                                            | 決定候補                                       | 決定 |
+| --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
+| D3  | Java 側の依存検査ツール選定 (ArchUnit 等。導入コスト過大なら別 issue 分離)                      | A) ArchUnit B) 規約文書のみで運用し別 issue 化 | 未決 |
+| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか)        | A) 1 spec 内で PR 分割 B) epic + 子 issue      | 未決 |
+| D5  | Go 側の依存方向 lint ツール選定と検査粒度 (depguard / gomodguard / go-arch-lint 等)             | A) golangci-lint + depguard B) 単体ツール      | 未決 |
+| D7  | Java Analyzer の層構造の具体形 (パイプライン段階の粒度、SootUp / Gradle Tooling API の隔離単位) | 9 sub-package の再配置案を設計で提示           | 未決 |
 
 ## 解決済みの論点
 
@@ -139,24 +138,29 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 - **D2: output の位置づけ → A) `platform/output` (presenter 層は設けない)** (2026-07-23, Fukuemon)
   - output は「外界への書き出し形式」という技術詳細として `platform` に含める。依存先は `domain` のみ (現状の `output -> protocol` import は本 issue で除去)
   - package 1 つのために 4 層目 (presenter) を作らない (先回りした共通化の回避)。将来 formatter が肥大化した場合に分離を再検討する
+- **D6: wire 変換層の配置 → A) platform 側に変換、app に port interface** (2026-07-23, Fukuemon)
+  - `domain/graph` が自前の `Symbol` / `SourceLocation` 相当型を持ち、protocol import をゼロにする (受け入れ基準 2)。wire 型との重複定義は境界隔離のコストとして許容する
+  - `app/analyze` は domain 型を返す port interface を定義し、`platform/protocol` (adapter) が wire → domain 変換を担って port を実装する。変換関数の現在地 (`graph/convert.go` の `NodeFromMethodSymbol` 等) は platform 側へ移す
+  - 依存方向は `platform` → `app` → `domain` の内向き単方向を例外なしで成立させる (app から protocol への import も除去)
+  - 配線は `cli` でのコンストラクタ注入による**手動 DI** とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない (独自の変換層のみ。ADR-0002 の依存最小方針と整合)
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D3〜D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- D3 / D4 / D5 / D7 (上表)。いずれも clarify (論点解決 phase) で確定する。決定者はすべて Fukuemon、期限は clarify phase 内 (D3〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
 
 ## 実装対象
 
 正規 target は [context/project.md](../../context/project.md) の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                           |
-| ------------------- | :------: | ------------------------------------------------------------------ |
-| `core`              |    ◯     | `core/internal` の層別再編、cli 迂回参照の整理、Go lint 組み込み   |
-| `traversal`         |    ◯     | Domain 相当層への配置替え (ロジック変更なし)                       |
-| `output`            |    ◯     | `platform/output` へ配置 (D2 確定)、`protocol` 依存の除去          |
-| `analyzer-protocol` |    ◯     | wire 表現の境界隔離、変換層の設計 (D6)。Protocol schema 自体は不変 |
-| `java-analyzer`     |    ◯     | `javaanalyzer` 配下のパッケージ再編、依存検査手段の導入判断 (D3)   |
+| モジュール          | 実装有無 | 主な責務                                                                     |
+| ------------------- | :------: | ---------------------------------------------------------------------------- |
+| `core`              |    ◯     | `core/internal` の層別再編、cli 迂回参照の整理、Go lint 組み込み             |
+| `traversal`         |    ◯     | Domain 相当層への配置替え (ロジック変更なし)                                 |
+| `output`            |    ◯     | `platform/output` へ配置 (D2 確定)、`protocol` 依存の除去                    |
+| `analyzer-protocol` |    ◯     | wire → domain 変換を platform 側に集約 (D6 確定)。Protocol schema 自体は不変 |
+| `java-analyzer`     |    ◯     | `javaanalyzer` 配下のパッケージ再編、依存検査手段の導入判断 (D3)             |
 
 ## 機能仕様
 
@@ -200,7 +204,8 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### Props / Request / Response
 
-- (設計 phase で確定: 変換層の入出力型 — protocol DTO → domain model の写像)
+- 変換層 (D6 確定): `app/analyze` が domain 型を返す port interface を定義し、`platform/protocol` が wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / domain 版 `SourceLocation`) の写像を実装する。変換関数のシグネチャ詳細は diagram / 実装 phase で確定
+- 配線は `cli` でのコンストラクタ注入による手動 DI (`google/wire` 等の DI ライブラリは導入しない)
 
 ## Content / Data 設計
 
@@ -210,20 +215,20 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### コンテンツ配置 / package / route
 
-- Core (Go) の層別配置 (D1 決定。output の最終位置は D2、変換層の位置は D6 で確定):
+- Core (Go) の層別配置 (D1 / D2 / D6 決定):
 
 ```text
 core/internal/
-├── domain/         # ドメイン層 (他層に依存しない)
-│   ├── graph/      # graph model (wire 非依存)
+├── domain/         # ドメイン層 (他層に依存しない。wire 非依存)
+│   ├── graph/      # graph model (自前の Symbol / SourceLocation 型)
 │   └── traversal/  # caller/callee 探索
 ├── app/            # アプリケーションサービス層 (usecase 相当)
-│   └── analyze/    # analyze orchestration
+│   └── analyze/    # analyze orchestration + port interface 定義
 └── platform/       # 技術基盤層 (infra 相当。外部ライブラリ隔離)
-    ├── protocol/   # JSONL wire DTO / parse / validate
+    ├── protocol/   # JSONL wire DTO / parse / validate + wire→domain 変換 (port 実装)
     ├── analyzer/   # Analyzer process 制御
-    ├── output/     # formatter (D2 確定: 依存は domain のみ)
-    └── cli/        # Cobra command
+    ├── output/     # formatter (依存は domain のみ)
+    └── cli/        # Cobra command + 手動 DI 配線
 ```
 
 - package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
@@ -314,9 +319,10 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節               | 変更内容 | 理由 |
-| --------------------------- | -------- | ---- |
-| (設計確定後に track で記録) |          |      |
+| 対象 doc / 節                     | 変更内容                                                                            | 理由                      |
+| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
+| graph / データ構造・変換          | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 | D6 決定 (source: clarify) |
+| (残りは設計確定後に track で記録) |                                                                                     |                           |
 
 ### context への影響
 
@@ -324,6 +330,7 @@ sequenceDiagram
 | ---------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------- |
 | architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 | D1 決定 (source: clarify) |
 | project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                            | D1 決定 (source: clarify) |
+| architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新  | D6 決定 (source: clarify) |
 | (残りは設計確定後に track で記録)  |                                                                                                 |                           |
 
 ### ADR の新規 / 更新
@@ -344,12 +351,13 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者                  | 変更内容                                         |
-| ---------- | ----------------------- | ------------------------------------------------ |
-| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)   |
-| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映 |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用) |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)     |
+| 日付       | 変更者                  | 変更内容                                                 |
+| ---------- | ----------------------- | -------------------------------------------------------- |
+| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)           |
+| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)             |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI) |
 
 ## 備考
 
