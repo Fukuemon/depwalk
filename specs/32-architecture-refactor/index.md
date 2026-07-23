@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 進行中     | 2026-07-23 | D1〜D3 / D5〜D7 解決済み。残り D4               |
+| 5   | 論点解決                    | 完了       | 2026-07-23 | D1〜D7 全件解決 (解決済みの論点を参照)          |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -120,9 +120,9 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点) から引き継ぎ。D5〜D7 は scaffold で追加。
 
-| #   | 論点                                                                                     | 決定候補                                  | 決定 |
-| --- | ---------------------------------------------------------------------------------------- | ----------------------------------------- | ---- |
-| D4  | 段階分割 (Core 再編 / Java 再編 / lint 導入を 1 PR にするか、epic + 子 issue に分けるか) | A) 1 spec 内で PR 分割 B) epic + 子 issue | 未決 |
+| #   | 論点                         | 決定候補 | 決定 |
+| --- | ---------------------------- | -------- | ---- |
+| -   | なし (D1〜D7 すべて解決済み) | -        | -    |
 
 ## 解決済みの論点
 
@@ -154,12 +154,17 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - ArchUnit を test 依存として追加し、「adapter package 以外から `sootup.*` / `com.github.javaparser.*` / `org.gradle.tooling.*` を import 禁止」等のルールを JUnit テストとして記述する
   - 既存の `./gradlew test` (quality gate 組み込み済み) で実行されるため、新しい gate 配線は不要。Go 側 (depguard) と対の機械検査が揃う (業務ルール 5)
   - 具体的なルールセットは diagram phase の配置図確定後に定義する。例外シナリオ 3 (別 issue 分離) は不採用
+- **D4: 段階分割 → A) epic + 子 issue 2 件** (2026-07-23, Fukuemon)
+  - #32 は epic (起票時にラベル付与済み) + 設計 spec の親 issue として維持し、実装は子 issue 2 件に分割する: ① Core 再編 + golangci-lint/depguard、② Java Analyzer 再編 + ArchUnit (いずれも実態追随の doc 修正を含む)
+  - 子 issue のラベルは `type:task` / `phase:implementation` / `domain:core` または `domain:java-analyzer`。branch は `feature/<子issue-id>`、PR は子 issue 単位で小さく保つ。両者は独立で並行作業可能
+  - 設計判断のドキュメント同期 (architecture.md / project.md / engineering.md / feature doc / ADR) は本 spec の sync phase で実装に先行して実施する
+  - 子 issue の起票は tasks (実装分割) phase で `workflow-git` に従って行う
 
 ## 未確定事項
 
 (決定できない項目を理由とともに残す。1 件でも残っていれば下流 phase は止める)
 
-- D4 (上表)。clarify (論点解決 phase) で確定する。決定者は Fukuemon、期限は clarify phase 内 ([requirements.md の未決事項](requirements.md#未決事項論点) と同一管理)
+- なし (D1〜D7 すべて解決済み。2026-07-23)
 
 ## 実装対象
 
@@ -302,16 +307,18 @@ sequenceDiagram
 
 ### 実装タスク案
 
-(D4 の決定後に確定)
+(D4 確定: epic #32 + 子 issue 2 件。詳細分割は tasks phase で確定)
 
-| Phase | 対象 | 概要 | 依存 |
-| ----- | ---- | ---- | ---- |
-| P1    |      |      |      |
+| Phase | 対象                     | 概要                                                                       | 依存                     |
+| ----- | ------------------------ | -------------------------------------------------------------------------- | ------------------------ |
+| P0    | 正本ドキュメント         | sync phase: architecture.md / project.md / engineering.md / ADR の先行更新 | 論点解決済み (D1〜D7)    |
+| P1    | 子 issue ① core          | Core 層別再編 (domain/app/platform) + port/変換層 + golangci-lint/depguard | P0                       |
+| P2    | 子 issue ② java-analyzer | Java Analyzer 段階別再編 + 外部 lib 隔離 + ArchUnit                        | P0 (P1 とは独立・並行可) |
 
 ### prompts 生成方針
 
-- 対象ドメイン (core / java-analyzer) と作業種別 (再編 / lint / doc 同期) のどこで分けるかは D4 の決定に従う
-- 並列実装できる境界: Core 再編と Java 再編は独立。lint 導入は各再編の完了に依存
+- 子 issue 単位 (core / java-analyzer) で prompts を分ける (D4 確定)
+- 並列実装できる境界: P1 と P2 は独立・並行可。各 issue 内では「package 移動 → 依存是正 → lint/ArchUnit 導入 → doc 実態追随」の順に段階化し、各段階で既存テスト PASS を維持する
 
 ## 上位資料からの変更点
 
@@ -376,6 +383,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)         |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)      |
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決      |
 
 ## 備考
 
