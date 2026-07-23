@@ -44,7 +44,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 ## 想定ユーザー/ステークホルダー
 
 - **リポジトリ開発者 (Fukuemon)**: 機能追加時に「どの層に置くか / 何に依存してよいか」を迷わず判断したい
-- *_AI エージェント (spec-_ workflow)**: context/architecture.md を読んで正しい配置・依存で実装したい
+- **AI エージェント (spec-\* workflow)**: context/architecture.md を読んで正しい配置・依存で実装したい
 - **将来のコントリビュータ / 第 2 言語 Analyzer 実装者**: 参照実装 (Java Analyzer) の構造から Analyzer の作り方を読み取りたい
 
 ## 提供価値(成功条件)
