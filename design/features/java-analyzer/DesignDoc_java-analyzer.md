@@ -1,6 +1,6 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-21 / Status: 完了 (spec #27 の診断 metadata・救済適用範囲拡大・完全性 gate opt-in 緩和を反映)
+> 最終更新: 2026-07-24 / Status: 完了 (spec #32 の内部 package 構成・外部ライブラリ隔離境界を反映)
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [spec #9](../../../specs/9-java-analyzer/)、[spec #21](../../../specs/21-java-dispatch-spring-di/)、[spec #22](../../../specs/22-cli-interface/)、[spec #24](../../../specs/24-gradle-multi-module-source-roots/)、[spec #27](../../../specs/27-unresolved-call-diagnosis/) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 
@@ -51,6 +51,15 @@ Phase1 の対象は Java/Spring Boot であり、Java Analyzer は `analyzer-pro
 - **JDK**: 25 LTS。Gradle toolchain で固定する (Analyzer process 自身が動く JVM の version。解析対象ソースの言語レベルとは独立して扱う)。
 - **配布形態**: 単一 fat jar (Gradle Shadow plugin)。Core は `java -jar <path>` の 1 コマンドで起動できる。
 - **実装言語**: Java を維持する (Kotlin を検討した上での判断)。JDK 25 の sealed interface + record + pattern matching で Kotlin を採用した場合の主利点 (代数的データ型、網羅性検査) が Java 単体で得られること、JavaParser との interop では Kotlin の null 安全が platform type で効かず利点が薄れること、将来の「Kotlin Analyzer」との命名混乱を避けられることが理由。
+
+### 内部 package 構成と依存境界
+
+`javaanalyzer` 配下の内部構成の正本 (判断は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../../../specs/32-architecture-refactor/index.md) D7)。
+
+- 直下の `protocol` (wire DTO) / `io` (JSONL 入出力) / `preflight` (入力検証) / `discovery` (Gradle Tooling API 隔離) は入出力・起動系として維持する。
+- `analysis` 配下は解析パイプラインの段階別 package で構成し、**段階の実行順は `analysis/pipeline` (AnalysisRunner) だけが知る**。実行順: scope 列挙 → context 構築 (JavaParser + augment) → attribution 準備 → sootup 型階層 index → spring DI index → graph 構築 → completeness 検査 → io 出力。`normalize` は段階横断の naming util。
+- 外部ライブラリの隔離は 3 段階: **SootUp** は `analysis/sootup` (adapter) に完全封じ込め (facade が自前型で公開し、他 package から `sootup.*` を import しない)。**Gradle Tooling API** は `discovery` に完全隔離。**JavaParser / SymbolSolver** は解析エンジンの中核として `analysis` 配下では自由に使い、`analysis` の外へは漏らさない。
+- 依存境界は ArchUnit の JUnit テストで機械検査する (quality gate は [engineering.md](../../../context/engineering.md))。
 
 ### 起動契約
 
@@ -487,3 +496,4 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | spec #22  | 追記                              | CLI プロセス E2E の correctness gate 後に 3 経路を再計測し、warm 中央値と warm 最大 RSS から latency / 最大 RSS の SLO を確定。計測値、算出式、適用境界、見直し条件を性能方針へ反映 (2026-07-20)                                                                                                                                                                                                                                                                                                                                        |
 | spec #27  | 追記                              | sync phase (2026-07-21) で D2 (診断 metadata 4項目の `error.details.metadata` 契約) を diagnostic / error code 体系へ、D3 (bytecode 救済・external-target 分類の method reference / explicit constructor invocation への適用拡大と receiver 型不明時の除外判定) を Parse・resolution・call 完全性へ、cross-module 生成 member 救済の欠陥修正注記を solver 層の bytecode member 合成へ、D4 (未解決 call パターン fixture) をテスト観点へ反映。決定経緯は [spec #27](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点) |
 | spec #27  | 追記                              | 実装 (2026-07-21) で ⑥ の external-target 判定規則の実体 (chain 前進解決 / 起点遡及 / lambda parameter 規則) を Parse・resolution・call 完全性へ、採用境界の機構記述精緻化を solver 層の bytecode member 合成へ、`metadata.allowIncompleteAnalysis` による完全性 gate の opt-in 緩和を Parse・resolution・call 完全性・metadata 契約・テスト観点へ追記。決定経緯は [spec #27](../../../specs/27-unresolved-call-diagnosis/index.md#解決済みの論点) / [report.md](../../../specs/27-unresolved-call-diagnosis/report.md)                 |
+| spec #32  | 追記                              | sync phase (2026-07-24) で「内部 package 構成と依存境界」節を追加 (D7: pipeline 新設・段階実行順・外部ライブラリ隔離 3 段階・ArchUnit 検査)。決定経緯は [spec #32](../../../specs/32-architecture-refactor/index.md#解決済みの論点)                                                                                                                                                                                                                                                                                                     |

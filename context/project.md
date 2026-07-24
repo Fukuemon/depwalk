@@ -1,6 +1,6 @@
 # Project Profile
 
-> 最終更新: 2026-07-20
+> 最終更新: 2026-07-24
 
 このプロダクト固有の値 (リポジトリ / 命名 / コマンド / 対象ドメイン / トラッカー / 正本パス) を集約する **唯一の正本**。`.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` 等の skill は、固有値をハードコードせず本ファイルを読む。
 
@@ -39,7 +39,10 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - Go package 名: 小文字、短い単語、責務名を使う。`core/internal/core` のような重複名は使わない。
 - Core module path: `github.com/Fukuemon/depwalk/core`
-- Core package: `core/internal/cli`、`core/internal/analyze`、`core/internal/protocol`、`core/internal/analyzer`、`core/internal/graph`、`core/internal/traversal`、`core/internal/output`
+- Core package (層別構造。正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md) / [architecture.md](architecture.md) の Package Boundary):
+  - `domain` 層: `core/internal/domain/graph`、`core/internal/domain/traversal`
+  - `app` 層: `core/internal/app/analyze`
+  - `platform` 層: `core/internal/platform/protocol`、`core/internal/platform/analyzer`、`core/internal/platform/output`、`core/internal/platform/cli`
 - Analyzer package / directory: `analyzers/<language>/`
 - ブランチ: `feature/<issue-id>`
 
