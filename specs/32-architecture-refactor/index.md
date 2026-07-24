@@ -15,19 +15,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                            |
-| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-07-23 | #32 (requirements.md で要求整理済み)            |
-| 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
-| 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS  |
-| 6   | Interface / Routing 設計    | 完了       | 2026-07-24 | diagram phase: 層依存図・配置図・フロー図を確定 |
-| 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
-| 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
-| 9   | Test / Metrics 設計         | 未着手     |            | 挙動不変の検証方針 (既存テスト無変更 PASS)      |
-| 10  | 実装分割                    | 未着手     |            | 段階分割 (D4) の決定に依存                      |
-| 11  | レビュー済                  | 未着手     |            |                                                 |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                             |
+| --- | --------------------------- | ---------- | ---------- | ------------------------------------------------ |
+| 1   | 起票                        | 完了       | 2026-07-23 | #32 (requirements.md で要求整理済み)             |
+| 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                    |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映   |
+| 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件  |
+| 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS   |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-24 | diagram: 図を確定。再レビュー PASS               |
+| 7   | Content / Data 設計         | 進行中     | 2026-07-24 | 図・配置は phase 6 で確定済み。残は変換 API 詳細 |
+| 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針               |
+| 9   | Test / Metrics 設計         | 未着手     |            | 挙動不変の検証方針 (既存テスト無変更 PASS)       |
+| 10  | 実装分割                    | 未着手     |            | 段階分割 (D4) の決定に依存                       |
+| 11  | レビュー済                  | 未着手     |            |                                                  |
 
 ## 上位文書整合
 
@@ -259,14 +259,14 @@ core/internal/
 ```
 
 - package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
-- Core の層依存図 (D1 / D2 / D6 確定):
+- Core の層依存図 (D1 / D2 / D6 確定)。**辺は Go の import 方向** (A → B は「A が B を import する」):
 
 ```mermaid
 flowchart LR
     subgraph platform["platform (技術基盤層)"]
-        cli["cli<br/>Cobra + 手動 DI 配線"]
-        protocol["protocol (ACL)<br/>wire DTO + Translator + Adapter"]
-        analyzer["analyzer<br/>process 制御"]
+        cli["cli<br/>Cobra + 手動 DI 配線<br/>(コンポジションルート)"]
+        protocol["protocol (ACL)<br/>wire DTO + Translator +<br/>Adapter (port 実装)"]
+        analyzer["analyzer<br/>process 制御 (spawn / stdio / exit)"]
         output["output<br/>formatter"]
     end
     subgraph app["app (アプリケーションサービス層)"]
@@ -276,17 +276,21 @@ flowchart LR
         graph_["graph<br/>自前 Symbol / SourceLocation"]
         traversal["traversal"]
     end
+    cli -->|"配線 + var _ 検証"| protocol
+    cli -->|配線| analyzer
     cli --> analyze
     cli --> output
-    protocol -->|"port 実装"| analyze
+    protocol -->|"port 型と domain 型を参照"| analyze
+    protocol -->|"process 起動に利用"| analyzer
     protocol --> graph_
-    analyzer --> analyze
     output --> graph_
     output --> traversal
     analyze --> graph_
     analyze --> traversal
     traversal --> graph_
 ```
+
+- 辺の読み方の補足: `analyzer` は純粋な process 制御であり内層を import しない (呼ばれる側)。ACL adapter (`protocol`) が process 起動に `analyzer` を利用し、`app/analyze` が定義した port を実装する。`cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
 
 - Java Analyzer の構造原理 (D7 確定 + 2026-07-24 精緻化): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下は既存 sub-package の粒度が段階として概ね妥当であり、再編の実体は ① `pipeline/` 新設 (実行順を知る唯一の場所として `AnalysisRunner` を移動)、② `sootup/` の facade 化 (自前型公開で `sootup.*` の漏れ 7 クラスを封じ込め)、③ `TypeSolverFactory` の `context/` への移動、④ 実行順の README 明文化。クラス単位の最終配置:
 
@@ -391,7 +395,7 @@ sequenceDiagram
     loop JSONL record ごと
         JA-->>PROC: MethodSymbol / CallEdge / diagnostic (stdout)
         PROC-->>ACL: raw record
-        ACL->>ACL: parse / validate (invalid record は拒否)
+        ACL->>ACL: parse / validate (parse / schema error は fatal → 下の破棄経路へ)
         ACL->>ACL: Translator: wire DTO → domain 型
         ACL-->>APP: domain 型の record
         APP->>DOM: 非公開 staging Graph へ 1-pass 変換
@@ -479,6 +483,8 @@ sequenceDiagram
 | 2026-07-23 | PASS (scaffold)          | 軽微 2 件: D5〜D7 の決定者未明示 / requirements.md の記法崩れ                                                                                            | 未確定事項へ決定者・期限を補記 / requirements.md を修正                                                     |
 | 2026-07-23 | NEEDS_WORK (clarify)     | D6 の位置づけ不正確 (graph feature doc の `SourceLocation` 再利用は確定済み決定であり「乖離是正」ではなく「決定の改訂」) / feature doc 影響行の欠落      | 上位文書整合・背景の表現を修正し、feature doc 影響行を追加 (2026-07-24)。再レビューは design 見直し後に実施 |
 | 2026-07-24 | PASS (clarify 再)        | 指摘 2 件の対応を確認。go-service-design 由来の精緻化追記も既存決定・上位文書と矛盾なし。参考指摘 2 件 (日付揃え / sync 時の graph feature doc 変換記述) | 日付を揃え、feature doc 影響行に変換記述の包含を明記                                                        |
+| 2026-07-24 | NEEDS_WORK (diagram)     | 層依存図と sequence の analyzer 駆動関係の矛盾 / cli 配線辺の欠落 / parse エラー表現 / phase 7 行の状態                                                  | 辺を D6 と一致させ凡例を明記、fatal 破棄経路へ合流を明示、phase 7 行を補記                                  |
+| 2026-07-24 | PASS (diagram 再)        | 指摘 4 件すべて解消を確認。Mermaid 構文・上位文書整合とも問題なし                                                                                        | 変更履歴へ反映行を追記                                                                                      |
 
 ## 変更履歴
 
@@ -497,6 +503,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法)  |
 | 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                       |
 | 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化 |
+| 2026-07-24 | Claude (spec-lifecycle) | diagram レビュー指摘 4 件を反映 (層依存図の辺修正・fatal 経路明示)。再レビュー PASS                |
 
 ## 備考
 

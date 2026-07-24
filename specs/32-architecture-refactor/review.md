@@ -69,3 +69,26 @@ Verdict: PASS
 
 - 設計フェーズ状況「論点解決」行の最終更新日を 2026-07-24 へ揃えた
 - sync 時に graph feature doc の「変換は Analyze Use Case 層で 1 回だけ」記述も更新対象であることを feature doc 影響行へ明記した
+
+## Review 2026-07-24 (diagram phase)
+
+Verdict: NEEDS_WORK → 対応後 PASS
+
+### 指摘 (初回 NEEDS_WORK)
+
+1. **層依存図と sequence の矛盾**: sequence では ACL (protocol) が analyzer を駆動するが、層依存図に `protocol → analyzer` がなく、逆に説明のない `analyzer → analyze` 辺が存在
+2. **cli の手動 DI 辺の欠落**: D6 (手動 DI / `var _` の cli 集約) に必要な `cli → protocol` / `cli → analyzer` が層依存図にない
+3. (軽微) sequence の「invalid record は拒否」が record 単位 skip と誤読しうる (graph feature doc は parse / schema error を fatal 全破棄と規定)
+4. (軽微) phase 7 行の状態が図の記載実態と不一致
+
+### 対応 (2026-07-24)
+
+- 層依存図の辺を D6 と一致させた: `analyzer → analyze` 削除、`cli → protocol` (配線 + var _ 検証) / `cli → analyzer` (配線) / `protocol → analyzer` (process 起動に利用) を追加。凡例「辺は Go の import 方向」と辺の読み方の補足 (analyzer は内層を import しない呼ばれる側、cli はコンポジションルート) を明記
+- sequence の parse / validate ラベルを「parse / schema error は fatal → 破棄経路へ」に修正
+- phase 7 行を「進行中 / 図・配置は phase 6 で確定済み」に補記
+
+### 再レビュー (PASS)
+
+- 指摘 4 件すべて解消を確認。層依存図の全辺が内向き依存で矛盾なし、Mermaid 構文 3 図とも妥当
+- Java 配置図は実ソースツリーと全件一致、sootup 漏れ 7 クラスも実測一致
+- 参考 (非ブロッキング): 変更履歴への反映行追記 → 対応済み
