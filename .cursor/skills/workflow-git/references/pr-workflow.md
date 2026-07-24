@@ -21,6 +21,11 @@
 - PRD / Design Doc / feature doc / context / spec / ADR のどこを更新したかを明示する
 - app / package 側の実装前提が変わる場合は Notes で伝える
 
+## マージ後 (issue が close したとき)
+
+- 対応する spec (`specs/<issue-id>-*/`) が残っていれば、`spec-lifecycle` の `references/closeout.md` に従い
+  sync の取りこぼしゼロを確認して spec を削除する (削除 commit に issue 番号を残す)
+
 ## 停止条件
 
 - base branch が `main` / `master` になっているが、明示指示がない

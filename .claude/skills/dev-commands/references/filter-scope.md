@@ -1,6 +1,6 @@
 # Filter Scope
 
-タスクを **特定 module にスコープ** するための短いガイド。具体的な module 名・コマンドは [context/project.md](../../../../context/project.md) を正本とする。
+タスクを **特定 module にスコープ** するための短いガイド。具体的な module 名・コマンドは [context/project.yml](../../../../context/project.yml) を正本とする。
 
 ## 基本
 

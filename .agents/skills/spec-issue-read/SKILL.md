@@ -16,7 +16,7 @@ Issue tracker から指定 issue を取得し、要約と推奨次アクショ�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract` — Issue Tracker / CLI / Repo の値を取得する
+- `AGENTS.md` の `Spec Workflow Contract` — tracker (CLI / project) の参照先を確認する
 
 ## 入力
 
@@ -27,7 +27,7 @@ Issue tracker から指定 issue を取得し、要約と推奨次アクショ�
 
 ## 実行フロー
 
-1. `context/project.md` の Issue Tracker から CLI (例: `gh`) と Repo を読む
+1. `context/project.yml` の `tracker` から CLI (例: `gh`) と project を読む
 2. Issue 詳細を取得する
 
    ```sh

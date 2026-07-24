@@ -6,20 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 cd "$ROOT_DIR"
 
-echo "[quality] core go mod tidy"
-(cd core && go mod tidy)
+# Node workspace が無い repo (Go 等) では対象外として skip する (hook は汎用に保つ)
+[ -f package.json ] || { echo "[quality] skip (package.json なし)"; exit 0; }
 
-if ! git diff --quiet -- core/go.mod core/go.sum; then
-  echo "[quality] go mod tidy changed core/go.mod or core/go.sum"
-  git diff -- core/go.mod core/go.sum
-  exit 1
-fi
+echo "[quality] dependency-cruiser"
+pnpm depcruise
 
-echo "[quality] core test"
-(cd core && go test ./...)
-
-echo "[quality] core vet"
-(cd core && go vet ./...)
-
-echo "[quality] core gofmt check"
-(cd core && test -z "$(gofmt -l .)")
+echo "[quality] knip"
+pnpm knip

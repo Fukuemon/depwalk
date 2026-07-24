@@ -14,7 +14,7 @@ cwc-long-running-agents の "Fresh-Context Evaluator" パターンに沿った s
 
 ## いつ使うか
 
-- phase gate (`spec-lifecycle` の各 phase 完了時)
+- phase gate (`spec-lifecycle` の gate phase 完了時。gate の正本は phase レジストリ)
 - ユーザーが「spec のレビュー」「review」「PASS / NEEDS_WORK」を要求した
 - `spec-lifecycle` からの呼び出し
 

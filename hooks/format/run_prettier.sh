@@ -20,5 +20,5 @@ if [ "${#STAGED_FILES[@]}" -eq 0 ]; then
   exit 0
 fi
 
-npx prettier --write "${STAGED_FILES[@]}"
+npx prettier --write -- "${STAGED_FILES[@]}"
 git add -- "${STAGED_FILES[@]}"

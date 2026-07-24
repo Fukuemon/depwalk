@@ -1,11 +1,11 @@
 # E2E Runtime
 
-E2E の env contract と対象側 script contract。プロジェクトが E2E を持つ場合に参照する。具体的な対象名・port・コマンドは [context/project.md](../../../../context/project.md) を正本とする。
+E2E の env contract と対象側 script contract。プロジェクトが E2E を持つ場合に参照する。具体的な対象名・port・コマンドは [context/project.yml](../../../../context/project.yml) を正本とする。
 
 ## env contract の考え方
 
 - 対象 (どの module を検証するか)、port、base URL を env で切り替えられるようにする。
-- 既定の対象と port を `context/project.md` の Quick Commands / テスト節に定義し、対象切替時のみ上書きする。
+- 既定の対象と port を `context/project.yml` の `commands` / テスト節に定義し、対象切替時のみ上書きする。
 
 ## 対象側 script 契約
 

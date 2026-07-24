@@ -49,5 +49,5 @@ spec の `## 上位文書整合` テーブルに以下を記入する:
 ## 「変更提案」を 1 件でも検出したときの扱い
 
 - spec の `論点一覧` に `<上位文書> への変更提案` を追加する
-- 下流 phase (clarify / diagram / tasks) に進む前に phase: sync (`phase-sync.md`) を提案して停止する
+- 下流 phase (clarify / diagram / prompts) に進む前に phase: sync (`phase-sync.md`) を提案して停止する
 - spec 単独で勝手に上位文書を書き換えてはならない

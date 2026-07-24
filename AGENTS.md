@@ -2,7 +2,7 @@
 
 エージェントが本リポジトリで作業するときの **最短の操作ガイド**。詳細はそれぞれの正本へリンクする。本 contract は `.rulesync/rules/CLAUDE.md` が正本で、`AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/` は生成物 (編集は `rulesync-sync` skill 経由)。
 
-プロジェクト固有値 (リポジトリ / 命名 / コマンド / 対象ドメイン / トラッカー / 正本パス) は **本 contract に直書きせず** [context/project.md](context/project.md) を読む。
+プロジェクト固有値 (product / repos / naming / commands / tracker / domains / labels / spec.phases / paths / templates / decision_priority / glossary) は **本 contract に直書きせず** [context/project.yml](context/project.yml) を読む。
 
 ## Documents (正本)
 
@@ -10,9 +10,9 @@
 - 全体像 / モジュール責務 (How: landscape): [design/DesignDoc.md](design/DesignDoc.md)
 - feature 単位の設計 (How: feature): [design/features/](design/features/)
 - 技術規約 / codebase architecture / 運用契約 (How: 横断): [context/](context/)
-- プロジェクト固有値: [context/project.md](context/project.md)
+- プロジェクト固有値: [context/project.yml](context/project.yml)
 - 個別の意思決定: [adr/](adr/)
-- 機能単位の作業文書: [specs/](specs/)
+- 機能単位の作業文書 (issue close 時に削除): [specs/](specs/)
 - 開発プロセス (skill 連鎖) の俯瞰図: [architecture.md](architecture.md)
 - skill / rule 著作の非自明な判断記録: [decisions.md](decisions.md)
 
@@ -21,9 +21,11 @@
 ## Setup (新規プロダクトでテンプレートを使い始めるとき)
 
 1. `design-doc` skill で PRD / Design Doc を作る (PRD 要否を判定)。
-2. `context-bootstrap` skill で [context/project.md](context/project.md) と `context/*.md` を生成する。
+2. `context-bootstrap` skill で [context/project.yml](context/project.yml) と `context/*.md` を生成する。
 3. `rulesync-sync` skill で各 provider 設定を生成する。
 4. 以降は `spec-*` skill で issue 駆動の設計・実装を進める。
+
+本テンプレ repo 自体 (共有プロセス層) を変更するとき: `.rulesync/` を編集 → `make generate` → `make check` → 生成物ごと commit。
 
 > 共有テンプレートとして使う場合: 本テンプレ repo で `scripts/link.sh <消費 repo>` (または `make link ARGS=<消費 repo>`) を実行すると、共有プロセス層を消費 repo へ接続できる。固有値 (`context/` 等) は消費 repo 側で実ファイルとして記入する。詳細は [README.md](README.md)。
 
@@ -31,22 +33,17 @@
 
 - **skills / rules / subagents / hooks の正本は sdd-template repo**。消費 repo の `.rulesync/*` は sdd-template への symlink であり、編集すると **テンプレ側の実体が変わる** (消費 repo では未追跡のため commit できない)。
 - したがって共有プロセス層の変更は: ① 編集 (symlink 経由でもテンプレ repo 直接でもよい) → ② **sdd-template repo 側で commit** → ③ 消費 repo で `rulesync generate` を再実行し **生成物だけを commit**、の順で行う。
-- 消費 repo に commit するのは生成物 (`AGENTS.md` / `.claude/` 等)・`hooks/` (実ファイルコピー)・`lefthook.yml`・`.template-version` のみ。`.rulesync/` 配下を消費 repo に commit しない。
+- 消費 repo に commit するのは生成物 (`AGENTS.md` / `.claude/` 等)・実ファイルコピー配布分 (`hooks/`・`scripts/generate.sh` 系・`sdd-template.mk`)・`lefthook.yml`・`.template-version` のみ。`.rulesync/` 配下を消費 repo に commit しない。
 - 今いる repo がテンプレか消費側かは `.rulesync/rules/CLAUDE.md` が symlink かどうかで判定できる (symlink なら消費側)。
-
-## Repository / Commands / Naming
-
-- リポジトリマップ・Quick Commands・命名規約・対象ドメインは [context/project.md](context/project.md) を正本とする。
-- コマンドのスコープ判断・E2E env contract・selector の使い分けは `dev-commands` skill。
 
 ## Skills (workflow 入口)
 
 | Skill                  | 用途                                                                     |
 | ---------------------- | ------------------------------------------------------------------------ |
 | `design-doc`           | PRD / Design Doc を作る (Why/What/How、PRD 要否判定)                     |
-| `context-bootstrap`    | `context/project.md` と context library を初期生成                       |
+| `context-bootstrap`    | `context/project.yml` と context library を初期生成                      |
 | `styleguide-documents` | 文書の品質基準・分割粒度 (doc を書く skill が参照)                       |
-| `dev-commands`         | コマンド / スコープ / E2E env を解決 (`context/project.md` 基準)         |
+| `dev-commands`         | コマンド / スコープ / E2E env を解決 (`context/project.yml` 基準)        |
 | `rulesync-sync`        | AI 設定 (`.rulesync/` → 各 provider) の編集と生成                        |
 | `workflow-git`         | branch / commit / issue / PR の Git 運用                                 |
 | `agent-orchestrate`    | 複数 CLI エージェントを非対話・並列に呼ぶ基盤 (`context/ai-agents.md`)   |
@@ -55,19 +52,30 @@
 | `context-harvest`      | 作業で得た横断的な知見を `context/` / feature doc / ADR に書き戻す       |
 | `spec-*`               | Spec Driven Development 一式 (下記 `Spec Workflow Contract`)             |
 
-skill は `.rulesync/skills/<name>/SKILL.md` が正本。直接呼び出すか slash command で起動する。
-
-## Decision Priority
-
-判断の優先度は [context/project.md](context/project.md) の Decision Priority を正本とする。技術選定の根拠は [Design Doc](design/DesignDoc.md) と [ADR](adr/)。
+全プロジェクト共通の workflow skill は `.rulesync/skills/<name>/SKILL.md` が正本。言語・framework など
+プロジェクトごとに要否が分かれる skill は `skills/<name>/` で配布し、消費側が `npx skills add` で選択導入する。
+導入済み skill は直接呼び出すか slash command で起動する。
 
 ## Forbidden Patterns
 
-- 生成物 (`AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/`) の直接編集 (`rulesync-sync` 経由で `.rulesync/` を編集する)
+- 生成物 (`AGENTS.md` / `CLAUDE.md` / `.agents/` / `.codex/` / `.claude/` / `.cursor/` / `.mcp.json`) の直接編集 (`rulesync-sync` 経由で `.rulesync/` を編集する)
 - 消費 repo への `.rulesync/` 配下の commit (正本は sdd-template repo。上記「共有プロセス層の正本」)
 - protected branch (例: `main` / `develop`) への直接コミット
-- skill / rule へのプロジェクト固有名の直書き (`context/project.md` を読む)
-- プロダクト固有の禁止事項は [context/project.md](context/project.md) / [context/](context/) に追記する
+- skill / rule へのプロジェクト固有名の直書き (`context/project.yml` を読む)
+- プロダクト固有の禁止事項は [context/project.yml](context/project.yml) / [context/](context/) に追記する
+
+## Security
+
+- secret / 認証情報 / トークンを文書 (spec / context / prompt) や commit に書かない。置き場と扱いは [context/infrastructure.md](context/infrastructure.md) の契約に従う
+- 個人 PC の絶対パスを文書・prompt に埋め込まない (`$(ghq root)` 等の動的解決を使う)
+
+## 承認の取り方
+
+副作用のある操作 (issue 起票 / 本文・ラベル変更 / commit / push / 正本ファイルの上書き) の直前と、プロセスの分岐点では:
+
+- Y/N の 2 択で聞かず、**3 つ以上の選択肢** (進める / 修正してから進める / 進めない) を提示する。選択肢 UI (AskUserQuestion 等) が使える環境では必ず使う
+- 既定を「進める側」に固定せず、ユーザーが明示選択するまで実行しない
+- 取り戻しが難しい操作には「他の対応」の逃げ道を必ず残す
 
 ## Output Format Rules
 
@@ -78,15 +86,15 @@ skill は `.rulesync/skills/<name>/SKILL.md` が正本。直接呼び出すか s
   - `<path>:<line-range>`
 ```
 
-repo path の記法 (ghq 等) は [context/project.md](context/project.md) の Repository Map に従う。
+repo path の記法 (ghq 等) は [context/project.yml](context/project.yml) の `repos.convention` に従う。
 
 ## Spec Workflow Contract
 
-Spec Driven Development (SDD) skill 群 (`.rulesync/skills/spec-*/SKILL.md`) が参照する **唯一の contract**。skill 側に project 固有名 (path / CLI / framework) を直書きせず、固有値は [context/project.md](context/project.md)、運用ルールは本節を読む。
+Spec Driven Development (SDD) skill 群 (`.rulesync/skills/spec-*/SKILL.md`) が参照する **唯一の contract**。skill 側に project 固有名 (path / CLI / framework) を直書きせず、固有値は [context/project.yml](context/project.yml)、運用ルールは本節を読む。
 
 ### 正本ドキュメント / Templates / Issue Tracker / 対象ドメイン
 
-[context/project.md](context/project.md) の `Source of Truth` / `Templates` / `Issue Tracker` / `対象ドメイン` を参照する。
+[context/project.yml](context/project.yml) の `paths` (正本パス) / `templates` / `tracker` (CLI / project) / `domains` (対象ドメイン) を参照する。
 
 ### 正本境界 (Source-of-Truth Boundary)
 
@@ -95,6 +103,7 @@ spec は **issue 単位** の文書、design (PRD / Design Doc / feature doc / c
 - **spec 作成〜clarify (`spec-lifecycle` の scaffold / clarify phase)**: spec が自身の決定の作業正本でよい。design へはまだ反映しない。
 - **sync phase 実行時 (正本ハンドオフ)**: durable な設計成果 (IA / データモデル / フロー / アーキ判断) を design 側へ反映したら、以後 **design 側が正本**。同時に spec の該当節を「決定時スナップショット」に降格し、design への正本リンクを張る。
 - **ハンドオフ後**: spec は論点 / 受け入れ基準 / レビュー / 実装分割 / 決定経緯のみを保持し、durable 成果の正本を二重に持たない (drift 防止)。
+- **issue close 後 (closeout)**: spec は **削除する** (手順と前提条件は `spec-lifecycle` の `references/closeout.md`)。durable 成果は sync で design 側へ、意思決定は ADR へ反映済みであることが削除の前提。経緯は issue / PR / git history で追う。design 側に spec への索引を残さない。
 
 判定の目安: 「issue が閉じても残り続ける設計情報」は design 正本、「この issue の意思決定の記録」は spec。
 
@@ -106,20 +115,23 @@ spec / ADR / context の本文を更新したら、対象文書の `更新日` /
 
 ### Phase Gate ルール
 
-- 各 phase 完了時に `spec-review` (fresh-context evaluator) を通す
+- phase の集合・順序は [context/project.yml](context/project.yml) の `spec.phases` が正本 (未設定時は `spec-lifecycle` の既定列)
+- gate phase (正本は `spec-lifecycle` の phase レジストリ) の完了時に `spec-review` (fresh-context evaluator) を通す。非 gate phase は次の gate で未レビュー分を累積レビューする
+- 設計開始 (scaffold)・最終 gate 通過・実装開始の節目で issue の `status:*` ラベルを遷移し、状態遷移コメントを残す (正本: `workflow-git` の `references/issue-status.md`)
 - PRD / Design Doc / feature doc / context / ADR と矛盾を検出したら sync phase を先に提案し、未解決のまま下流 phase に進まない
 - spec 内「設計フェーズ状況」表が状態 (`未着手 / 進行中 / 完了 / レビュー済 / 保留`) を管理する
 - 確定済みの判断 (解決済みの論点) を skill から上書きしない
 
 ### Skill 共通契約
 
-- skill 内に project 固有名を直書きしない (本 contract と `context/project.md` を読む)
+- skill 内に project 固有名を直書きしない (本 contract と `context/project.yml` を読む)
 - skill 本体 (SKILL.md) は **200 行未満**、詳細は `references/<topic>.md` へ 1 階層深さで分離。100 行を超える reference は冒頭に目次を置く
 - description は日本語・third-person で「何をする + いつ起動」を含め、発動トリガー語を引用符で列挙する。`いつ使うか` は description の言い換えにせず、追加のトリガー語 / 文脈のみ書く
 - 必須セクション (正規名のみ使用): `いつ使うか` / `先に読むもの` / `実行フロー` / `停止条件`。`実行手順` / `生成手順` / `終了条件` 等の同義異名を使わない
 - 任意セクション: `入力` / `中核原則` / `禁止事項` 等は追加してよい。手順の全体像は ASCII 図でなく `実行フロー` 内の番号付きステップ (複雑なら冒頭にコピー可能なチェックリスト) で示し、`ワークフロー` 節を重複して置かない
 - **例外**: 品質基準のみを提供する reference 型 skill (例: `styleguide-documents`) は `先に読むもの` / `実行フロー` / `停止条件` を省略してよい
 - 文書を書く skill は `styleguide-documents` skill を「先に読むもの」で参照する
+- 読み物として読ませる文章 (記事 / 解説 / 章立ての文章) を生成・推敲するときは `styleguide-documents` の `references/prose-rhythm.md` (緩急・認知リズムの規範) を **必ず読む** (spec / ADR / context 等の技術文書には適用しない)
 - 同じ規範を複数ファイルに再掲しない。正本を 1 箇所に置き、他は 1 行で参照する
 - 本契約の機械検査は `make check` (`scripts/check-skills.sh` + 生成物 drift 検査)。skill / rule / subagent を変更したら `make check` を通す
 - skill の連鎖挙動 (呼び出し関係 / phase gate / 状態遷移) を変えたら、同 PR で [architecture.md](architecture.md) のシーケンスを更新する
@@ -131,13 +143,14 @@ spec / ADR / context の本文を更新したら、対象文書の `更新日` /
 | ------------------ | --------------------------------------------------- | -------------------- |
 | `spec-issue-read`  | Issue 取得 + 要約                                   | intake               |
 | `spec-requirement` | 要求の対話整理 → requirements doc / Issue 起票      | intake → specify     |
-| `spec-lifecycle`   | 設計プロセスを集約した半自律 orchestrator           | scaffold 〜 tasks    |
+| `spec-lifecycle`   | 設計プロセスを集約した半自律 orchestrator           | scaffold 〜 prompts  |
 | `spec-review`      | fresh-context evaluator が PASS / NEEDS_WORK を返す | review gate (複数回) |
 
 設計プロセスの各 phase は `spec-lifecycle` に集約され、手順は `references/phase-*.md` で持つ:
 scaffold (`phase-scaffold.md`) / clarify (`phase-clarify.md`) / diagram (`phase-diagram.md`) /
 track (`phase-track.md`) / sync (`phase-sync.md`) / prompts (`phase-prompts.md`)。
-個別 skill (旧 `spec-draft` 等) としては起動せず、`spec-lifecycle` の単一コンテキストから phase を進める。
+実行する phase の集合・順序は `context/project.yml` の `spec.phases`、識別子と gate 属性の正本は
+`spec-lifecycle` の phase レジストリ。個別 skill (旧 `spec-draft` 等) としては起動せず、`spec-lifecycle` の単一コンテキストから phase を進める。
 
 レビュー観点の正本は subagent 定義 [.rulesync/subagents/spec-reviewer.md](.rulesync/subagents/spec-reviewer.md)。
 `spec-review` skill は委譲と集約のみを担い、観点を skill 側で再記述しない。

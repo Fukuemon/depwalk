@@ -39,16 +39,15 @@ description: >-
    - 既存 skill の修正 → 該当 `.rulesync/skills/<skill-name>/` 配下
    - ❌ `AGENTS.md` / `CLAUDE.md` / `.claude/` / `.codex/` / `.cursor/` を直接編集してはいけない
 2. **編集**: `.rulesync/` 配下の対象ファイルだけを編集する
-3. **生成**: 次を実行する (生成後に cursor cli.json の正規化を必ず通す。理由は `references/generate-and-verify.md`)
-   ```sh
-   npx rulesync@latest generate
-   bash scripts/fix-cursor-cli.sh
-   ```
+3. **生成**: provider 別 normalizer を含む Make target を実行する (理由は `references/generate-and-verify.md`)
+   - sdd-template repo: `make generate`
+   - 消費 repo: `make -f sdd-template.mk generate` (`Makefile` に `generate` target は無い)
 4. **差分確認** (`references/generate-and-verify.md`):
    - `git status` で生成先 (`AGENTS.md`, `CLAUDE.md`, `.codex/`, `.claude/`, `.cursor/`) に意図どおりの差分が出ているか
    - `git diff -- AGENTS.md CLAUDE.md` で内容を確認する
    - `.rulesync/` 側の編集と生成先の差分が一致していなければ、`.rulesync/` を修正して再実行する
-5. **検証**: `make check` を実行する (skill 契約の機械検査 + 生成物 drift 検査)。通らない状態で終わらない
+5. **検証**: sdd-template repo では `make check` を実行する (skill 契約の機械検査 + 生成物 drift 検査)。通らない状態で終わらない
+   - 消費 repo には `check` target が無い。手順 4 の `git status` / `git diff` 確認で代替する
 6. **生成失敗時**: 生成先を手作業で合わせず、`.rulesync/` 側の失敗理由を解消して再実行する
 7. 次アクションを提案: skill を追加した場合は `dev-commands` / `workflow-git` 経由でテスト・コミットを促す
 
