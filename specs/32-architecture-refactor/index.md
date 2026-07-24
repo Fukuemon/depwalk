@@ -22,7 +22,7 @@
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
 | 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS  |
-| 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
+| 6   | Interface / Routing 設計    | 完了       | 2026-07-24 | diagram phase: 層依存図・配置図・フロー図を確定 |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
 | 9   | Test / Metrics 設計         | 未着手     |            | 挙動不変の検証方針 (既存テスト無変更 PASS)      |
@@ -158,6 +158,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - SootUp 型の漏れ (現状 `graph` / `augment` / `completeness` / `spring` / `AnalysisRunner` に散在) を adapter package (`sootup` 等) の境界内に封じ、JavaParser / SymbolSolver も同様に扱う
   - Core (3 層) と命名思想が非対称になることは許容し、意図 (Analyzer は変換パイプラインである) を README / architecture.md で説明する
   - クラス単位の最終配置図は diagram phase で確定する
+  - (2026-07-24 精緻化, Fukuemon 確認済み) 外部ライブラリ隔離の適用レベルを 3 段階に確定: **SootUp** は `sootup/` adapter に完全封じ込め (facade が自前型で公開。現状 7 クラスに漏れている `sootup.*` import を除去)。**Gradle Tooling API** は `discovery/` に完全隔離 (現状維持)。**JavaParser / SymbolSolver** は解析エンジンの中核であり `analysis` 配下の段階 package 間では自由に使ってよい — 禁止するのは `analysis` の外 (`io` / `protocol` / `preflight` / `discovery` / `Main`) への漏れのみ。字義どおりの全面隔離は実質的な解析器書き換えとなり「外部挙動不変の再編」スコープを超えるため不採用
 - **D3: Java 側の依存検査 → A) ArchUnit を採用** (2026-07-23, Fukuemon)
   - ArchUnit を test 依存として追加し、「adapter package 以外から `sootup.*` / `com.github.javaparser.*` / `org.gradle.tooling.*` を import 禁止」等のルールを JUnit テストとして記述する
   - 既存の `./gradlew test` (quality gate 組み込み済み) で実行されるため、新しい gate 配線は不要。Go 側 (depguard) と対の機械検査が揃う (業務ルール 5)
@@ -258,7 +259,60 @@ core/internal/
 ```
 
 - package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
-- Java Analyzer の構造原理 (D7 確定): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下を「実行順の段階別 package + 外部ライブラリ adapter package (`sootup` / `javaparser` 等)」へ再編し、段階の実行順は `pipeline` (Runner) だけが知る。クラス単位の配置図は diagram phase で確定
+- Core の層依存図 (D1 / D2 / D6 確定):
+
+```mermaid
+flowchart LR
+    subgraph platform["platform (技術基盤層)"]
+        cli["cli<br/>Cobra + 手動 DI 配線"]
+        protocol["protocol (ACL)<br/>wire DTO + Translator + Adapter"]
+        analyzer["analyzer<br/>process 制御"]
+        output["output<br/>formatter"]
+    end
+    subgraph app["app (アプリケーションサービス層)"]
+        analyze["analyze<br/>orchestration + port 定義"]
+    end
+    subgraph domain["domain (ドメイン層)"]
+        graph_["graph<br/>自前 Symbol / SourceLocation"]
+        traversal["traversal"]
+    end
+    cli --> analyze
+    cli --> output
+    protocol -->|"port 実装"| analyze
+    protocol --> graph_
+    analyzer --> analyze
+    output --> graph_
+    output --> traversal
+    analyze --> graph_
+    analyze --> traversal
+    traversal --> graph_
+```
+
+- Java Analyzer の構造原理 (D7 確定 + 2026-07-24 精緻化): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下は既存 sub-package の粒度が段階として概ね妥当であり、再編の実体は ① `pipeline/` 新設 (実行順を知る唯一の場所として `AnalysisRunner` を移動)、② `sootup/` の facade 化 (自前型公開で `sootup.*` の漏れ 7 クラスを封じ込め)、③ `TypeSolverFactory` の `context/` への移動、④ 実行順の README 明文化。クラス単位の最終配置:
+
+```text
+javaanalyzer/
+├── Main / JavaDiagnosticCode / JavaErrorCode      (現状維持)
+├── protocol/  io/  preflight/  discovery/          (現状維持。discovery = Gradle Tooling API 隔離)
+└── analysis/
+    ├── pipeline/      AnalysisRunner (analysis 直下から移動。段階の実行順を知る唯一のクラス)
+    ├── scope/         ScopeFiles
+    ├── context/       AnalysisContextFactory / ContextScope / LanguageLevels / ParsePreflight /
+    │                  ResolvedDeclarationOrigin / SolverOriginIndex / SourceSetAnalysisContext /
+    │                  TypeSolverFactory (analysis 直下から移動)
+    ├── augment/       AugmentedJavaParserClassDeclaration / GenericSignatureReader /
+    │                  MemberAugmentingTypeSolver / SynthesizedBytecodeMethodDeclaration
+    ├── attribution/   AttributionResolver / AttributionResult / LiftExcludePackages / TypeSite
+    ├── sootup/        SootUpTypeHierarchyIndex + 型階層 facade (新設。自前型で公開する adapter)
+    ├── spring/        SpringAnnotations / SpringDiagnosticEmitter / SpringDiIndex
+    ├── graph/         CallGraphBuilder / GraphAccumulator / ReachabilityFilter / SourceMethodIndex
+    ├── completeness/  CallSiteId / CallSiteInventory / CallSiteOutcomeLedger /
+    │                  IncompleteAnalysisException / ProjectBytecodeMemberIndex /
+    │                  WorkspaceSourceDeclarationIndex
+    └── normalize/     BinaryNames / MethodIds / RelativePaths (段階横断 util)
+```
+
+- 段階の実行順 (pipeline README に明文化する内容。AnalysisRunner の実測): scope 列挙 → context 構築 (JavaParser + augment) → attribution 準備 → sootup 型階層 index → spring DI index → graph 構築 → completeness 検査 → io 出力
 
 ## Performance / Security 設計
 
@@ -298,18 +352,61 @@ core/internal/
 
 ## フロー / シーケンス
 
-(diagram phase で生成。再編後の依存方向図・変換層のデータフローを Mermaid に落とす)
+再編後の `depwalk analyze` の流れ。**外部挙動 (コマンド・出力・exit code) は現状と完全に同一**であり、変わるのは内部の担当 package と依存方向のみ。Core の層依存図と Java Analyzer の配置図は `## Content / Data 設計` を参照。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    start["ユーザー / CI が depwalk analyze を実行"] --> validate["platform/cli: フラグ解析・入力 validation"]
+    validate -->|"入力エラー"| usage["usage / エラー表示<br/>非ゼロ exit"]
+    validate -->|OK| wire["platform/cli: 手動 DI 配線<br/>(ACL adapter を app の port へ注入)"]
+    wire --> exec["app/analyze: use case 実行"]
+    exec --> result{"解析結果"}
+    result -->|成功| format["platform/output: 指定形式で整形<br/>(Console / JSON / DOT / Mermaid)"]
+    format --> done["stdout へ出力<br/>exit 0"]
+    result -->|"Analyzer fatal / 非ゼロ exit"| discard["staging Graph と先行 diagnostic を破棄"]
+    discard --> fail["エラー報告<br/>非ゼロ exit"]
 ```
 
 ### Sequence
 
 ```mermaid
 sequenceDiagram
+    actor User as ユーザー / CI
+    participant CLI as platform/cli
+    participant APP as app/analyze
+    participant ACL as platform/protocol (ACL)
+    participant PROC as platform/analyzer
+    participant JA as Java Analyzer (別プロセス)
+    participant DOM as domain (graph / traversal)
+    participant OUT as platform/output
+
+    User->>CLI: depwalk analyze <root> --method ...
+    CLI->>CLI: フラグ validation / 手動 DI 配線
+    CLI->>APP: Execute(request)
+    APP->>ACL: port 経由で解析結果を要求 (domain 型)
+    ACL->>PROC: Analyzer process 起動を依頼
+    PROC->>JA: spawn + analysisRequest (JSONL/stdin)
+    loop JSONL record ごと
+        JA-->>PROC: MethodSymbol / CallEdge / diagnostic (stdout)
+        PROC-->>ACL: raw record
+        ACL->>ACL: parse / validate (invalid record は拒否)
+        ACL->>ACL: Translator: wire DTO → domain 型
+        ACL-->>APP: domain 型の record
+        APP->>DOM: 非公開 staging Graph へ 1-pass 変換
+    end
+    alt process 成功 + 参照完全性 OK
+        APP->>DOM: staging Graph を公開
+        APP->>DOM: traversal 実行 (caller / callee)
+        APP-->>CLI: 探索結果 (domain 型)
+        CLI->>OUT: 整形を依頼
+        OUT-->>User: Console / JSON / DOT / Mermaid (exit 0)
+    else fatal / 非ゼロ exit
+        APP->>DOM: staging Graph と先行 diagnostic を破棄
+        APP-->>CLI: エラー
+        CLI-->>User: エラー報告 (非ゼロ exit)
+    end
 ```
 
 ## 実装分割
@@ -385,20 +482,21 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者                  | 変更内容                                                                                          |
-| ---------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                                                    |
-| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                                                  |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                                                  |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                                                      |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                                          |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                                                  |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                                               |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                                                  |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                               |
-| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                          |
-| 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法) |
-| 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                      |
+| 日付       | 変更者                  | 変更内容                                                                                           |
+| ---------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
+| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                                                     |
+| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                                                       |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                                           |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                                                |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                                |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                           |
+| 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法)  |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                       |
+| 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化 |
 
 ## 備考
 
