@@ -442,37 +442,40 @@ sequenceDiagram
 
 ### Design Doc への影響
 
-| 対象節                      | 変更内容 | 理由 |
-| --------------------------- | -------- | ---- |
-| (設計確定後に track で記録) |          |      |
+| 対象節              | 変更内容                                                                                                                                 | 理由                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| なし (本文変更不要) | モジュール責務表・C4 図・設計原則はモジュール名ベースで package path を参照しておらず影響なし (grep 実測で `core/internal` への言及ゼロ) | 再編は P2/P3 の内部徹底であり landscape 不変 (source: track) |
 
 ### feature doc への影響
 
-| 対象 doc / 節                         | 変更内容                                                                                                                                    | 理由                      |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| graph / データ構造・変換              | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 (「変換は Analyze Use Case 層で 1 回だけ」の記述も含む) | D6 決定 (source: clarify) |
-| graph / データ構造 (`SourceLocation`) | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂)  | D6 決定 (source: clarify) |
-| java-analyzer / 内部構成              | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                                                                                 | D7 決定 (source: clarify) |
-| (残りは設計確定後に track で記録)     |                                                                                                                                             |                           |
+| 対象 doc / 節                                           | 変更内容                                                                                                                                                      | 理由                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| graph / データ構造・変換                                | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 (「変換は Analyze Use Case 層で 1 回だけ」の記述も含む)                   | D6 決定 (source: clarify)               |
+| graph / データ構造 (`SourceLocation`)                   | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂)                    | D6 決定 (source: clarify)               |
+| java-analyzer / 内部構成                                | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                                                                                                   | D7 決定 (source: clarify)               |
+| java-analyzer / 依存境界                                | 外部ライブラリ隔離の 3 段階 (SootUp = adapter facade / Gradle Tooling API = discovery / JavaParser = analysis 配下許容) と `pipeline/` 新設・段階実行順を反映 | D7 精緻化 2026-07-24 (source: track)    |
+| cli / graph / output / traversal / java-analyzer 各 doc | `core/internal/<pkg>` への path 参照 (grep 実測 計 13 箇所) を再編後の `core/internal/{domain,app,platform}/<pkg>` へ機械的追随                               | D1 決定に伴う path 追随 (source: track) |
 
 ### context への影響
 
-| 対象 doc / 節                      | 変更内容                                                                                        | 理由                      |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------- |
-| architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 | D1 決定 (source: clarify) |
-| project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                            | D1 決定 (source: clarify) |
-| architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新  | D6 決定 (source: clarify) |
-| engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記              | D5 決定 (source: clarify) |
-| engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記            | D3 決定 (source: clarify) |
-| (残りは設計確定後に track で記録)  |                                                                                                 |                           |
+| 対象 doc / 節                      | 変更内容                                                                                                                                                             | 理由                                    |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化                                                                      | D1 決定 (source: clarify)               |
+| project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂                                                                                                 | D1 決定 (source: clarify)               |
+| architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新                                                                       | D6 決定 (source: clarify)               |
+| engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記                                                                                   | D5 決定 (source: clarify)               |
+| engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記                                                                                 | D3 決定 (source: clarify)               |
+| architecture.md / Package Boundary | Java Analyzer 側の内部境界 (SootUp = `sootup/` adapter facade、Gradle Tooling API = `discovery/`、JavaParser = `analysis` 配下のみ許容) と ArchUnit による検査を追記 | D3 / D7 決定 (source: track)            |
+| testing.md / toolchain.md          | `core/internal/<pkg>` への path 参照 (grep 実測 計 4 箇所) を再編後 path へ機械的追随                                                                                | D1 決定に伴う path 追随 (source: track) |
 
 ### ADR の新規 / 更新
 
-| ADR ID                            | 変更内容                                                                            | 理由                      |
-| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
-| 新規 (番号は起票時採番)           | 層別ディレクトリ再編と Go 慣習寄り層名 (`domain`/`app`/`platform`) の採用判断を記録 | D1 決定 (source: clarify) |
-| ADR-0002 追補                     | 初期 directory / package 構成の記述を新 ADR 参照へ追補                              | D1 決定 (source: clarify) |
-| (残りは設計確定後に track で記録) |                                                                                     |                           |
+| ADR ID                  | 変更内容                                                                                                                                  | 理由                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 新規 (番号は起票時採番) | 層別ディレクトリ再編と Go 慣習寄り層名 (`domain`/`app`/`platform`) の採用判断を記録                                                       | D1 決定 (source: clarify)        |
+| 新規 (同上・1 本に統合) | 上記 ADR に D2〜D7 の判断一式 (output 配置 / 変換層 + port + 手動 DI / depguard / ArchUnit / Java 構造原理と隔離 3 段階) も含めて記録する | D2〜D7 決定 (source: track)      |
+| ADR-0002 追補           | 初期 directory / package 構成の記述を新 ADR 参照へ追補                                                                                    | D1 決定 (source: clarify)        |
+| ADR-0003                | `core/internal` 参照 2 箇所は履歴文書として当時の記述のまま保持 (改訂しない)                                                              | ADR の追跡可能性 (source: track) |
 
 ## レビュー
 
@@ -504,6 +507,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                       |
 | 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化 |
 | 2026-07-24 | Claude (spec-lifecycle) | diagram レビュー指摘 4 件を反映 (層依存図の辺修正・fatal 経路明示)。再レビュー PASS                |
+| 2026-07-24 | Claude (spec-lifecycle) | track: 上位資料からの変更点を最新化 (path 追随の実測件数・Java 内部境界・ADR 統合方針を追記)       |
 
 ## 備考
 
