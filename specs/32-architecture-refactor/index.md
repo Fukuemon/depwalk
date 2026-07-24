@@ -62,6 +62,7 @@
 - [context/engineering.md](../../context/engineering.md) — quality gate (lint 組み込み先)
 - [adr/0002-core-implementation-foundation.md](../../adr/0002-core-implementation-foundation.md) — 現行 package 構成の正本 (追補対象)
 - 関連 feature doc: [graph](../../design/features/graph/DesignDoc_graph.md) / [output](../../design/features/output/DesignDoc_output.md) / [analyzer-protocol](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [java-analyzer](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)
+- 外部参考資料: [Go の設計、どこまでやる？ (zenn.dev/135yshr/books/go-service-design)](https://zenn.dev/135yshr/books/go-service-design) — 依存性ルール / interface 利用側定義 / UseCase 層 / ACL / 手動 DI / depguard の各章を D1・D5・D6 の精緻化根拠として参照 (2026-07-24)
 
 ## 背景
 
@@ -132,6 +133,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - `core/internal/` 直下を `domain/` (graph / traversal)、`app/` (analyze)、`platform/` (protocol / analyzer / cli、output は D2 で確定) の 3 層ディレクトリでグルーピングする。package 名 (import 末尾) は従来の責務名を維持する
   - `usecase` / `infra` という機械的層名は避け、Go コミュニティで通用する語彙 (`app` = アプリケーションサービス層、`platform` = 技術基盤層) を使う。層名とクリーンアーキテクチャ用語の対応は architecture.md と各層 README で明文化する
   - 依存方向は `platform` → `app` → `domain` の内向き単方向 (業務ルール 1)。lint (D5) はディレクトリ prefix 単位でルール化する
+  - (2026-07-24 追記, go-service-design 準拠) クリーンアーキテクチャで唯一絶対なのは依存の内向き方向であり、層数・ディレクトリ構成・命名は自由 (原典 Ch.22)。書籍はマルチ feature アプリでは「モジュール × レイヤー」分割 (feature 散在の回避) を推すが、Core は呼び出しグラフ解析という単一 context で責務 package (graph / traversal 等) がそのまま機能単位なので、層ファースト構成でも feature 散在は起きない — D1 の構成を維持する根拠として記録
 - **D2: output の位置づけ → A) `platform/output` (presenter 層は設けない)** (2026-07-23, Fukuemon)
   - output は「外界への書き出し形式」という技術詳細として `platform` に含める。依存先は `domain` のみ (現状の `output -> protocol` import は本 issue で除去)
   - package 1 つのために 4 層目 (presenter) を作らない (先回りした共通化の回避)。将来 formatter が肥大化した場合に分離を再検討する
@@ -140,10 +142,16 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - `app/analyze` は domain 型を返す port interface を定義し、`platform/protocol` (adapter) が wire → domain 変換を担って port を実装する。変換関数の現在地 (`graph/convert.go` の `NodeFromMethodSymbol` 等) は platform 側へ移す
   - 依存方向は `platform` → `app` → `domain` の内向き単方向を例外なしで成立させる (app から protocol への import も除去)
   - 配線は `cli` でのコンストラクタ注入による**手動 DI** とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない (独自の変換層のみ。ADR-0002 の依存最小方針と整合)
+  - (2026-07-24 追記, go-service-design 準拠) port interface の置き方を精緻化:
+    - port は **利用側 (app/analyze) のファイル内に小さく定義** (1〜2 メソッド、必要なら非公開)。`port/` 専用ディレクトリ・package は作らない (Input Port 廃止・interface は利用側 package に属するという Go 慣習)
+    - `app/analyze` 自身は **struct として公開**し、cli 向けの先回り interface (Preemptive Interface) を作らない。cli 側が抽象を必要とする場合のみ cli 側で定義する
+    - `var _ Interface = (*Impl)(nil)` による interface 満足の検証は **コンポジションルート (cli の配線箇所) に集約**する
+    - `platform/protocol` は **ACL (腐敗防止層)** として位置づける: wire DTO (外部形式) は ACL 内に閉じ、Translator (wire → domain 変換) + Adapter (port 実装) の組で構成する
 - **D5: Go 側の依存方向 lint → A) golangci-lint + depguard** (2026-07-23, Fukuemon)
   - golangci-lint を dev ツールとして導入し、depguard で層別 (ディレクトリ prefix 単位) の import 禁止ルールを宣言する: `domain` は `app` / `platform` を deny、`app` は `platform` を deny
   - 既存 quality gate (lefthook pre-commit / CI) に組み込む。バージョンは固定して再現性を保つ
   - ルール定義の詳細 (`.golangci.yml` の具体構成) は実装 phase で確定
+  - (2026-07-24 追記, go-service-design 準拠) depguard ルールは `files` (層の glob) + `deny` (禁止 pkg) + `desc` (違反理由の日本語メッセージ) の宣言形式で記述する (書籍 Ch.17 のパターン)。違反時に理由が表示されることで開発者・AI エージェントが自己修正しやすくなる
 - **D7: Java Analyzer の層構造 → A) パイプライン段階 + 外部ライブラリ隔離** (2026-07-23, Fukuemon)
   - `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`discovery` は引き続き Gradle Tooling API の隔離境界とする
   - `analysis` 配下を「実行順の段階別 package」+「外部ライブラリ adapter package」で再編する。段階の実行順は `pipeline` (Runner) だけが知る
@@ -221,7 +229,8 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### Props / Request / Response
 
-- 変換層 (D6 確定): `app/analyze` が domain 型を返す port interface を定義し、`platform/protocol` が wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / domain 版 `SourceLocation`) の写像を実装する。変換関数のシグネチャ詳細は diagram / 実装 phase で確定
+- 変換層 (D6 確定): `app/analyze` が domain 型を返す port interface を **自ファイル内に小さく** 定義し (`port/` package は作らない)、`platform/protocol` (ACL) が wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / domain 版 `SourceLocation`) の写像 (Translator) と port 実装 (Adapter) を担う。変換関数のシグネチャ詳細は diagram / 実装 phase で確定
+- `app/analyze` は struct として公開し、cli 向けの先回り interface は作らない。`var _` による interface 満足検証は cli の配線箇所に集約する
 - 配線は `cli` でのコンストラクタ注入による手動 DI (`google/wire` 等の DI ライブラリは導入しない)
 
 ## Content / Data 設計
@@ -375,18 +384,19 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者                  | 変更内容                                                                 |
-| ---------- | ----------------------- | ------------------------------------------------------------------------ |
-| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                           |
-| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                             |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                 |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                      |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                      |
-| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録) |
+| 日付       | 変更者                  | 変更内容                                                                                          |
+| ---------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
+| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                                                    |
+| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                                                  |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                                                  |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                                                      |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                                          |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                                                  |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                                               |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                                                  |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                               |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                          |
+| 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法) |
 
 ## 備考
 
