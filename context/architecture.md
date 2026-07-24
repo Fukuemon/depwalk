@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-18
+> 最終更新: 2026-07-24
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.md](project.md) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -10,31 +10,49 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 依存方向は **Core 内は単方向、Core → Analyzer は Protocol 経由のみ** とする (DesignDoc 設計原則 P1〜P4)。
 
 - CLI → Core のみに依存する。
-- Core 内: `Traversal Engine` → `Graph Engine` → `Model`、`Output Engine` → `Graph Engine` / `Traversal Engine` / `Model`。Model は他に依存しない。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
-- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を保持する。Analyze Use Case は valid Protocol record を非公開 staging Graph へ 1-pass 変換し、process 成功と stream 全体の参照完全性を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
+- Core 内: `Traversal Engine` → `Graph Engine`、`Output Engine` → `Graph Engine` / `Traversal Engine`。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
+- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録し、process 成功と stream 全体の参照完全性を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
 - Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
 
-Go 側 Core の初期 package 境界は次とする。
+### Core の層構造 (Go)
 
-| Package                   | 責務                                                                      |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `core/cmd/depwalk`        | `main` と Cobra root command の起動                                       |
-| `core/internal/cli`       | CLI command / flags / 入力 validation                                     |
-| `core/internal/analyze`   | `depwalk analyze` の use case orchestration                               |
-| `core/internal/protocol`  | JSONL record type、Protocol DTO / wire model、parse、validate             |
-| `core/internal/analyzer`  | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling |
-| `core/internal/graph`     | graph 内部 model、node / edge 管理                                        |
-| `core/internal/traversal` | caller / callee traversal                                                 |
-| `core/internal/output`    | text / JSON / DOT / Mermaid formatter                                     |
+`core/internal` 配下は 3 層ディレクトリでグルーピングする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md))。層名はクリーンアーキテクチャの機械的層名を避けた Go 慣習寄りの語彙で、`domain` = ドメイン層、`app` = アプリケーションサービス層 (usecase 相当)、`platform` = 技術基盤層 (infrastructure 相当) に対応する。
+
+| Layer      | Package                           | 責務                                                                                      |
+| ---------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
+| (cmd)      | `core/cmd/depwalk`                | `main`。Cobra root command の起動                                                         |
+| `domain`   | `core/internal/domain/graph`      | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
+| `domain`   | `core/internal/domain/traversal`  | caller / callee traversal                                                                 |
+| `app`      | `core/internal/app/analyze`       | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
+| `platform` | `core/internal/platform/protocol` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
+| `platform` | `core/internal/platform/analyzer` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
+| `platform` | `core/internal/platform/output`   | text / JSON / DOT / Mermaid formatter (依存先は domain のみ)                              |
+| `platform` | `core/internal/platform/cli`      | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
+
+依存規則 (内向き単方向):
+
+- `domain` は他層に依存しない (wire 表現 `protocol` への import 禁止を含む)
+- `app` → `domain` のみ。`platform` への import 禁止 (抽象は app 側の port interface で表現し、`platform` が実装する)
+- `platform` → `app` / `domain`。`cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
+- DI ライブラリ (`google/wire` 等) は導入せず、`cli` でのコンストラクタ注入による手動 DI とする
+
+### Java Analyzer の内部境界
+
+`analyzers/java` の `javaanalyzer` 配下は、解析パイプラインの段階別 package (`analysis/` 配下) と入出力・起動系 (`protocol` / `io` / `preflight` / `discovery`) で構成する。段階の実行順は `analysis/pipeline` (Runner) だけが知る。外部ライブラリの隔離は次の 3 段階とする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)):
+
+- **SootUp**: `analysis/sootup` (adapter) に完全に封じ込め、facade が自前型で公開する。他 package から `sootup.*` の import 禁止
+- **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.tooling.*` は discovery のみ)
+- **JavaParser / SymbolSolver**: 解析エンジンの中核として `analysis` 配下では自由に使ってよい。`analysis` の外への import は禁止
 
 言語別 Analyzer 実装は `analyzers/<language>/` に置く。
 Java Analyzer 実装は `analyzers/java/` に置き、Core の `internal` package には入れない。
 Core と Analyzer の共有境界は Protocol doc、ADR、JSONL fixture、contract test 観点に限定する。
 Go package や Java 実装 code を共有しない。
 
-> 依存境界の自動検査は [engineering.md](engineering.md) の quality gate で扱う。
+> 依存境界の自動検査 (Go: golangci-lint + depguard、Java: ArchUnit) は [engineering.md](engineering.md) の quality gate で扱う。
+> 本節の層別構造は spec #32 の子 issue で実装する (実装完了までコードは旧配置の場合がある)。
 
 ## Runtime Boundary
 

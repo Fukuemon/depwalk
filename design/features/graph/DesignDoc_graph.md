@@ -1,19 +1,19 @@
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で Edge metadata の保持と JSON への透過表出を追加)
+> 最終更新: 2026-07-24 / Status: 完了 (spec #32 sync で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動)
 
 Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D1) を参照する。
 
 ## メタ
 
-| 項目           | 値                                                                                                                                                                                                                             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                         |
-| 関連 DesignDoc | [モジュール責務 Graph Engine / Model](../../DesignDoc.md#モジュール責務)、[成功条件 S3](../../DesignDoc.md#提供価値--成功条件-what)                                                                                            |
-| 関連 context   | [architecture](../../../context/architecture.md) (Package Boundary)                                                                                                                                                            |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                  |
-| 関連 spec      | [specs/7-output](../../../specs/7-output/) (D1)、[specs/6-traversal](../../../specs/6-traversal/) (読み取り API の consumer)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/) |
-| 対象モジュール | `core` (`core/internal/graph`)                                                                                                                                                                                                 |
+| 項目           | 値                                                                                                                                                                                                                                                                                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                                                                                   |
+| 関連 DesignDoc | [モジュール責務 Graph Engine / Model](../../DesignDoc.md#モジュール責務)、[成功条件 S3](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                                      |
+| 関連 context   | [architecture](../../../context/architecture.md) (Package Boundary)                                                                                                                                                                                                                                                                                      |
+| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                                                                                                                                            |
+| 関連 spec      | [specs/7-output](../../../specs/7-output/) (D1)、[specs/6-traversal](../../../specs/6-traversal/) (読み取り API の consumer)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)、[specs/32-architecture-refactor](../../../specs/32-architecture-refactor/) (D6: SourceLocation 自前型化・変換所在の改訂) |
+| 対象モジュール | `core` (`core/internal/domain/graph`。層構造の正本は [architecture.md](../../../context/architecture.md))                                                                                                                                                                                                                                                |
 
 ## 背景・要件解釈
 
@@ -41,7 +41,7 @@ Output Engine (Console / JSON / DOT / Mermaid) がメソッド名・宣言位置
 graph は node / edge の ID に加えて、表示に必要な属性を **graph 固有の値型**として保持する。
 
 ```go
-// core/internal/graph
+// core/internal/domain/graph
 type Node struct {
     ID     string // Analyzer の methodId (不透明な stable ID)
     Symbol Symbol
@@ -50,28 +50,28 @@ type Node struct {
 type Symbol struct {
     QualifiedName string
     Signature     string
-    Source        *protocol.SourceLocation // 宣言位置 (optional)
-    Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)
+    Source        *SourceLocation // 宣言位置 (optional。graph 固有の値型)
+    Metadata      map[string]any  // Analyzer 固有情報 (opaque, optional)
 }
 
 type Edge struct {
     ID       string
     CallerID string
     CalleeID string
-    CallSite *protocol.SourceLocation // 呼び出し箇所 (optional)
-    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)
+    CallSite *SourceLocation // 呼び出し箇所 (optional。graph 固有の値型)
+    Metadata map[string]any  // Analyzer 固有情報 (opaque, optional)
 }
 ```
 
-- **変換は graph 構築時 (Analyze Use Case 層) に 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しであり、以後 Core 内で wire record を持ち回らない。
+- **変換は 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しは `platform` 層の ACL (`platform/protocol`。app が定義する port の実装側) が担い、以後 Core 内で wire record を持ち回らない (変換の所在は spec #32 D6 で Analyze Use Case 層から platform 層へ改訂)。
 - **wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない**。graph が wire 表現に結合すると、Protocol の版更新が Core 内部モデルへ波及するため。
-- `SourceLocation` は `protocol` package の型を再利用する。この型は `path` / `startLine` 等の純粋な値のみで wire 専用フィールドを持たず、依存方向も `Graph Engine → Model` の範囲内に収まる。
+- `SourceLocation` は graph package が自前の値型として定義し、`protocol` package の型を再利用しない (2026-07-24 改訂。旧決定は protocol 型の再利用だったが、domain 層から wire 表現への import をゼロにする層規約 [ADR-0007](../../../adr/0007-layered-architecture-refactor.md) に伴い改訂。wire 型との重複定義は境界隔離のコストとして許容する。決定経緯は [spec #32](../../../specs/32-architecture-refactor/index.md))。
 - `sourceLocation` / `callSite` は Protocol 上 optional であり、graph でも nil を許容する。表示時の省略規則は consumer (output feature doc) が定める。
 - `methodSymbol.metadata` / `callEdge.metadata` は Graph が所有する opaque 属性として nested map / array を含め deep copy する (`Symbol.Metadata` / `Edge.Metadata`)。Graph / Traversal は値の意味を解釈しない。JSON 出力へは opaque なまま透過表出する (表出の正本は [output feature doc](../output/DesignDoc_output.md)。spec #22 D11 で決定)。console 等それ以外の既存出力表現には自動では表出しない。bytecode-only symbol のように `sourceLocation` がない node も有効であり、owner の source anchor は metadata と sourceLocation を混同しない。
 
 ### 構築と公開の原子性
 
-Analyze Use Case は valid な `methodSymbol` / `callEdge` を受領順に graph 値型へ変換し、request 専用の **非公開 staging Graph** へ登録する。wire DTO 全件や Analyzer 側の全 graph を別途 buffer しない。Analyzer が exit `0` で終了し、fatal record がなく、stream 全体で全 edge の caller / callee 参照が揃った場合だけ staging Graph と diagnostic を公開する。
+Analyze Use Case は valid な `methodSymbol` / `callEdge` を受領順に (ACL が graph 値型へ変換したものを) request 専用の **非公開 staging Graph** へ登録する。wire DTO 全件や Analyzer 側の全 graph を別途 buffer しない。Analyzer が exit `0` で終了し、fatal record がなく、stream 全体で全 edge の caller / callee 参照が揃った場合だけ staging Graph と diagnostic を公開する。
 
 valid `error`、非ゼロ exit、stdout の parse / schema error の場合は参照完全性の成立を要求せず、staging Graph と先行 diagnostic をすべて破棄する。Graph Engine の公開 API から request の部分結果は観測できない。
 
@@ -83,10 +83,10 @@ valid `error`、非ゼロ exit、stdout の parse / schema error の場合は参
 
 ```mermaid
 flowchart TD
-    UseCase["Analyze Use Case<br/>(wire record → graph 値型の変換)"] --> Graph["Graph Engine<br/>(core/internal/graph)"]
+    ACL["platform/protocol (ACL)<br/>(wire record → graph 値型の変換)"] --> UseCase["Analyze Use Case<br/>(port 経由で domain 値を受領し staging へ登録)"]
+    UseCase --> Graph["Graph Engine<br/>(core/internal/domain/graph)"]
     Traversal["Traversal Engine"] -->|"読み取り API"| Graph
     Output["Output Engine"] -->|"symbol / callSite を解決"| Graph
-    Graph --> Model["Model (protocol.SourceLocation)"]
 ```
 
 ### フロー / シーケンス
@@ -119,3 +119,4 @@ flowchart TD
 | ADR       | 継承                              | ADR-0001 (Protocol/Model 境界) / ADR-0002 (Core package 境界) の範囲内。新規 ADR 不要                                                                                                                                |
 | spec #24  | 追記                              | `Symbol.Metadata` の deep copy、非公開 staging Graph への1-pass変換、成功時公開、fatal時破棄、正常streamの参照完全性を反映                                                                                           |
 | spec #22  | 追記                              | `Edge.Metadata` (`callEdge.metadata` の opaque 保持、Symbol 側と同じ deep copy 方針) を追加し、JSON 出力への透過表出 (正本: output feature doc) を明記 (D11。決定経緯: [spec #22](../../../specs/22-cli-interface/)) |
+| spec #32  | 変更 (改訂)                       | `SourceLocation` を protocol 型再利用から graph 自前型へ改訂し、wire → 値型変換の所在を Analyze Use Case 層から platform 層 ACL へ移動 (D6。層規約は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md)) |

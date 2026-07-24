@@ -4,6 +4,8 @@
 
 承認
 
+> 追補 (2026-07-24): 本 ADR の「初期 directory / package 構成」(`core/internal/` 直下の 7 package 並列) は [ADR-0007](0007-layered-architecture-refactor.md) で層別構造 (`domain` / `app` / `platform`) へ改訂した。実装言語 / Go modules / 標準 command / JSONL parser 方針など他の決定は引き続き有効。
+
 ## 決定日
 
 2026-06-27

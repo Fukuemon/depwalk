@@ -1,6 +1,6 @@
 # Engineering Conventions
 
-> 最終更新: 2026-07-11
+> 最終更新: 2026-07-24
 
 shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.md](project.md)。
 
@@ -9,7 +9,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 ## Shared Config Boundary
 
 - Core の初期 shared config は Go 標準 command を優先し、専用 config を増やさない。
-- `golangci-lint`、`govulncheck`、release automation の設定は、CI gate または release 手順が要件化した時点で追加する。
+- `golangci-lint` は依存方向検査 (depguard) の要件化 (spec #32) に伴い導入する。バージョンは固定し、設定は `core/.golangci.yml` に置く。`govulncheck`、release automation の設定は、CI gate または release 手順が要件化した時点で追加する。
 - 現状の共有契約はドキュメント正本パス ([project.md](project.md) Source of Truth) と AI 設定 (`.rulesync/` → 各 provider 生成)。
 
 ## Root Task Boundary
@@ -23,3 +23,5 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - 現状の gate: Markdown / ドキュメント整合 (lefthook 経由)。AI 設定は `.rulesync/` を正本とし、生成物 (`AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/`) の直接編集を禁止する。
 - Core 実装後の最小 gate: `cd core && go test ./...`、`cd core && go vet ./...`、`cd core && test -z "$(gofmt -l .)"`、`cd core && go mod tidy` 後の差分確認。
 - 依存境界 gate: Core から `analyzers/<language>/` や特定 Analyzer runtime へ直接依存しないことを CI の Go job で検査する (`go list -deps ./...` に `analyzers/` が含まれないこと。`.github/workflows/ci.yml`)。
+- 層依存 gate (Go): `core/internal` の層をまたぐ禁止 import (`domain` → `app`/`platform`、`app` → `platform`) を golangci-lint + depguard で検査し、lefthook pre-commit / CI に組み込む。ルールは `files` (層の glob) + `deny` + `desc` (違反理由) の宣言形式で書く。層の定義は [architecture.md](architecture.md) の Package Boundary が正本 (導入判断は [ADR-0007](../adr/0007-layered-architecture-refactor.md))。
+- 層依存 gate (Java): 外部ライブラリ隔離 (`sootup.*` は `analysis/sootup` のみ / `org.gradle.tooling.*` は `discovery` のみ / `com.github.javaparser.*` は `analysis` 配下のみ) を ArchUnit の JUnit テストで検査する。既存の `./gradlew test` (quality gate 組み込み済み) で実行され、新しい gate 配線は不要。
