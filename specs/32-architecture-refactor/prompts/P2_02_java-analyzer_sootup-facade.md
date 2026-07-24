@@ -38,12 +38,12 @@
 ### ステップ 1: facade の設計と導入
 
 1. テストを先に書く / 更新する (facade の公開型に対する unit test)
-2. `analysis/sootup` に、利用側 6 クラスが現在 `sootup.*` 型で受け渡ししている情報 (型階層照会・bytecode member 照会・クラス/メソッドシグネチャ) を **自前型 (record / interface) で公開する facade** を定義する。既存 `SootUpTypeHierarchyIndex` の公開 API を自前型へ置き換える形でよい
+2. `analysis/sootup` に、利用側 6 クラス (7 ファイル) が現在 `sootup.*` 型で受け渡ししている情報 (型階層照会・bytecode member 照会・クラス/メソッドシグネチャ) を **自前型 (record / interface) で公開する facade** を定義する。既存 `SootUpTypeHierarchyIndex` の公開 API を自前型へ置き換える形でよい
 3. `## 検証コマンド` を実行し、diff レビューを回す
 
 ### ステップ 2: 利用側 6 クラスの sootup import 除去
 
-1. 次の 6 クラスから `sootup.*` の import を除去し、facade の自前型経由に置き換える (1〜2 クラスずつ進め、都度テストを回す):
+1. 次の 6 クラス (7 ファイル) から `sootup.*` の import を除去し、facade の自前型経由に置き換える (1〜2 クラスずつ進め、都度テストを回す):
    - `analysis/pipeline/AnalysisRunner`
    - `analysis/graph/CallGraphBuilder`
    - `analysis/graph/SourceMethodIndex`

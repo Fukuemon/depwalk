@@ -5,7 +5,7 @@
 ## メタ情報
 
 - Issue: `#32`
-- ステータス: `Draft`
+- ステータス: `In Progress` (設計フェーズ完了・実装は子 issue #34 / #35 で進行)
 - 作成日: 2026-07-23
 - 更新日: 2026-07-24
 - Branch: `feature/32`
@@ -15,19 +15,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                             |
-| --- | --------------------------- | ---------- | ---------- | ------------------------------------------------ |
-| 1   | 起票                        | 完了       | 2026-07-23 | #32 (requirements.md で要求整理済み)             |
-| 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                    |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-24 | track で変更点テーブル最新化。再レビュー PASS    |
-| 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件  |
-| 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS   |
-| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-24 | diagram: 図を確定。再レビュー PASS               |
-| 7   | Content / Data 設計         | 進行中     | 2026-07-24 | 図・配置は phase 6 で確定済み。残は変換 API 詳細 |
-| 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針               |
-| 9   | Test / Metrics 設計         | 未着手     |            | 挙動不変の検証方針 (既存テスト無変更 PASS)       |
-| 10  | 実装分割                    | 完了       | 2026-07-24 | 子 issue #34 / #35 起票、prompts 6 本生成        |
-| 11  | レビュー済                  | 未着手     |            |                                                  |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                                                |
+| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-07-23 | #32 (requirements.md で要求整理済み)                                                |
+| 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                                                       |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-24 | track で変更点テーブル最新化。再レビュー PASS                                       |
+| 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件                                     |
+| 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS                                      |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-07-24 | diagram: 図を確定。再レビュー PASS                                                  |
+| 7   | Content / Data 設計         | 完了       | 2026-07-24 | 図・配置・変換方針を確定。変換 API の関数シグネチャ詳細は実装 prompt (P2_01) へ委譲 |
+| 8   | Performance / Security 設計 | 完了       | 2026-07-24 | 変換は既存処理の再配置で追加走査なし。E2E 時間逸脱なしを基準化 (該当節に記述済み)   |
+| 9   | Test / Metrics 設計         | 完了       | 2026-07-24 | 挙動不変の検証方針 (既存テスト無変更 PASS + 意図的違反での lint FAIL 確認) を確定   |
+| 10  | 実装分割                    | レビュー済 | 2026-07-24 | 子 issue #34 / #35 起票、prompts 6 本生成。再レビュー PASS                          |
+| 11  | レビュー済                  | 完了       | 2026-07-24 | 全 phase レビュー済み。最終 (tasks) レビュー PASS                                   |
 
 ## 上位文書整合
 
@@ -226,7 +226,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### UI / API / Event Interface
 
-- (設計 phase で確定: 層別ディレクトリ構造図、各層の公開境界)
+- 確定済み: 層別ディレクトリ構造図・各層の公開境界は `## Content / Data 設計` の「コンテンツ配置 / package / route」(決定時スナップショット) と正本 (architecture.md / ADR-0007) を参照
 
 ### Props / Request / Response
 
@@ -466,7 +466,7 @@ sequenceDiagram
 | 対象 doc / 節                                           | 変更内容                                                                                                                                                                                    | 理由                                    |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | graph / データ構造・変換                                | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 (「変換は Analyze Use Case 層で 1 回だけ」の記述も含む) **[反映済: 2026-07-24 sync]**                   | D6 決定 (source: clarify)               |
-| graph / データ構造 (`SourceLocation`)                   | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂) **[反映済: 2026-07-24 sync]**                    | D6 決定 (source: clarify)               |
+| graph / データ構造 (`SourceLocation`)                   | `Node.Symbol` の `Symbol.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂) **[反映済: 2026-07-24 sync]** | D6 決定 (source: clarify)               |
 | java-analyzer / 内部構成                                | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新 **[反映済: 2026-07-24 sync「内部 package 構成と依存境界」節]**                                                                  | D7 決定 (source: clarify)               |
 | java-analyzer / 依存境界                                | 外部ライブラリ隔離の 3 段階 (SootUp = adapter facade / Gradle Tooling API = discovery / JavaParser = analysis 配下許容) と `pipeline/` 新設・段階実行順を反映 **[反映済: 2026-07-24 sync]** | D7 精緻化 2026-07-24 (source: track)    |
 | cli / graph / output / traversal / java-analyzer 各 doc | `core/internal/<pkg>` への path 参照 (grep 実測 計 13 箇所) を再編後の `core/internal/{domain,app,platform}/<pkg>` へ機械的追随 **[子 issue で実施 (D4: 実態追随の doc 修正)]**             | D1 決定に伴う path 追随 (source: track) |
@@ -506,6 +506,8 @@ sequenceDiagram
 | 2026-07-24 | NEEDS_WORK (track)       | phase 3 行のメタ情報未同期 / project.md 対象ドメインの変更要否が未記録 (実測主張は全件一致を確認済み)                                                    | phase 3 行を更新し、対象ドメイン「変更不要」行を追加                                                        |
 | 2026-07-24 | PASS (track 再)          | 指摘 2 件の解消を確認。変更点テーブルの実測主張は上位文書と全件一致。sync へ進行可                                                                       | レビュー表・変更履歴へ記録                                                                                  |
 | 2026-07-24 | PASS (sync)              | [反映済] 7 系統の実反映・正本ハンドオフの完全性・D1〜D7 一致・path 委譲の一貫性をすべて確認。参考 2 件 (graph doc の drift 注記等) は非ブロッキング      | graph doc の drift 窓は子 issue ① で解消される旨を認識                                                      |
+| 2026-07-24 | NEEDS_WORK (tasks)       | フェーズ表 7〜9 のメタ未同期 (ブロッキング) / feature doc 影響行の表記 / Interface 設計節のプレースホルダ残置 / P2_02 のクラス数表記揺れ                 | 4 件すべて反映                                                                                              |
+| 2026-07-24 | PASS (tasks 再)          | 指摘 4 件の解消を確認。prompts 6 本の自己完結性 (必須 10 節 / antipatterns / Quick Commands 一致) も確認済み                                             | 最終レビュー PASS。spec-lifecycle 完了                                                                      |
 
 ## 変更履歴
 
@@ -530,6 +532,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | sync: 正本ハンドオフ (architecture/project/engineering/graph・java-analyzer feature doc へ反映、ADR-0007 起票、ADR-0002 追補)。path 追随は子 issue へ委譲 |
 | 2026-07-24 | Claude (spec-lifecycle) | sync レビュー PASS (反映の実在・ハンドオフ完全性・D1〜D7 一致を確認)                                                                                      |
 | 2026-07-24 | Claude (spec-lifecycle) | tasks: 子 issue #34 / #35 を起票し、prompts 6 本 (P1〜P3 × core / java-analyzer) を生成                                                                   |
+| 2026-07-24 | Claude (spec-lifecycle) | tasks レビュー指摘 4 件を反映し再レビュー PASS。全 phase レビュー済みで spec-lifecycle 完了                                                               |
 
 ## 備考
 
