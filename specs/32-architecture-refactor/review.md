@@ -44,3 +44,28 @@ Verdict: NEEDS_WORK
 - 指摘 1: 上位文書整合テーブルの graph 行と背景節を「feature doc の `SourceLocation` 再利用決定を D6 で改訂する変更提案」へ修正
 - 指摘 2: feature doc への影響テーブルへ型置換の行を追加 (source: clarify)
 - 再レビューは外部資料 (go-service-design) を踏まえた設計見直し後に実施
+
+## Review 2026-07-24 (clarify 再レビュー)
+
+Verdict: PASS
+
+### 前回指摘の対応確認
+
+1. **D6 の位置づけ — 対応済み**: 上位文書整合テーブル graph 行と背景節が「feature doc の `SourceLocation` protocol 型再利用決定を D6 で覆す変更提案」として正確に記録。「乖離の是正」表現は除去済み
+2. **feature doc 影響行 — 追加済み**: `Node.Source` / `Edge.CallSite` の domain 自前型への置換行が存在し、feature doc の実型定義と対応
+
+### 精緻化追記 (go-service-design 由来) の整合確認
+
+- D1 追記 (層数・命名自由 / 層ファースト維持根拠): DesignDoc P1〜P4 と矛盾なし
+- D5 追記 (depguard の files+deny+desc 記法): engineering.md の「CI gate 要件化時点で追加」条件と整合
+- D6 追記 (port 利用側定義 / port package なし / struct 公開 / var _ の cli 集約 / ACL): D6 本体・Interface 設計節・ADR-0002 依存最小方針と一貫
+
+### 観点別評価 (要旨)
+
+- 上位文書整合 / 未解決論点 / 実装対象明示 / template 必須節 / EARS acceptance: すべて PASS
+- prompts 自己完結性 / 正本境界: N/A (未着手 phase)
+
+### 参考指摘 (判定に影響しない) → 対応済み
+
+- 設計フェーズ状況「論点解決」行の最終更新日を 2026-07-24 へ揃えた
+- sync 時に graph feature doc の「変換は Analyze Use Case 層で 1 回だけ」記述も更新対象であることを feature doc 影響行へ明記した
