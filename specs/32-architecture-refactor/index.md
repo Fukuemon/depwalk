@@ -26,7 +26,7 @@
 | 7   | Content / Data 設計         | 進行中     | 2026-07-24 | 図・配置は phase 6 で確定済み。残は変換 API 詳細 |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針               |
 | 9   | Test / Metrics 設計         | 未着手     |            | 挙動不変の検証方針 (既存テスト無変更 PASS)       |
-| 10  | 実装分割                    | 未着手     |            | 段階分割 (D4) の決定に依存                       |
+| 10  | 実装分割                    | 完了       | 2026-07-24 | 子 issue #34 / #35 起票、prompts 6 本生成        |
 | 11  | レビュー済                  | 未着手     |            |                                                  |
 
 ## 上位文書整合
@@ -419,13 +419,26 @@ sequenceDiagram
 
 ### 実装タスク案
 
-(D4 確定: epic #32 + 子 issue 2 件。詳細分割は tasks phase で確定)
+(D4 確定: epic #32 + 子 issue 2 件。子 issue は 2026-07-24 起票済み: [#34](https://github.com/Fukuemon/depwalk/issues/34) Core / [#35](https://github.com/Fukuemon/depwalk/issues/35) Java Analyzer)
 
-| Phase | 対象                     | 概要                                                                       | 依存                     |
-| ----- | ------------------------ | -------------------------------------------------------------------------- | ------------------------ |
-| P0    | 正本ドキュメント         | sync phase: architecture.md / project.md / engineering.md / ADR の先行更新 | 論点解決済み (D1〜D7)    |
-| P1    | 子 issue ① core          | Core 層別再編 (domain/app/platform) + port/変換層 + golangci-lint/depguard | P0                       |
-| P2    | 子 issue ② java-analyzer | Java Analyzer 段階別再編 + 外部 lib 隔離 + ArchUnit                        | P0 (P1 とは独立・並行可) |
+| Phase | 対象                         | 概要                                                                       | 依存                     |
+| ----- | ---------------------------- | -------------------------------------------------------------------------- | ------------------------ |
+| P0    | 正本ドキュメント             | sync phase: architecture.md / project.md / engineering.md / ADR の先行更新 | 完了 (2026-07-24 sync)   |
+| P1    | 子 issue #34 (core)          | Core 層別再編 (domain/app/platform) + port/変換層 + golangci-lint/depguard | P0 (main へのマージ)     |
+| P2    | 子 issue #35 (java-analyzer) | Java Analyzer pipeline 再編 + SootUp 隔離 + ArchUnit                       | P0 (P1 とは独立・並行可) |
+
+### 生成済み prompts 一覧
+
+`prompts/` 配下 (2026-07-24 生成)。各 issue 内は直列、issue 間 (P*\_01 系列と P*_02 系列) は並列可:
+
+| ファイル                                    | issue | target        | 並列可     | 依存先 | 概要                                                                 |
+| ------------------------------------------- | ----- | ------------- | ---------- | ------ | -------------------------------------------------------------------- |
+| `P1_01_core_layer-move.md`                  | #34   | core          | P1_02 と可 | なし   | 層別ディレクトリへの物理移動 + import path 更新                      |
+| `P2_01_core_wire-acl-port.md`               | #34   | core          | P*_02 と可 | P1_01  | domain 自前型 + ACL (Translator/Adapter) + port + 手動 DI            |
+| `P3_01_core_depguard-quality-gate.md`       | #34   | core          | P*_02 と可 | P2_01  | golangci-lint + depguard の gate 組み込み + doc path 追随            |
+| `P1_02_java-analyzer_pipeline-structure.md` | #35   | java-analyzer | P1_01 と可 | なし   | pipeline 新設 (Runner 移動) + TypeSolverFactory 移動 + 実行順 README |
+| `P2_02_java-analyzer_sootup-facade.md`      | #35   | java-analyzer | P*_01 と可 | P1_02  | SootUp facade 化 (自前型公開、7 ファイルの import 除去)              |
+| `P3_02_java-analyzer_archunit-gate.md`      | #35   | java-analyzer | P*_01 と可 | P2_02  | ArchUnit 隔離 3 段階の検査 + doc path 追随                           |
 
 ### prompts 生成方針
 
@@ -516,6 +529,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | track レビュー指摘 2 件を反映し再レビュー PASS                                                                                                            |
 | 2026-07-24 | Claude (spec-lifecycle) | sync: 正本ハンドオフ (architecture/project/engineering/graph・java-analyzer feature doc へ反映、ADR-0007 起票、ADR-0002 追補)。path 追随は子 issue へ委譲 |
 | 2026-07-24 | Claude (spec-lifecycle) | sync レビュー PASS (反映の実在・ハンドオフ完全性・D1〜D7 一致を確認)                                                                                      |
+| 2026-07-24 | Claude (spec-lifecycle) | tasks: 子 issue #34 / #35 を起票し、prompts 6 本 (P1〜P3 × core / java-analyzer) を生成                                                                   |
 
 ## 備考
 
