@@ -6,27 +6,27 @@
 
 ## 位置づけ
 
-| 層              | 文書                                          | 役割                                              |
-| --------------- | --------------------------------------------- | ------------------------------------------------- |
-| Why / What      | [PRD.md](../PRD.md) (統合時は DesignDoc)       | 誰のどの課題を、なぜ・何で解決するか              |
-| How (全体像)    | [design/DesignDoc.md](../design/DesignDoc.md) | system landscape / モジュール責務 / 横断方針      |
-| How (feature)   | [design/features/](../design/features/)       | feature 単位の設計 (データ構造・画面・フロー)     |
-| How (規約/契約) | **context/** (本ライブラリ)                   | 技術スタック規約・codebase architecture・運用契約 |
-| 固有値          | [project.md](project.md)                      | repo / 命名 / コマンド / 対象ドメイン / トラッカー |
-| 意思決定        | [adr/](../adr/)                               | 長期参照する技術選定・境界の確定                  |
-| 作業文書        | [specs/](../specs/)                           | issue / 機能単位の要求・設計・テスト観点          |
+| 層              | 文書                                          | 役割                                               |
+| --------------- | --------------------------------------------- | -------------------------------------------------- |
+| Why / What      | [PRD.md](../PRD.md) (統合時は DesignDoc)      | 誰のどの課題を、なぜ・何で解決するか               |
+| How (全体像)    | [design/DesignDoc.md](../design/DesignDoc.md) | system landscape / モジュール責務 / 横断方針       |
+| How (feature)   | [design/features/](../design/features/)       | feature 単位の設計 (データ構造・画面・フロー)      |
+| How (規約/契約) | **context/** (本ライブラリ)                   | 技術スタック規約・codebase architecture・運用契約  |
+| 固有値          | [project.yml](project.yml)                    | repo / 命名 / コマンド / 対象ドメイン / トラッカー |
+| 意思決定        | [adr/](../adr/)                               | 長期参照する技術選定・境界の確定                   |
+| 作業文書        | [specs/](../specs/)                           | issue / 機能単位の要求・設計・テスト観点           |
 
 ## ファイル一覧
 
-| ファイル                                 | 内容                                                                   |
-| ---------------------------------------- | ---------------------------------------------------------------------- |
-| [project.md](project.md)                 | プロジェクト固有値 (repo / 命名 / コマンド / 対象ドメイン / トラッカー) |
-| [architecture.md](architecture.md)       | codebase architecture: package / runtime boundary, 依存方向            |
-| [toolchain.md](toolchain.md)             | toolchain 一覧, build 構成, scaffold policy                            |
-| [engineering.md](engineering.md)         | root task boundary, shared config boundary, repository quality gate    |
-| [testing.md](testing.md)                 | test 責務分担, test runtime contract                                   |
-| [infrastructure.md](infrastructure.md)   | infra / deployment / environment / operations / security 契約          |
-| [ai-agents.md](ai-agents.md)             | 非対話 CLI エージェントの invocation / routing / timeout 契約          |
+| ファイル                               | 内容                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| [project.yml](project.yml)             | プロジェクト固有値 (repo / 命名 / コマンド / 対象ドメイン / トラッカー) |
+| [architecture.md](architecture.md)     | codebase architecture: package / runtime boundary, 依存方向             |
+| [toolchain.md](toolchain.md)           | toolchain 一覧, build 構成, scaffold policy                             |
+| [engineering.md](engineering.md)       | root task boundary, shared config boundary, repository quality gate     |
+| [testing.md](testing.md)               | test 責務分担, test runtime contract                                    |
+| [infrastructure.md](infrastructure.md) | infra / deployment / environment / operations / security 契約           |
+| [ai-agents.md](ai-agents.md)           | 非対話 CLI エージェントの invocation / routing / timeout 契約           |
 
 ## Producer / Consumer 契約
 

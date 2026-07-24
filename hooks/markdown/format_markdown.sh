@@ -20,6 +20,6 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 0
 fi
 
-npx prettier --write "$FILE_PATH" >/dev/null 2>&1 || true
+npx prettier --write -- "$FILE_PATH" >/dev/null 2>&1 || true
 
 exit 0

@@ -27,7 +27,7 @@ skill / rule / subagent を **使っている最中に見つけた** 不具合 (
 ## 実行フロー
 
 1. **事象の特定**: 何が・どの skill のどの記述と食い違ったかを 1〜2 行で言語化する (file:line まで特定する)
-2. **原因の分類**: (a) 記述が古い / 誤り → 修正、(b) project 固有値の直書き → `context/project.md` 参照へ置換、(c) 説明不足 → SKILL.md か references に追記、(d) 設計判断の変更が必要 → ユーザーに提案して停止
+2. **原因の分類**: (a) 記述が古い / 誤り → 修正、(b) project 固有値の直書き → `context/project.yml` 参照へ置換、(c) 説明不足 → SKILL.md か references に追記、(d) 設計判断の変更が必要 → ユーザーに提案して停止
 3. **decisions.md との突合**: 変更が過去の判断 (`背景 / 判断 / 理由 / 今後`) の逆戻しに当たる場合、該当セクションを提示してユーザーに確認する
 4. **正本の修正**: `rulesync-sync` skill の手順で `.rulesync/` を編集し、生成・検証 (`make generate` → `make check`) まで行う
 5. **連鎖影響の確認**: skill の呼び出し関係 / phase gate / 状態遷移を変えた場合は `architecture.md` のシーケンスを同時に更新する
@@ -37,5 +37,5 @@ skill / rule / subagent を **使っている最中に見つけた** 不具合 (
 
 - 修正が skill の設計判断の変更 (フローの組み替え / 責務の移動) に及ぶ — ユーザー承認なしに進めない
 - `decisions.md` の既存判断と衝突する — 逆戻しの可否をユーザーに確認する
-- 事象が skill 起因か project 固有値 (`context/project.md`) の未記入かを切り分けられない
+- 事象が skill 起因か project 固有値 (`context/project.yml`) の未記入かを切り分けられない
 - `make check` が通らない状態で終わろうとしている

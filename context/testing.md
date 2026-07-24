@@ -2,7 +2,7 @@
 
 > 最終更新: 2026-07-20
 
-テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.md](project.md)。
+テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.yml](project.yml)。
 
 Core の test framework は Go 標準の `testing` とする。
 判断根拠は [ADR-0002](../adr/0002-core-implementation-foundation.md)。

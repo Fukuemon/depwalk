@@ -147,5 +147,9 @@
         ]
       }
     ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

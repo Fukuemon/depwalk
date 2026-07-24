@@ -209,7 +209,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 ### Engineering Context (How: 横断規約)
 
-技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.md](../context/project.md)。
+技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.yml](../context/project.yml)。
 
 | トピック                     | 文書                                                  |
 | ---------------------------- | ----------------------------------------------------- |

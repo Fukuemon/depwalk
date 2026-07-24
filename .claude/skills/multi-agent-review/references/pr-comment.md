@@ -25,7 +25,7 @@
 2. 既存の投稿を探す (再実行時の重複防止):
 
    ```bash
-   gh api repos/{owner}/{repo}/issues/<PR番号>/comments \
+   gh api --paginate repos/{owner}/{repo}/issues/<PR番号>/comments \
      --jq '.[] | select(.body | startswith("<!-- multi-agent-review -->")) | .id'
    ```
 

@@ -10,7 +10,7 @@ depwalk CLI の durable な feature 設計正本。`depwalk analyze` の **コ�
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                 |
 | 関連 DesignDoc | [成功条件 S1-S3](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 CLI](../../DesignDoc.md#モジュール責務)                                                                  |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[project (Quick Commands)](../../../context/project.md)                                      |
+| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[project (Quick Commands)](../../../context/project.yml)                                     |
 | 関連 ADR       | [ADR-0002](../../../adr/0002-core-implementation-foundation.md) (Cobra)、[ADR-0003](../../../adr/0003-analyzer-command-resolution.md) (Analyzer 起動契約)                              |
 | 関連 spec      | [specs/22-cli-interface](../../../specs/22-cli-interface/) (D1-D12)、[specs/24](../../../specs/24-gradle-multi-module-source-roots/) (`--source-root` / include・exclude の引き継ぎ元) |
 | 対象モジュール | `core` (`core/internal/cli` / `core/internal/analyze`)                                                                                                                                 |
@@ -83,5 +83,5 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 | PRD         | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                                                               |
 | DesignDoc   | 継承                              | S1-S3 の CLI 出力レベル照合を完成させる責務。モジュール責務 CLI (引数解析、実行制御、Core 呼び出し) の範囲内                                                  |
 | feature doc | 追記                              | graph / output への Metadata 透過 (spec #22 D11) はそれぞれ [graph](../graph/DesignDoc_graph.md) / [output](../output/DesignDoc_output.md) feature doc が正本 |
-| context     | 追記                              | `context/project.md` Quick Commands に探索クエリの起動例、`context/testing.md` に E2E 具体引数の確定を反映                                                    |
+| context     | 追記                              | `context/project.yml` Quick Commands に探索クエリの起動例、`context/testing.md` に E2E 具体引数の確定を反映                                                   |
 | ADR         | 継承                              | ADR-0003 は無改訂 (規約 path 前段の導入見送り判断は spec #22 D10 に記録)                                                                                      |
