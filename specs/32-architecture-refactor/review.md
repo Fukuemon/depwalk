@@ -20,3 +20,27 @@ Verdict: PASS
 
 - D5〜D7 に決定者 / 期限が未明示 → 対応済み (未確定事項へ決定者 Fukuemon / 期限 clarify 内を補記)
 - requirements.md:47 の markdown 崩れ → 対応済み (太字記法を修正)
+
+## Review 2026-07-23 (clarify phase 完了時点)
+
+Verdict: NEEDS_WORK
+
+### 観点別評価 (要旨)
+
+- **上位文書整合: NEEDS_WORK** — 指摘 2 件 (下記)。D1 / D3 / D4 / D5 は上位文書と整合し変更提案も記録済み
+- **未解決論点: PASS** — D1〜D7 全件が決定者 / 決定日付きで「解決済みの論点」へ移動済み。未決を残した下流記述なし
+- **実装対象明示: PASS** — 5 target が project.md の対象ドメインと一致し、D2/D3/D6 の決定が反映済み
+- **template 必須節: PASS** — 必須 22 セクション存在、メタ情報同期良好
+- **EARS acceptance: PASS** — requirements.md と整合、全件観測可能
+- **prompts 自己完結性 / 正本境界: N/A** — 未着手 phase
+
+### 指摘
+
+1. **D6 の位置づけが不正確**: graph feature doc (`DesignDoc_graph.md:68`) は `SourceLocation` について protocol 型の再利用を明示的に決定済み。`graph -> protocol` import は規約違反の実装漏れではなく公認設計であり、D6 は「乖離の是正」ではなく「feature doc 決定を覆す変更提案」として記録すべき
+2. **feature doc への影響行の欠落**: `Node.Source` / `Edge.CallSite` の型置換 (protocol 型 → domain 自前型) の影響行が「feature doc への影響」テーブルにない
+
+### 対応 (2026-07-24)
+
+- 指摘 1: 上位文書整合テーブルの graph 行と背景節を「feature doc の `SourceLocation` 再利用決定を D6 で改訂する変更提案」へ修正
+- 指摘 2: feature doc への影響テーブルへ型置換の行を追加 (source: clarify)
+- 再レビューは外部資料 (go-service-design) を踏まえた設計見直し後に実施
