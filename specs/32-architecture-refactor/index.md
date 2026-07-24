@@ -21,7 +21,7 @@
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                   |
 | 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映  |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件 |
-| 5   | 論点解決                    | 完了       | 2026-07-23 | D1〜D7 全件解決 (解決済みの論点を参照)          |
+| 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS  |
 | 6   | Interface / Routing 設計    | 未着手     |            | 層別ディレクトリ構造・package 配置図の確定      |
 | 7   | Content / Data 設計         | 未着手     |            | 変換層 (wire DTO → domain model) の API 詳細    |
 | 8   | Performance / Security 設計 | 未着手     |            | 変換層追加による性能影響の確認方針              |
@@ -347,12 +347,12 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節                         | 変更内容                                                                                                                                   | 理由                      |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- |
-| graph / データ構造・変換              | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新                                                        | D6 決定 (source: clarify) |
-| graph / データ構造 (`SourceLocation`) | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂) | D6 決定 (source: clarify) |
-| java-analyzer / 内部構成              | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                                                                                | D7 決定 (source: clarify) |
-| (残りは設計確定後に track で記録)     |                                                                                                                                            |                           |
+| 対象 doc / 節                         | 変更内容                                                                                                                                    | 理由                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| graph / データ構造・変換              | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 (「変換は Analyze Use Case 層で 1 回だけ」の記述も含む) | D6 決定 (source: clarify) |
+| graph / データ構造 (`SourceLocation`) | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂)  | D6 決定 (source: clarify) |
+| java-analyzer / 内部構成              | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                                                                                 | D7 決定 (source: clarify) |
+| (残りは設計確定後に track で記録)     |                                                                                                                                             |                           |
 
 ### context への影響
 
@@ -377,10 +377,11 @@ sequenceDiagram
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                            | 対応                                                                                                        |
-| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 2026-07-23 | PASS (scaffold)          | 軽微 2 件: D5〜D7 の決定者未明示 / requirements.md の記法崩れ                                                                                       | 未確定事項へ決定者・期限を補記 / requirements.md を修正                                                     |
-| 2026-07-23 | NEEDS_WORK (clarify)     | D6 の位置づけ不正確 (graph feature doc の `SourceLocation` 再利用は確定済み決定であり「乖離是正」ではなく「決定の改訂」) / feature doc 影響行の欠落 | 上位文書整合・背景の表現を修正し、feature doc 影響行を追加 (2026-07-24)。再レビューは design 見直し後に実施 |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                                 | 対応                                                                                                        |
+| ---------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2026-07-23 | PASS (scaffold)          | 軽微 2 件: D5〜D7 の決定者未明示 / requirements.md の記法崩れ                                                                                            | 未確定事項へ決定者・期限を補記 / requirements.md を修正                                                     |
+| 2026-07-23 | NEEDS_WORK (clarify)     | D6 の位置づけ不正確 (graph feature doc の `SourceLocation` 再利用は確定済み決定であり「乖離是正」ではなく「決定の改訂」) / feature doc 影響行の欠落      | 上位文書整合・背景の表現を修正し、feature doc 影響行を追加 (2026-07-24)。再レビューは design 見直し後に実施 |
+| 2026-07-24 | PASS (clarify 再)        | 指摘 2 件の対応を確認。go-service-design 由来の精緻化追記も既存決定・上位文書と矛盾なし。参考指摘 2 件 (日付揃え / sync 時の graph feature doc 変換記述) | 日付を揃え、feature doc 影響行に変換記述の包含を明記                                                        |
 
 ## 変更履歴
 
@@ -397,6 +398,7 @@ sequenceDiagram
 | 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                               |
 | 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                          |
 | 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法) |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                      |
 
 ## 備考
 
