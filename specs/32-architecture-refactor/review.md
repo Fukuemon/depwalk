@@ -114,3 +114,19 @@ Verdict: NEEDS_WORK → 対応後 PASS
 ### 再レビュー (PASS)
 
 - 指摘 2 件の解消を確認。sync phase へ進行可と判断
+
+## Review 2026-07-24 (sync phase)
+
+Verdict: PASS
+
+### 確認内容
+
+- **[反映済] 行の実反映**: 7 系統 (architecture.md 3 層化 + Java 内部境界 / project.md Naming Conventions / engineering.md 層依存 gate / graph feature doc の SourceLocation 改訂 + 変換所在 / java-analyzer feature doc の内部構成節 / ADR-0007 新規 / ADR-0002 追補) すべて実在・改変なしを実地確認
+- **正本ハンドオフの完全性**: design 側の正本宣言と spec 側の「決定時スナップショット」降格を確認。二重正本なし。用語規約 (spec = 決定経緯) 遵守。反映先文書のメタ情報 (最終更新 / Status / 変更点行) も同期済み
+- **D1〜D7 一致**: 段階実行順・JavaParser 隔離 3 段階・depguard 記法・手動 DI / `var _` 集約まで欠落なし
+- **path 機械追随の子 issue 委譲**: 残存旧 path (feature doc ≈13 箇所 / context 4 箇所) が spec の記録と合致し、architecture.md に drift 注記あり
+
+### 参考指摘 (非ブロッキング)
+
+- フェーズ表に sync 専用行がない (変更履歴と上位文書整合で記録されており許容範囲)
+- graph feature doc は新 path を先行使用しており drift 注記がない → 子 issue ① 完了までの短期 drift 窓として認識
