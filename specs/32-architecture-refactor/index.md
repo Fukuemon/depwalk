@@ -7,7 +7,7 @@
 - Issue: `#32`
 - ステータス: `Draft`
 - 作成日: 2026-07-23
-- 更新日: 2026-07-23
+- 更新日: 2026-07-24
 - Branch: `feature/32`
 - Owner: Fukuemon
 
@@ -37,18 +37,18 @@
 - Design Doc 更新要否: 要 (モジュール責務・図の package 参照が再編後に古くなる場合のみ)
 - ADR 起票要否: 要 (層構造の判断根拠。ADR-0002 の package 構成記述への追補)
 
-| 上位文書                | 節 / 該当箇所                                         | 整合方針 (継承 / 補足 / 変更提案)                                        |
-| ----------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
-| Design Doc (統合 PRD)   | Why/What / 成功条件 / Non Goals                       | 継承 (外部挙動・スコープを変えない)                                      |
-| Design Doc              | モジュール責務 / 設計原則 P1〜P4                      | 継承 (P2/P3 の内部徹底。責務分割自体は変えない)                          |
-| Design Doc              | モジュール責務表・図中の package 対応                 | 変更提案 (再編後の package 名参照の更新が必要なら sync で反映)           |
-| feature doc (graph)     | staging Graph / wire DTO 非保持の規約                 | 継承 + 変更提案 (`graph -> protocol` 依存の是正で実装を規約に一致させる) |
-| feature doc (output 等) | package 参照箇所                                      | 変更提案 (移動後の path 追随。sync で反映)                               |
-| context/architecture.md | Package Boundary (package 表 / 依存方向)              | 変更提案 (層別構造へ改訂。本 issue の成果物)                             |
-| context/project.md      | Naming Conventions (Core package 一覧) / 対象ドメイン | 変更提案 (再編後の package 一覧へ改訂)                                   |
-| context/engineering.md  | quality gate                                          | 変更提案 (依存方向 lint の組み込みを追記)                                |
-| ADR-0002                | 初期 directory / package 構成                         | 変更提案 (追補 ADR で改訂。0002 自体は履歴として保持)                    |
-| ADR-0001 / ADR-0006     | Protocol 境界 / Gradle discovery                      | 継承 (プロセス境界・Protocol は現状維持)                                 |
+| 上位文書                | 節 / 該当箇所                                         | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                         |
+| ----------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design Doc (統合 PRD)   | Why/What / 成功条件 / Non Goals                       | 継承 (外部挙動・スコープを変えない)                                                                                                                                       |
+| Design Doc              | モジュール責務 / 設計原則 P1〜P4                      | 継承 (P2/P3 の内部徹底。責務分割自体は変えない)                                                                                                                           |
+| Design Doc              | モジュール責務表・図中の package 対応                 | 変更提案 (再編後の package 名参照の更新が必要なら sync で反映)                                                                                                            |
+| feature doc (graph)     | staging Graph の規約 / `SourceLocation` 再利用決定    | 継承 + 変更提案 (staging Graph 規約は継承。`SourceLocation` は feature doc が protocol 型の再利用を明示決定済みであり、D6 はこれを覆して domain 自前型へ改訂する変更提案) |
+| feature doc (output 等) | package 参照箇所                                      | 変更提案 (移動後の path 追随。sync で反映)                                                                                                                                |
+| context/architecture.md | Package Boundary (package 表 / 依存方向)              | 変更提案 (層別構造へ改訂。本 issue の成果物)                                                                                                                              |
+| context/project.md      | Naming Conventions (Core package 一覧) / 対象ドメイン | 変更提案 (再編後の package 一覧へ改訂)                                                                                                                                    |
+| context/engineering.md  | quality gate                                          | 変更提案 (依存方向 lint の組み込みを追記)                                                                                                                                 |
+| ADR-0002                | 初期 directory / package 構成                         | 変更提案 (追補 ADR で改訂。0002 自体は履歴として保持)                                                                                                                     |
+| ADR-0001 / ADR-0006     | Protocol 境界 / Gradle discovery                      | 継承 (プロセス境界・Protocol は現状維持)                                                                                                                                  |
 
 > 変更提案は本 issue の目的そのもの (ドキュメント同期が成果物) であり、変更内容は論点解決 (層命名・配置) に依存する。したがって scaffold 時点で sync へ分岐せず、論点解決・設計確定後の sync phase で back-propagate する。
 
@@ -66,7 +66,7 @@
 ## 背景
 
 - Core (Go) は `core/internal` 配下が feature 単位の 7 package 並列で、Domain / UseCase / Infrastructure の層区別と依存方向がディレクトリ構造から読み取れない。
-- import 実測 (2026-07-23) で `core/internal/protocol` がハブ化しており、`graph` / `output` / `cli` / `analyze` / `analyzer` の 5 package が直接依存。wire 表現 (JSONL DTO) がドメイン側へ漏れ、architecture.md の「wire DTO を graph model に保持しない」「Model は他に依存しない」と実装が乖離している (`graph -> protocol` の import が実在)。
+- import 実測 (2026-07-23) で `core/internal/protocol` がハブ化しており、`graph` / `output` / `cli` / `analyze` / `analyzer` の 5 package が直接依存。wire 表現 (JSONL DTO) がドメイン側へ漏れている (`graph -> protocol` の import が実在)。なお `SourceLocation` の protocol 型再利用は graph feature doc が明示的に決定した設計であり (規約違反ではない)、architecture.md の「wire DTO / wire 専用フィールドを graph model に保持しない」との間で文書間の緊張関係があった。本 issue (D6) はこれを domain 自前型へ統一する方向で改訂する。
 - `core/internal/cli` が use case (`analyze`) だけでなく `graph` / `output` / `protocol` にも直接依存し、エントリポイントが内層を迂回参照している。
 - Java Analyzer は `analysis` 配下に 9 sub-package が並列し、解析パイプラインの段階と SootUp 等外部ライブラリへの依存境界が構造から読み取れない。
 - これを層が明示された構造へ再編し、依存方向を機械検査 (lint) で固定し、正本ドキュメントを実態と一致させる。外側の Core / Analyzer プロセス境界 (P1〜P4) は変更しない。
@@ -338,11 +338,12 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節                     | 変更内容                                                                            | 理由                      |
-| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
-| graph / データ構造・変換          | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新 | D6 決定 (source: clarify) |
-| java-analyzer / 内部構成          | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                         | D7 決定 (source: clarify) |
-| (残りは設計確定後に track で記録) |                                                                                     |                           |
+| 対象 doc / 節                         | 変更内容                                                                                                                                   | 理由                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- |
+| graph / データ構造・変換              | wire → graph 変換の所在を graph package から platform 側 (adapter) へ移す記述に更新                                                        | D6 決定 (source: clarify) |
+| graph / データ構造 (`SourceLocation`) | `Node.Source` / `Edge.CallSite` の `*protocol.SourceLocation` を domain 自前型へ置換 (feature doc の「protocol 型を再利用する」決定を改訂) | D6 決定 (source: clarify) |
+| java-analyzer / 内部構成              | `analysis` 配下の package 参照を段階別 + adapter 構造へ更新                                                                                | D7 決定 (source: clarify) |
+| (残りは設計確定後に track で記録)     |                                                                                                                                            |                           |
 
 ### context への影響
 
@@ -367,23 +368,25 @@ sequenceDiagram
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                      | 対応                                                    |
-| ---------- | ------------------------ | ------------------------------------------------------------- | ------------------------------------------------------- |
-| 2026-07-23 | PASS (scaffold)          | 軽微 2 件: D5〜D7 の決定者未明示 / requirements.md の記法崩れ | 未確定事項へ決定者・期限を補記 / requirements.md を修正 |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                            | 対応                                                                                                        |
+| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2026-07-23 | PASS (scaffold)          | 軽微 2 件: D5〜D7 の決定者未明示 / requirements.md の記法崩れ                                                                                       | 未確定事項へ決定者・期限を補記 / requirements.md を修正                                                     |
+| 2026-07-23 | NEEDS_WORK (clarify)     | D6 の位置づけ不正確 (graph feature doc の `SourceLocation` 再利用は確定済み決定であり「乖離是正」ではなく「決定の改訂」) / feature doc 影響行の欠落 | 上位文書整合・背景の表現を修正し、feature doc 影響行を追加 (2026-07-24)。再レビューは design 見直し後に実施 |
 
 ## 変更履歴
 
-| 日付       | 変更者                  | 変更内容                                                 |
-| ---------- | ----------------------- | -------------------------------------------------------- |
-| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)           |
-| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)             |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI) |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)      |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                         |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決      |
+| 日付       | 変更者                  | 変更内容                                                                 |
+| ---------- | ----------------------- | ------------------------------------------------------------------------ |
+| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                           |
+| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                             |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                 |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                      |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                         |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                      |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録) |
 
 ## 備考
 
