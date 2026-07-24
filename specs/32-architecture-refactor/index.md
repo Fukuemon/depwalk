@@ -492,6 +492,7 @@ sequenceDiagram
 | 2026-07-24 | PASS (diagram 再)        | 指摘 4 件すべて解消を確認。Mermaid 構文・上位文書整合とも問題なし                                                                                        | 変更履歴へ反映行を追記                                                                                      |
 | 2026-07-24 | NEEDS_WORK (track)       | phase 3 行のメタ情報未同期 / project.md 対象ドメインの変更要否が未記録 (実測主張は全件一致を確認済み)                                                    | phase 3 行を更新し、対象ドメイン「変更不要」行を追加                                                        |
 | 2026-07-24 | PASS (track 再)          | 指摘 2 件の解消を確認。変更点テーブルの実測主張は上位文書と全件一致。sync へ進行可                                                                       | レビュー表・変更履歴へ記録                                                                                  |
+| 2026-07-24 | PASS (sync)              | [反映済] 7 系統の実反映・正本ハンドオフの完全性・D1〜D7 一致・path 委譲の一貫性をすべて確認。参考 2 件 (graph doc の drift 注記等) は非ブロッキング      | graph doc の drift 窓は子 issue ① で解消される旨を認識                                                      |
 
 ## 変更履歴
 
@@ -514,6 +515,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | track: 上位資料からの変更点を最新化 (path 追随の実測件数・Java 内部境界・ADR 統合方針を追記)                                                              |
 | 2026-07-24 | Claude (spec-lifecycle) | track レビュー指摘 2 件を反映し再レビュー PASS                                                                                                            |
 | 2026-07-24 | Claude (spec-lifecycle) | sync: 正本ハンドオフ (architecture/project/engineering/graph・java-analyzer feature doc へ反映、ADR-0007 起票、ADR-0002 追補)。path 追随は子 issue へ委譲 |
+| 2026-07-24 | Claude (spec-lifecycle) | sync レビュー PASS (反映の実在・ハンドオフ完全性・D1〜D7 一致を確認)                                                                                      |
 
 ## 備考
 
