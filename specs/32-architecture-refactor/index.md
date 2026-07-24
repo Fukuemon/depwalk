@@ -19,7 +19,7 @@
 | --- | --------------------------- | ---------- | ---------- | ------------------------------------------------ |
 | 1   | 起票                        | 完了       | 2026-07-23 | #32 (requirements.md で要求整理済み)             |
 | 2   | 下書き                      | レビュー済 | 2026-07-23 | 本 scaffold。spec-review PASS                    |
-| 3   | 上位文書突合                | レビュー済 | 2026-07-23 | 変更提案は本 issue の成果物。sync phase で反映   |
+| 3   | 上位文書突合                | レビュー済 | 2026-07-24 | track で変更点テーブル最新化。再レビュー PASS    |
 | 4   | 論点整理                    | レビュー済 | 2026-07-23 | requirements の未決 4 件 + scaffold で追加 3 件  |
 | 5   | 論点解決                    | レビュー済 | 2026-07-24 | D1〜D7 全件解決 + 精緻化追記。spec-review PASS   |
 | 6   | Interface / Routing 設計    | レビュー済 | 2026-07-24 | diagram: 図を確定。再レビュー PASS               |
@@ -467,6 +467,7 @@ sequenceDiagram
 | engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記                                                                                 | D3 決定 (source: clarify)               |
 | architecture.md / Package Boundary | Java Analyzer 側の内部境界 (SootUp = `sootup/` adapter facade、Gradle Tooling API = `discovery/`、JavaParser = `analysis` 配下のみ許容) と ArchUnit による検査を追記 | D3 / D7 決定 (source: track)            |
 | testing.md / toolchain.md          | `core/internal/<pkg>` への path 参照 (grep 実測 計 4 箇所) を再編後 path へ機械的追随                                                                                | D1 決定に伴う path 追随 (source: track) |
+| project.md / 対象ドメイン          | 変更不要 (module 名ベースで package path を参照しておらず、上位文書整合テーブルの変更提案は Naming Conventions 側のみが対象)                                         | 実測確認 (source: track)                |
 
 ### ADR の新規 / 更新
 
@@ -488,6 +489,8 @@ sequenceDiagram
 | 2026-07-24 | PASS (clarify 再)        | 指摘 2 件の対応を確認。go-service-design 由来の精緻化追記も既存決定・上位文書と矛盾なし。参考指摘 2 件 (日付揃え / sync 時の graph feature doc 変換記述) | 日付を揃え、feature doc 影響行に変換記述の包含を明記                                                        |
 | 2026-07-24 | NEEDS_WORK (diagram)     | 層依存図と sequence の analyzer 駆動関係の矛盾 / cli 配線辺の欠落 / parse エラー表現 / phase 7 行の状態                                                  | 辺を D6 と一致させ凡例を明記、fatal 破棄経路へ合流を明示、phase 7 行を補記                                  |
 | 2026-07-24 | PASS (diagram 再)        | 指摘 4 件すべて解消を確認。Mermaid 構文・上位文書整合とも問題なし                                                                                        | 変更履歴へ反映行を追記                                                                                      |
+| 2026-07-24 | NEEDS_WORK (track)       | phase 3 行のメタ情報未同期 / project.md 対象ドメインの変更要否が未記録 (実測主張は全件一致を確認済み)                                                    | phase 3 行を更新し、対象ドメイン「変更不要」行を追加                                                        |
+| 2026-07-24 | PASS (track 再)          | 指摘 2 件の解消を確認。変更点テーブルの実測主張は上位文書と全件一致。sync へ進行可                                                                       | レビュー表・変更履歴へ記録                                                                                  |
 
 ## 変更履歴
 
@@ -508,6 +511,7 @@ sequenceDiagram
 | 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化 |
 | 2026-07-24 | Claude (spec-lifecycle) | diagram レビュー指摘 4 件を反映 (層依存図の辺修正・fatal 経路明示)。再レビュー PASS                |
 | 2026-07-24 | Claude (spec-lifecycle) | track: 上位資料からの変更点を最新化 (path 追随の実測件数・Java 内部境界・ADR 統合方針を追記)       |
+| 2026-07-24 | Claude (spec-lifecycle) | track レビュー指摘 2 件を反映し再レビュー PASS                                                     |
 
 ## 備考
 

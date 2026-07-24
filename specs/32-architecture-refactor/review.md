@@ -92,3 +92,25 @@ Verdict: NEEDS_WORK → 対応後 PASS
 - 指摘 4 件すべて解消を確認。層依存図の全辺が内向き依存で矛盾なし、Mermaid 構文 3 図とも妥当
 - Java 配置図は実ソースツリーと全件一致、sootup 漏れ 7 クラスも実測一致
 - 参考 (非ブロッキング): 変更履歴への反映行追記 → 対応済み
+
+## Review 2026-07-24 (track phase)
+
+Verdict: NEEDS_WORK → 対応後 PASS
+
+### 独立検証 (reviewer による実測突合)
+
+変更点テーブルの grep 実測主張はすべて上位文書の実記述と一致: Design Doc の `core/internal` 言及ゼロ / feature doc 計 13 箇所 (traversal 3 + cli 3 + output 3 + java-analyzer 1 + graph 3) / context 計 4 箇所 (testing 3 + toolchain 1) / ADR-0003 の 2 箇所。D1〜D7 の反映カバレッジも網羅 (D2 は architecture 3 層改訂 + ADR 統合行に包含、D4 はプロセス判断で上位文書変更不要)。source: clarify / track の二重追記なし。
+
+### 指摘
+
+1. phase 3「上位文書突合」行のメタ情報が track 本文更新に未同期
+2. 上位文書整合テーブルが project.md「対象ドメイン」を変更提案としているのに、変更点テーブルに変更要否の記録がない (実測では変更不要)
+
+### 対応 (2026-07-24)
+
+- phase 3 行を「完了 / 2026-07-24」→ 再レビュー後「レビュー済」に更新
+- context への影響へ「project.md / 対象ドメイン: 変更不要 (module 名ベースで path 非参照)」行を追加 (source: track)
+
+### 再レビュー (PASS)
+
+- 指摘 2 件の解消を確認。sync phase へ進行可と判断
