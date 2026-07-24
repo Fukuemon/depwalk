@@ -130,3 +130,24 @@ Verdict: PASS
 
 - フェーズ表に sync 専用行がない (変更履歴と上位文書整合で記録されており許容範囲)
 - graph feature doc は新 path を先行使用しており drift 注記がない → 子 issue ① 完了までの短期 drift 窓として認識
+
+## Review 2026-07-24 (tasks/prompts phase・最終レビュー)
+
+Verdict: NEEDS_WORK → 対応後 PASS
+
+### 指摘 (初回)
+
+1. [ブロッキング] 設計フェーズ状況表の phase 7〜9 が本文の記述実態と未同期 (7 進行中 / 8・9 未着手のまま phase 10 完了)
+2. feature doc 影響行の表記が正本のデータモデル (`Node.Symbol` / `Symbol.Source`) と不一致
+3. Interface 設計節に「設計 phase で確定」プレースホルダが残置
+4. P2_02 のステップで「6 クラス」と「7 ファイル」の数え方が揺れる
+
+### 対応 (2026-07-24)
+
+- phase 7〜9 を「完了 / 2026-07-24」へ同期 (備考に確定内容と委譲先を明記)、表記 3 件を修正
+
+### 再レビュー (PASS)
+
+- 指摘 4 件の解消を確認。prompts 6 本は必須 10 セクション・antipatterns 注入・spec 抜粋のコピー・探索誘発表現なし・Quick Commands 一致・依存表の一貫性をすべて満たす
+- prompt 内容は D1〜D7 / ADR-0007 / architecture.md / engineering.md / feature doc と矛盾なし
+- **最終レビュー PASS。全 phase レビュー済みで spec-lifecycle 完了**
