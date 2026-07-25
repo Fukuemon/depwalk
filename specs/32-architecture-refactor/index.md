@@ -158,7 +158,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - SootUp 型の漏れ (現状 `graph` / `augment` / `completeness` / `spring` / `AnalysisRunner` に散在) を adapter package (`sootup` 等) の境界内に封じ、JavaParser / SymbolSolver も同様に扱う
   - Core (3 層) と命名思想が非対称になることは許容し、意図 (Analyzer は変換パイプラインである) を README / architecture.md で説明する
   - クラス単位の最終配置図は diagram phase で確定する
-  - (2026-07-24 精緻化, Fukuemon 確認済み) 外部ライブラリ隔離の適用レベルを 3 段階に確定: **SootUp** は `sootup/` adapter に完全封じ込め (facade が自前型で公開。現状 7 クラスに漏れている `sootup.*` import を除去)。**Gradle Tooling API** は `discovery/` に完全隔離 (現状維持)。**JavaParser / SymbolSolver** は解析エンジンの中核であり `analysis` 配下の段階 package 間では自由に使ってよい — 禁止するのは `analysis` の外 (`io` / `protocol` / `preflight` / `discovery` / `Main`) への漏れのみ。字義どおりの全面隔離は実質的な解析器書き換えとなり「外部挙動不変の再編」スコープを超えるため不採用
+  - (2026-07-24 精緻化, Fukuemon 確認済み) 外部ライブラリ隔離の適用レベルを 3 段階に確定: **SootUp** は `sootup/` adapter に完全封じ込め (facade が自前型で公開。~~現状 7 クラスに漏れている `sootup.*` import を除去~~ **→ 2026-07-25 #35 実測で前提誤りと判明: この 7 クラスが import しているのは自前 package `...analysis.sootup` であり SootUp ライブラリではない。`import sootup.` は全履歴を通じて `SootUpTypeHierarchyIndex.java` 1 ファイルのみで、facade も既に自前型のみを公開済み。除去対象は存在せず、隔離は ArchUnit ルールで機械保証した**)。**Gradle Tooling API** は `discovery/` に完全隔離 (現状維持)。**JavaParser / SymbolSolver** は解析エンジンの中核であり `analysis` 配下の段階 package 間では自由に使ってよい — 禁止するのは `analysis` の外 (`io` / `protocol` / `preflight` / `discovery` / `Main`) への漏れのみ。字義どおりの全面隔離は実質的な解析器書き換えとなり「外部挙動不変の再編」スコープを超えるため不採用
 - **D3: Java 側の依存検査 → A) ArchUnit を採用** (2026-07-23, Fukuemon)
   - ArchUnit を test 依存として追加し、「adapter package 以外から `sootup.*` / `com.github.javaparser.*` / `org.gradle.tooling.*` を import 禁止」等のルールを JUnit テストとして記述する
   - 既存の `./gradlew test` (quality gate 組み込み済み) で実行されるため、新しい gate 配線は不要。Go 側 (depguard) と対の機械検査が揃う (業務ルール 5)
@@ -297,7 +297,7 @@ flowchart LR
 
 - 辺の読み方の補足: `analyzer` は純粋な process 制御であり内層を import しない (呼ばれる側)。ACL adapter (`protocol`) が process 起動に `analyzer` を利用し、`app/analyze` が定義した port を実装する。`cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
 
-- Java Analyzer の構造原理 (D7 確定 + 2026-07-24 精緻化): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下は既存 sub-package の粒度が段階として概ね妥当であり、再編の実体は ① `pipeline/` 新設 (実行順を知る唯一の場所として `AnalysisRunner` を移動)、② `sootup/` の facade 化 (自前型公開で `sootup.*` の漏れ 7 クラスを封じ込め)、③ `TypeSolverFactory` の `context/` への移動、④ 実行順の README 明文化。クラス単位の最終配置:
+- Java Analyzer の構造原理 (D7 確定 + 2026-07-24 精緻化): `javaanalyzer` 直下 (`protocol` / `io` / `preflight` / `discovery`) は現状維持。`analysis` 配下は既存 sub-package の粒度が段階として概ね妥当であり、再編の実体は ① `pipeline/` 新設 (実行順を知る唯一の場所として `AnalysisRunner` を移動)、② ~~`sootup/` の facade 化 (自前型公開で `sootup.*` の漏れ 7 クラスを封じ込め)~~ **→ 2026-07-25 #35 実測で実施不要と判明 (D7 の注記参照: 漏れは存在せず facade は既に自前型のみ公開。ArchUnit で機械保証)**、③ `TypeSolverFactory` の `context/` への移動、④ 実行順の README 明文化。クラス単位の最終配置:
 
 ```text
 javaanalyzer/
