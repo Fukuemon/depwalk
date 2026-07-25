@@ -13,10 +13,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Fukuemon/depwalk/core/internal/analyze"
+	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 	"github.com/Fukuemon/depwalk/core/internal/output"
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
+
+// cli はコンポジションルートとして ACL adapter を analyze の port へ手動 DI
+// で注入する。port の満足検証はこの配線箇所に集約する (spec #32 D6)。
+var _ analyze.AnalysisSource = (*protocol.Adapter)(nil)
 
 // analyzeFlags holds the complete flag surface for newAnalyzeCommand:
 // Analyzer launch inputs, source filters, and method query options.
@@ -89,21 +94,30 @@ func newAnalyzeCommand() *cobra.Command {
 				maxDepth = &flags.maxDepth
 			}
 
-			result, err := analyze.Run(analyze.Options{
-				WorkspaceRoot:  workspaceRoot,
-				SourceRoots:    flags.sourceRoots,
-				Language:       protocol.Language(flags.language),
-				AnalyzerCmd:    flags.analyzerCmd,
-				AnalyzerMeta:   flags.analyzerMeta,
-				Include:        flags.include,
-				Exclude:        flags.exclude,
-				Method:         flags.method,
-				Direction:      graph.Direction(flags.direction),
-				MaxDepth:       maxDepth,
-				Format:         output.Format(flags.format),
-				Output:         cmd.OutOrStdout(),
-				AnalyzerStderr: cmd.ErrOrStderr(),
-				Getenv:         os.Getenv,
+			command, err := analyze.ResolveCommand(flags.analyzerCmd, os.Getenv)
+			if err != nil {
+				return err
+			}
+			argv, err := analyze.SplitCommand(command)
+			if err != nil {
+				return err
+			}
+
+			runner := analyze.New(protocol.NewAdapter(analyzer.Command{
+				Path:   argv[0],
+				Args:   argv[1:],
+				Stderr: cmd.ErrOrStderr(),
+			}))
+			result, err := runner.Run(analyze.Options{
+				WorkspaceRoot: workspaceRoot,
+				SourceRoots:   flags.sourceRoots,
+				Language:      flags.language,
+				AnalyzerMeta:  flags.analyzerMeta,
+				Include:       flags.include,
+				Exclude:       flags.exclude,
+				Method:        flags.method,
+				Direction:     graph.Direction(flags.direction),
+				MaxDepth:      maxDepth,
 			})
 			if err != nil {
 				var failure *analyze.AnalyzerFailure
@@ -116,6 +130,16 @@ func newAnalyzeCommand() *cobra.Command {
 					cmd.SilenceUsage = true
 				}
 				return err
+			}
+
+			if result.MethodQuery != nil {
+				if err := output.Write(cmd.OutOrStdout(), output.Format(flags.format), output.Input{
+					Graph:   result.Graph,
+					Result:  result.MethodQuery.Result,
+					Request: result.MethodQuery.Request,
+				}); err != nil {
+					return fmt.Errorf("write %s output: %w", flags.format, err)
+				}
 			}
 
 			for _, diagnostic := range result.Diagnostics {
@@ -154,14 +178,13 @@ func newAnalyzeCommand() *cobra.Command {
 // shown verbatim, never interpreted.
 func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	fmt.Fprintf(w, "Error: %s\n", failure.Error())
-	record := failure.Record
-	if record.Source != nil {
-		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(record.Source))
+	if failure.Source != nil {
+		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(failure.Source))
 	}
-	if record.Metadata != nil {
-		fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(record.Metadata))
+	if failure.Metadata != nil {
+		fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(failure.Metadata))
 	}
-	for i, detail := range record.Details {
+	for i, detail := range failure.Details {
 		fmt.Fprintf(w, "detail[%d] %s: %s\n", i, detail.Code, detail.Message)
 		if detail.Source != nil {
 			fmt.Fprintf(w, "  at %s\n", formatSourceLocation(detail.Source))
@@ -172,7 +195,7 @@ func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	}
 }
 
-func formatSourceLocation(location *protocol.SourceLocation) string {
+func formatSourceLocation(location *graph.SourceLocation) string {
 	text := fmt.Sprintf("%s:%d", location.Path, location.StartLine)
 	if location.StartColumn != nil {
 		text = fmt.Sprintf("%s:%d", text, *location.StartColumn)

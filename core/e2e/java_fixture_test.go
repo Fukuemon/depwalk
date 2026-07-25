@@ -264,7 +264,7 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		t.Fatalf("fixture analysisRequest is invalid: %v", err)
 	}
 
-	runner := analyzer.New(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
+	runner := protocol.NewRunner(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
 	var records []protocol.Record
 	result, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
