@@ -1,15 +1,20 @@
-package graph
+package protocol
 
-import "github.com/Fukuemon/depwalk/core/internal/protocol"
+import "github.com/Fukuemon/depwalk/core/internal/graph"
 
-// NodeFromMethodSymbol converts an Analyzer Protocol method symbol to a [Node].
-// The record's source location and opaque metadata are deep copied into
-// graph-owned values so later mutation of the protocol DTO cannot change the
-// graph.
-func NodeFromMethodSymbol(record protocol.MethodSymbol) Node {
-	return Node{
+// This file is the Translator half of the ACL (spec #32 D6): it maps wire
+// DTOs to graph-owned domain values, deep copying nested data so later
+// mutation of a protocol DTO can never change the graph. Wire-only fields
+// (schemaVersion / recordType) are dropped here and never reach the
+// domain model.
+
+// NodeFromMethodSymbol converts an Analyzer Protocol method symbol to a
+// [graph.Node]. The record's source location and opaque metadata are deep
+// copied into graph-owned values.
+func NodeFromMethodSymbol(record MethodSymbol) graph.Node {
+	return graph.Node{
 		ID: record.MethodID,
-		Symbol: Symbol{
+		Symbol: graph.Symbol{
 			QualifiedName: record.QualifiedName,
 			Signature:     record.Signature,
 			Source:        copySourceLocation(record.Source),
@@ -18,11 +23,24 @@ func NodeFromMethodSymbol(record protocol.MethodSymbol) Node {
 	}
 }
 
-func copySourceLocation(location *protocol.SourceLocation) *SourceLocation {
+// EdgeFromCallEdge converts an Analyzer Protocol call edge to a
+// [graph.Edge]. The call site and opaque metadata are deep copied into
+// graph-owned values like the node conversion.
+func EdgeFromCallEdge(record CallEdge) graph.Edge {
+	return graph.Edge{
+		ID:       record.EdgeID,
+		CallerID: record.CallerMethodID,
+		CalleeID: record.CalleeMethodID,
+		CallSite: copySourceLocation(record.CallSite),
+		Metadata: copyMetadataObject(record.Metadata),
+	}
+}
+
+func copySourceLocation(location *SourceLocation) *graph.SourceLocation {
 	if location == nil {
 		return nil
 	}
-	return &SourceLocation{
+	return &graph.SourceLocation{
 		Path:        location.Path,
 		StartLine:   location.StartLine,
 		StartColumn: copyIntPointer(location.StartColumn),
@@ -65,18 +83,5 @@ func copyMetadataValue(value any) any {
 		return copied
 	default:
 		return typed
-	}
-}
-
-// EdgeFromCallEdge converts an Analyzer Protocol call edge to an [Edge]. The
-// call site and opaque metadata are deep copied into graph-owned values like
-// the node conversion.
-func EdgeFromCallEdge(record protocol.CallEdge) Edge {
-	return Edge{
-		ID:       record.EdgeID,
-		CallerID: record.CallerMethodID,
-		CalleeID: record.CalleeMethodID,
-		CallSite: copySourceLocation(record.CallSite),
-		Metadata: copyMetadataObject(record.Metadata),
 	}
 }

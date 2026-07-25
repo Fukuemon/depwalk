@@ -3,8 +3,6 @@ package analyze
 import (
 	"fmt"
 	"strings"
-
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 // BuildMetadata composes analysisRequest.metadata from repeated
@@ -17,12 +15,12 @@ import (
 //   - an empty value (key=) registers the key with an empty array;
 //   - the split happens on the first "=", so a value may itself contain "=";
 //   - an entry without "=" is rejected as a validation error.
-func BuildMetadata(pairs []string) (protocol.Metadata, error) {
+func BuildMetadata(pairs []string) (map[string]any, error) {
 	if len(pairs) == 0 {
 		return nil, nil
 	}
 
-	metadata := protocol.Metadata{}
+	metadata := map[string]any{}
 	for _, pair := range pairs {
 		key, value, ok := strings.Cut(pair, "=")
 		if !ok {
