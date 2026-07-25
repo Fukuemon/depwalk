@@ -124,6 +124,7 @@ spec / ADR / context の本文を更新したら、対象文書の `更新日` /
 
 ### Skill 共通契約
 
+- 本契約は `.rulesync/skills/` と選択導入型 `skills/` の両方に適用する (外部から移植した skill も取り込み時に本契約へ書き直す)
 - skill 内に project 固有名を直書きしない (本 contract と `context/project.yml` を読む)
 - skill 本体 (SKILL.md) は **200 行未満**、詳細は `references/<topic>.md` へ 1 階層深さで分離。100 行を超える reference は冒頭に目次を置く
 - description は日本語・third-person で「何をする + いつ起動」を含め、発動トリガー語を引用符で列挙する。`いつ使うか` は description の言い換えにせず、追加のトリガー語 / 文脈のみ書く
