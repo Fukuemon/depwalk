@@ -102,6 +102,14 @@ func TestAdapterTranslatesStructuredFailureDetails(t *testing.T) {
 	if failure == nil {
 		t.Fatal("Failure = nil, want structured failure")
 	}
+	wantSource := &graph.SourceLocation{Path: "module-a/src/Main.java", StartLine: 3}
+	if !reflect.DeepEqual(failure.Source, wantSource) {
+		t.Fatalf("Source = %#v, want %#v", failure.Source, wantSource)
+	}
+	wantMetadata := map[string]any{"phase": "completeness"}
+	if !reflect.DeepEqual(failure.Metadata, wantMetadata) {
+		t.Fatalf("Metadata = %#v, want %#v", failure.Metadata, wantMetadata)
+	}
 	want := []analyze.FailureDetail{
 		{
 			Code:     "DETAIL_CODE_B",
@@ -167,29 +175,59 @@ func TestAdapterReportsNonZeroExit(t *testing.T) {
 	}
 }
 
-func TestAdapterSendsExplicitFullGraphRequestWithFilters(t *testing.T) {
-	t.Parallel()
+// assertRequestScenarioPassed fails the test when the fake Analyzer
+// rejected the wire request. The fake reports assertion failures by
+// exiting non-zero, and a non-zero exit is carried in the outcome rather
+// than returned as an error, so the exit code must be checked explicitly.
+func assertRequestScenarioPassed(t *testing.T, outcome analyze.AnalysisOutcome, err error) {
+	t.Helper()
 
-	_, _, _, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.AnalysisRequest{
-		WorkspaceRoot: t.TempDir(),
-		Language:      "java",
-		Include:       []string{"src/**", "generated/**"},
-		Exclude:       []string{"**/vendor/**", "**/*Test.java"},
-	})
 	if err != nil {
 		t.Fatalf("RunAnalysis() error = %v", err)
 	}
+	if outcome.ExitCode != 0 {
+		t.Fatalf("fake analyzer rejected the wire request (exit %d)", outcome.ExitCode)
+	}
+}
+
+func TestAdapterSendsExplicitFullGraphRequestWithFilters(t *testing.T) {
+	t.Parallel()
+
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.AnalysisRequest{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+		SourceRoots:   []string{"module-b/src", "module-a/src"},
+		Include:       []string{"src/**", "generated/**"},
+		Exclude:       []string{"**/vendor/**", "**/*Test.java"},
+	})
+	assertRequestScenarioPassed(t, outcome, err)
 }
 
 func TestAdapterOmitsUnsetFiltersAndEntrypoints(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, err := runAdapter(fakeAnalyzerAdapter("request-defaults"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-defaults"), analyze.AnalysisRequest{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+	})
+	assertRequestScenarioPassed(t, outcome, err)
+}
+
+// The no-op guard for the two tests above: a deliberately wrong wire
+// request must make them fail. The fake analyzer's "request-options"
+// scenario expects filters, so sending none has to be rejected.
+func TestAdapterRequestAssertionsDetectAWrongRequest(t *testing.T) {
+	t.Parallel()
+
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.AnalysisRequest{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
 	if err != nil {
 		t.Fatalf("RunAnalysis() error = %v", err)
+	}
+	if outcome.ExitCode == 0 {
+		t.Fatal("ExitCode = 0, want the fake analyzer to reject a request without the expected filters")
 	}
 }
 
@@ -232,7 +270,8 @@ func TestAdapterFakeAnalyzerProcess(t *testing.T) {
 		fmt.Print(`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"boom"}` + "\n")
 		os.Exit(1)
 	case "error-with-details":
-		fmt.Print(`{"schemaVersion":"1","recordType":"error","code":"SOME_ANALYZER_CODE","message":"unresolved calls remain","details":[` +
+		fmt.Print(`{"schemaVersion":"1","recordType":"error","code":"SOME_ANALYZER_CODE","message":"unresolved calls remain",` +
+			`"sourceLocation":{"path":"module-a/src/Main.java","startLine":3},"metadata":{"phase":"completeness"},"details":[` +
 			`{"code":"DETAIL_CODE_B","message":"first detail","sourceLocation":{"path":"module-b/src/App.java","startLine":12},"metadata":{"kind":"virtual","candidates":["z","a"]}},` +
 			`{"code":"DETAIL_CODE_A","message":"second detail"}]}` + "\n")
 		os.Exit(1)
@@ -295,6 +334,10 @@ func assertAdapterRequest(requestBytes []byte, withFilters bool) {
 	if withFilters {
 		if !reflect.DeepEqual(request.Include, []string{"src/**", "generated/**"}) || !reflect.DeepEqual(request.Exclude, []string{"**/vendor/**", "**/*Test.java"}) {
 			fmt.Fprintf(os.Stderr, "filters = %#v/%#v, want ordered values\n", request.Include, request.Exclude)
+			os.Exit(2)
+		}
+		if !reflect.DeepEqual(request.SourceRoots, []string{"module-b/src", "module-a/src"}) {
+			fmt.Fprintf(os.Stderr, "sourceRoots = %#v, want the values in flag order\n", request.SourceRoots)
 			os.Exit(2)
 		}
 		return

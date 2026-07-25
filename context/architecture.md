@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-24
+> 最終更新: 2026-07-25
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -11,7 +11,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - CLI → Core のみに依存する。
 - Core 内: `Traversal Engine` → `Graph Engine`、`Output Engine` → `Graph Engine` / `Traversal Engine`。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
-- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録し、process 成功と stream 全体の参照完全性を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
+- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録する。stream 全体の参照完全性の**検査自体は ACL** が行い (wire record を見る責務)、use case はその結果と process 成功を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
 - Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
@@ -71,7 +71,7 @@ Core と Analyzer の共有境界は Protocol doc、ADR、JSONL fixture、contra
 Go package や Java 実装 code を共有しない。
 
 > 依存境界の自動検査 (Go: golangci-lint + depguard、Java: ArchUnit) は [engineering.md](engineering.md) の quality gate で扱う。
-> 本節の層別構造は spec #32 の子 issue で実装する (実装完了までコードは旧配置の場合がある)。
+> Core (Go) 側の依存方向は #34 で実装済み (実 import は上の生成依存図と一致)。Java Analyzer 側の内部境界は #35 で実装するため、完了までコードは旧配置の場合がある。
 
 ## Runtime Boundary
 

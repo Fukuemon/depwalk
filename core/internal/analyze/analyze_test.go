@@ -248,8 +248,12 @@ func TestRunQueryMatchesFullSignatureAndReturnsTraversal(t *testing.T) {
 	if result.MethodQuery.Request.StartID != "opaque-target" {
 		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
 	}
-	if _, reached := result.MethodQuery.Result.Nodes["opaque-caller"]; !reached {
-		t.Fatalf("traversal nodes = %#v, want opaque-caller reached", result.MethodQuery.Result.Nodes)
+	wantNodes := map[string]bool{"opaque-target": true, "opaque-caller": true}
+	if !reflect.DeepEqual(result.MethodQuery.Result.Nodes, wantNodes) {
+		t.Fatalf("traversal nodes = %#v, want %#v", result.MethodQuery.Result.Nodes, wantNodes)
+	}
+	if _, ok := result.MethodQuery.Result.Edges["opaque-edge"]; !ok || len(result.MethodQuery.Result.Edges) != 1 {
+		t.Fatalf("traversal edges = %#v, want only opaque-edge", result.MethodQuery.Result.Edges)
 	}
 }
 
@@ -267,6 +271,10 @@ func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	}
 	if result.MethodQuery.Request.StartID != "opaque-target" {
 		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
+	}
+	// 署名を省いたセレクタでも、フルシグネチャ指定と同じ探索結果になる。
+	if _, reached := result.MethodQuery.Result.Nodes["opaque-caller"]; !reached {
+		t.Fatalf("traversal nodes = %#v, want opaque-caller reached", result.MethodQuery.Result.Nodes)
 	}
 }
 
