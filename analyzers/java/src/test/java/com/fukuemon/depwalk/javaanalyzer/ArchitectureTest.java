@@ -38,10 +38,12 @@ class ArchitectureTest {
     }
 
     @Test
-    void gradleToolingApiIsConfinedToDiscovery() {
+    void gradleApiIsConfinedToDiscovery() {
+        // gradle-tooling-api の jar は org.gradle.tooling 以外に org.gradle.api / util /
+        // internal も同梱するため、tooling 配下だけでなく org.gradle 全体を禁止する。
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("..javaanalyzer.discovery..")
-                .should().dependOnClassesThat().resideInAPackage("org.gradle.tooling..")
+                .should().dependOnClassesThat().resideInAPackage("org.gradle..")
                 .because("Gradle Tooling API による project 構造取得は discovery に隔離する (ADR-0007)");
 
         rule.check(PRODUCTION_CLASSES);

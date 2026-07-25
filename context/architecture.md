@@ -62,7 +62,7 @@ graph LR
 `analyzers/java` の `javaanalyzer` 配下は、解析パイプラインの段階別 package (`analysis/` 配下) と入出力・起動系 (`protocol` / `io` / `preflight` / `discovery`) で構成する。段階の実行順は `analysis/pipeline` (Runner) だけが知る。外部ライブラリの隔離は次の 3 段階とする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)):
 
 - **SootUp**: `analysis/sootup` (adapter) に完全に封じ込め、facade が自前型で公開する。他 package から `sootup.*` の import 禁止
-- **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.tooling.*` は discovery のみ)
+- **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.*` は discovery のみ。jar が `org.gradle.api` / `util` / `internal` も同梱するため tooling 配下限定にしない)
 - **JavaParser / SymbolSolver**: 解析エンジンの中核として `analysis` 配下では自由に使ってよい。`analysis` の外への import は禁止
 
 言語別 Analyzer 実装は `analyzers/<language>/` に置く。
