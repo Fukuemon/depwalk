@@ -2,21 +2,34 @@
 
 phase: prompts (`phase-prompts.md`) で生成する prompt の粒度 / 責務境界 / 自己完結性を揃えるルール。
 
+## 機械可読 frontmatter (実行契約)
+
+各 prompt の先頭に `--- 〜 ---` の frontmatter を必ず置く。後段のツール・実行者はこれだけを読んで
+実行順・対象・実依存を解決する (本文の全文読みを要求しない):
+
+- `phase` / `seq`: ファイル名の P 番号・連番と一致させる
+- `target`: `context/project.yml` の `domains` から 1 つ (ファイル名の target と一致)
+- `issue`: 対応する issue 番号。未起票なら `TBD` とし、起票後に書き戻す
+- `depends_on`: **実際に依存する prompt のファイル名を列挙する** (phase が隣接しているだけの
+  prompt を依存扱いにしない)。依存なしは空配列
+
 ## 設計原則
 
 - 1 prompt = 1 責務 (target 1 つ × scope 1 つ)
 - 明示された path 以外の探索を前提にしない
-- 依存関係は phase で表現する (P1 → P2 → P3)
+- 依存関係は phase で大分けし、実依存は frontmatter `depends_on` に列挙する
 - 同一 phase 内の prompt は **並列可** または **並列不可** を明示する
-- target を無理に 1 本にまとめない (`Spec Workflow Contract` の target 一覧で分ける)
+- target を無理に 1 本にまとめない (`context/project.yml` の `domains` で分ける)
 - 未確定事項が残るなら prompt を作らず、spec 側へ戻す
 
 ## 自己完結性ルール
 
 - 実装に必要な spec 抜粋を prompt 本文に **コピーする** (spec の参照だけでは不可)
 - 他 app / package の追加探索を要求しない
-- 検証コマンドは `context/project.md` の Quick Commands にある標準 task を直接書く
+- 検証コマンドは `context/project.yml` の `commands` にある標準 task を直接書く
 - 「既存コードを参考に」「既存実装を確認して」等の探索誘発表現を使わない
+- `## 実装コンテキスト` に列挙する path は、`context/impact-index.yaml` があれば該当 feature の
+  `read:` から採る (索引に無い path を手当たり次第に足さない。エントリが無ければ索引の整備を先に提案する)
 
 ## 受け入れ基準の EARS 風書き換え
 
@@ -54,7 +67,7 @@ P{phase}_{seq}_{target}_{scope}.md
 
 - `phase`: 整数 (1 始まり)
 - `seq`: 2 桁ゼロ埋め (`01`, `02`, ...)
-- `target`: `Spec Workflow Contract` の target 一覧から 1 つ
+- `target`: `context/project.yml` の `domains` から 1 つ
 - `scope`: ケバブケースで責務を表す (`page_shell` / `button_variants` / `contact_flow` 等)
 
 ## phase の決め方

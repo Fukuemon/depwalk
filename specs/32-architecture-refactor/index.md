@@ -45,7 +45,7 @@
 | feature doc (graph)     | staging Graph の規約 / `SourceLocation` 再利用決定    | 継承 + 変更提案 (staging Graph 規約は継承。`SourceLocation` は feature doc が protocol 型の再利用を明示決定済みであり、D6 はこれを覆して domain 自前型へ改訂する変更提案) |
 | feature doc (output 等) | package 参照箇所                                      | 変更提案 (移動後の path 追随。sync で反映)                                                                                                                                |
 | context/architecture.md | Package Boundary (package 表 / 依存方向)              | 変更提案 (層別構造へ改訂。本 issue の成果物)                                                                                                                              |
-| context/project.md      | Naming Conventions (Core package 一覧) / 対象ドメイン | 変更提案 (再編後の package 一覧へ改訂)                                                                                                                                    |
+| context/project.yml     | Naming Conventions (Core package 一覧) / 対象ドメイン | 変更提案 (再編後の package 一覧へ改訂)                                                                                                                                    |
 | context/engineering.md  | quality gate                                          | 変更提案 (依存方向 lint の組み込みを追記)                                                                                                                                 |
 | ADR-0002                | 初期 directory / package 構成                         | 変更提案 (追補 ADR で改訂。0002 自体は履歴として保持)                                                                                                                     |
 | ADR-0001 / ADR-0006     | Protocol 境界 / Gradle discovery                      | 継承 (プロセス境界・Protocol は現状維持)                                                                                                                                  |
@@ -58,7 +58,7 @@
 - Issue: https://github.com/Fukuemon/depwalk/issues/32
 - [design/DesignDoc.md](../../design/DesignDoc.md) — 設計原則 P1〜P4、モジュール責務
 - [context/architecture.md](../../context/architecture.md) — Package Boundary (改訂対象)
-- [context/project.md](../../context/project.md) — Naming Conventions / 対象ドメイン (改訂対象)
+- [context/project.yml](../../context/project.yml) — Naming Conventions / 対象ドメイン (改訂対象)
 - [context/engineering.md](../../context/engineering.md) — quality gate (lint 組み込み先)
 - [adr/0002-core-implementation-foundation.md](../../adr/0002-core-implementation-foundation.md) — 現行 package 構成の正本 (追補対象)
 - 関連 feature doc: [graph](../../design/features/graph/DesignDoc_graph.md) / [output](../../design/features/output/DesignDoc_output.md) / [analyzer-protocol](../../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [java-analyzer](../../design/features/java-analyzer/DesignDoc_java-analyzer.md)
@@ -80,7 +80,7 @@
 - 依存方向の是正: wire 表現のドメイン漏れを変換層で断ち切る (`graph` / `output` から `protocol` への依存除去を含む)。`cli` の内層迂回参照の整理
 - Java Analyzer `javaanalyzer` 配下を、解析パイプラインの段階と依存境界 (SootUp 等の隔離) が読み取れる構造へ再編
 - 依存方向の自動検査: Go は lint (depguard 等) を既存 quality gate (lefthook / CI) に組み込む。Java 側の検査手段は設計で選定
-- ドキュメント同期: architecture.md / DesignDoc / feature doc / project.md / engineering.md / 追補 ADR
+- ドキュメント同期: architecture.md / DesignDoc / feature doc / project.yml / engineering.md / 追補 ADR
 
 ### やらないこと
 
@@ -94,7 +94,7 @@
 ### 実現したいユーザー価値
 
 - 機能追加時に「どの層に置くか / 何に依存してよいか」をディレクトリ構造と lint から迷わず判断できる
-- AI エージェント (spec-* workflow) が architecture.md を読んで正しい配置・依存で実装できる
+- AI エージェント (spec-\* workflow) が architecture.md を読んで正しい配置・依存で実装できる
 - 第 2 言語 Analyzer 実装者が参照実装 (Java Analyzer) の構造から Analyzer の作り方を読み取れる
 
 ### 成功条件
@@ -114,7 +114,7 @@ EARS 風で振る舞いを記述する (正本は [requirements.md の受け入�
 - THE SYSTEM SHALL Core の Domain 相当層から wire 表現 (`protocol` 相当 package) への import を持たない
 - IF 層をまたぐ禁止 import が追加された場合、システムは lint で検出し CI / pre-commit を FAIL させる
 - WHEN 再編後に既存テストスイートを実行したとき、システムはテスト本体のロジック変更なし (package 移動の機械的修正のみ) で全件 PASS する
-- THE SYSTEM SHALL architecture.md / project.md の記述と実装の package 構造・import 関係を一致させる
+- THE SYSTEM SHALL architecture.md / project.yml の記述と実装の package 構造・import 関係を一致させる
 
 ## 設計時の論点
 
@@ -166,7 +166,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 - **D4: 段階分割 → A) epic + 子 issue 2 件** (2026-07-23, Fukuemon)
   - #32 は epic (起票時にラベル付与済み) + 設計 spec の親 issue として維持し、実装は子 issue 2 件に分割する: ① Core 再編 + golangci-lint/depguard、② Java Analyzer 再編 + ArchUnit (いずれも実態追随の doc 修正を含む)
   - 子 issue のラベルは `type:task` / `phase:implementation` / `domain:core` または `domain:java-analyzer`。branch は `feature/<子issue-id>`、PR は子 issue 単位で小さく保つ。両者は独立で並行作業可能
-  - 設計判断のドキュメント同期 (architecture.md / project.md / engineering.md / feature doc / ADR) は本 spec の sync phase で実装に先行して実施する
+  - 設計判断のドキュメント同期 (architecture.md / project.yml / engineering.md / feature doc / ADR) は本 spec の sync phase で実装に先行して実施する
   - 子 issue の起票は tasks (実装分割) phase で `workflow-git` に従って行う
 - **D8: 層ディレクトリの物理化を撤回し、フラット構成 + 生成依存図で可視性を実現する** (2026-07-25, Fukuemon)
   - `core/internal` は現行のフラットな責務名 package (`graph` / `traversal` / `analyze` / `protocol` / `analyzer` / `output` / `cli`) を維持し、`domain/` `app/` `platform/` への物理移動 (D1・P1_01) を実施しない。層は概念として architecture.md の対応表で示す
@@ -183,7 +183,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ## 実装対象
 
-正規 target は [context/project.md](../../context/project.md) の対象ドメイン一覧を正本とする。
+正規 target は [context/project.yml](../../context/project.yml) の対象ドメイン一覧を正本とする。
 
 | モジュール          | 実装有無 | 主な責務                                                                     |
 | ------------------- | :------: | ---------------------------------------------------------------------------- |
@@ -424,23 +424,23 @@ sequenceDiagram
 
 (D4 確定: epic #32 + 子 issue 2 件。子 issue は 2026-07-24 起票済み: [#34](https://github.com/Fukuemon/depwalk/issues/34) Core / [#35](https://github.com/Fukuemon/depwalk/issues/35) Java Analyzer)
 
-| Phase | 対象                         | 概要                                                                       | 依存                     |
-| ----- | ---------------------------- | -------------------------------------------------------------------------- | ------------------------ |
-| P0    | 正本ドキュメント             | sync phase: architecture.md / project.md / engineering.md / ADR の先行更新 | 完了 (2026-07-24 sync)   |
-| P1    | 子 issue #34 (core)          | wire ACL 化 + port + 手動 DI + depguard (package 単位) + 生成依存図        | P0 (main へのマージ)     |
-| P2    | 子 issue #35 (java-analyzer) | Java Analyzer pipeline 再編 + SootUp 隔離 + ArchUnit                       | P0 (P1 とは独立・並行可) |
+| Phase | 対象                         | 概要                                                                        | 依存                     |
+| ----- | ---------------------------- | --------------------------------------------------------------------------- | ------------------------ |
+| P0    | 正本ドキュメント             | sync phase: architecture.md / project.yml / engineering.md / ADR の先行更新 | 完了 (2026-07-24 sync)   |
+| P1    | 子 issue #34 (core)          | wire ACL 化 + port + 手動 DI + depguard (package 単位) + 生成依存図         | P0 (main へのマージ)     |
+| P2    | 子 issue #35 (java-analyzer) | Java Analyzer pipeline 再編 + SootUp 隔離 + ArchUnit                        | P0 (P1 とは独立・並行可) |
 
 ### 生成済み prompts 一覧
 
-`prompts/` 配下 (2026-07-24 生成、2026-07-25 D8 改訂で core 系列を 3 本 → 2 本に再編)。各 issue 内は直列、issue 間 (P*\_01 系列と P*_02 系列) は並列可:
+`prompts/` 配下 (2026-07-24 生成、2026-07-25 D8 改訂で core 系列を 3 本 → 2 本に再編)。各 issue 内は直列、issue 間 (P*\_01 系列と P*\_02 系列) は並列可:
 
-| ファイル                                    | issue | target        | 並列可     | 依存先 | 概要                                                                 |
-| ------------------------------------------- | ----- | ------------- | ---------- | ------ | -------------------------------------------------------------------- |
-| `P1_01_core_wire-acl-port.md`               | #34   | core          | P*_02 と可 | なし   | graph 自前型 + ACL (Translator/Adapter) + port + 手動 DI (D8 改訂済) |
-| `P2_01_core_depguard-depgraph.md`           | #34   | core          | P*_02 と可 | P1_01  | golangci-lint + depguard (package 単位) + 生成依存図 + drift 検査    |
-| `P1_02_java-analyzer_pipeline-structure.md` | #35   | java-analyzer | P1_01 と可 | なし   | pipeline 新設 (Runner 移動) + TypeSolverFactory 移動 + 実行順 README |
-| `P2_02_java-analyzer_sootup-facade.md`      | #35   | java-analyzer | P*_01 と可 | P1_02  | SootUp facade 化 (自前型公開、7 ファイルの import 除去)              |
-| `P3_02_java-analyzer_archunit-gate.md`      | #35   | java-analyzer | P*_01 と可 | P2_02  | ArchUnit 隔離 3 段階の検査 + doc path 追随                           |
+| ファイル                                    | issue | target        | 並列可       | 依存先 | 概要                                                                 |
+| ------------------------------------------- | ----- | ------------- | ------------ | ------ | -------------------------------------------------------------------- |
+| `P1_01_core_wire-acl-port.md`               | #34   | core          | P\*\_02 と可 | なし   | graph 自前型 + ACL (Translator/Adapter) + port + 手動 DI (D8 改訂済) |
+| `P2_01_core_depguard-depgraph.md`           | #34   | core          | P\*\_02 と可 | P1_01  | golangci-lint + depguard (package 単位) + 生成依存図 + drift 検査    |
+| `P1_02_java-analyzer_pipeline-structure.md` | #35   | java-analyzer | P1_01 と可   | なし   | pipeline 新設 (Runner 移動) + TypeSolverFactory 移動 + 実行順 README |
+| `P2_02_java-analyzer_sootup-facade.md`      | #35   | java-analyzer | P\*\_01 と可 | P1_02  | SootUp facade 化 (自前型公開、7 ファイルの import 除去)              |
+| `P3_02_java-analyzer_archunit-gate.md`      | #35   | java-analyzer | P\*\_01 と可 | P2_02  | ArchUnit 隔離 3 段階の検査 + doc path 追随                           |
 
 ### prompts 生成方針
 
@@ -478,13 +478,13 @@ sequenceDiagram
 | 対象 doc / 節                      | 変更内容                                                                                                                                                                                           | 理由                                    |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 **[反映済: 2026-07-24 sync]**                                                                      | D1 決定 (source: clarify)               |
-| project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂 **[反映済: 2026-07-24 sync]**                                                                                                 | D1 決定 (source: clarify)               |
+| project.yml / Naming Conventions   | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂 **[反映済: 2026-07-24 sync]**                                                                                                 | D1 決定 (source: clarify)               |
 | architecture.md / Package Boundary | 変換の所在を「analyze が port を定義し protocol が wire→domain 変換を実装」へ更新 **[反映済: 2026-07-24 sync]**                                                                                    | D6 決定 (source: clarify)               |
 | engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記 **[反映済: 2026-07-24 sync]**                                                                                   | D5 決定 (source: clarify)               |
 | engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記 **[反映済: 2026-07-24 sync]**                                                                                 | D3 決定 (source: clarify)               |
 | architecture.md / Package Boundary | Java Analyzer 側の内部境界 (SootUp = `sootup/` adapter facade、Gradle Tooling API = `discovery/`、JavaParser = `analysis` 配下のみ許容) と ArchUnit による検査を追記 **[反映済: 2026-07-24 sync]** | D3 / D7 決定 (source: track)            |
 | testing.md / toolchain.md          | `core/internal/<pkg>` への path 参照 (grep 実測 計 4 箇所) を再編後 path へ機械的追随 **[子 issue で実施 (D4: 実態追随の doc 修正)]**                                                              | D1 決定に伴う path 追随 (source: track) |
-| project.md / 対象ドメイン          | 変更不要 (module 名ベースで package path を参照しておらず、上位文書整合テーブルの変更提案は Naming Conventions 側のみが対象)                                                                       | 実測確認 (source: track)                |
+| project.yml / 対象ドメイン         | 変更不要 (module 名ベースで package path を参照しておらず、上位文書整合テーブルの変更提案は Naming Conventions 側のみが対象)                                                                       | 実測確認 (source: track)                |
 
 ### ADR の新規 / 更新
 
@@ -505,7 +505,7 @@ sequenceDiagram
 | 2026-07-24 | PASS (clarify 再)        | 指摘 2 件の対応を確認。go-service-design 由来の精緻化追記も既存決定・上位文書と矛盾なし。参考指摘 2 件 (日付揃え / sync 時の graph feature doc 変換記述) | 日付を揃え、feature doc 影響行に変換記述の包含を明記                                                        |
 | 2026-07-24 | NEEDS_WORK (diagram)     | 層依存図と sequence の analyzer 駆動関係の矛盾 / cli 配線辺の欠落 / parse エラー表現 / phase 7 行の状態                                                  | 辺を D6 と一致させ凡例を明記、fatal 破棄経路へ合流を明示、phase 7 行を補記                                  |
 | 2026-07-24 | PASS (diagram 再)        | 指摘 4 件すべて解消を確認。Mermaid 構文・上位文書整合とも問題なし                                                                                        | 変更履歴へ反映行を追記                                                                                      |
-| 2026-07-24 | NEEDS_WORK (track)       | phase 3 行のメタ情報未同期 / project.md 対象ドメインの変更要否が未記録 (実測主張は全件一致を確認済み)                                                    | phase 3 行を更新し、対象ドメイン「変更不要」行を追加                                                        |
+| 2026-07-24 | NEEDS_WORK (track)       | phase 3 行のメタ情報未同期 / project.yml 対象ドメインの変更要否が未記録 (実測主張は全件一致を確認済み)                                                   | phase 3 行を更新し、対象ドメイン「変更不要」行を追加                                                        |
 | 2026-07-24 | PASS (track 再)          | 指摘 2 件の解消を確認。変更点テーブルの実測主張は上位文書と全件一致。sync へ進行可                                                                       | レビュー表・変更履歴へ記録                                                                                  |
 | 2026-07-24 | PASS (sync)              | [反映済] 7 系統の実反映・正本ハンドオフの完全性・D1〜D7 一致・path 委譲の一貫性をすべて確認。参考 2 件 (graph doc の drift 注記等) は非ブロッキング      | graph doc の drift 窓は子 issue ① で解消される旨を認識                                                      |
 | 2026-07-24 | NEEDS_WORK (tasks)       | フェーズ表 7〜9 のメタ未同期 (ブロッキング) / feature doc 影響行の表記 / Interface 設計節のプレースホルダ残置 / P2_02 のクラス数表記揺れ                 | 4 件すべて反映                                                                                              |

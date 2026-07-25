@@ -25,7 +25,7 @@
 
 - 設計 (正本): `design/DesignDoc.md` / `design/features/...` の該当節へのリンク
 - spec / 要求: `specs/<issue-id>-<slug>/` へのリンク (詳細はこちらが正本)
-- ラベル: `type:feature` + 該当する `phase:*` / `domain:*` (+ 大きい要件なら `epic`) — 正本は context/project.md の Label Policy
+- ラベル: `type:feature` + 該当する `phase:*` / `domain:*` (+ 大きい要件なら `epic`) — 正本は context/project.yml の labels
 
 ## 補足
 

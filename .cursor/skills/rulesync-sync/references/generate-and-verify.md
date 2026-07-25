@@ -5,14 +5,16 @@
 ## 1. 生成コマンド
 
 ```sh
-npx rulesync@latest generate
-bash scripts/fix-cursor-cli.sh   # cursor cli.json を cursor-agent 互換へ正規化
+make generate                      # sdd-template repo
+make -f sdd-template.mk generate   # 消費 repo
 ```
 
+- 実体は `scripts/generate.sh` (両 target が共通で呼ぶ唯一の生成シーケンス)
 - 引数なしで全 provider に展開する
-- `@latest` を明示するのは旧キャッシュ版を踏まないため
+- rulesync のバージョンは `scripts/generate.sh` で **pin** している (上流リリースによる生成物の
+  無断変化を防ぐ)。更新は動作確認のうえ generate.sh の bump commit で行う
 - 生成先は `AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/`
-- **生成後に必ず `scripts/fix-cursor-cli.sh` を実行する** (理由は下記)
+- `scripts/generate.sh` は rulesync の後に Cursor / Claude 用 normalizer を必ず実行する
 
 ### cursor cli.json の正規化が必要な理由
 
@@ -23,6 +25,23 @@ bash scripts/fix-cursor-cli.sh   # cursor cli.json を cursor-agent 互換へ正
 `scripts/fix-cursor-cli.sh` (jq で `version`/`editor` を除去し `deny` 配列を保証) を通す。
 冪等なので何度実行してもよい。`.rulesync/permissions.json` に deny エントリを持たせると
 deny 配列は rulesync 側でも出力される (スクリプトは欠落時の保険)。
+
+### codex config.toml の正規化が必要な理由
+
+`rulesync generate` (14.x 現在も) は `.codex/config.toml` に `default_permissions = "rulesync"` と
+`":minimal" = "read"` を含む `[permissions.rulesync.filesystem]` block を出力する。この profile は
+Codex Desktop で repository path が cwd として見えていても、`specs/` / `context/` / `design/` /
+`.rulesync/` など通常の project file read が `Operation not permitted` になることがある
+(14.x で `extends = ":workspace"` が併記されるようになったが、阻害が解消されたことを実機で
+確認できるまでは normalizer を維持する)。生成直後に `scripts/fix-codex-config.sh` で
+`default_permissions = "rulesync"` と `[permissions.rulesync.filesystem]` block を除去する。
+MCP / hooks / network permissions は残す。冪等なので何度実行してもよい。
+
+### Claude settings の正規化が必要な理由
+
+Claude Code は commit と PR に attribution を既定で付ける。公式設定の `attribution.commit` と
+`attribution.pr` を空文字にすると両方を無効化できるため、`scripts/fix-claude-settings.sh` が
+生成後の `.claude/settings.json` にこの値を設定する。冪等なので何度実行してもよい。
 
 ## 2. 差分確認チェックリスト
 

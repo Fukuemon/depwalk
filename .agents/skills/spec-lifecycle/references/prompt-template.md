@@ -5,6 +5,14 @@ project 固有のレビュー CLI / branch 運用は spec / `AGENTS.md` / `workf
 (下記は prompt 本体のひな形。`text` fence は underscore を含む例示名をそのまま保つため)
 
 ```text
+---
+phase: {実装 phase 番号 (整数)}
+seq: {phase 内連番 (整数)}
+target: {対象ドメイン (context/project.yml の domains から 1 つ)}
+issue: {issue 番号。未起票なら TBD}
+depends_on: [{依存する prompt のファイル名。依存なしなら空配列}]
+---
+
 # {タスク名}
 
 ## 絶対ルール
@@ -18,14 +26,16 @@ project 固有のレビュー CLI / branch 運用は spec / `AGENTS.md` / `workf
 
 ## 作業ステップ (この順序で実行する)
 
-### ステップ 0: ブランチ準備
+### ステップ 0: ブランチ準備と着手記録
 
 ブランチ命名と base branch は `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` に従う。
 
-1. 最新の base branch を取得
-2. 作業ブランチ `feature/{Issue番号}` を作成
-3. PR / MR テンプレートを確認し、完了条件を description に転記する
-4. Draft PR / MR を作成して push する
+1. 対象 issue の `status:*` が `status:implementing` でなければ付け替え、状態遷移コメントを残す
+   (`workflow-git` の `references/issue-status.md`。既に implementing なら何もしない)
+2. 最新の base branch を取得
+3. 作業ブランチ `feature/{Issue番号}` を作成
+4. PR / MR テンプレートを確認し、完了条件を description に転記する
+5. Draft PR / MR を作成して push する
 
 ### ステップ 1: {作業単位 1}
 
@@ -87,7 +97,7 @@ spec から該当箇所を必要最小限だけ抜粋して埋める (リンク�
 
 ## 検証コマンド
 
-`context/project.md` の Quick Commands にある標準 task を直接書く。
+`context/project.yml` の `commands` にある標準 task を直接書く。
 
 - 例: lint / typecheck / unit test / e2e / 健全性検査 のうち該当するもの
 

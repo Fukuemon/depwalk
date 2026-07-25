@@ -17,8 +17,19 @@ description: >-
 ## 先に読むもの
 
 - `AGENTS.md` の `Spec Workflow Contract`
+- `context/project.yml` の `tracker` (起票先の CLI / project)
 - `templates/requirements/template.md`
 - `references/intake-checklist.md`
+
+## 禁止事項 (起票ゲート)
+
+以下は、ユーザーが draft を確認し「起票してよい」等の明示承認を返すまで禁止する。
+ユーザーが「そのまま進めて」と言ってもゲートは緩めない:
+
+- tracker への issue 新規作成 / 本文更新 / ラベル付与・削除
+- tracker 上の公開・共有状態に影響する操作
+
+承認前に行ってよいのは、ローカル draft の作成・更新とレビュー依頼の提示までとする。
 
 ## 実行フロー
 
@@ -49,13 +60,27 @@ description: >-
 
 ### 4. Issue 起票 (任意)
 
-ユーザーが起票を承認した場合のみ、`Spec Workflow Contract` の CLI / Repo を使って起票する:
+ユーザーが起票を承認した場合のみ、`context/project.yml` の `tracker` (CLI / project) を使って起票する:
 
 ```sh
-<ISSUE_CLI> issue create --repo <REPO> --title "<title>" --body-file <requirements.md path>
+<tracker.cli> issue create --repo <tracker.project> --title "<title>" --body-file <requirements.md path>
 ```
 
-起票後、Issue 番号と URL を報告し、spec-dir のリネームが必要であればユーザーに確認する。
+### 5. 完了時の案内 (必須)
+
+起票 (または起票なしでの draft 確定) の直後、必ず以下を報告する:
+
+```text
+🎉 要求の整理が完了しました。
+
+【requirements doc】 specs/<...>/requirements.md
+【Issue】 {番号 / URL、起票しなかった場合は「未起票」}
+
+次工程:
+  `spec-lifecycle {issue 番号 or spec path}` で設計を開始します。
+```
+
+spec-dir のリネームが必要であればあわせてユーザーに確認する。
 
 ## 停止条件
 

@@ -10,7 +10,7 @@ Verdict: PASS
 
 - **上位文書整合: PASS** — `index.md` の `## 上位文書整合` テーブルが 10 行埋まっており、継承 / 変更提案が文書別に区別されている。実測課題の根拠は `context/architecture.md:13-14` の実記述と一致。DesignDoc の Why/What / 成功条件 S1〜S5 / Non Goals は「外部挙動を変えない」スコープと矛盾しない。P2/P3 の内部徹底という位置づけも DesignDoc の設計原則と整合。ADR-0002 は追補 ADR での改訂を提案済み、ADR-0001 / 0006 は継承。scaffold 時点で sync へ分岐しない理由も明記されており妥当 (変更内容が論点解決に依存)。
 - **未解決論点: PASS** — D1〜D7 は全行「未決」と明示され空欄なし。`## 未確定事項` で clarify phase での確定を宣言し、D1〜D4 は requirements.md で決定者 / 期限付き管理。下流節はすべてプレースホルダで、未決のまま下流記述が進んでいない。
-- **実装対象明示: PASS** — 5 target は `context/project.md` の対象ドメイン一覧と完全一致。各 target の責務が読める。検証は既存テストスイート + lefthook / CI で Quick Commands の範囲内。
+- **実装対象明示: PASS** — 5 target は `context/project.yml` の対象ドメイン一覧と完全一致。各 target の責務が読める。検証は既存テストスイート + lefthook / CI で Quick Commands の範囲内。
 - **template 必須節: PASS** — `hooks/spec/validate_document.sh` の必須 22 セクションすべて存在。設計フェーズ状況は 11 フェーズ。メタ情報同期も本文と一致。
 - **EARS acceptance: PASS** — WHEN / IF / THE SYSTEM SHALL 形式 5 件。いずれも観測可能で requirements.md と整合。
 - **prompts 自己完結性: N/A** — prompts phase 未着手。
@@ -29,7 +29,7 @@ Verdict: NEEDS_WORK
 
 - **上位文書整合: NEEDS_WORK** — 指摘 2 件 (下記)。D1 / D3 / D4 / D5 は上位文書と整合し変更提案も記録済み
 - **未解決論点: PASS** — D1〜D7 全件が決定者 / 決定日付きで「解決済みの論点」へ移動済み。未決を残した下流記述なし
-- **実装対象明示: PASS** — 5 target が project.md の対象ドメインと一致し、D2/D3/D6 の決定が反映済み
+- **実装対象明示: PASS** — 5 target が project.yml の対象ドメインと一致し、D2/D3/D6 の決定が反映済み
 - **template 必須節: PASS** — 必須 22 セクション存在、メタ情報同期良好
 - **EARS acceptance: PASS** — requirements.md と整合、全件観測可能
 - **prompts 自己完結性 / 正本境界: N/A** — 未着手 phase
@@ -58,7 +58,7 @@ Verdict: PASS
 
 - D1 追記 (層数・命名自由 / 層ファースト維持根拠): DesignDoc P1〜P4 と矛盾なし
 - D5 追記 (depguard の files+deny+desc 記法): engineering.md の「CI gate 要件化時点で追加」条件と整合
-- D6 追記 (port 利用側定義 / port package なし / struct 公開 / var _ の cli 集約 / ACL): D6 本体・Interface 設計節・ADR-0002 依存最小方針と一貫
+- D6 追記 (port 利用側定義 / port package なし / struct 公開 / var \_ の cli 集約 / ACL): D6 本体・Interface 設計節・ADR-0002 依存最小方針と一貫
 
 ### 観点別評価 (要旨)
 
@@ -83,7 +83,7 @@ Verdict: NEEDS_WORK → 対応後 PASS
 
 ### 対応 (2026-07-24)
 
-- 層依存図の辺を D6 と一致させた: `analyzer → analyze` 削除、`cli → protocol` (配線 + var _ 検証) / `cli → analyzer` (配線) / `protocol → analyzer` (process 起動に利用) を追加。凡例「辺は Go の import 方向」と辺の読み方の補足 (analyzer は内層を import しない呼ばれる側、cli はコンポジションルート) を明記
+- 層依存図の辺を D6 と一致させた: `analyzer → analyze` 削除、`cli → protocol` (配線 + var \_ 検証) / `cli → analyzer` (配線) / `protocol → analyzer` (process 起動に利用) を追加。凡例「辺は Go の import 方向」と辺の読み方の補足 (analyzer は内層を import しない呼ばれる側、cli はコンポジションルート) を明記
 - sequence の parse / validate ラベルを「parse / schema error は fatal → 破棄経路へ」に修正
 - phase 7 行を「進行中 / 図・配置は phase 6 で確定済み」に補記
 
@@ -104,12 +104,12 @@ Verdict: NEEDS_WORK → 対応後 PASS
 ### 指摘
 
 1. phase 3「上位文書突合」行のメタ情報が track 本文更新に未同期
-2. 上位文書整合テーブルが project.md「対象ドメイン」を変更提案としているのに、変更点テーブルに変更要否の記録がない (実測では変更不要)
+2. 上位文書整合テーブルが project.yml「対象ドメイン」を変更提案としているのに、変更点テーブルに変更要否の記録がない (実測では変更不要)
 
 ### 対応 (2026-07-24)
 
 - phase 3 行を「完了 / 2026-07-24」→ 再レビュー後「レビュー済」に更新
-- context への影響へ「project.md / 対象ドメイン: 変更不要 (module 名ベースで path 非参照)」行を追加 (source: track)
+- context への影響へ「project.yml / 対象ドメイン: 変更不要 (module 名ベースで path 非参照)」行を追加 (source: track)
 
 ### 再レビュー (PASS)
 
@@ -121,7 +121,7 @@ Verdict: PASS
 
 ### 確認内容
 
-- **[反映済] 行の実反映**: 7 系統 (architecture.md 3 層化 + Java 内部境界 / project.md Naming Conventions / engineering.md 層依存 gate / graph feature doc の SourceLocation 改訂 + 変換所在 / java-analyzer feature doc の内部構成節 / ADR-0007 新規 / ADR-0002 追補) すべて実在・改変なしを実地確認
+- **[反映済] 行の実反映**: 7 系統 (architecture.md 3 層化 + Java 内部境界 / project.yml Naming Conventions / engineering.md 層依存 gate / graph feature doc の SourceLocation 改訂 + 変換所在 / java-analyzer feature doc の内部構成節 / ADR-0007 新規 / ADR-0002 追補) すべて実在・改変なしを実地確認
 - **正本ハンドオフの完全性**: design 側の正本宣言と spec 側の「決定時スナップショット」降格を確認。二重正本なし。用語規約 (spec = 決定経緯) 遵守。反映先文書のメタ情報 (最終更新 / Status / 変更点行) も同期済み
 - **D1〜D7 一致**: 段階実行順・JavaParser 隔離 3 段階・depguard 記法・手動 DI / `var _` 集約まで欠落なし
 - **path 機械追随の子 issue 委譲**: 残存旧 path (feature doc ≈13 箇所 / context 4 箇所) が spec の記録と合致し、architecture.md に drift 注記あり

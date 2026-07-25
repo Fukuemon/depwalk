@@ -19,7 +19,7 @@ description: >-
 
 - `styleguide-documents` skill (文書の品質基準・分割粒度)
 - `.rulesync/rules/CLAUDE.md` のドキュメント階層と `Spec Workflow Contract`
-- `context/project.md` (存在すれば。なければ本 skill 後に `context-bootstrap` を案内する)
+- `context/project.yml` (存在すれば。なければ本 skill 後に `context-bootstrap` を案内する)
 - `templates/prd/template.md` / `templates/design-doc/template.md`
 
 ## 実行フロー

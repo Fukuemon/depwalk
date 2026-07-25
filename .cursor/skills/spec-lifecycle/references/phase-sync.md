@@ -3,6 +3,10 @@
 spec で確定した決定のうち、PRD / Design Doc / feature doc / context / ADR の範囲を超えるものを **上位文書に書き戻す** phase。
 spec が `## 上位資料からの変更点` テーブルに残した「変更提案」行を処理する。phase: scaffold / clarify が「変更提案」を理由に停止したときにも実行する。
 
+> **spec は issue close 時に削除される** (`closeout.md`)。本 phase が durable 情報の**唯一の救出点**であり、
+> 「あとで spec から拾える」を前提にしない。取りこぼしは closeout の最終刈り取りで検出されるが、
+> そこで見つかるのは失敗であり、本 phase で棚卸しを完了させる。
+
 ## 先に読むもの
 
 - `AGENTS.md` の `Spec Workflow Contract`
@@ -11,10 +15,12 @@ spec が `## 上位資料からの変更点` テーブルに残した「変更�
 
 ## 手順
 
-### 1. 変更提案の列挙
+### 1. 変更提案と解決済み論点の棚卸し
 
-spec の `## 上位資料からの変更点` から、未反映の「変更提案」行を抜き出す。
-phase: clarify が決めた決定の中で、上位文書を書き換えるべきものを列挙する。
+- spec の `## 上位資料からの変更点` から、未反映の「変更提案」行を抜き出す
+- **`## 解決済みの論点` を全行走査し**、各行に「反映先 (PRD / Design Doc / feature doc / context / ADR) または
+  spec で閉じる」の判定を付ける。判定の付いていない論点行を残さない (取りこぼしの構造的防止。
+  この判定列は closeout の最終刈り取りと `spec-review` の検査対象になる)
 
 ### 2. 反映先の振り分け (ユーザー承認必須)
 
@@ -28,6 +34,10 @@ phase: clarify が決めた決定の中で、上位文書を書き換えるべ�
 | context     | architecture / toolchain / engineering 規約 / testing / infra の変更 |
 | ADR (新規)  | 技術選定 / 責務境界 / 不可逆な意思決定の記録                         |
 | spec のみ   | 上位文書側の変更不要 (spec で閉じる) — テーブルから除去              |
+
+> **意思決定の ADR 化基準**: 選択肢を比較して決めた判断 (採らなかった案とその理由がある判断) は、
+> 影響が単一 feature 内でも **ADR 化を既定** とする。spec 削除後に「なぜこうしたか」を再現できる
+> 場所は ADR だけになるため。「spec で閉じる」を選べるのは、選択の余地がなかった作業上の決定のみ。
 
 > **重要**: ユーザーの承認なしに PRD / Design Doc / feature doc / context を書き換えてはならない。
 
@@ -46,7 +56,8 @@ durable な設計成果を design 側へ反映したときは、正本を design
 - design 側: 反映した節に「本 doc を正本とする」旨を明記する (該当する場合は spec への決定経緯リンクを併記)
 - spec 側: 反映した durable 節を「決定時スナップショット」と明示し、design への正本リンクを張る
 - 同一 durable 成果について spec と design が二重に「正本」を名乗らないようにする (drift 防止)
-- 論点 / 受け入れ基準 / レビュー / 実装分割 / 決定経緯は spec に残す (ハンドオフ対象外)
+- 論点 / 受け入れ基準 / レビュー / 実装分割 / 決定経緯は spec に残す (ハンドオフ対象外。
+  ただしこれらは issue close 時に spec ごと削除されるため、長期参照が必要な決定経緯は上記基準で ADR へ)
 
 ### 4. spec 側のトレース更新
 
@@ -54,6 +65,8 @@ durable な設計成果を design 側へ反映したときは、正本を design
 - 新規 ADR を起こした場合は ADR ID を spec の `## 上位文書整合` テーブルに追記する
 - 関連 spec / ADR / context を更新した場合は `Spec Workflow Contract` の「文書メタ情報の同期」に従い、対象文書のメタ情報も更新する
 - handoff 後の spec の呼称は `Spec Workflow Contract` の正本境界「用語規約」に従い書き換える
+- `context/impact-index.yaml` (読み取り索引) がある場合、対象 feature のエントリを更新する
+  (反映先ファイルを `read:` に、spec を `source_refs:` に。新規 feature ならエントリを新設する)
 
 ### 5. ユーザー報告
 

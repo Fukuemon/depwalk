@@ -62,7 +62,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 - **依存方向の是正**: wire 表現 (protocol DTO) のドメイン漏れを変換層で断ち切る (`graph` / `output` から `protocol` への依存除去を含む)。エントリポイント (`cli`) の内層迂回参照を整理する
 - **Java Analyzer のパッケージ再編**: `javaanalyzer` 配下を解析パイプラインの段階と依存境界 (SootUp 等の外部ライブラリ隔離) が読み取れる構造へ再編する
 - **依存方向の自動検査**: Go 側は lint (depguard 等) で層をまたぐ禁止 import を検査し、既存 quality gate (lefthook / CI) に組み込む。Java 側の検査手段は設計フェーズで選定する
-- **ドキュメント同期**: context/architecture.md の Package Boundary、design/DesignDoc.md・feature doc の該当節、context/project.md の Naming Conventions / 対象ドメイン記述を再編後の実態に合わせて更新する
+- **ドキュメント同期**: context/architecture.md の Package Boundary、design/DesignDoc.md・feature doc の該当節、context/project.yml の Naming Conventions / 対象ドメイン記述を再編後の実態に合わせて更新する
 
 ### やらないこと
 
@@ -95,12 +95,12 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 
 ### 出力
 
-| #   | 出力                                           | 条件                   | 備考                                     |
-| --- | ---------------------------------------------- | ---------------------- | ---------------------------------------- |
-| 1   | 層別に再編されたディレクトリ構造 (Go / Java)   | 必須                   | 具体構造は設計フェーズで確定             |
-| 2   | 依存方向 lint 設定と quality gate への組み込み | 必須                   | Go: depguard 等。Java: 設計フェーズ選定  |
-| 3   | 更新された正本ドキュメント群                   | 必須                   | architecture.md / DesignDoc / project.md |
-| 4   | 層構造の判断根拠を記録した ADR                 | 設計判断が非自明な場合 |                                          |
+| #   | 出力                                           | 条件                   | 備考                                      |
+| --- | ---------------------------------------------- | ---------------------- | ----------------------------------------- |
+| 1   | 層別に再編されたディレクトリ構造 (Go / Java)   | 必須                   | 具体構造は設計フェーズで確定              |
+| 2   | 依存方向 lint 設定と quality gate への組み込み | 必須                   | Go: depguard 等。Java: 設計フェーズ選定   |
+| 3   | 更新された正本ドキュメント群                   | 必須                   | architecture.md / DesignDoc / project.yml |
+| 4   | 層構造の判断根拠を記録した ADR                 | 設計判断が非自明な場合 |                                           |
 
 ## 例外シナリオ
 
@@ -145,7 +145,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 2. THE SYSTEM SHALL Core の Domain 相当層 (graph / traversal 相当) から wire 表現 (`protocol` 相当 package) への import を持たない。
 3. IF 層をまたぐ禁止 import が追加された場合、THEN THE SYSTEM SHALL lint (quality gate) で検出し CI / pre-commit を FAIL させる。
 4. WHEN 再編後に既存のテストスイート (Go unit / Java unit / E2E / golden) を実行したとき、THE SYSTEM SHALL テスト本体のロジック変更なし (package 移動に伴う機械的修正のみ) で全件 PASS する。
-5. THE SYSTEM SHALL context/architecture.md の Package Boundary 記述・context/project.md の Naming Conventions と、実装の package 構造 / import 関係を一致させる。
+5. THE SYSTEM SHALL context/architecture.md の Package Boundary 記述・context/project.yml の Naming Conventions と、実装の package 構造 / import 関係を一致させる。
 
 ## 未決事項（論点）
 
@@ -170,7 +170,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 
 - [design/DesignDoc.md](../../design/DesignDoc.md) — 設計原則 P1〜P4、モジュール責務 (本要求は P2/P3 の内部徹底であり矛盾しない)
 - [context/architecture.md](../../context/architecture.md) — Package Boundary (本要求で実態と同期する対象)
-- [context/project.md](../../context/project.md) — Naming Conventions / 対象ドメイン (同期対象)
+- [context/project.yml](../../context/project.yml) — Naming Conventions / 対象ドメイン (同期対象)
 - [adr/0002-core-implementation-foundation.md](../../adr/0002-core-implementation-foundation.md) — Core 実装基盤 (package 構成の変更で改訂または追補 ADR が必要)
 - 関連 feature doc: graph / output / analyzer-protocol / java-analyzer (`design/features/`)
 
@@ -179,9 +179,9 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 | 対象                    | 変更内容                                        | 理由                 |
 | ----------------------- | ----------------------------------------------- | -------------------- |
 | context/architecture.md | Package Boundary 表を層別構造へ改訂             | 実装再編との同期     |
-| context/project.md      | Naming Conventions の Core package 一覧を改訂   | 同上                 |
+| context/project.yml     | Naming Conventions の Core package 一覧を改訂   | 同上                 |
 | adr/0002                | package 構成の記述が古くなるため追補 ADR で改訂 | 意思決定の追跡可能性 |
-| design/features/*       | graph / output 等の package 参照箇所を更新      | 同上                 |
+| design/features/\*      | graph / output 等の package 参照箇所を更新      | 同上                 |
 
 ## 変更履歴
 

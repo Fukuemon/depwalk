@@ -37,10 +37,10 @@ tools: "Read, Grep, Glob"
 
 ## 3. 実装対象明示 (Target Boundaries)
 
-- `## 実装対象` テーブルの target が `context/project.md` の対象ドメイン一覧と一致しているか
+- `## 実装対象` テーブルの target が `context/project.yml` の `domains` と一致しているか
 - 複数 target がある場合、責務境界 (どの target が何をするか) が読めるか
 - module 間の直接依存が発生していないか (`context/architecture.md` の境界規約)
-- spec 固有の検証コマンドと `context/project.md` の Quick Commands が異なる場合、その関係 (局所 smoke / 全体 gate / 代替不可など) が説明されているか
+- spec 固有の検証コマンドと `context/project.yml` の `commands` が異なる場合、その関係 (局所 smoke / 全体 gate / 代替不可など) が説明されているか
 
 → target が曖昧 / 越境していれば `NEEDS_WORK`。
 
@@ -78,7 +78,7 @@ tools: "Read, Grep, Glob"
 - 別 app / package の追加探索を要求していないか
 - `## 絶対ルール` に `spec-lifecycle/references/antipatterns.md` の実装制約ブロック (スコープ厳守 / 観測可能契約の保持 / 推測排除 / fallback 最小化 / dead code 禁止 / 判断記録) が注入されているか
 - 命名規則 `P{phase}_{seq}_{target}_{scope}.md` を満たしているか
-- target が `Spec Workflow Contract` の target 一覧に含まれているか
+- target が `context/project.yml` の `domains` に含まれているか
 - phase 依存表 (並列可 / 依存先) が報告されているか
 
 → いずれか違反があれば `NEEDS_WORK`。
@@ -93,6 +93,10 @@ tools: "Read, Grep, Glob"
   - spec の該当節が「決定時スナップショット」と明示され、design への正本リンクを持つか
   - 同一 durable 成果について spec と design が二重に「正本」を名乗っていないか
   - 「正本」の呼称が `Spec Workflow Contract` の正本境界「用語規約」に従っているか (handoff 済み spec を「正本」と呼んでいないか)
+  - **`## 解決済みの論点` の全行に「反映先 (design / ADR) または spec で閉じる」の判定が付いているか**。
+    spec は issue close 時に削除されるため、未判定の論点行は sync の取りこぼし
+  - 選択肢を比較して決めた判断 (採らなかった案がある判断) が「spec で閉じる」になっていないか
+    (ADR 化基準は `phase-sync.md`。該当があれば `NEEDS_WORK`)
 
 → sync 済なのに spec が durable 成果の正本を抱えたまま design へリンクしていなければ `NEEDS_WORK`、対応として `spec-lifecycle` の sync phase (正本ハンドオフ) を提案する。
 

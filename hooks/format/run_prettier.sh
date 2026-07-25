@@ -6,6 +6,16 @@
 
 set -euo pipefail
 
+# prettier はローカル導入を優先し、無ければ pin したバージョンを npx で実行する
+# (バージョン未 pin の @latest 実行は供給網リスク。pin の bump は動作確認込みで行う)
+run_prettier() {
+  if [ -x "node_modules/.bin/prettier" ]; then
+    node_modules/.bin/prettier "$@"
+  else
+    npx --yes prettier@3.6.2 "$@"
+  fi
+}
+
 STAGED_FILES=()
 
 while IFS= read -r file; do
@@ -20,5 +30,5 @@ if [ "${#STAGED_FILES[@]}" -eq 0 ]; then
   exit 0
 fi
 
-npx prettier --write "${STAGED_FILES[@]}"
+run_prettier --write -- "${STAGED_FILES[@]}"
 git add -- "${STAGED_FILES[@]}"
