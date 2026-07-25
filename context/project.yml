@@ -5,7 +5,7 @@
 # 依存する context/*.md との整合を確認する。
 
 meta:
-  updated: 2026-07-24
+  updated: 2026-07-25
 
 product:
   name: depwalk
@@ -34,7 +34,9 @@ repos:
 naming:
   package: Go package は小文字・短い単語・責務名 (core/internal/core のような重複名は使わない)
   core_module: github.com/Fukuemon/depwalk/core
-  core_packages: core/internal/{cli,analyze,protocol,analyzer,graph,traversal,output}
+  # フラットな責務名構成。層ディレクトリは作らない (層は概念として architecture.md の対応表で示す)。
+  # 正本は adr/0007-layered-architecture-refactor.md / context/architecture.md の Package Boundary
+  core_packages: core/internal/{graph,traversal,analyze,protocol,analyzer,output,cli}
   analyzer_dir: analyzers/<language>/
   branch: feature/<issue-id>
 
