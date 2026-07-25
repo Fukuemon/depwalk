@@ -56,6 +56,16 @@ jobs:
           git diff --exit-code go.mod go.sum
         working-directory: core
 
+      - name: Dependency direction gate (depguard)
+        run: scripts/golangci-lint.sh ./...
+
+      - name: Dependency graph drift check
+        run: |
+          # 実 import が変わったのに architecture.md の生成区間を再生成して
+          # いない状態を検出する (図の腐敗を構造的に防ぐ。spec #32 D8)。
+          scripts/depgraph.sh
+          git diff --exit-code context/architecture.md
+
       - name: Dependency boundary gate (core must not depend on analyzers/)
         run: |
           # Scope the grep to this repo's own analyzers/<language> import
