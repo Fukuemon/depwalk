@@ -8,27 +8,47 @@ import (
 )
 
 func TestNodeFromMethodSymbol(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "service.go", StartLine: 12}
+	startColumn := 4
 	record := protocol.MethodSymbol{
 		SchemaVersion: "1.0",
 		RecordType:    protocol.RecordTypeMethodSymbol,
 		MethodID:      "method:a",
 		QualifiedName: "example.Service.Run",
 		Signature:     "()",
-		Source:        source,
+		Source:        &protocol.SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
 	}
 
 	got := NodeFromMethodSymbol(record)
+	wantColumn := 4
 	want := Node{
 		ID: "method:a",
 		Symbol: Symbol{
 			QualifiedName: "example.Service.Run",
 			Signature:     "()",
-			Source:        source,
+			Source:        &SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &wantColumn},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("NodeFromMethodSymbol() = %#v, want %#v", got, want)
+	}
+}
+
+func TestNodeFromMethodSymbolDeepCopiesSourceLocation(t *testing.T) {
+	startColumn := 4
+	record := protocol.MethodSymbol{
+		MethodID: "method:a",
+		Source:   &protocol.SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
+	}
+
+	got := NodeFromMethodSymbol(record)
+
+	// Mutating the protocol DTO must not change the graph-owned value.
+	record.Source.Path = "mutated.go"
+	*record.Source.StartColumn = 99
+	wantColumn := 4
+	want := &SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &wantColumn}
+	if !reflect.DeepEqual(got.Symbol.Source, want) {
+		t.Fatalf("Source after DTO mutation = %#v, want unchanged %#v", got.Symbol.Source, want)
 	}
 }
 
@@ -40,18 +60,20 @@ func TestNodeFromMethodSymbolAllowsNilSource(t *testing.T) {
 }
 
 func TestEdgeFromCallEdge(t *testing.T) {
-	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 24}
 	record := protocol.CallEdge{
 		SchemaVersion:  "1.0",
 		RecordType:     protocol.RecordTypeCallEdge,
 		EdgeID:         "edge:ab",
 		CallerMethodID: "method:a",
 		CalleeMethodID: "method:b",
-		CallSite:       callSite,
+		CallSite:       &protocol.SourceLocation{Path: "caller.go", StartLine: 24},
 	}
 
 	got := EdgeFromCallEdge(record)
-	want := Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite}
+	want := Edge{
+		ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b",
+		CallSite: &SourceLocation{Path: "caller.go", StartLine: 24},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("EdgeFromCallEdge() = %#v, want %#v", got, want)
 	}

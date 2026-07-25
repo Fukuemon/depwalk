@@ -8,13 +8,12 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
 func TestBuildViewResolvesSymbolsAndSortsCollections(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "a.go", StartLine: 10}
-	callSite := &protocol.SourceLocation{Path: "z.go", StartLine: 20}
+	source := &graph.SourceLocation{Path: "a.go", StartLine: 10}
+	callSite := &graph.SourceLocation{Path: "z.go", StartLine: 20}
 	nodeMetadata := map[string]any{"declarationOrigin": "projectClasses"}
 	edgeMetadata := map[string]any{"resolution": "springDi"}
 	g := graph.New()

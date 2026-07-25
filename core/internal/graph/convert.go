@@ -18,15 +18,17 @@ func NodeFromMethodSymbol(record protocol.MethodSymbol) Node {
 	}
 }
 
-func copySourceLocation(location *protocol.SourceLocation) *protocol.SourceLocation {
+func copySourceLocation(location *protocol.SourceLocation) *SourceLocation {
 	if location == nil {
 		return nil
 	}
-	copied := *location
-	copied.StartColumn = copyIntPointer(location.StartColumn)
-	copied.EndLine = copyIntPointer(location.EndLine)
-	copied.EndColumn = copyIntPointer(location.EndColumn)
-	return &copied
+	return &SourceLocation{
+		Path:        location.Path,
+		StartLine:   location.StartLine,
+		StartColumn: copyIntPointer(location.StartColumn),
+		EndLine:     copyIntPointer(location.EndLine),
+		EndColumn:   copyIntPointer(location.EndColumn),
+	}
 }
 
 func copyIntPointer(value *int) *int {

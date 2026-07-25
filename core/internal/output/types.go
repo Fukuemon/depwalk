@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
@@ -44,7 +43,7 @@ type NodeView struct {
 	ID            string
 	QualifiedName string
 	Signature     string
-	Source        *protocol.SourceLocation
+	Source        *graph.SourceLocation
 	MinDepth      int
 	Metadata      map[string]any
 }
@@ -55,7 +54,7 @@ type EdgeView struct {
 	CallerID string
 	CalleeID string
 	Cycle    bool
-	CallSite *protocol.SourceLocation
+	CallSite *graph.SourceLocation
 	Metadata map[string]any
 }
 
@@ -66,7 +65,7 @@ type CutoffView struct {
 	CalleeID       string
 	TargetMethodID string
 	TargetMinDepth int
-	CallSite       *protocol.SourceLocation
+	CallSite       *graph.SourceLocation
 }
 
 // Formatter renders a View to a writer.

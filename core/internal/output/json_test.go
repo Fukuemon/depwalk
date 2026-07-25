@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
@@ -266,8 +265,8 @@ func writeJSONDocument(t *testing.T, in Input) jsonDocument {
 func intPointer(value int) *int { return &value }
 
 func jsonGraphView() View {
-	source := &protocol.SourceLocation{Path: "m.go", StartLine: 10}
-	callSite := &protocol.SourceLocation{Path: "z.go", StartLine: 20}
+	source := &graph.SourceLocation{Path: "m.go", StartLine: 10}
+	callSite := &graph.SourceLocation{Path: "z.go", StartLine: 20}
 	return View{
 		Status: traversal.StatusOK, Direction: graph.DirectionCaller, Start: NodeView{ID: "method:a"},
 		Nodes: []NodeView{

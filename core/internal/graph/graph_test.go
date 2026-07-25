@@ -3,8 +3,6 @@ package graph
 import (
 	"reflect"
 	"testing"
-
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 func TestNodeReturnsRegisteredNode(t *testing.T) {
@@ -21,7 +19,7 @@ func TestNodeReturnsRegisteredNode(t *testing.T) {
 }
 
 func TestNodeReturnsRegisteredSymbol(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "service.go", StartLine: 12}
+	source := &SourceLocation{Path: "service.go", StartLine: 12}
 	want := Symbol{QualifiedName: "example.Service.Run", Signature: "()", Source: source}
 	g := New()
 	g.AddNode(Node{ID: "method:a", Symbol: want})
@@ -192,7 +190,7 @@ func TestAddEdgeIgnoresDuplicateID(t *testing.T) {
 }
 
 func TestNeighborsReturnsRegisteredCallSite(t *testing.T) {
-	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 24}
+	callSite := &SourceLocation{Path: "caller.go", StartLine: 24}
 	g := New()
 	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite})
 
