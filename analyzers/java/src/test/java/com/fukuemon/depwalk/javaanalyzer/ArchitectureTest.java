@@ -30,7 +30,7 @@ class ArchitectureTest {
     @Test
     void sootUpIsConfinedToTheSootUpAdapterPackage() {
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("..analysis.sootup..")
+                .that().resideOutsideOfPackage("..javaanalyzer.analysis.sootup..")
                 .should().dependOnClassesThat().resideInAPackage("sootup..")
                 .because("SootUp は analysis/sootup の facade に封じ込め、自前型で公開する (ADR-0007)");
 
@@ -40,7 +40,7 @@ class ArchitectureTest {
     @Test
     void gradleToolingApiIsConfinedToDiscovery() {
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("..discovery..")
+                .that().resideOutsideOfPackage("..javaanalyzer.discovery..")
                 .should().dependOnClassesThat().resideInAPackage("org.gradle.tooling..")
                 .because("Gradle Tooling API による project 構造取得は discovery に隔離する (ADR-0007)");
 
