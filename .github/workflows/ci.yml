@@ -64,7 +64,10 @@ jobs:
           # 実 import が変わったのに architecture.md の生成区間を再生成して
           # いない状態を検出する (図の腐敗を構造的に防ぐ。spec #32 D8)。
           scripts/depgraph.sh
-          git diff --exit-code context/architecture.md
+          if ! git diff --exit-code context/architecture.md; then
+            echo "::error::context/architecture.md の依存図が実 import と一致しません。scripts/depgraph.sh を実行して結果を commit してください"
+            exit 1
+          fi
 
       - name: Dependency boundary gate (core must not depend on analyzers/)
         run: |
