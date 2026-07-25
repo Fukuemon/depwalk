@@ -264,6 +264,28 @@ func writeJSONDocument(t *testing.T, in Input) jsonDocument {
 
 func intPointer(value int) *int { return &value }
 
+// jsonLocation の手書きフィールド対応 (path/startLine + optional 3 フィールド)
+// が取り違えなく wire 互換の名前で marshal されることを固定する。
+func TestJSONSourceLocationMarshalsAllOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	location := &graph.SourceLocation{
+		Path:        "m.go",
+		StartLine:   10,
+		StartColumn: intPointer(4),
+		EndLine:     intPointer(12),
+		EndColumn:   intPointer(8),
+	}
+	encoded, err := json.Marshal(jsonLocation(location))
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	want := `{"path":"m.go","startLine":10,"startColumn":4,"endLine":12,"endColumn":8}`
+	if string(encoded) != want {
+		t.Fatalf("marshaled location = %s, want %s", encoded, want)
+	}
+}
+
 func jsonGraphView() View {
 	source := &graph.SourceLocation{Path: "m.go", StartLine: 10}
 	callSite := &graph.SourceLocation{Path: "z.go", StartLine: 20}

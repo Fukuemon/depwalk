@@ -79,6 +79,25 @@ func TestEdgeFromCallEdge(t *testing.T) {
 	}
 }
 
+func TestEdgeFromCallEdgeDeepCopiesCallSite(t *testing.T) {
+	startColumn := 7
+	record := protocol.CallEdge{
+		EdgeID:   "edge:ab",
+		CallSite: &protocol.SourceLocation{Path: "caller.go", StartLine: 24, StartColumn: &startColumn},
+	}
+
+	got := EdgeFromCallEdge(record)
+
+	// Mutating the protocol DTO must not change the graph-owned value.
+	record.CallSite.Path = "mutated.go"
+	*record.CallSite.StartColumn = 99
+	wantColumn := 7
+	want := &SourceLocation{Path: "caller.go", StartLine: 24, StartColumn: &wantColumn}
+	if !reflect.DeepEqual(got.CallSite, want) {
+		t.Fatalf("CallSite after DTO mutation = %#v, want unchanged %#v", got.CallSite, want)
+	}
+}
+
 func TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata(t *testing.T) {
 	record := protocol.MethodSymbol{
 		MethodID: "method:a",
