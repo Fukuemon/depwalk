@@ -1,0 +1,2 @@
+{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-2","workspaceRoot":"/workspace/depwalk","language":"java","sourceRoots":["module-a/src/main/java","module-b/src/main/java"],"include":["module-a/src/**/*.java","module-b/src/**/*.java"],"metadata":{"classpath":[]}}
+{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-3","workspaceRoot":"/workspace/single","language":"java","sourceRoots":["."],"metadata":{"classpath":[],"javaLanguageLevel":["17"]}}

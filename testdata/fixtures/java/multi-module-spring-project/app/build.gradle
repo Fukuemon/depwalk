@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':service')
+}
+// language level は release 優先の discovery 規則を検証する (spec #24 D12)。
+tasks.named('compileJava') { options.release = 17 }

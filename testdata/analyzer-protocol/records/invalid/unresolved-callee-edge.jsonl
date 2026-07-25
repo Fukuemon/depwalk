@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:unresolved","callerMethodId":"method:com.example.App.main","calleeMethodId":"","callSite":{"path":"src/main/java/com/example/App.java","startLine":11}}

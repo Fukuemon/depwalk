@@ -1,0 +1,55 @@
+package traversal
+
+import "github.com/Fukuemon/depwalk/core/internal/graph"
+
+// buildResult classifies every edge adjacent to a reached node into the
+// induced edge set or a depth cutoff, then annotates cycle edges. The
+// classification depends only on the reached node set and minDepth, so
+// the result is identical for any visit order. depths must cover every
+// reachable node (as returned by [minDepths]).
+func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, depths map[string]int) Result {
+	edges := make(map[string]graph.Edge, len(nodes))
+	cutoffs := map[string]DepthCutoff{}
+	reachedDepths := make(map[string]int, len(nodes))
+	for id := range nodes {
+		reachedDepths[id] = depths[id]
+		for _, e := range g.Neighbors(id, dir) {
+			next := nextNode(e, dir)
+			if nodes[next] {
+				edges[e.ID] = e
+				continue
+			}
+			cutoffs[e.ID] = DepthCutoff{Edge: e, TargetMinDepth: depths[next]}
+		}
+	}
+
+	return Result{
+		Status:       StatusOK,
+		Nodes:        nodes,
+		Depths:       reachedDepths,
+		Edges:        edges,
+		Cycles:       cycleEdges(nodes, edges),
+		DepthCutoffs: cutoffs,
+	}
+}
+
+// cycleEdges returns the IDs of induced edges that lie on a cycle of the
+// reached subgraph. An edge lies on a cycle exactly when its endpoints
+// belong to the same strongly connected component (a self-loop trivially
+// does). Convergent (diamond) edges connect distinct components and are
+// never annotated.
+func cycleEdges(nodes map[string]bool, edges map[string]graph.Edge) map[string]bool {
+	adjacency := make(map[string][]string, len(nodes))
+	for _, e := range edges {
+		adjacency[e.CallerID] = append(adjacency[e.CallerID], e.CalleeID)
+	}
+	component := sccComponents(nodes, adjacency)
+
+	cycles := map[string]bool{}
+	for id, e := range edges {
+		if component[e.CallerID] == component[e.CalleeID] {
+			cycles[id] = true
+		}
+	}
+	return cycles
+}

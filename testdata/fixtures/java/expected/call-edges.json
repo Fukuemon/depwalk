@@ -1,0 +1,29 @@
+[
+  {
+    "description": "interface injection: GreetingService.greetUser calls Greeter.greet through the interface type",
+    "caller": "java:com.example.GreetingService#greetUser(java.lang.String)",
+    "callee": "java:com.example.Greeter#greet(java.lang.String)",
+    "dispatch": "interface"
+  },
+  {
+    "description": "inheritance with override: AnimalCaller.describeDog resolves to Dog's own sound()",
+    "caller": "java:com.example.AnimalCaller#describeDog(com.example.Dog)",
+    "callee": "java:com.example.Dog#sound()"
+  },
+  {
+    "description": "inheritance without override: AnimalCaller.describeCat resolves to the inherited Animal.sound()",
+    "caller": "java:com.example.AnimalCaller#describeCat(com.example.Cat)",
+    "callee": "java:com.example.Animal#sound()"
+  },
+  {
+    "description": "jar-derived inherited method call is lifted to the scope-internal subtype (WidgetUsingLib extends com.example.lib.LibBase)",
+    "caller": "java:com.example.WidgetUsingLib#useHelper()",
+    "callee": "java:com.example.WidgetUsingLib#helper()"
+  },
+  {
+    "description": "call inside a lambda body keeps the enclosing method as caller and is tagged viaLambda",
+    "caller": "java:com.example.LambdaUser#run()",
+    "callee": "java:com.example.LambdaUser#helperMessage()",
+    "viaLambda": true
+  }
+]
