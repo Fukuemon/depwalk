@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * metadata 契約は classpath entry として「依存 jar」だけでなく「classes dir (コンパイル済み
  * .class ファイルの directory)」も許容する。{@link javax.tools.JavaCompiler} で小さなクラスを
- * classes dir へコンパイルし、{@link com.fukuemon.depwalk.javaanalyzer.analysis.TypeSolverFactory}
+ * classes dir へコンパイルし、{@link com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory}
  * がそれを解決できることを確認する。
  */
 class ClassesDirTypeSolverTest {

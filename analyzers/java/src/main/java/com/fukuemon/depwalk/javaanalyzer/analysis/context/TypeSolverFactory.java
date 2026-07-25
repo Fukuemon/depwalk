@@ -1,4 +1,4 @@
-package com.fukuemon.depwalk.javaanalyzer.analysis;
+package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ClassLoaderTypeSolver;
