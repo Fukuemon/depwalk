@@ -1,7 +1,5 @@
 package graph
 
-import "github.com/Fukuemon/depwalk/core/internal/protocol"
-
 // Builder assembles a [Graph] fluently. It exists mainly for tests and
 // fixtures that need to lay out call graphs (linear, diamond, circular,
 // deep) concisely; production code feeding Analyzer records can use
@@ -36,7 +34,7 @@ func (b *Builder) Edge(id, callerID, calleeID string) *Builder {
 
 // EdgeWithCallSite registers a directed edge with an optional call site and
 // returns the builder for chaining.
-func (b *Builder) EdgeWithCallSite(id, callerID, calleeID string, callSite *protocol.SourceLocation) *Builder {
+func (b *Builder) EdgeWithCallSite(id, callerID, calleeID string, callSite *SourceLocation) *Builder {
 	b.g.AddNode(Node{ID: callerID})
 	b.g.AddNode(Node{ID: calleeID})
 	b.g.AddEdge(Edge{ID: id, CallerID: callerID, CalleeID: calleeID, CallSite: callSite})

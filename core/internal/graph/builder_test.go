@@ -3,8 +3,6 @@ package graph
 import (
 	"reflect"
 	"testing"
-
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 func TestBuilderBuildsNodesAndEdges(t *testing.T) {
@@ -39,8 +37,8 @@ func TestBuilderEdgeRegistersEndpointNodes(t *testing.T) {
 }
 
 func TestBuilderBuildsNodeWithSymbolAndEdgeWithCallSite(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "callee.go", StartLine: 8}
-	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 13}
+	source := &SourceLocation{Path: "callee.go", StartLine: 8}
+	callSite := &SourceLocation{Path: "caller.go", StartLine: 13}
 	symbol := Symbol{QualifiedName: "example.Callee.Run", Signature: "()", Source: source}
 
 	g := NewBuilder().

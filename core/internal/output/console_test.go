@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
@@ -192,8 +191,8 @@ func rootSelfLoopView() View {
 }
 
 func diamondView() View {
-	rootSource := &protocol.SourceLocation{Path: "root.go", StartLine: 10}
-	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 20}
+	rootSource := &graph.SourceLocation{Path: "root.go", StartLine: 10}
+	callSite := &graph.SourceLocation{Path: "caller.go", StartLine: 20}
 	view := consoleView("method:a",
 		[]NodeView{
 			{ID: "method:a", QualifiedName: "A", Signature: "A()", Source: rootSource},
