@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-25 / Status: 完了 (spec #22 sync で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲。#34 の実装追随で View の位置情報型を `graph.SourceLocation` (domain 自前型、ADR-0007 / D6) へ更新 — JSON 出力のフィールド名は output 側の serialization view で不変)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯と issue 単位の作業記録は [spec #7](../../../specs/7-output/) (論点 D2-D7) を参照する。
 
@@ -88,7 +88,7 @@ type NodeView struct {
     ID            string
     QualifiedName string
     Signature     string
-    Source        *protocol.SourceLocation // nil なら位置情報なし
+    Source        *graph.SourceLocation // nil なら位置情報なし
     MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
     Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
@@ -99,7 +99,7 @@ type EdgeView struct {
     CallerID string
     CalleeID string
     Cycle    bool
-    CallSite *protocol.SourceLocation // nil なら位置情報なし
+    CallSite *graph.SourceLocation // nil なら位置情報なし
     Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (spec #22 D11)
 }
 
@@ -110,7 +110,7 @@ type CutoffView struct {
     CalleeID       string
     TargetMethodID string                   // 探索方向の接続先 (dangling する側)
     TargetMinDepth int                      // TargetMethodID の minDepth
-    CallSite       *protocol.SourceLocation // nil なら位置情報なし
+    CallSite       *graph.SourceLocation // nil なら位置情報なし
 }
 
 type Formatter interface {
