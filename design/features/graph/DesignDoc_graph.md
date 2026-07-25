@@ -13,7 +13,7 @@ Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire r
 | 関連 context   | [architecture](../../../context/architecture.md) (Package Boundary)                                                                                                                                                                                                                                                                                      |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                                                                                                                                            |
 | 関連 spec      | [specs/7-output](../../../specs/7-output/) (D1)、[specs/6-traversal](../../../specs/6-traversal/) (読み取り API の consumer)、[specs/24-gradle-multi-module-source-roots](../../../specs/24-gradle-multi-module-source-roots/)、[specs/32-architecture-refactor](../../../specs/32-architecture-refactor/) (D6: SourceLocation 自前型化・変換所在の改訂) |
-| 対象モジュール | `core` (`core/internal/domain/graph`。層構造の正本は [architecture.md](../../../context/architecture.md))                                                                                                                                                                                                                                                |
+| 対象モジュール | `core` (`core/internal/graph`。層構造の正本は [architecture.md](../../../context/architecture.md))                                                                                                                                                                                                                                                       |
 
 ## 背景・要件解釈
 
@@ -41,7 +41,7 @@ Output Engine (Console / JSON / DOT / Mermaid) がメソッド名・宣言位置
 graph は node / edge の ID に加えて、表示に必要な属性を **graph 固有の値型**として保持する。
 
 ```go
-// core/internal/domain/graph
+// core/internal/graph
 type Node struct {
     ID     string // Analyzer の methodId (不透明な stable ID)
     Symbol Symbol
@@ -63,7 +63,7 @@ type Edge struct {
 }
 ```
 
-- **変換は 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しは `platform` 層の ACL (`platform/protocol`。app が定義する port の実装側) が担い、以後 Core 内で wire record を持ち回らない (変換の所在は spec #32 D6 で Analyze Use Case 層から platform 層へ改訂)。
+- **変換は 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しは ACL (`protocol`。app が定義する port の実装側) が担い、以後 Core 内で wire record を持ち回らない (変換の所在は spec #32 D6 で Analyze Use Case 層から platform 層へ改訂)。
 - **wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない**。graph が wire 表現に結合すると、Protocol の版更新が Core 内部モデルへ波及するため。
 - `SourceLocation` は graph package が自前の値型として定義し、`protocol` package の型を再利用しない (2026-07-24 改訂。旧決定は protocol 型の再利用だったが、domain 層から wire 表現への import をゼロにする層規約 [ADR-0007](../../../adr/0007-layered-architecture-refactor.md) に伴い改訂。wire 型との重複定義は境界隔離のコストとして許容する。決定経緯は [spec #32](../../../specs/32-architecture-refactor/index.md))。
 - `sourceLocation` / `callSite` は Protocol 上 optional であり、graph でも nil を許容する。表示時の省略規則は consumer (output feature doc) が定める。
@@ -83,8 +83,8 @@ valid `error`、非ゼロ exit、stdout の parse / schema error の場合は参
 
 ```mermaid
 flowchart TD
-    ACL["platform/protocol (ACL)<br/>(wire record → graph 値型の変換)"] --> UseCase["Analyze Use Case<br/>(port 経由で domain 値を受領し staging へ登録)"]
-    UseCase --> Graph["Graph Engine<br/>(core/internal/domain/graph)"]
+    ACL["protocol (ACL)<br/>(wire record → graph 値型の変換)"] --> UseCase["Analyze Use Case<br/>(port 経由で domain 値を受領し staging へ登録)"]
+    UseCase --> Graph["Graph Engine<br/>(core/internal/graph)"]
     Traversal["Traversal Engine"] -->|"読み取り API"| Graph
     Output["Output Engine"] -->|"symbol / callSite を解決"| Graph
 ```

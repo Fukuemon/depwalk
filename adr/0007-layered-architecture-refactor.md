@@ -1,4 +1,4 @@
-# ADR-0007: Core / Java Analyzer の内部を層別構造へ再編し依存方向を機械検査する
+# ADR-0007: Core / Java Analyzer の依存境界を ACL と機械検査で固定する (Core はフラット package 構成を維持)
 
 ## 状態
 
@@ -6,7 +6,7 @@
 
 ## 決定日
 
-2026-07-24
+2026-07-24 (2026-07-25 改訂: Core の層ディレクトリ物理化を撤回。経緯は spec #32 の D8)
 
 ## 背景
 
@@ -21,22 +21,24 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + JSONL Protocol 
 
 ## 決定
 
-### Core (Go) の層構造
+### Core (Go) の package 構成と依存方向
 
-`core/internal` 配下を 3 層ディレクトリでグルーピングする。層名は `domain` / `usecase` / `infra` のような機械的層名を避け、Go コミュニティで通用する語彙を使う (D1)。
+`core/internal` 配下は**フラットな責務名 package 構成を維持**し、物理的な層ディレクトリは作らない (D8。2026-07-25 改訂 — 当初決定 D1 の 3 層ディレクトリ `domain/app/platform` への物理移動を撤回)。
 
-- `domain/` (graph / traversal): ドメイン層。他層に依存しない
-- `app/` (analyze): アプリケーションサービス層 (usecase 相当)。`domain` のみに依存する
-- `platform/` (protocol / analyzer / output / cli): 技術基盤層 (infrastructure 相当)。外部ライブラリを隔離する
+問題の本質は「package 間の実際の依存エッジが見えない・強制されないこと」であり、層ディレクトリはこれに対して粗すぎる答えだった (層は 3 分類の順序しか示さず、`graph` と `traversal` の関係のような実エッジは依然不可視)。代わりに次の 3 点で可視性と強制を実現する:
 
-package 名 (import 末尾) は従来の責務名を維持する。output は presenter 層を新設せず `platform` に含める (D2)。
+- **依存方向の規定と機械検査**: package 単位の依存規則 (正本は `context/architecture.md` の Package Boundary) を depguard の deny ルールで宣言し、CI / pre-commit で強制する。層 glob より解像度が高い
+- **生成された依存図**: `go list` から package 依存図 (mermaid) を生成するスクリプトを置き、`context/architecture.md` の生成マーカー区間を更新する。手描きの図と違い腐らず、再生成 diff を検査すれば実態との drift も検出できる
+- **コンポジションルート**: 配線 (手動 DI + `var _` 検証) を `cli` に集約し、実際の依存グラフが 1 箇所で読めるようにする
+
+層 (domain / app / platform 相当) は**概念としては維持**し、architecture.md の表で package との対応を示す。ディレクトリには焼き付けない。output は presenter 層を新設しない (D2 は不変)。
 
 ### wire 変換層 (ACL) と port
 
-- `domain/graph` は自前の `Symbol` / `SourceLocation` 値型を持ち、protocol import をゼロにする。wire 型との重複定義は境界隔離のコストとして許容する (D6。graph feature doc の「protocol 型を再利用する」旧決定を改訂)
-- `app/analyze` は domain 型を返す port interface を利用側のファイル内に小さく定義する (`port/` 専用 package は作らない)。app 自身は struct として公開し、先回り interface を作らない
-- `platform/protocol` は腐敗防止層 (ACL) として wire DTO を内部に閉じ、Translator (wire → domain 変換) + Adapter (port 実装) を担う
-- 配線は `platform/cli` (コンポジションルート) でのコンストラクタ注入による手動 DI とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない。`var _ Interface = (*Impl)(nil)` の interface 満足検証も cli に集約する
+- `graph` は自前の `Symbol` / `SourceLocation` 値型を持ち、protocol import をゼロにする。wire 型との重複定義は境界隔離のコストとして許容する (D6。graph feature doc の「protocol 型を再利用する」旧決定を改訂)
+- `analyze` は domain 型 (graph の値型) を返す port interface を利用側のファイル内に小さく定義する (`port/` 専用 package は作らない)。analyze 自身は struct として公開し、先回り interface を作らない
+- `protocol` は腐敗防止層 (ACL) として wire DTO を内部に閉じ、Translator (wire → domain 変換) + Adapter (port 実装) を担う
+- 配線は `cli` (コンポジションルート) でのコンストラクタ注入による手動 DI とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない。`var _ Interface = (*Impl)(nil)` の interface 満足検証も cli に集約する
 
 ### Java Analyzer の構造
 
@@ -46,7 +48,7 @@ package 名 (import 末尾) は従来の責務名を維持する。output は pr
 
 ### 依存方向の機械検査
 
-- Go: golangci-lint + depguard を導入し、層をまたぐ禁止 import (`domain` → `app`/`platform`、`app` → `platform`) を `files` + `deny` + `desc` の宣言形式で検査する。lefthook pre-commit / CI に組み込む (D5)
+- Go: golangci-lint + depguard を導入し、package 単位の禁止 import (例: `graph` / `traversal` → `protocol` / `cli` / `output` を deny、`analyze` → `protocol` / `analyzer` / `output` / `cli` を deny) を `files` + `deny` + `desc` の宣言形式で検査する。lefthook pre-commit / CI に組み込む (D5 / D8)
 - Java: ArchUnit を test 依存として追加し、外部ライブラリ隔離ルールを JUnit テストとして記述する。既存の `./gradlew test` で実行される (D3)
 
 ### 実装の段階分割
@@ -57,8 +59,8 @@ package 名 (import 末尾) は従来の責務名を維持する。output は pr
 
 - 機械的層名 (`domain` / `usecase` / `infra`) を採用する。
   - 却下理由: クリーンアーキテクチャで唯一絶対なのは依存の内向き方向であり、層名・層数は自由。Go コミュニティは機械的層名を避ける傾向があり、`app` / `platform` で同じ構造的可読性が得られる。
-- フラット構成を維持し、層は README / lint のみで表現する。
-  - 却下理由: 「ディレクトリ構造を見るだけで層と依存方向が判別できる」という要求の成功条件を構造で満たせず、文書依存になる。
+- 3 層ディレクトリ (`domain/` `app/` `platform/`) へ物理移動する (当初決定。2026-07-25 撤回)。
+  - 撤回理由: 知りたい解像度は実際の依存エッジであり、層ディレクトリは 3 分類の粗い順序しか示さない。package 名は責務名のまま維持されるため、import path の深化・既存 branch との conflict・17 箇所の doc 追随という churn に見合う情報増がない。Go 規約 (effective-go skill) の「layer-first を避け、責務名パッケージを保つ」とも整合しない。depguard は package 単位ルールで層 glob と同等以上の強制ができ、当初「フラット + lint」案の却下理由だった「文書依存になる」は、手描き文書でなく生成された依存図 + drift 検査に置き換えることで解消した。
 - output を presenter として独立層にする。
   - 却下理由: package 1 つのために 4 層目を作るのは先回りした共通化。依存ルールは platform → domain の既存規則で表現できる。
 - 変換を `app/analyze` に置き、app → platform/protocol の import を例外許可する。
@@ -74,7 +76,7 @@ package 名 (import 末尾) は従来の責務名を維持する。output は pr
 
 ### 良い影響
 
-- ディレクトリ構造だけで層と依存方向が判別でき、新規参加者・AI エージェントが配置と依存を誤りにくい
+- 生成された依存図・depguard の理由付きエラー・cli の配線コードの 3 点から実際の依存関係が判別でき、新規参加者・AI エージェントが配置と依存を誤りにくい (物理移動ゼロで既存 path・既存 branch に影響しない)
 - wire 表現の変更 (Protocol 版更新) がドメインへ波及しない (ACL で遮断)
 - 禁止 import が CI / pre-commit で機械検出され、人力レビュー頼みの regression を防げる
 - 参照実装 (Java Analyzer) の構造から第 2 言語 Analyzer の作り方を読み取れる
@@ -83,7 +85,8 @@ package 名 (import 末尾) は従来の責務名を維持する。output は pr
 
 - `SourceLocation` 相当の型定義が wire 用と domain 用で重複し、フィールド追加時に 2 箇所の更新と変換の追随が必要になる
 - golangci-lint / ArchUnit という dev / test 依存が増える (バージョン固定の保守が必要)
-- import path が 1 階層深くなり、既存 branch との conflict・path 参照 doc の追随コストが一時的に発生する
+- パスを見るだけでは層の粗い順序が読めない (生成図と depguard の desc メッセージ、architecture.md の層対応表で代替する)
+- 依存図生成スクリプトという保守対象が 1 つ増える (drift 検査で腐敗は防ぐ)
 
 ### 影響範囲
 
@@ -92,7 +95,7 @@ package 名 (import 末尾) は従来の責務名を維持する。output は pr
 ## 実装・運用への反映
 
 - spec 更新要否: 要。spec #32 が決定経緯を保持し、実装は #32 の子 issue 2 件で行う
-- context / AI 向け設定更新要否: 要。`context/architecture.md` (Package Boundary の層別化 / Java 内部境界)、`context/project.md` (Naming Conventions)、`context/engineering.md` (層依存 gate) へ反映済み (2026-07-24)
+- context / AI 向け設定更新要否: 要。`context/architecture.md` (Package Boundary の依存規則・生成依存図 / Java 内部境界)、`context/project.md` (Naming Conventions)、`context/engineering.md` (依存方向 gate) へ反映済み (2026-07-24、2026-07-25 D8 改訂を反映)
 
 ## 関連ドキュメント / チケット
 

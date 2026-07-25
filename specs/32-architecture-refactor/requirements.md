@@ -49,7 +49,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + Protocol で分
 
 ## 提供価値(成功条件)
 
-- ディレクトリ構造を見るだけで Domain / UseCase / Infrastructure の層と依存方向が判別できる
+- 依存方向が機械検査 (lint) で強制され、実際の依存関係 (package 間のエッジ) が生成された依存図と配線コード (composition root) から判別できる (2026-07-25 改訂: 当初の「ディレクトリ構造を見るだけで層が判別できる」は、層 3 分類の粗い順序しか示せず知りたい解像度に届かないため、生成図による判別に置き換え。決定経緯は spec D8)
 - 層をまたぐ禁止 import が CI / pre-commit で機械的に検出され、regression が防止される
 - context/architecture.md・DesignDoc の記述と実装の乖離 (graph -> protocol 等) がゼロになる
 - 既存の外部挙動 (CLI インターフェース / JSONL Protocol / 出力形式) は一切変わらない

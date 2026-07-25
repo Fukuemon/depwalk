@@ -7,7 +7,7 @@
 - Issue: `#32`
 - ステータス: `In Progress` (設計フェーズ完了・実装は子 issue #34 / #35 で進行)
 - 作成日: 2026-07-23
-- 更新日: 2026-07-24
+- 更新日: 2026-07-25
 - Branch: `feature/32`
 - Owner: Fukuemon
 
@@ -129,7 +129,7 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 (clarify で確定したものをここに移動する)
 
-- **D1: Core の層ディレクトリ命名 → B) Go 慣習寄りの層名 `domain` / `app` / `platform` を採用** (2026-07-23, Fukuemon)
+- **D1: Core の層ディレクトリ命名 → B) Go 慣習寄りの層名 `domain` / `app` / `platform` を採用** (2026-07-23, Fukuemon) **→ 2026-07-25 D8 で物理化を撤回 (層は概念のみ維持)**
   - `core/internal/` 直下を `domain/` (graph / traversal)、`app/` (analyze)、`platform/` (protocol / analyzer / cli、output は D2 で確定) の 3 層ディレクトリでグルーピングする。package 名 (import 末尾) は従来の責務名を維持する
   - `usecase` / `infra` という機械的層名は避け、Go コミュニティで通用する語彙 (`app` = アプリケーションサービス層、`platform` = 技術基盤層) を使う。層名とクリーンアーキテクチャ用語の対応は architecture.md と各層 README で明文化する
   - 依存方向は `platform` → `app` → `domain` の内向き単方向 (業務ルール 1)。lint (D5) はディレクトリ prefix 単位でルール化する
@@ -138,16 +138,16 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - output は「外界への書き出し形式」という技術詳細として `platform` に含める。依存先は `domain` のみ (現状の `output -> protocol` import は本 issue で除去)
   - package 1 つのために 4 層目 (presenter) を作らない (先回りした共通化の回避)。将来 formatter が肥大化した場合に分離を再検討する
 - **D6: wire 変換層の配置 → A) platform 側に変換、app に port interface** (2026-07-23, Fukuemon)
-  - `domain/graph` が自前の `Symbol` / `SourceLocation` 相当型を持ち、protocol import をゼロにする (受け入れ基準 2)。wire 型との重複定義は境界隔離のコストとして許容する
-  - `app/analyze` は domain 型を返す port interface を定義し、`platform/protocol` (adapter) が wire → domain 変換を担って port を実装する。変換関数の現在地 (`graph/convert.go` の `NodeFromMethodSymbol` 等) は platform 側へ移す
+  - `graph` が自前の `Symbol` / `SourceLocation` 相当型を持ち、protocol import をゼロにする (受け入れ基準 2)。wire 型との重複定義は境界隔離のコストとして許容する
+  - `analyze` は domain 型を返す port interface を定義し、`protocol` (adapter) が wire → domain 変換を担って port を実装する。変換関数の現在地 (`graph/convert.go` の `NodeFromMethodSymbol` 等) は platform 側へ移す
   - 依存方向は `platform` → `app` → `domain` の内向き単方向を例外なしで成立させる (app から protocol への import も除去)
   - 配線は `cli` でのコンストラクタ注入による**手動 DI** とし、`google/wire` 等の DI ライブラリ・コード生成は導入しない (独自の変換層のみ。ADR-0002 の依存最小方針と整合)
   - (2026-07-24 追記, go-service-design 準拠) port interface の置き方を精緻化:
     - port は **利用側 (app/analyze) のファイル内に小さく定義** (1〜2 メソッド、必要なら非公開)。`port/` 専用ディレクトリ・package は作らない (Input Port 廃止・interface は利用側 package に属するという Go 慣習)
     - `app/analyze` 自身は **struct として公開**し、cli 向けの先回り interface (Preemptive Interface) を作らない。cli 側が抽象を必要とする場合のみ cli 側で定義する
     - `var _ Interface = (*Impl)(nil)` による interface 満足の検証は **コンポジションルート (cli の配線箇所) に集約**する
-    - `platform/protocol` は **ACL (腐敗防止層)** として位置づける: wire DTO (外部形式) は ACL 内に閉じ、Translator (wire → domain 変換) + Adapter (port 実装) の組で構成する
-- **D5: Go 側の依存方向 lint → A) golangci-lint + depguard** (2026-07-23, Fukuemon)
+    - `protocol` は **ACL (腐敗防止層)** として位置づける: wire DTO (外部形式) は ACL 内に閉じ、Translator (wire → domain 変換) + Adapter (port 実装) の組で構成する
+- **D5: Go 側の依存方向 lint → A) golangci-lint + depguard** (2026-07-23, Fukuemon) **→ 2026-07-25 D8 でルール単位を層 glob から package 単位へ変更**
   - golangci-lint を dev ツールとして導入し、depguard で層別 (ディレクトリ prefix 単位) の import 禁止ルールを宣言する: `domain` は `app` / `platform` を deny、`app` は `platform` を deny
   - 既存 quality gate (lefthook pre-commit / CI) に組み込む。バージョンは固定して再現性を保つ
   - ルール定義の詳細 (`.golangci.yml` の具体構成) は実装 phase で確定
@@ -168,6 +168,12 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
   - 子 issue のラベルは `type:task` / `phase:implementation` / `domain:core` または `domain:java-analyzer`。branch は `feature/<子issue-id>`、PR は子 issue 単位で小さく保つ。両者は独立で並行作業可能
   - 設計判断のドキュメント同期 (architecture.md / project.md / engineering.md / feature doc / ADR) は本 spec の sync phase で実装に先行して実施する
   - 子 issue の起票は tasks (実装分割) phase で `workflow-git` に従って行う
+- **D8: 層ディレクトリの物理化を撤回し、フラット構成 + 生成依存図で可視性を実現する** (2026-07-25, Fukuemon)
+  - `core/internal` は現行のフラットな責務名 package (`graph` / `traversal` / `analyze` / `protocol` / `analyzer` / `output` / `cli`) を維持し、`domain/` `app/` `platform/` への物理移動 (D1・P1_01) を実施しない。層は概念として architecture.md の対応表で示す
+  - **経緯**: 本 issue の課題の本質は「package 間の実際の依存エッジが見えない・強制されないこと」であり、層ディレクトリは 3 分類の粗い順序しか示さず (`graph` ↔ `traversal` のような層内エッジは依然不可視)、知りたい解像度に届かない。また sdd-template の Go 規約 (effective-go。2026-07-25 改訂) が layer-first 構成を避け責務名 package を推す方向に更新され、D1 の 2026-07-24 追記 (層ファースト維持の根拠) を再検討した結果の再決定
+  - **代替の可視化 3 点**: ① composition root (`cli` の手動 DI 配線 + `var _` 集約 — D6 から不変) ② depguard を package 単位の deny ルールに変更 (層 glob より高解像度。D5 改訂) ③ 依存図を `go list` から生成するスクリプト (`scripts/depgraph.sh`) を導入し、architecture.md の生成マーカー区間を更新・drift 検査する (手描き図の腐敗を構造的に防止)
+  - requirements の成功条件「ディレクトリ構造を見るだけで層と依存方向が判別できる」を「機械検査 + 生成依存図 + 配線コードで判別・強制できる」に改訂 (要求者確認済み)
+  - ACL / port / 手動 DI (D6)・Java 側 (D7 / D3)・段階分割 (D4) は不変。P1_01 (物理移動 prompt) は削除し、core 系列は 2 本 (ACL 化 → depguard + depgraph) に再編
 
 ## 未確定事項
 
@@ -226,12 +232,12 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 ### UI / API / Event Interface
 
-- 確定済み: 層別ディレクトリ構造図・各層の公開境界は `## Content / Data 設計` の「コンテンツ配置 / package / route」(決定時スナップショット) と正本 (architecture.md / ADR-0007) を参照
+- 確定済み: package 配置図 (D8 改訂でフラット構成)・公開境界は `## Content / Data 設計` の「コンテンツ配置 / package / route」(決定時スナップショット) と正本 (architecture.md / ADR-0007) を参照
 
 ### Props / Request / Response
 
-- 変換層 (D6 確定): `app/analyze` が domain 型を返す port interface を **自ファイル内に小さく** 定義し (`port/` package は作らない)、`platform/protocol` (ACL) が wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / domain 版 `SourceLocation`) の写像 (Translator) と port 実装 (Adapter) を担う。変換関数のシグネチャ詳細は diagram / 実装 phase で確定
-- `app/analyze` は struct として公開し、cli 向けの先回り interface は作らない。`var _` による interface 満足検証は cli の配線箇所に集約する
+- 変換層 (D6 確定): `analyze` が domain 型を返す port interface を **自ファイル内に小さく** 定義し (`port/` package は作らない)、`platform/protocol` (ACL) が wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / domain 版 `SourceLocation`) の写像 (Translator) と port 実装 (Adapter) を担う。変換関数のシグネチャ詳細は diagram / 実装 phase で確定
+- `analyze` は struct として公開し、cli 向けの先回り interface は作らない。`var _` による interface 満足検証は cli の配線箇所に集約する
 - 配線は `cli` でのコンストラクタ注入による手動 DI (`google/wire` 等の DI ライブラリは導入しない)
 
 ## Content / Data 設計
@@ -244,24 +250,21 @@ D1〜D4 は [requirements.md の未決事項](requirements.md#未決事項論点
 
 > **決定時スナップショット (2026-07-24 sync で正本ハンドオフ済み)**: 以下の層別配置・層依存図・Java 配置の正本は [context/architecture.md](../../context/architecture.md) の Package Boundary / [ADR-0007](../../adr/0007-layered-architecture-refactor.md) / [java-analyzer feature doc](../../design/features/java-analyzer/DesignDoc_java-analyzer.md) の「内部 package 構成と依存境界」節。本節は決定時点の記録であり、以後の更新は design 側で行う。
 
-- Core (Go) の層別配置 (D1 / D2 / D6 決定):
+- Core (Go) の配置 (D1 / D2 / D6 決定、**2026-07-25 D8 改訂: フラット構成を維持し層ディレクトリは作らない**):
 
 ```text
 core/internal/
-├── domain/         # ドメイン層 (他層に依存しない。wire 非依存)
-│   ├── graph/      # graph model (自前の Symbol / SourceLocation 型)
-│   └── traversal/  # caller/callee 探索
-├── app/            # アプリケーションサービス層 (usecase 相当)
-│   └── analyze/    # analyze orchestration + port interface 定義
-└── platform/       # 技術基盤層 (infra 相当。外部ライブラリ隔離)
-    ├── protocol/   # JSONL wire DTO / parse / validate + wire→domain 変換 (port 実装)
-    ├── analyzer/   # Analyzer process 制御
-    ├── output/     # formatter (依存は domain のみ)
-    └── cli/        # Cobra command + 手動 DI 配線
+├── graph/      # [domain 相当] graph model (自前の Symbol / SourceLocation 型。wire 非依存)
+├── traversal/  # [domain 相当] caller/callee 探索
+├── analyze/    # [app 相当]    analyze orchestration + port interface 定義
+├── protocol/   # [platform 相当] JSONL wire DTO / parse / validate + wire→domain 変換 (port 実装)
+├── analyzer/   # [platform 相当] Analyzer process 制御
+├── output/     # [platform 相当] formatter (依存は graph / traversal のみ)
+└── cli/        # [platform 相当] Cobra command + 手動 DI 配線 (コンポジションルート)
 ```
 
-- package 名 (import 末尾) は従来の責務名を維持する。`core/cmd/depwalk` は現状維持
-- Core の層依存図 (D1 / D2 / D6 確定)。**辺は Go の import 方向** (A → B は「A が B を import する」):
+- `core/cmd/depwalk` は現状維持
+- Core の依存図 (D1 / D2 / D6 確定、D8 改訂後も辺は不変)。**辺は Go の import 方向** (A → B は「A が B を import する」)。subgraph は概念上の層対応でありディレクトリではない:
 
 ```mermaid
 flowchart LR
@@ -382,7 +385,7 @@ sequenceDiagram
     actor User as ユーザー / CI
     participant CLI as platform/cli
     participant APP as app/analyze
-    participant ACL as platform/protocol (ACL)
+    participant ACL as protocol (ACL)
     participant PROC as platform/analyzer
     participant JA as Java Analyzer (別プロセス)
     participant DOM as domain (graph / traversal)
@@ -424,18 +427,17 @@ sequenceDiagram
 | Phase | 対象                         | 概要                                                                       | 依存                     |
 | ----- | ---------------------------- | -------------------------------------------------------------------------- | ------------------------ |
 | P0    | 正本ドキュメント             | sync phase: architecture.md / project.md / engineering.md / ADR の先行更新 | 完了 (2026-07-24 sync)   |
-| P1    | 子 issue #34 (core)          | Core 層別再編 (domain/app/platform) + port/変換層 + golangci-lint/depguard | P0 (main へのマージ)     |
+| P1    | 子 issue #34 (core)          | wire ACL 化 + port + 手動 DI + depguard (package 単位) + 生成依存図        | P0 (main へのマージ)     |
 | P2    | 子 issue #35 (java-analyzer) | Java Analyzer pipeline 再編 + SootUp 隔離 + ArchUnit                       | P0 (P1 とは独立・並行可) |
 
 ### 生成済み prompts 一覧
 
-`prompts/` 配下 (2026-07-24 生成)。各 issue 内は直列、issue 間 (P*\_01 系列と P*_02 系列) は並列可:
+`prompts/` 配下 (2026-07-24 生成、2026-07-25 D8 改訂で core 系列を 3 本 → 2 本に再編)。各 issue 内は直列、issue 間 (P*\_01 系列と P*_02 系列) は並列可:
 
 | ファイル                                    | issue | target        | 並列可     | 依存先 | 概要                                                                 |
 | ------------------------------------------- | ----- | ------------- | ---------- | ------ | -------------------------------------------------------------------- |
-| `P1_01_core_layer-move.md`                  | #34   | core          | P1_02 と可 | なし   | 層別ディレクトリへの物理移動 + import path 更新                      |
-| `P2_01_core_wire-acl-port.md`               | #34   | core          | P*_02 と可 | P1_01  | domain 自前型 + ACL (Translator/Adapter) + port + 手動 DI            |
-| `P3_01_core_depguard-quality-gate.md`       | #34   | core          | P*_02 と可 | P2_01  | golangci-lint + depguard の gate 組み込み + doc path 追随            |
+| `P1_01_core_wire-acl-port.md`               | #34   | core          | P*_02 と可 | なし   | graph 自前型 + ACL (Translator/Adapter) + port + 手動 DI (D8 改訂済) |
+| `P2_01_core_depguard-depgraph.md`           | #34   | core          | P*_02 と可 | P1_01  | golangci-lint + depguard (package 単位) + 生成依存図 + drift 検査    |
 | `P1_02_java-analyzer_pipeline-structure.md` | #35   | java-analyzer | P1_01 と可 | なし   | pipeline 新設 (Runner 移動) + TypeSolverFactory 移動 + 実行順 README |
 | `P2_02_java-analyzer_sootup-facade.md`      | #35   | java-analyzer | P*_01 と可 | P1_02  | SootUp facade 化 (自前型公開、7 ファイルの import 除去)              |
 | `P3_02_java-analyzer_archunit-gate.md`      | #35   | java-analyzer | P*_01 と可 | P2_02  | ArchUnit 隔離 3 段階の検査 + doc path 追随                           |
@@ -477,7 +479,7 @@ sequenceDiagram
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | architecture.md / Package Boundary | Core package 表を 3 層構造 (`domain` / `app` / `platform`) へ改訂し、層名と層責務の対応を明文化 **[反映済: 2026-07-24 sync]**                                                                      | D1 決定 (source: clarify)               |
 | project.md / Naming Conventions    | Core package 一覧を `core/internal/{domain,app,platform}/...` へ改訂 **[反映済: 2026-07-24 sync]**                                                                                                 | D1 決定 (source: clarify)               |
-| architecture.md / Package Boundary | 変換の所在を「app/analyze が port を定義し platform/protocol が wire→domain 変換を実装」へ更新 **[反映済: 2026-07-24 sync]**                                                                       | D6 決定 (source: clarify)               |
+| architecture.md / Package Boundary | 変換の所在を「analyze が port を定義し protocol が wire→domain 変換を実装」へ更新 **[反映済: 2026-07-24 sync]**                                                                                    | D6 決定 (source: clarify)               |
 | engineering.md / quality gate      | golangci-lint + depguard による依存方向検査を lefthook / CI の quality gate へ追記 **[反映済: 2026-07-24 sync]**                                                                                   | D5 決定 (source: clarify)               |
 | engineering.md / quality gate      | Java 側の依存検査 (ArchUnit、`./gradlew test` 内で実行) を quality gate の記述へ追記 **[反映済: 2026-07-24 sync]**                                                                                 | D3 決定 (source: clarify)               |
 | architecture.md / Package Boundary | Java Analyzer 側の内部境界 (SootUp = `sootup/` adapter facade、Gradle Tooling API = `discovery/`、JavaParser = `analysis` 配下のみ許容) と ArchUnit による検査を追記 **[反映済: 2026-07-24 sync]** | D3 / D7 決定 (source: track)            |
@@ -511,28 +513,29 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者                  | 変更内容                                                                                                                                                  |
-| ---------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                                                                                                            |
-| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                                                                                                          |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                                                                                                          |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                                                                                                              |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                                                                                                  |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                                                                                                          |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                                                                                                       |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                                                                                                          |
-| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                                                                                       |
-| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                                                                                  |
-| 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法)                                                         |
-| 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                                                                              |
-| 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化                                                        |
-| 2026-07-24 | Claude (spec-lifecycle) | diagram レビュー指摘 4 件を反映 (層依存図の辺修正・fatal 経路明示)。再レビュー PASS                                                                       |
-| 2026-07-24 | Claude (spec-lifecycle) | track: 上位資料からの変更点を最新化 (path 追随の実測件数・Java 内部境界・ADR 統合方針を追記)                                                              |
-| 2026-07-24 | Claude (spec-lifecycle) | track レビュー指摘 2 件を反映し再レビュー PASS                                                                                                            |
-| 2026-07-24 | Claude (spec-lifecycle) | sync: 正本ハンドオフ (architecture/project/engineering/graph・java-analyzer feature doc へ反映、ADR-0007 起票、ADR-0002 追補)。path 追随は子 issue へ委譲 |
-| 2026-07-24 | Claude (spec-lifecycle) | sync レビュー PASS (反映の実在・ハンドオフ完全性・D1〜D7 一致を確認)                                                                                      |
-| 2026-07-24 | Claude (spec-lifecycle) | tasks: 子 issue #34 / #35 を起票し、prompts 6 本 (P1〜P3 × core / java-analyzer) を生成                                                                   |
-| 2026-07-24 | Claude (spec-lifecycle) | tasks レビュー指摘 4 件を反映し再レビュー PASS。全 phase レビュー済みで spec-lifecycle 完了                                                               |
+| 日付       | 変更者                  | 変更内容                                                                                                                                                                           |
+| ---------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-23 | Claude (spec-lifecycle) | scaffold: index.md 初版作成 (論点 D1〜D7 整理)                                                                                                                                     |
+| 2026-07-23 | Claude (spec-lifecycle) | spec-review PASS (scaffold)。軽微指摘 2 件を反映                                                                                                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D1 解決 (層名 domain/app/platform 採用)                                                                                                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D2 解決 (output は platform に配置)                                                                                                                                       |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D6 解決 (変換は platform、port は app、手動 DI)                                                                                                                           |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D5 解決 (golangci-lint + depguard 採用)                                                                                                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D7 解決 (パイプライン段階 + 外部 lib 隔離)                                                                                                                                |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D3 解決 (ArchUnit 採用)                                                                                                                                                   |
+| 2026-07-23 | Claude (spec-lifecycle) | clarify: D4 解決 (epic + 子 issue 2 件)。全論点解決                                                                                                                                |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify レビュー指摘 2 件を反映 (D6 を feature doc 決定の改訂として記録)                                                                                                           |
+| 2026-07-24 | Claude (spec-lifecycle) | go-service-design を照合し D1 / D5 / D6 へ精緻化を追記 (interface 利用側定義・ACL・depguard 記法)                                                                                  |
+| 2026-07-24 | Claude (spec-lifecycle) | clarify 再レビュー PASS。参考指摘 2 件を反映                                                                                                                                       |
+| 2026-07-24 | Claude (spec-lifecycle) | diagram: 層依存図・Java クラス配置図・flowchart/sequence を追加。D7 に JavaParser 隔離範囲を精緻化                                                                                 |
+| 2026-07-24 | Claude (spec-lifecycle) | diagram レビュー指摘 4 件を反映 (層依存図の辺修正・fatal 経路明示)。再レビュー PASS                                                                                                |
+| 2026-07-24 | Claude (spec-lifecycle) | track: 上位資料からの変更点を最新化 (path 追随の実測件数・Java 内部境界・ADR 統合方針を追記)                                                                                       |
+| 2026-07-24 | Claude (spec-lifecycle) | track レビュー指摘 2 件を反映し再レビュー PASS                                                                                                                                     |
+| 2026-07-24 | Claude (spec-lifecycle) | sync: 正本ハンドオフ (architecture/project/engineering/graph・java-analyzer feature doc へ反映、ADR-0007 起票、ADR-0002 追補)。path 追随は子 issue へ委譲                          |
+| 2026-07-24 | Claude (spec-lifecycle) | sync レビュー PASS (反映の実在・ハンドオフ完全性・D1〜D7 一致を確認)                                                                                                               |
+| 2026-07-24 | Claude (spec-lifecycle) | tasks: 子 issue #34 / #35 を起票し、prompts 6 本 (P1〜P3 × core / java-analyzer) を生成                                                                                            |
+| 2026-07-24 | Claude (spec-lifecycle) | tasks レビュー指摘 4 件を反映し再レビュー PASS。全 phase レビュー済みで spec-lifecycle 完了                                                                                        |
+| 2026-07-25 | Claude + Fukuemon       | D8: 層ディレクトリ物理化を撤回 (フラット維持 + package 単位 depguard + 生成依存図)。ADR-0007 / requirements 成功条件 / 正本 doc / prompts (core 系列 3→2 本) / 子 issue #34 を改訂 |
 
 ## 備考
 

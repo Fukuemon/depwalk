@@ -32,48 +32,48 @@
 
 ### ステップ 0: ブランチ準備
 
-1. `feature/34` を checkout する (P1_01 で作成済み。Draft PR 継続)
-2. P1_01 の完了 (層別移動済み・全テスト PASS) を確認する
+1. 最新の develop から `feature/34` を作成する
+2. Draft PR を作成して push する (PR 本文に完了条件を転記。`Closes #34`)
 
 ### ステップ 1: domain の自前値型
 
 1. テストを先に書く / 更新する (TDD。graph の値型テスト)
-2. `domain/graph` に自前の `SourceLocation` 値型を定義し、`Symbol.Source` / `Edge.CallSite` を `*graph.SourceLocation` (自前型) へ置換する。`graph/convert.go` の変換関数 (`NodeFromMethodSymbol` 等) と deep copy 補助は `platform/protocol` 側へ移す前提でこのステップでは仮置きしてよい
+2. `graph` に自前の `SourceLocation` 値型を定義し、`Symbol.Source` / `Edge.CallSite` を `*graph.SourceLocation` (自前型) へ置換する。`graph/convert.go` の変換関数 (`NodeFromMethodSymbol` 等) と deep copy 補助は `protocol` 側へ移す前提でこのステップでは仮置きしてよい
 3. `## 検証コマンド` を実行する
 4. diff レビューを回し、指摘を対応してから次へ
 
 ### ステップ 2: port 定義と ACL (Translator + Adapter)
 
 1. テストを先に書く / 更新する
-2. `app/analyze` に「domain 型を返す解析結果供給の port interface」を利用側ファイル内に小さく定義する (`port/` package は作らない。1〜2 メソッド、必要なら非公開)
-3. `platform/protocol` に ACL を実装する: wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / `graph.SourceLocation`) の Translator (deep copy 含む) と、`platform/analyzer` (process 制御) を利用して port を満たす Adapter
-4. `app/analyze` / `platform/output` / `domain/graph` から `platform/protocol` への import を除去する
+2. `analyze` に「domain 型 (graph の値型) を返す解析結果供給の port interface」を利用側ファイル内に小さく定義する (`port/` package は作らない。1〜2 メソッド、必要なら非公開)
+3. `protocol` に ACL を実装する: wire DTO (`MethodSymbol` / `CallEdge` / `SourceLocation`) → domain 型 (`graph.Node` / `graph.Edge` / `graph.SourceLocation`) の Translator (deep copy 含む) と、`analyzer` (process 制御) を利用して port を満たす Adapter
+4. `analyze` / `output` / `graph` から `protocol` への import を除去する
 5. `## 検証コマンド` を実行し、diff レビューを回す
 
 ### ステップ 3: cli の手動 DI 配線
 
-1. `platform/cli` で ACL adapter を `app/analyze` の port へコンストラクタ注入する手動 DI に整理し、`cli` の内層迂回参照を配線目的に限定する
+1. `cli` で ACL adapter を `analyze` の port へコンストラクタ注入する手動 DI に整理し、`cli` の内層迂回参照を配線目的に限定する
 2. `var _ <port> = (*<Adapter>)(nil)` の interface 満足検証を cli の配線箇所に集約する
 3. `## 検証コマンド` を実行し、diff レビューを回す
 
 ### ステップ最終: 最終確認
 
-1. `core/` 配下で `platform/protocol` を import しているのが `platform/cli` (配線) と `platform/protocol` 自身のみであることを確認する (`go list` の import 確認は許可された検証手順)
+1. `core/` 配下で `protocol` を import しているのが `cli` (配線) と `protocol` 自身のみであることを確認する (`go list` の import 確認は許可された検証手順)
 2. 全テスト / vet / fmt / E2E がパスすることを確認し、E2E 実行時間が現行から大きく逸脱していないことを確認する
-3. commit する (PR は P3_01 完了まで Draft のまま)
+3. commit する (PR は P2_01 完了まで Draft のまま)
 
 ## 実装コンテキスト
 
 - spec: `specs/32-architecture-refactor/index.md` (解決済みの論点 D6 / Interface 設計 / フロー・シーケンス)
 - 正本: `adr/0007-layered-architecture-refactor.md`、`context/architecture.md`、`design/features/graph/DesignDoc_graph.md` (データ構造 / 構築と公開の原子性)
 - repo root: `$(ghq root)/github.com/Fukuemon/depwalk`
-- 参照する path: `core/internal/domain/graph/` (graph.go / builder.go / convert.go)、`core/internal/app/analyze/`、`core/internal/platform/protocol/`、`core/internal/platform/analyzer/`、`core/internal/platform/output/` (types.go / console.go / json.go)、`core/internal/platform/cli/`
+- 参照する path: `core/internal/graph/` (graph.go / builder.go / convert.go)、`core/internal/analyze/`、`core/internal/protocol/`、`core/internal/analyzer/`、`core/internal/output/` (types.go / console.go / json.go)、`core/internal/cli/` (フラット構成を維持する。D8)
 
 ## 前提条件
 
-- 完了しているべき phase / 依存 prompt: `P1_01_core_layer-move.md`
-- 完了後に着手可能になる後続 prompt: `P3_01_core_depguard-quality-gate.md`
-- 必要な repo 状態: `feature/34` に P1_01 の層別移動が commit 済み
+- 完了しているべき phase / 依存 prompt: なし (issue #34 の最初の prompt)
+- 完了後に着手可能になる後続 prompt: `P2_01_core_depguard-depgraph.md`
+- 必要な repo 状態: develop が spec #32 (PR #36) マージ済み
 
 ## 不明点ハンドリング
 
@@ -85,16 +85,15 @@
 
 ### 実装する範囲
 
-- `domain/graph` の自前 `SourceLocation` 値型と `Symbol` / `Edge` の型置換
-- `app/analyze` の port interface 定義 (利用側・小さく)
-- `platform/protocol` の Translator + Adapter (ACL)、変換関数の移設
+- `graph` の自前 `SourceLocation` 値型と `Symbol` / `Edge` の型置換
+- `analyze` の port interface 定義 (利用側・小さく)
+- `protocol` の Translator + Adapter (ACL)、変換関数の移設
 - `graph` / `output` / `analyze` からの `protocol` import 除去、`cli` の手動 DI 配線と `var _` 集約
 
 ### 実装しない範囲
 
-- 層ディレクトリの移動 (P1_01 で完了済み)
-- depguard / lint 導入 — P3_01 の責務
-- doc の path 追随 — P3_01 の責務
+- package の物理移動・改名 (フラット構成を維持する。D8 で層ディレクトリ化は撤回済み)
+- depguard / lint / 依存図生成の導入 — P2_01 の責務
 - JSONL Protocol schema / parse / validate 仕様の変更 (protocol package の検証ロジックは不変)
 - staging Graph の公開 / 破棄セマンティクスの変更 (挙動は現状維持。担当が ACL に移るだけ)
 
@@ -102,11 +101,11 @@
 
 spec #32 D6 (確定) の抜粋:
 
-- `domain/graph` が自前の `Symbol` / `SourceLocation` 相当型を持ち、protocol import をゼロにする (受け入れ基準 2)。wire 型との重複定義は境界隔離のコストとして許容する
-- `app/analyze` は domain 型を返す port interface を定義し、`platform/protocol` (adapter) が wire → domain 変換を担って port を実装する
-- 依存方向は `platform` → `app` → `domain` の内向き単方向を例外なしで成立させる
+- `graph` が自前の `Symbol` / `SourceLocation` 相当型を持ち、protocol import をゼロにする (受け入れ基準 2)。wire 型との重複定義は境界隔離のコストとして許容する
+- `analyze` は domain 型を返す port interface を定義し、`protocol` (adapter) が wire → domain 変換を担って port を実装する
+- 依存方向は architecture.md の package 単位の依存規則を例外なしで成立させる (`graph` / `analyze` / `output` から `protocol` への import ゼロ)
 - 配線は `cli` でのコンストラクタ注入による手動 DI。`google/wire` 等は導入しない
-- port は利用側 (app) のファイル内に小さく定義し、`port/` 専用 package を作らない。app は struct として公開し、cli 向けの先回り interface を作らない。`var _` 検証は cli に集約
+- port は利用側 (`analyze`) のファイル内に小さく定義し、`port/` 専用 package を作らない。analyze は struct として公開し、cli 向けの先回り interface を作らない。`var _` 検証は cli に集約
 - graph feature doc (改訂済み): 変換は 1 回だけ。wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない。metadata は deep copy。`sourceLocation` / `callSite` は nil 許容
 - 構築と公開の原子性 (不変): valid record を受領順に staging Graph へ登録し、process 成功 + 参照完全性成立時のみ公開。fatal / 非ゼロ exit / parse・schema error 時は staging と先行 diagnostic を全破棄
 
@@ -137,9 +136,9 @@ analyzer → (内層 import なし)
 
 ## 完了条件
 
-- [ ] `domain/graph` に自前 `SourceLocation` があり、`Symbol.Source` / `Edge.CallSite` が自前型になっている
-- [ ] `domain/*` / `app/*` / `platform/output` から `platform/protocol` への import がゼロ
-- [ ] port が `app/analyze` 内に小さく定義され、`platform/protocol` が実装している
+- [ ] `graph` に自前 `SourceLocation` があり、`Symbol.Source` / `Edge.CallSite` が自前型になっている
+- [ ] `graph` / `traversal` / `analyze` / `output` から `protocol` への import がゼロ
+- [ ] port が `analyze` 内に小さく定義され、`protocol` が実装している
 - [ ] `cli` の手動 DI 配線と `var _` 検証が cli に集約されている
 - [ ] `## 検証コマンド` がすべてパスし、E2E 実行時間が大きく逸脱していない
 - [ ] 各ステップで diff レビューを実施し、指摘を対応した
