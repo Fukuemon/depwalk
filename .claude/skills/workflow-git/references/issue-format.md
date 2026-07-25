@@ -9,7 +9,7 @@ GitHub Issue のタイトル・本文フォーマット。
 | `feature`  | `✨ feature: <サマリ>`  | `type:feature`  | 新機能、利用者価値を増やす改善 |
 | `bug`      | `🐛 bug: <サマリ>`      | `type:bug`      | 不具合修正                     |
 | `research` | `🔎 research: <サマリ>` | `type:research` | 調査、技術検証、スパイク       |
-| `task`     | `🛠 task: <サマリ>`      | `type:task`     | 実装や運用で実施すべき具体作業 |
+| `task`     | `🛠 task: <サマリ>`     | `type:task`     | 実装や運用で実施すべき具体作業 |
 | `chore`    | `🧹 chore: <サマリ>`    | `type:chore`    | 保守、設定変更、依存更新、雑務 |
 
 ## タイトル
