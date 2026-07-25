@@ -1,6 +1,6 @@
 # Engineering Conventions
 
-> 最終更新: 2026-07-24
+> 最終更新: 2026-07-26
 
 shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.yml](project.yml)。
 
