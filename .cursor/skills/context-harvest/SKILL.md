@@ -18,7 +18,7 @@ description: 実装・レビュー・障害対応で得た横断的な知見 (�
 ## 先に読むもの
 
 - `AGENTS.md` の `Spec Workflow Contract` — 正本境界 (どの文書がどの情報の正本か) と「文書メタ情報の同期」
-- `context/project.md` と既存の `context/*.md` — 追記先の候補と既存記述 (重複防止)
+- `context/project.yml` と既存の `context/*.md` — 追記先の候補と既存記述 (重複防止)
 - `styleguide-documents` skill — 書き戻す文章の品質基準
 
 ## 入力
@@ -55,6 +55,16 @@ issue 固有の決定は spec に残す (本 skill の対象外。`Spec Workflow
 - `styleguide-documents` の原則に従い、条件・理由・判断基準まで書く (「注意する」だけの行を足さない)。
 - 既存記述と重複・矛盾する場合は追記でなく該当箇所を更新する。
 - `Spec Workflow Contract` の「文書メタ情報の同期」に従い、対象文書のメタ情報も更新する。
+
+### 3-2. 読み取り索引 (`context/impact-index.yaml`) の更新
+
+書き戻した知見が特定 feature に紐づく場合、索引の該当エントリを同時に更新する:
+
+- 該当エントリの `read:` に書き戻し先ファイルが含まれているか確認し、無ければ足す
+- 新しい feature ならエントリを新設する (`coverage: partial` で仮置きしてよい)
+- 書き戻しで context が揃った feature は `coverage: partial` → `full` に上げる
+
+索引が実態とずれると読み取り契約 (索引 → `read:` だけを読む) が壊れ、全文読みに逆戻りする。
 
 ### 4. ユーザー報告
 

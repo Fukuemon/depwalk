@@ -1,3 +1,6 @@
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
@@ -13,6 +16,12 @@ url = "https://mcp.deepwiki.com/mcp"
 
 [features]
 hooks = true
+
+[permissions.rulesync]
+extends = ":workspace"
+
+[permissions.rulesync.filesystem.":workspace_roots"]
+".git/**" = "write"
 
 [permissions.rulesync.network]
 enabled = true

@@ -95,7 +95,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + JSONL Protocol 
 ## 実装・運用への反映
 
 - spec 更新要否: 要。spec #32 が決定経緯を保持し、実装は #32 の子 issue 2 件で行う
-- context / AI 向け設定更新要否: 要。`context/architecture.md` (Package Boundary の依存規則・生成依存図 / Java 内部境界)、`context/project.md` (Naming Conventions)、`context/engineering.md` (依存方向 gate) へ反映済み (2026-07-24、2026-07-25 D8 改訂を反映)
+- context / AI 向け設定更新要否: 要。`context/architecture.md` (Package Boundary の依存規則・生成依存図 / Java 内部境界)、`context/project.yml` (Naming Conventions)、`context/engineering.md` (依存方向 gate) へ反映済み (2026-07-24、2026-07-25 D8 改訂を反映)
 
 ## 関連ドキュメント / チケット
 

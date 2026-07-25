@@ -2,7 +2,7 @@
 
 > 最終更新: 2026-07-18
 
-採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.md](project.md) の Quick Commands を正本とする。
+採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
 
 Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
 本書は、実装者が参照する標準 stack と導入境界だけを保持する。

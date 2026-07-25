@@ -56,7 +56,7 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 ## 実装・運用への反映
 
 - spec 更新要否: 要。spec #9 の durable 成果を feature doc / ADR 正本へハンドオフし、spec 側は決定時スナップショットへ降格する。
-- context / AI 向け設定更新要否: 要。`context/project.md` の Quick Commands (開発起動 / E2E) を本決定に沿って更新する。
+- context / AI 向け設定更新要否: 要。`context/project.yml` の Quick Commands (開発起動 / E2E) を本決定に沿って更新する。
 
 ## 関連ドキュメント / チケット
 

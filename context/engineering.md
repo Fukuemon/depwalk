@@ -2,7 +2,7 @@
 
 > 最終更新: 2026-07-24
 
-shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.md](project.md)。
+shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.yml](project.yml)。
 
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
 
@@ -10,7 +10,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - Core の初期 shared config は Go 標準 command を優先し、専用 config を増やさない。
 - `golangci-lint` は依存方向検査 (depguard) の要件化 (spec #32) に伴い導入する。バージョンは固定し、設定は `core/.golangci.yml` に置く。`govulncheck`、release automation の設定は、CI gate または release 手順が要件化した時点で追加する。
-- 現状の共有契約はドキュメント正本パス ([project.md](project.md) Source of Truth) と AI 設定 (`.rulesync/` → 各 provider 生成)。
+- 現状の共有契約はドキュメント正本パス ([project.yml](project.yml) Source of Truth) と AI 設定 (`.rulesync/` → 各 provider 生成)。
 
 ## Root Task Boundary
 

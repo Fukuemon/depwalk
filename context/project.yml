@@ -1,0 +1,150 @@
+# Project Profile — depwalk 固有値の唯一の正本 (機械可読)
+#
+# `.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` / `workflow-git` 等の skill は、
+# 固有名をハードコードせず本ファイルを読む。値を変えたら meta.updated を更新し、
+# 依存する context/*.md との整合を確認する。
+
+meta:
+  updated: 2026-07-25
+
+product:
+  name: depwalk
+  slug: depwalk
+
+# Repository Map。Core 実装基盤の正本は adr/0002-core-implementation-foundation.md、
+# 詳細な package boundary は context/architecture.md。
+repos:
+  convention: ghq 規約。$(ghq root)/github.com/Fukuemon/depwalk
+  app: "." # 単一リポジトリ
+  docs: "."
+  infra: null
+  layout: |
+    depwalk/
+    ├── design/        # 全体像 (landscape) と feature 設計 (DesignDoc.md + features/)
+    ├── context/       # 技術規約 / codebase architecture / 運用契約
+    ├── specs/         # 機能単位の作業文書 (issue 駆動。close 時に削除)
+    ├── adr/           # 個別の意思決定
+    ├── core/          # Go 実装の Core CLI / graph / traversal / output / protocol
+    ├── analyzers/     # 言語別 Analyzer 実装
+    ├── testdata/      # JSONL contract fixture / E2E fixture
+    ├── templates/     # 各文書のテンプレート
+    └── .rulesync/     # AI 設定 (sdd-template への symlink。commit しない)
+
+# Naming Conventions
+naming:
+  package: Go package は小文字・短い単語・責務名 (core/internal/core のような重複名は使わない)
+  core_module: github.com/Fukuemon/depwalk/core
+  # フラットな責務名構成。層ディレクトリは作らない (層は概念として architecture.md の対応表で示す)。
+  # 正本は adr/0007-layered-architecture-refactor.md / context/architecture.md の Package Boundary
+  core_packages: core/internal/{graph,traversal,analyze,protocol,analyzer,output,cli}
+  analyzer_dir: analyzers/<language>/
+  branch: feature/<issue-id>
+
+# Quick Commands。Core の標準 command は adr/0002 を正本とする。
+# repository-level の make-like wrapper は初期導入しない。
+commands:
+  dev: depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" # 自動 discovery (Gradle build model)
+  dev-override: depwalk analyze <workspace-root> --language java --source-root <relative-root> --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --analyzer-meta classpath= --analyzer-meta javaLanguageLevel=21 # 明示 override (--source-root 繰り返し可。preview は --analyzer-meta javaPreview=true)
+  query: depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --method "com.example.UserService#findById(java.lang.Long)" --direction caller --format json # 探索クエリ。正本は design/features/cli/DesignDoc_cli.md (設計確定済み・実装は #22)
+  build: cd core && go build ./...
+  lint: cd core && go vet ./...
+  format: cd core && go fmt ./... # 確認は cd core && test -z "$(gofmt -l .)"
+  test: cd core && go test ./...
+  analyzer-build: cd analyzers/java && ./gradlew shadowJar
+  analyzer-test: cd analyzers/java && ./gradlew test
+  e2e: (cd analyzers/java && ./gradlew shadowJar) && ./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project clean writeDepwalkClasspath && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1) # 要 JDK 25。fixture task は classes に依存
+  e2e-multiproject: (cd analyzers/java && ./gradlew shadowJar) && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -run TestGradleMultiProjectCLI -count=1) # 実 Core CLI + 実 Analyzer jar
+  gradle-compat: (cd analyzers/java && ./gradlew gradleCompatibilityTest) # Gradle 7.6.5〜9.6.x の CI anchor 再現
+  check: lefthook run pre-commit
+  tidy: cd core && go mod tidy
+  add-dep: cd core && go get <module>@<version>
+
+tracker:
+  type: github
+  cli: gh
+  project: Fukuemon/depwalk
+
+# 対象ドメイン (spec「実装対象」テーブルと domain:* ラベルの正本)
+domains:
+  - core # CLI entrypoint、Analyzer process orchestration、graph/traversal/output/protocol を束ねる Go Core
+  - traversal # Caller / Callee 探索 (Traversal Engine)
+  - output # 出力形式 (Console / JSON / DOT / Mermaid; Output Engine)
+  - analyzer-protocol # Analyzer SPI + Communication Protocol (JSONL) + Model (言語非依存の共通契約)
+  - java-analyzer # Java/Spring 解析の言語別実装 (analyzer-protocol を実装)
+
+# Label Policy — Issue / PR のラベル体系の唯一の正本 (workflow-git skill が読む)
+labels:
+  axes:
+    - axis: "type:*"
+      values: [type:feature, type:bug, type:research, type:task, type:chore]
+      color: "#1d76db"
+      rule: 必須・1 件。issue の種類 (workflow-git の issue-format と一致させる)
+    - axis: "phase:*"
+      values: [phase:design, phase:implementation]
+      color: "#5319e7"
+      rule: SDD ライフサイクル。設計 issue は phase:design
+    - axis: "domain:*"
+      values_from: domains # 上記 domains と一対一。横断は domain:core
+      color: "#0e8a16"
+      rule: 1 件以上。ドメインを増やすときは domains と両方更新する
+    - axis: flag
+      values: [epic]
+      color: "#fbca04"
+      rule: 複数 phase / spec にまたがる大きい要件 (親)
+    - axis: "status:*"
+      values: [status:designing, status:ready-to-implement, status:implementing]
+      color: "#0052cc"
+      rule: 設計対象 issue に常に 1 件。遷移は節目の skill が行う (workflow-git の issue-status.md)
+    - axis: "quality:*"
+      values: [quality:requirement-gap, quality:design-gap]
+      color: "#d93f0b"
+      rule: 派生 issue (前段 phase の取りこぼし) 側にのみ付与し、変更元 issue には付けない (workflow-git の derived-issue.md)
+  minimum:
+    - すべての issue に type:* を 1 件付ける
+    - 実装対象が定まる issue には該当する domain:* を付ける
+    - 設計フェーズ issue には phase:design、実装フェーズには phase:implementation
+    - 複数 phase / spec に展開される親 issue には epic を付ける
+
+spec:
+  phases: [intake, scaffold, clarify, diagram, track, sync, prompts]
+
+design:
+  prd: integrated # PRD は design/DesignDoc.md の Why/What 節に統合
+
+# Source of Truth — 正本ドキュメントのパス契約
+paths:
+  prd: design/DesignDoc.md # 統合モード (Why/What 節)
+  design_doc: design/DesignDoc.md
+  feature_dir: design/features/<feature>/
+  feature_doc: design/features/<feature>/DesignDoc_<feature>.md
+  context: context/<topic>.md
+  adr: adr/
+  spec_dir: specs/<issue-id>-<slug>/
+  spec_body: specs/<issue-id>-<slug>/index.md
+  spec_prompts: specs/<issue-id>-<slug>/prompts/
+  spec_requirements: specs/<issue-id>-<slug>/requirements.md # 任意
+  spec_review: specs/<issue-id>-<slug>/review.md # 任意
+
+templates:
+  prd: templates/prd/template.md
+  design_doc: templates/design-doc/template.md
+  context: templates/context/<topic>.md
+  spec: templates/specs/template.md
+  spec_appendices: templates/specs/appendices/<topic>.md
+  feature: templates/features/template.md
+  requirements: templates/requirements/template.md
+  adr: templates/adr/template.md
+
+# Decision Priority (DesignDoc 設計原則 P1〜P4 から導出)。
+# 技術選定の根拠は design/DesignDoc.md と adr/。
+decision_priority:
+  - 将来拡張性 (マルチ言語化 / Analyzer 追加で Core 無変更 — S5, P1/P4)
+  - Core の言語非依存性 / 結合点の最小化 (Protocol のみで結合 — P2/P3)
+  - デバッグ容易性 (JSONL でテキスト観測可能 — Communication Protocol)
+  - 開発体験
+
+glossary:
+  - term: Analyzer
+    def: 言語別の解析プロセス。Core と JSONL Protocol のみで結合する
+  - term: Traversal Engine
+    def: Caller / Callee 探索を担う Core 内モジュール

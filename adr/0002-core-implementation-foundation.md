@@ -114,7 +114,7 @@ Go package や Java 実装 code を共有境界にしない。
 ## 実装・運用への反映
 
 - spec 更新要否: 要。spec #11 は本 ADR と context への handoff を記録し、durable な判断の正本を ADR / context に移す。
-- context / AI 向け設定更新要否: 要。`context/project.md`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` を本 ADR 参照として更新する。
+- context / AI 向け設定更新要否: 要。`context/project.yml`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` を本 ADR 参照として更新する。
 
 ## 関連ドキュメント / チケット
 

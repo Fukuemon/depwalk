@@ -20,6 +20,10 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 0
 fi
 
-npx prettier --write "$FILE_PATH" >/dev/null 2>&1 || true
+if [ -x "node_modules/.bin/prettier" ]; then
+  node_modules/.bin/prettier --write -- "$FILE_PATH" >/dev/null 2>&1 || true
+else
+  npx --yes prettier@3.6.2 --write -- "$FILE_PATH" >/dev/null 2>&1 || true
+fi
 
 exit 0

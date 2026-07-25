@@ -1,6 +1,6 @@
 # Command Matrix
 
-コマンドの **分類と用途**。具体的なコマンド文字列は [context/project.md](../../../../context/project.md) の Quick Commands を正本とし、ここでは「どの分類をいつ使うか」を解説する。
+コマンドの **分類と用途**。具体的なコマンド文字列は [context/project.yml](../../../../context/project.yml) の `commands` を正本とし、ここでは「どの分類をいつ使うか」を解説する。
 
 ## Contents
 
