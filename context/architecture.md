@@ -16,27 +16,46 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
 
-### Core の層構造 (Go)
+### Core の package 構成と依存方向 (Go)
 
-`core/internal` 配下は 3 層ディレクトリでグルーピングする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md))。層名はクリーンアーキテクチャの機械的層名を避けた Go 慣習寄りの語彙で、`domain` = ドメイン層、`app` = アプリケーションサービス層 (usecase 相当)、`platform` = 技術基盤層 (infrastructure 相当) に対応する。
+`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md) D8)。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
-| Layer      | Package                           | 責務                                                                                      |
-| ---------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| (cmd)      | `core/cmd/depwalk`                | `main`。Cobra root command の起動                                                         |
-| `domain`   | `core/internal/domain/graph`      | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
-| `domain`   | `core/internal/domain/traversal`  | caller / callee traversal                                                                 |
-| `app`      | `core/internal/app/analyze`       | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
-| `platform` | `core/internal/platform/protocol` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
-| `platform` | `core/internal/platform/analyzer` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
-| `platform` | `core/internal/platform/output`   | text / JSON / DOT / Mermaid formatter (依存先は domain のみ)                              |
-| `platform` | `core/internal/platform/cli`      | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
+| Package                   | 層 (概念)  | 責務                                                                                      |
+| ------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `core/cmd/depwalk`        | (cmd)      | `main`。Cobra root command の起動                                                         |
+| `core/internal/graph`     | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
+| `core/internal/traversal` | `domain`   | caller / callee traversal                                                                 |
+| `core/internal/analyze`   | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
+| `core/internal/protocol`  | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
+| `core/internal/analyzer`  | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
+| `core/internal/output`    | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
+| `core/internal/cli`       | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
 
-依存規則 (内向き単方向):
+依存規則 (package 単位。depguard で機械検査する):
 
-- `domain` は他層に依存しない (wire 表現 `protocol` への import 禁止を含む)
-- `app` → `domain` のみ。`platform` への import 禁止 (抽象は app 側の port interface で表現し、`platform` が実装する)
-- `platform` → `app` / `domain`。`cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
+- `graph`: 他の internal package に依存しない (wire 表現 `protocol` への import 禁止を含む)
+- `traversal` → `graph` のみ
+- `analyze` → `graph` / `traversal` のみ。`protocol` / `analyzer` / `output` / `cli` への import 禁止 (抽象は analyze 側の port interface で表現し、`protocol` が実装する)
+- `output` → `graph` / `traversal` のみ
+- `protocol` → `analyze` (port 実装) / `analyzer` (process 起動に利用) / `graph`
+- `analyzer`: 他の internal package に依存しない
+- `cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
 - DI ライブラリ (`google/wire` 等) は導入せず、`cli` でのコンストラクタ注入による手動 DI とする
+
+依存図は手で描かず、`go list` から生成して下の生成マーカー区間に埋める (生成スクリプトと drift 検査は #34 で導入。再生成して diff が出る状態を CI で检出する):
+
+<!-- BEGIN GENERATED: core-depgraph (scripts/depgraph.sh が更新する。手編集しない) -->
+
+```mermaid
+graph LR
+    cli --> analyze & protocol & analyzer & output
+    protocol --> analyze & analyzer & graph
+    analyze --> graph & traversal
+    output --> graph & traversal
+    traversal --> graph
+```
+
+<!-- END GENERATED: core-depgraph -->
 
 ### Java Analyzer の内部境界
 

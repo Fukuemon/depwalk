@@ -39,10 +39,8 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - Go package 名: 小文字、短い単語、責務名を使う。`core/internal/core` のような重複名は使わない。
 - Core module path: `github.com/Fukuemon/depwalk/core`
-- Core package (層別構造。正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md) / [architecture.md](architecture.md) の Package Boundary):
-  - `domain` 層: `core/internal/domain/graph`、`core/internal/domain/traversal`
-  - `app` 層: `core/internal/app/analyze`
-  - `platform` 層: `core/internal/platform/protocol`、`core/internal/platform/analyzer`、`core/internal/platform/output`、`core/internal/platform/cli`
+- Core package (フラットな責務名構成。正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md) / [architecture.md](architecture.md) の Package Boundary):
+  - `core/internal/{graph, traversal, analyze, protocol, analyzer, output, cli}` — 層ディレクトリは作らない (層は概念として architecture.md の対応表で示す)
 - Analyzer package / directory: `analyzers/<language>/`
 - ブランチ: `feature/<issue-id>`
 
