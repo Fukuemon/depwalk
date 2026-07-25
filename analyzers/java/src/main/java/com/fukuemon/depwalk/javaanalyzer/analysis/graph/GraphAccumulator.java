@@ -23,7 +23,7 @@ import java.util.Map;
  * 不変であり、fullGraph streaming で flush 済みの node と後続ファイル由来の同一 methodId が衝突しても
  * 出力の劣化は起きない。
  *
- * <p>1 回の {@link com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner} 実行の中で単一
+ * <p>1 回の {@link com.fukuemon.depwalk.javaanalyzer.analysis.pipeline.AnalysisRunner} 実行の中で単一
  * thread から呼び出される前提であり、並行アクセスに対する保護は行わない。
  */
 public final class GraphAccumulator {

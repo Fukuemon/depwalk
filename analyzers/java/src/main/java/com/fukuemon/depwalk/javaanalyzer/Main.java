@@ -1,7 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisRunner;
+import com.fukuemon.depwalk.javaanalyzer.analysis.pipeline.AnalysisRunner;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.discovery.DiscoveryFailure;

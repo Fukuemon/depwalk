@@ -1,6 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.spring;
 
-import com.fukuemon.depwalk.javaanalyzer.analysis.TypeSolverFactory;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;

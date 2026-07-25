@@ -1,4 +1,4 @@
-package com.fukuemon.depwalk.javaanalyzer.analysis;
+package com.fukuemon.depwalk.javaanalyzer.analysis.pipeline;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
@@ -20,6 +20,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.context.ParsePreflight;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ResolvedDeclarationOrigin;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.SourceSetAnalysisContext;
+import com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
