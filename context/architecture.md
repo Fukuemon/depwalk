@@ -42,16 +42,16 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - `cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
 - DI ライブラリ (`google/wire` 等) は導入せず、`cli` でのコンストラクタ注入による手動 DI とする
 
-依存図は手で描かず、`go list` から生成して下の生成マーカー区間に埋める (生成スクリプトと drift 検査は #34 で導入。再生成して diff が出る状態を CI で检出する):
+依存図は手で描かず、`go list` の実 import から `scripts/depgraph.sh` で生成して下の生成マーカー区間に埋める。再生成して diff が出る状態 (図の更新漏れ) は lefthook pre-commit と CI が drift として検出する:
 
 <!-- BEGIN GENERATED: core-depgraph (scripts/depgraph.sh が更新する。手編集しない) -->
 
 ```mermaid
 graph LR
-    cli --> analyze & protocol & analyzer & output
-    protocol --> analyze & analyzer & graph
     analyze --> graph & traversal
+    cli --> analyze & analyzer & graph & output & protocol
     output --> graph & traversal
+    protocol --> analyze & analyzer & graph
     traversal --> graph
 ```
 

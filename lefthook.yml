@@ -6,6 +6,24 @@ pre-commit:
       run: hooks/format/run_prettier.sh
     repo-analysis:
       run: hooks/quality/validate_repo_analysis.sh
+    # Go の依存方向 gate (spec #32 D5 / D8)。import かルール自体を
+    # 触ったときだけ走らせる (毎 commit で linter を起動しない)。
+    go-depguard:
+      glob:
+        - "core/**/*.go"
+        - "core/.golangci.yml"
+      run: scripts/golangci-lint.sh ./...
+    # 依存図の drift 検査: 実 import が変わったのに architecture.md の
+    # 生成区間を更新していない状態を検出する。生成側 (スクリプト) と
+    # 生成先 (architecture.md) の手編集も同じ検査で拾う。
+    go-depgraph-drift:
+      glob:
+        - "core/**/*.go"
+        - "scripts/depgraph.sh"
+        - "context/architecture.md"
+      run: |
+        scripts/depgraph.sh
+        git diff --exit-code context/architecture.md
 
 pre-push:
   commands:
