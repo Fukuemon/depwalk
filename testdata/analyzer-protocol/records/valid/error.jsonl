@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"error","code":"ANALYZER_FAILED","message":"Analyzer could not read project","sourceLocation":{"path":"src/main/java/com/example/App.java","startLine":1}}

@@ -1,0 +1,44 @@
+{
+  "description": "自己再帰 (self-loop): a -> b, b -> b。self-loop は cycle 注釈付きで到達 edge 集合に残る",
+  "graph": {
+    "nodes": ["method:a", "method:b"],
+    "edges": [
+      {
+        "edgeId": "edge:ab",
+        "callerMethodId": "method:a",
+        "calleeMethodId": "method:b"
+      },
+      {
+        "edgeId": "edge:bb",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:b"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: callee from a annotates the self-loop as cycle",
+      "start": "method:a",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:a", "method:b"],
+        "edges": ["edge:ab", "edge:bb"],
+        "cycles": ["edge:bb"],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from b includes the recursive caller",
+      "start": "method:b",
+      "direction": "caller",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:b", "method:a"],
+        "edges": ["edge:ab", "edge:bb"],
+        "cycles": ["edge:bb"],
+        "depthCutoffs": []
+      }
+    }
+  ]
+}

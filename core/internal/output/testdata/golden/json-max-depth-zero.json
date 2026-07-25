@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "status": "ok",
+  "direction": "callee",
+  "start": "method:a",
+  "nodes": [
+    {
+      "methodId": "method:a",
+      "qualifiedName": "A",
+      "signature": "A()",
+      "minDepth": 0
+    }
+  ],
+  "edges": [],
+  "depthCutoffs": [
+    {
+      "edgeId": "edge:ab",
+      "callerMethodId": "method:a",
+      "calleeMethodId": "method:b",
+      "targetMethodId": "method:b",
+      "targetMinDepth": 1
+    }
+  ]
+}

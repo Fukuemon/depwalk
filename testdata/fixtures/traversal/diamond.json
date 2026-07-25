@@ -1,0 +1,54 @@
+{
+  "description": "合流 (ダイヤモンド型): o -> a -> m と o -> b -> m。合流 edge は cycle と誤標識されずすべて保持される",
+  "graph": {
+    "nodes": ["method:o", "method:a", "method:b", "method:m"],
+    "edges": [
+      {
+        "edgeId": "edge:oa",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:a"
+      },
+      {
+        "edgeId": "edge:ob",
+        "callerMethodId": "method:o",
+        "calleeMethodId": "method:b"
+      },
+      {
+        "edgeId": "edge:am",
+        "callerMethodId": "method:a",
+        "calleeMethodId": "method:m"
+      },
+      {
+        "edgeId": "edge:bm",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:m"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: callee from o keeps all convergent edges without cycle annotation",
+      "start": "method:o",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:o", "method:a", "method:b", "method:m"],
+        "edges": ["edge:oa", "edge:ob", "edge:am", "edge:bm"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from m reaches both arms",
+      "start": "method:m",
+      "direction": "caller",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:m", "method:a", "method:b", "method:o"],
+        "edges": ["edge:am", "edge:bm", "edge:oa", "edge:ob"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    }
+  ]
+}

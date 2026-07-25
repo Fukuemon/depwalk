@@ -1,0 +1,135 @@
+name: CI
+
+# NOTE: setup-java / setup-go の重複は現状 2-3 箇所に収まる規模のため
+# composite action 化していない。job が増えて setup 記述が 3 箇所以上に
+# 重複するようになったら .github/actions/ へ composite action として抽出する。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go-quality:
+    name: "Go quality (fmt / vet / build / test)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+
+      # E2E テストは JDK 不在時に自動 skip されるため、この job に JVM は含めない
+      # (JVM が必要な検証は java-analyzer / e2e job が担う)。
+
+      - name: Check gofmt
+        run: test -z "$(gofmt -l .)"
+        working-directory: core
+
+      - name: go vet
+        run: go vet ./...
+        working-directory: core
+
+      - name: go build
+        run: go build ./...
+        working-directory: core
+
+      - name: go test
+        run: go test ./...
+        working-directory: core
+
+      - name: go mod tidy diff check
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+        working-directory: core
+
+      - name: Dependency boundary gate (core must not depend on analyzers/)
+        run: |
+          # Scope the grep to this repo's own analyzers/<language> import
+          # path prefix (not a bare "analyzers/" substring) so a
+          # third-party dependency whose import path happens to contain
+          # "analyzers/" isn't misreported as a boundary violation.
+          if go list -deps ./... | grep -E "^github.com/Fukuemon/depwalk/analyzers/"; then
+            echo "core must not depend on analyzers/<language>/ packages"
+            exit 1
+          fi
+        working-directory: core
+
+  java-analyzer:
+    name: "Java Analyzer (unit tests / fat jar)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Build and test Java Analyzer
+        run: ./gradlew test shadowJar
+        working-directory: analyzers/java
+
+      - name: Upload Java Analyzer fat jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-analyzer-jar
+          path: analyzers/java/build/libs/java-analyzer.jar
+          retention-days: 1
+
+  e2e:
+    name: "E2E (depwalk analyze × real jar)"
+    needs: java-analyzer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+
+      - name: Download Java Analyzer fat jar
+        uses: actions/download-artifact@v4
+        with:
+          name: java-analyzer-jar
+          path: analyzers/java/build/libs/
+
+      - name: Assert jar is at expected path
+        run: ls -l analyzers/java/build/libs/java-analyzer.jar
+
+      - name: Build Spring fixture classpath
+        run: ./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project writeDepwalkClasspath
+
+      - name: Run Go E2E tests
+        run: go test ./e2e/... -v
+        working-directory: core
+        env:
+          # Fail (not skip) when a prerequisite (JDK 25, the analyzer jar)
+          # is missing, so a broken JDK detection or jar download doesn't
+          # silently turn this job into a no-op green check (see
+          # skipOrFail in core/e2e/java_fixture_test.go).
+          DEPWALK_E2E_REQUIRED: "1"

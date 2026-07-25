@@ -1,0 +1,26 @@
+subprojects {
+    apply plugin: 'java'
+    repositories { mavenCentral() }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 17
+    }
+}
+
+// 明示 override 用 global classpath manifest (root fixture と同形式)。
+tasks.register('writeDepwalkClasspath') {
+    subprojects.each { p -> dependsOn(p.tasks.named('classes')) }
+    def outputFile = layout.buildDirectory.file('depwalk-classpath.txt')
+    outputs.file(outputFile)
+    doLast {
+        def entries = [] as Set
+        subprojects.each { p ->
+            entries.addAll(p.sourceSets.main.output.classesDirs.files)
+            entries.addAll(p.configurations.runtimeClasspath.files)
+        }
+        def sorted = entries.collect { it.absoluteFile.toPath().normalize().toString() }.unique().sort()
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.text = sorted.join('\n') + '\n'
+    }
+}

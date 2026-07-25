@@ -1,0 +1,1 @@
+{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace/depwalk","language":"java","include":["src/**/*.java"],"exclude":["build/**"],"entrypoints":[{"qualifiedName":"com.example.App.main","signature":"main(java.lang.String[]):void"}],"analysisMode":"reachableFromEntrypoints","metadata":{"analyzer":"java"}}

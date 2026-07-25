@@ -1,0 +1,73 @@
+{
+  "description": "直線 chain: a -> b -> c -> d",
+  "graph": {
+    "nodes": ["method:a", "method:b", "method:c", "method:d"],
+    "edges": [
+      {
+        "edgeId": "edge:ab",
+        "callerMethodId": "method:a",
+        "calleeMethodId": "method:b"
+      },
+      {
+        "edgeId": "edge:bc",
+        "callerMethodId": "method:b",
+        "calleeMethodId": "method:c"
+      },
+      {
+        "edgeId": "edge:cd",
+        "callerMethodId": "method:c",
+        "calleeMethodId": "method:d"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "S2: callee from a reaches the whole chain",
+      "start": "method:a",
+      "direction": "callee",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:a", "method:b", "method:c", "method:d"],
+        "edges": ["edge:ab", "edge:bc", "edge:cd"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from d reaches the whole chain",
+      "start": "method:d",
+      "direction": "caller",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:d", "method:c", "method:b", "method:a"],
+        "edges": ["edge:cd", "edge:bc", "edge:ab"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "S1: caller from b reaches only upstream",
+      "start": "method:b",
+      "direction": "caller",
+      "expected": {
+        "status": "ok",
+        "nodes": ["method:b", "method:a"],
+        "edges": ["edge:ab"],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    },
+    {
+      "name": "missing start yields startNotFound with empty sets",
+      "start": "method:ghost",
+      "direction": "callee",
+      "expected": {
+        "status": "startNotFound",
+        "nodes": [],
+        "edges": [],
+        "cycles": [],
+        "depthCutoffs": []
+      }
+    }
+  ]
+}
