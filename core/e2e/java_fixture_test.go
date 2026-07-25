@@ -228,15 +228,16 @@ func assertDiagnosticCode(t *testing.T, diagnostics []protocol.Diagnostic, code 
 // checks the result against the fixture's known caller/callee/diagnostic
 // expectations.
 //
-// This test goes one layer below analyze.Run (using analyzer.Runner
-// directly) instead of asserting against analyze.Run's Result: Result.Graph
-// does not carry callEdge.metadata (graph.Edge has no Metadata field, since
-// the current Traversal Engine graph model does not need it), but this test needs to
-// see callEdge.metadata.dispatch and .viaLambda. Going one layer down keeps
-// the assertions at the protocol record level without reimplementing any
-// analyze/protocol logic — it reuses analyze.BuildMetadata for the
-// metadata composition rule and protocol.AnalysisRequest.Validate for
-// request validation, exactly as analyze.Run does internally.
+// This test goes one layer below the analyze use case (driving
+// protocol.Runner directly) instead of asserting against its Result:
+// Result.Graph does not carry callEdge.metadata (graph.Edge has no Metadata
+// field, since the current Traversal Engine graph model does not need it),
+// but this test needs to see callEdge.metadata.dispatch and .viaLambda.
+// Going one layer down keeps the assertions at the protocol record level
+// without reimplementing any analyze/protocol logic — it reuses
+// analyze.BuildMetadata for the metadata composition rule and
+// protocol.AnalysisRequest.Validate for request validation, exactly as the
+// ACL adapter (protocol.Adapter) does internally.
 func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
