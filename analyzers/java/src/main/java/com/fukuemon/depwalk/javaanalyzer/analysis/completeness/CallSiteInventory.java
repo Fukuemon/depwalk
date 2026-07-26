@@ -28,6 +28,7 @@ import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclarati
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -67,77 +68,58 @@ public final class CallSiteInventory {
     }
 
     private void walk(Node node, String path, Node enclosingType, List<String> callers) {
-        if (node instanceof TypeDeclaration<?> td) {
-            recurse(node, path, td, List.of());
-            return;
-        }
-        if (node instanceof MethodDeclaration md) {
-            recurse(node, path, enclosingType, List.of(CallerIdentities.methodCallerId(enclosingType, md, path)));
-            return;
-        }
-        if (node instanceof ConstructorDeclaration cd) {
-            recurse(node, path, enclosingType, List.of(CallerIdentities.constructorCallerId(enclosingType, cd, path)));
-            return;
-        }
-        if (node instanceof CompactConstructorDeclaration ccd) {
-            recurse(node, path, enclosingType,
-                    List.of(CallerIdentities.compactConstructorCallerId(enclosingType, ccd, path)));
-            return;
-        }
-        if (node instanceof InitializerDeclaration id) {
-            recurse(node, path, enclosingType, id.isStatic()
-                    ? List.of(CallerIdentities.staticInitializerId(enclosingType))
-                    : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
-            return;
-        }
-        if (node instanceof FieldDeclaration fd) {
-            recurse(node, path, enclosingType, fd.isStatic()
-                    ? List.of(CallerIdentities.staticInitializerId(enclosingType))
-                    : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
-            return;
-        }
-        if (node instanceof EnumConstantDeclaration) {
+        switch (node) {
+            case TypeDeclaration<?> td -> recurse(node, path, td, List.of());
+            case MethodDeclaration md ->
+                    recurse(node, path, enclosingType, List.of(CallerIdentities.methodCallerId(enclosingType, md, path)));
+            case ConstructorDeclaration cd ->
+                    recurse(node, path, enclosingType,
+                            List.of(CallerIdentities.constructorCallerId(enclosingType, cd, path)));
+            case CompactConstructorDeclaration ccd ->
+                    recurse(node, path, enclosingType,
+                            List.of(CallerIdentities.compactConstructorCallerId(enclosingType, ccd, path)));
+            case InitializerDeclaration id ->
+                    recurse(node, path, enclosingType, id.isStatic()
+                            ? List.of(CallerIdentities.staticInitializerId(enclosingType))
+                            : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
+            case FieldDeclaration fd ->
+                    recurse(node, path, enclosingType, fd.isStatic()
+                            ? List.of(CallerIdentities.staticInitializerId(enclosingType))
+                            : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
             // enum constant の引数評価は <clinit> 意味論。
-            recurse(node, path, enclosingType, List.of(CallerIdentities.staticInitializerId(enclosingType)));
-            return;
-        }
-        if (node instanceof LambdaExpr) {
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof MethodCallExpr mce) {
-            register(mce, path, CallSiteId.CallKind.METHOD_CALL, enclosingType, callers);
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof MethodReferenceExpr mre) {
-            register(mre, path, CallSiteId.CallKind.METHOD_REFERENCE, enclosingType, callers);
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof ObjectCreationExpr oce) {
-            register(oce, path, CallSiteId.CallKind.OBJECT_CREATION, enclosingType, callers);
-            for (Node argument : oce.getArguments()) {
-                walk(argument, path, enclosingType, callers);
+            case EnumConstantDeclaration enumConstant ->
+                    recurse(node, path, enclosingType, List.of(CallerIdentities.staticInitializerId(enclosingType)));
+            case LambdaExpr lambda -> recurse(node, path, enclosingType, callers);
+            case MethodCallExpr mce -> {
+                register(mce, path, CallSiteId.CallKind.METHOD_CALL, enclosingType, callers);
+                recurse(node, path, enclosingType, callers);
             }
-            oce.getScope().ifPresent(scope -> walk(scope, path, enclosingType, callers));
-            if (oce.getAnonymousClassBody().isPresent()) {
-                for (BodyDeclaration<?> member : oce.getAnonymousClassBody().get()) {
-                    walk(member, path, oce, List.of());
+            case MethodReferenceExpr mre -> {
+                register(mre, path, CallSiteId.CallKind.METHOD_REFERENCE, enclosingType, callers);
+                recurse(node, path, enclosingType, callers);
+            }
+            case ObjectCreationExpr oce -> {
+                register(oce, path, CallSiteId.CallKind.OBJECT_CREATION, enclosingType, callers);
+                for (Node argument : oce.getArguments()) {
+                    walk(argument, path, enclosingType, callers);
+                }
+                oce.getScope().ifPresent(scope -> walk(scope, path, enclosingType, callers));
+                if (oce.getAnonymousClassBody().isPresent()) {
+                    for (BodyDeclaration<?> member : oce.getAnonymousClassBody().get()) {
+                        walk(member, path, oce, List.of());
+                    }
                 }
             }
-            return;
-        }
-        if (node instanceof ExplicitConstructorInvocationStmt ecis) {
-            register(ecis, path, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, enclosingType, callers);
-            for (Node argument : ecis.getArguments()) {
-                walk(argument, path, enclosingType, callers);
+            case ExplicitConstructorInvocationStmt ecis -> {
+                register(ecis, path, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, enclosingType, callers);
+                for (Node argument : ecis.getArguments()) {
+                    walk(argument, path, enclosingType, callers);
+                }
+                // qualified super (`expr.super(...)`) の outer 式内の call も登録する。
+                ecis.getExpression().ifPresent(expression -> walk(expression, path, enclosingType, callers));
             }
-            // qualified super (`expr.super(...)`) の outer 式内の call も登録する。
-            ecis.getExpression().ifPresent(expression -> walk(expression, path, enclosingType, callers));
-            return;
+            default -> recurse(node, path, enclosingType, callers);
         }
-        recurse(node, path, enclosingType, callers);
     }
 
     private void recurse(Node node, String path, Node enclosingType, List<String> callers) {
@@ -194,7 +176,7 @@ public final class CallSiteInventory {
      * @return 変更不可 view
      */
     public Set<CallSiteId> ids() {
-        return java.util.Collections.unmodifiableSet(ids);
+        return Collections.unmodifiableSet(ids);
     }
 
     /**

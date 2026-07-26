@@ -29,6 +29,8 @@ import java.util.Map;
 public final class GraphAccumulator {
 
     private final Map<String, MethodSymbol> nodesByMethodId = new LinkedHashMap<>();
+    /** {@code nodesByMethodId} と同じ登録順の node 列 (streaming の進捗を index で追うため)。 */
+    private final List<MethodSymbol> nodes = new ArrayList<>();
     private final List<CallEdge> edges = new ArrayList<>();
     private final List<Diagnostic> diagnostics = new ArrayList<>();
     private long edgeSequence = 0;
@@ -44,7 +46,9 @@ public final class GraphAccumulator {
      * @param symbol 追加する method symbol
      */
     public void addNode(MethodSymbol symbol) {
-        nodesByMethodId.putIfAbsent(symbol.methodId(), symbol);
+        if (nodesByMethodId.putIfAbsent(symbol.methodId(), symbol) == null) {
+            nodes.add(symbol);
+        }
     }
 
     /**
@@ -103,6 +107,18 @@ public final class GraphAccumulator {
      */
     public Map<String, MethodSymbol> nodesByMethodId() {
         return nodesByMethodId;
+    }
+
+    /**
+     * 登録済み node を登録順の list で返す。
+     *
+     * <p>{@link #nodesByMethodId()} の値と同一順序・同一内容で、要素は追加のみされる。
+     * 逐次 flush 側は「どこまで書き出したか」を index で保持でき、既出判定に全件走査を要しない。
+     *
+     * @return method symbol の登録順 list
+     */
+    public List<MethodSymbol> nodes() {
+        return nodes;
     }
 
     /**

@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -97,7 +98,7 @@ public final class SpringDiagnosticEmitter {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("injectedType", resolution.injectionPoint().injectedType());
         metadata.put("targetName", resolution.injectionPoint().targetName());
-        metadata.put("resolution", resolution.status().name().toLowerCase(java.util.Locale.ROOT));
+        metadata.put("resolution", resolution.status().name().toLowerCase(Locale.ROOT));
         List<String> candidateTypes = resolution.candidates().stream()
                 .map(candidate -> candidate.bean().implementationType())
                 .distinct()

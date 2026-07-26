@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -344,7 +345,7 @@ public final class SpringDiIndex {
     private static Optional<String> factoryImplementationType(MethodDeclaration method) {
         Set<String> returnedTypes = new LinkedHashSet<>();
         for (ReturnStmt returnStmt : method.findAll(ReturnStmt.class)) {
-            if (!isDirectMethodReturn(returnStmt, method) || returnStmt.getExpression().isEmpty()) {
+            if (!belongsToCallable(returnStmt, method) || returnStmt.getExpression().isEmpty()) {
                 continue;
             }
             if (returnStmt.getExpression().get() instanceof ObjectCreationExpr creation) {
@@ -356,17 +357,6 @@ public final class SpringDiIndex {
             }
         }
         return returnedTypes.size() == 1 ? Optional.of(returnedTypes.iterator().next()) : Optional.empty();
-    }
-
-    private static boolean isDirectMethodReturn(ReturnStmt returnStmt, MethodDeclaration method) {
-        Node current = returnStmt.getParentNode().orElse(null);
-        while (current != null && current != method) {
-            if (current instanceof LambdaExpr || current instanceof MethodDeclaration) {
-                return false;
-            }
-            current = current.getParentNode().orElse(null);
-        }
-        return current == method;
     }
 
     private List<InjectionPoint> collectInjections(List<ClassOrInterfaceDeclaration> types) {
@@ -422,19 +412,12 @@ public final class SpringDiIndex {
         if (instanceFields.isEmpty()) {
             return;
         }
-        List<VariableDeclarator> requiredFields = type.getFields().stream()
-                .filter(field -> !field.isStatic())
-                .flatMap(field -> field.getVariables().stream()
-                        .filter(variable -> isRequiredConstructorField(field, variable)))
-                .filter(variable -> variable.getInitializer().isEmpty())
+        List<VariableDeclarator> requiredFields = instanceFields.stream()
+                .filter(SpringDiIndex::isRequiredConstructorField)
                 .toList();
         String ownerType = BinaryNames.forTypeLikeNode(type);
-        List<String> requiredTypes = requiredFields.stream()
-                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
-                .toList();
-        List<String> allInstanceTypes = instanceFields.stream()
-                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
-                .toList();
+        List<String> requiredTypes = erasedTypesOf(requiredFields);
+        List<String> allInstanceTypes = erasedTypesOf(instanceFields);
         SootUpTypeHierarchyIndex.Resolution constructors = sootUpIndex.resolveConstructors(ownerType);
         if (!constructors.isAvailable()) {
             return;
@@ -466,15 +449,24 @@ public final class SpringDiIndex {
      * {@code @RequiredArgsConstructor}は未初期化のfinal fieldに加えて、未初期化の
      * {@code @NonNull} fieldもconstructor引数に含める。
      *
-     * @param field field宣言。複数variable宣言時のmodifierと宣言annotationを保持する
-     * @param variable 判定対象のvariable
+     * @param variable 判定対象のvariable。modifierと宣言annotationは親のfield宣言が保持する
      * @return required constructorの候補fieldなら{@code true}
      */
-    private static boolean isRequiredConstructorField(FieldDeclaration field, VariableDeclarator variable) {
+    private static boolean isRequiredConstructorField(VariableDeclarator variable) {
+        if (!(variable.getParentNode().orElse(null) instanceof FieldDeclaration field)) {
+            return false;
+        }
         return field.isFinal()
                 || SpringAnnotations.has(field, LOMBOK_NON_NULL)
                 || variable.getType().getAnnotations().stream()
                         .anyMatch(annotation -> LOMBOK_NON_NULL.equals(SpringAnnotations.fqn(annotation)));
+    }
+
+    /** field 宣言順のまま erasure 済み型 binary name へ写す。 */
+    private static List<String> erasedTypesOf(List<VariableDeclarator> variables) {
+        return variables.stream()
+                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
+                .toList();
     }
 
     private void collectFieldInjections(ClassOrInterfaceDeclaration type, List<InjectionPoint> injections) {
@@ -583,6 +575,14 @@ public final class SpringDiIndex {
         return List.copyOf(names);
     }
 
+    /**
+     * node が指定 callable の直下スコープに属するかを判定する。間に別の callable
+     * (constructor / method / lambda) が挟まる node は nested スコープの所有物として除外する。
+     *
+     * @param node 判定対象 node
+     * @param callable 所有元として期待する constructor または method
+     * @return callable 自身のスコープに属するなら {@code true}
+     */
     private static boolean belongsToCallable(Node node, Node callable) {
         Node current = node.getParentNode().orElse(null);
         while (current != null && current != callable) {
@@ -685,11 +685,7 @@ public final class SpringDiIndex {
         Set<String> types = new LinkedHashSet<>();
         types.add(BinaryNames.forTypeLikeNode(type));
         try {
-            type.resolve().getAllAncestors().stream()
-                    .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
-                    .filter(java.util.Objects::nonNull)
-                    .map(BinaryNames::forResolvedDeclaration)
-                    .forEach(types::add);
+            addAncestorTypes(type.resolve(), types);
         } catch (RuntimeException | LinkageError ignored) {
             // 未解決 ancestor は候補にせず、解決できた型だけを中間索引へ保持する。
         }
@@ -703,17 +699,22 @@ public final class SpringDiIndex {
             try {
                 ResolvedReferenceTypeDeclaration declaration = type.asReferenceType().getTypeDeclaration().orElse(null);
                 if (declaration != null) {
-                    declaration.getAllAncestors().stream()
-                            .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
-                            .filter(java.util.Objects::nonNull)
-                            .map(BinaryNames::forResolvedDeclaration)
-                            .forEach(types::add);
+                    addAncestorTypes(declaration, types);
                 }
             } catch (RuntimeException | LinkageError ignored) {
                 // return type 自体は保持済み。未解決 ancestor だけを除外する。
             }
         }
         return Set.copyOf(types);
+    }
+
+    /** 解決済み宣言の全 ancestor のうち、宣言を引ける型の binary name を収集する。 */
+    private static void addAncestorTypes(ResolvedReferenceTypeDeclaration declaration, Set<String> types) {
+        declaration.getAllAncestors().stream()
+                .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
+                .filter(Objects::nonNull)
+                .map(BinaryNames::forResolvedDeclaration)
+                .forEach(types::add);
     }
 
     private static Set<String> annotationTypesOf(ClassOrInterfaceDeclaration type) {
@@ -731,11 +732,11 @@ public final class SpringDiIndex {
         return bean.beanType() + "#" + String.join(",", bean.names());
     }
 
-    private static int lineOf(com.github.javaparser.ast.Node node) {
+    private static int lineOf(Node node) {
         return node.getBegin().map(position -> position.line).orElse(0);
     }
 
-    private static String sourcePathOf(com.github.javaparser.ast.Node node) {
+    private static String sourcePathOf(Node node) {
         return node.findCompilationUnit()
                 .flatMap(CompilationUnit::getStorage)
                 .map(storage -> storage.getPath().toAbsolutePath().normalize().toString())

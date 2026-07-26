@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
@@ -22,6 +23,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.CompactConstructorDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
@@ -30,6 +32,8 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.expr.EnclosedExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.LambdaExpr;
@@ -39,7 +43,12 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.SuperExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
+import com.github.javaparser.ast.expr.TypeExpr;
+import com.github.javaparser.ast.expr.VariableDeclarationExpr;
+import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
+import com.github.javaparser.ast.stmt.ExpressionStmt;
+import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
@@ -56,8 +65,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 /**
  * AST を 1 ファイルずつ走査し、declared method / constructor / static initializer の
@@ -77,7 +89,7 @@ public final class CallGraphBuilder {
     private final CallSiteOutcomeLedger ledger;
     private final WorkspaceSourceDeclarationIndex declIndex;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
-    private final java.util.Set<String> reachableContextIds;
+    private final Set<String> reachableContextIds;
     /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
     private String currentPath;
 
@@ -110,7 +122,7 @@ public final class CallGraphBuilder {
             CallSiteOutcomeLedger ledger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
-            java.util.Set<String> reachableContextIds) {
+            Set<String> reachableContextIds) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
@@ -166,33 +178,26 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof MethodDeclaration md) {
-            MethodSymbol symbol;
-            try {
-                ResolvedMethodDeclaration resolved = md.resolve();
-                symbol = buildMethodSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException | LinkageError e) {
-                reportUnresolvedDeclaration(md, "failed to resolve method declaration: " + md.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of(
-                        CallSiteInventory.CallerIdentities.methodCallerId(ctx.enclosingTypeNode(), md, currentPath))));
-                return;
-            }
-            accumulator.addNode(symbol);
-            recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+            walkCallableDeclaration(
+                    node,
+                    ctx,
+                    () -> buildMethodSymbol(
+                            AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
+                            md.resolve()),
+                    "failed to resolve method declaration: " + md.getNameAsString(),
+                    () -> CallSiteInventory.CallerIdentities.methodCallerId(ctx.enclosingTypeNode(), md, currentPath));
             return;
         }
         if (node instanceof ConstructorDeclaration cd) {
-            MethodSymbol symbol;
-            try {
-                ResolvedConstructorDeclaration resolved = cd.resolve();
-                symbol = buildConstructorSymbol(AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())), resolved);
-            } catch (RuntimeException | LinkageError e) {
-                reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of(
-                        CallSiteInventory.CallerIdentities.constructorCallerId(ctx.enclosingTypeNode(), cd, currentPath))));
-                return;
-            }
-            accumulator.addNode(symbol);
-            recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+            walkCallableDeclaration(
+                    node,
+                    ctx,
+                    () -> buildConstructorSymbol(
+                            AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
+                            cd.resolve()),
+                    "failed to resolve constructor declaration: " + cd.getNameAsString(),
+                    () -> CallSiteInventory.CallerIdentities.constructorCallerId(
+                            ctx.enclosingTypeNode(), cd, currentPath));
             return;
         }
         if (node instanceof CompactConstructorDeclaration ccd) {
@@ -200,43 +205,21 @@ public final class CallGraphBuilder {
             // canonical constructor 扱いとし、signature は record component の erasure 型列にする。
             // JavaParser の CompactConstructorDeclaration#resolve() は未実装
             // (UnsupportedOperationException) なため、record の component 列から自前で計算する。
-            MethodSymbol symbol;
-            try {
-                symbol = buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd);
-            } catch (RuntimeException | LinkageError e) {
-                reportUnresolvedDeclaration(ccd, "failed to resolve compact constructor declaration: " + ccd.getNameAsString());
-                recurseChildren(node, ctx.withCaller(List.of(
-                        CallSiteInventory.CallerIdentities.compactConstructorCallerId(ctx.enclosingTypeNode(), ccd, currentPath))));
-                return;
-            }
-            accumulator.addNode(symbol);
-            recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+            walkCallableDeclaration(
+                    node,
+                    ctx,
+                    () -> buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd),
+                    "failed to resolve compact constructor declaration: " + ccd.getNameAsString(),
+                    () -> CallSiteInventory.CallerIdentities.compactConstructorCallerId(
+                            ctx.enclosingTypeNode(), ccd, currentPath));
             return;
         }
         if (node instanceof InitializerDeclaration id) {
-            if (!containsAnyCall(id)) {
-                recurseChildren(node, ctx);
-                return;
-            }
-            if (id.isStatic()) {
-                String clinitId = ensureStaticInitializerNode(ctx.enclosingTypeNode());
-                recurseChildren(node, ctx.withCaller(List.of(clinitId)));
-            } else {
-                recurseChildren(node, ctx.withCaller(constructorCallerIdsFor(ctx.enclosingTypeNode())));
-            }
+            walkInitializingMember(node, ctx, id.isStatic());
             return;
         }
         if (node instanceof FieldDeclaration fd) {
-            if (!containsAnyCall(fd)) {
-                recurseChildren(node, ctx);
-                return;
-            }
-            if (fd.isStatic()) {
-                String clinitId = ensureStaticInitializerNode(ctx.enclosingTypeNode());
-                recurseChildren(node, ctx.withCaller(List.of(clinitId)));
-            } else {
-                recurseChildren(node, ctx.withCaller(constructorCallerIdsFor(ctx.enclosingTypeNode())));
-            }
+            walkInitializingMember(node, ctx, fd.isStatic());
             return;
         }
         if (node instanceof LambdaExpr) {
@@ -280,17 +263,60 @@ public final class CallGraphBuilder {
         recurseChildren(node, ctx);
     }
 
+    /**
+     * 宣言 (method / constructor / compact constructor) を 1 件処理する。{@code symbolFactory} が
+     * symbol を作れたら node として積み、その methodId を caller に子を辿る。例外で失敗した場合は
+     * {@code failureMessage} の診断を出し、{@code fallbackCallerId} (失敗時のみ評価する。宣言を解決
+     * できない site も完全性 gate から漏らさないための識別子) を caller に子を辿る。
+     */
+    private void walkCallableDeclaration(
+            Node node,
+            WalkContext ctx,
+            Supplier<MethodSymbol> symbolFactory,
+            String failureMessage,
+            Supplier<String> fallbackCallerId) {
+        MethodSymbol symbol;
+        try {
+            symbol = symbolFactory.get();
+        } catch (RuntimeException | LinkageError e) {
+            reportUnresolvedDeclaration(node, failureMessage);
+            recurseChildren(node, ctx.withCaller(List.of(fallbackCallerId.get())));
+            return;
+        }
+        accumulator.addNode(symbol);
+        recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+    }
+
+    /**
+     * initializer block / field 初期化子を走査する。呼び出しを含まない member は caller を変えずに
+     * 素通しし、含む場合だけ static は {@code <clinit>}、instance は囲み型の全 constructor を
+     * caller として子を辿る。
+     */
+    private void walkInitializingMember(Node node, WalkContext ctx, boolean isStatic) {
+        if (!containsAnyCall(node)) {
+            recurseChildren(node, ctx);
+            return;
+        }
+        if (isStatic) {
+            String clinitId = ensureStaticInitializerNode(ctx.enclosingTypeNode());
+            recurseChildren(node, ctx.withCaller(List.of(clinitId)));
+        } else {
+            recurseChildren(node, ctx.withCaller(constructorCallerIdsFor(ctx.enclosingTypeNode())));
+        }
+    }
+
     private void recurseChildren(Node node, WalkContext ctx) {
         for (Node child : node.getChildNodes()) {
             walk(child, ctx);
         }
     }
 
+    /** subtree に呼び出し式が 1 つでもあるか (最初の 1 件で打ち切る)。 */
     private boolean containsAnyCall(Node node) {
-        return !node.findAll(MethodCallExpr.class).isEmpty()
-                || !node.findAll(ObjectCreationExpr.class).isEmpty()
-                || !node.findAll(ExplicitConstructorInvocationStmt.class).isEmpty()
-                || !node.findAll(MethodReferenceExpr.class).isEmpty();
+        return node.findFirst(MethodCallExpr.class).isPresent()
+                || node.findFirst(ObjectCreationExpr.class).isPresent()
+                || node.findFirst(ExplicitConstructorInvocationStmt.class).isPresent()
+                || node.findFirst(MethodReferenceExpr.class).isPresent();
     }
 
     // ------------------------------------------------------------------
@@ -353,7 +379,7 @@ public final class CallGraphBuilder {
         // 「solver 層の bytecode member 合成」) は、既存の bytecode-only member と同じ
         // 出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、ADR-0005)
         // で emit する。
-        if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
+        if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
             // 型名 scope の static call を instance 合成 member で解決しない
             // (usage 経路は staticOnly を持たないため、emit 前にここで検査する)。
             if (!synthesized.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
@@ -364,14 +390,7 @@ public final class CallGraphBuilder {
                         "unresolved-method-call", mce.getNameAsString(), guardMetadata);
                 return;
             }
-            WorkspaceSourceDeclarationIndex.TypeLocation owner =
-                    declIndex.find(synthesized.candidate().declaringType()).orElse(null);
-            if (owner == null || !reachableContextIds.contains(owner.contextId())) {
-                throw new IllegalStateException(
-                        "synthesized bytecode member without a reachable in-scope owner: "
-                                + synthesized.candidate().declaringType() + "#" + synthesized.getName());
-            }
-            emitBytecodeOnlyCall(mce, ctx, owner,
+            emitBytecodeOnlyCall(mce, ctx, requireReachableOwner(synthesized),
                     synthesized.candidate().declaringType(), synthesized.getName(),
                     synthesized.candidate().parameterTypes(), "method");
             commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
@@ -515,15 +534,8 @@ public final class CallGraphBuilder {
         // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、
         // ADR-0005) で emit する (従来この経路は通常 symbol として emit され、
         // この出力契約から漏れていた)。
-        if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
-            WorkspaceSourceDeclarationIndex.TypeLocation owner =
-                    declIndex.find(synthesized.candidate().declaringType()).orElse(null);
-            if (owner == null || !reachableContextIds.contains(owner.contextId())) {
-                throw new IllegalStateException(
-                        "synthesized bytecode member without a reachable in-scope owner: "
-                                + synthesized.candidate().declaringType() + "#" + synthesized.getName());
-            }
-            emitBytecodeOnlyCall(mre, ctx, owner,
+        if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
+            emitBytecodeOnlyCall(mre, ctx, requireReachableOwner(synthesized),
                     synthesized.candidate().declaringType(), synthesized.getName(),
                     synthesized.candidate().parameterTypes(), "method", true);
             commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
@@ -704,13 +716,15 @@ public final class CallGraphBuilder {
     /** edge 出力に使える caller (placeholder を除外し、caller 不在時は <clinit> node を保証する)。 */
     private List<String> edgeCallers(Node callNode, WalkContext ctx) {
         List<String> callers = ledgerCallers(callNode, ctx);
+        // enum constant 引数など member 外の call は <clinit> caller で edge 化する
+        // (caller ごとに変わらない条件なのでループ外で判定する)。
+        boolean needsStaticInitializer = ctx.callerMethodIds().isEmpty() && ctx.enclosingTypeNode() != null;
         List<String> result = new ArrayList<>();
         for (String caller : callers) {
             if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
                 continue;
             }
-            if (ctx.callerMethodIds().isEmpty() && ctx.enclosingTypeNode() != null) {
-                // enum constant 引数など member 外の call は <clinit> caller で edge 化する。
+            if (needsStaticInitializer) {
                 ensureStaticInitializerNode(ctx.enclosingTypeNode());
             }
             result.add(caller);
@@ -807,6 +821,31 @@ public final class CallGraphBuilder {
         return metadata;
     }
 
+    // ------------------------------------------------------------------
+    // bytecode 救済の共通判定
+    // ------------------------------------------------------------------
+
+    /**
+     * {@code binaryName} の型が workspace source 宣言を持ち、かつ呼び出し元 context から
+     * 依存到達可能な context に属する場合だけ、その source 上の所在を返す。bytecode 救済 /
+     * 候補の source 再対応付けはすべてこの到達可能性判定を通す (ADR-0005)。
+     */
+    private Optional<WorkspaceSourceDeclarationIndex.TypeLocation> reachableOwner(String binaryName) {
+        return declIndex.find(binaryName).filter(owner -> reachableContextIds.contains(owner.contextId()));
+    }
+
+    /**
+     * solver が合成した bytecode-only member の owner。合成は到達可能な scope 内 owner を
+     * 前提に行われるため、ここで引けない場合は analyzer 側の不変条件違反として failfast する。
+     */
+    private WorkspaceSourceDeclarationIndex.TypeLocation requireReachableOwner(
+            SynthesizedBytecodeMethodDeclaration synthesized) {
+        return reachableOwner(synthesized.candidate().declaringType())
+                .orElseThrow(() -> new IllegalStateException(
+                        "synthesized bytecode member without a reachable in-scope owner: "
+                                + synthesized.candidate().declaringType() + "#" + synthesized.getName()));
+    }
+
     /** receiver 式の静的型を計算できるか (診断 metadata の receiverTypeResolved)。 */
     private static boolean receiverTypeResolves(Expression scope) {
         try {
@@ -822,25 +861,7 @@ public final class CallGraphBuilder {
      */
     private boolean tryBytecodeMethodRescue(MethodCallExpr mce, WalkContext ctx) {
         String ownerBinaryName = bytecodeRescueOwner(mce, ctx);
-        if (ownerBinaryName == null) {
-            return false;
-        }
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
-            return false;
-        }
-        var candidate = bytecodeIndex.uniqueMethod(ownerBinaryName, mce.getNameAsString(), mce.getArguments().size())
-                .orElse(null);
-        if (candidate == null) {
-            return false;
-        }
-        // 型名 scope の static call を instance member で救済しない (偽 edge 防止)。
-        if (!candidate.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
-            return false;
-        }
-        emitBytecodeOnlyCall(mce, ctx, owner,
-                candidate.declaringType(), candidate.methodName(), candidate.parameterTypes(), "method");
-        return true;
+        return ownerBinaryName != null && tryBytecodeMethodRescueWithOwner(mce, ctx, ownerBinaryName);
     }
 
     /**
@@ -849,18 +870,18 @@ public final class CallGraphBuilder {
      * qualified name だけを型名とみなす。型が取れない scope は bytecode-only
      * field 補完経路の instance receiver であり型名扱いしない。
      */
-    private static boolean isTypeNameScope(com.github.javaparser.ast.expr.Expression scope) {
+    private static boolean isTypeNameScope(Expression scope) {
         try {
             scope.calculateResolvedType();
         } catch (RuntimeException | LinkageError e) {
             return false;
         }
         try {
-            if (scope instanceof com.github.javaparser.ast.expr.NameExpr nameExpr) {
+            if (scope instanceof NameExpr nameExpr) {
                 nameExpr.resolve();
                 return false;
             }
-            if (scope instanceof com.github.javaparser.ast.expr.FieldAccessExpr fieldAccess) {
+            if (scope instanceof FieldAccessExpr fieldAccess) {
                 fieldAccess.resolve();
                 return false;
             }
@@ -880,11 +901,11 @@ public final class CallGraphBuilder {
         if (ownerBinaryName == null) {
             return false;
         }
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = reachableOwner(ownerBinaryName).orElse(null);
+        if (owner == null) {
             return false;
         }
-        boolean typeNameScope = mre.getScope() instanceof com.github.javaparser.ast.expr.TypeExpr;
+        boolean typeNameScope = mre.getScope() instanceof TypeExpr;
         int samArity = inferFunctionalInterfaceArity(mre);
         var candidate = selectMethodReferenceCandidate(ownerBinaryName, mre.getIdentifier(), typeNameScope, samArity);
         if (candidate == null) {
@@ -909,9 +930,8 @@ public final class CallGraphBuilder {
      * ないため、より保守的に「参照形式に矛盾しない (typeNameScope なら static も
      * instance も許容、bound なら instance のみ) 名前一意の member」だけを採用する。
      */
-    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
-            selectMethodReferenceCandidate(
-                    String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
+    private SootUpTypeHierarchyIndex.MethodCandidate selectMethodReferenceCandidate(
+            String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
         if (samArity < 0) {
             var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
                     .filter(method -> method.methodName().equals(methodName))
@@ -933,8 +953,8 @@ public final class CallGraphBuilder {
     }
 
     /** 名前・arity・static 性が一致する owner classfile 上の一意 member。 */
-    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
-            uniqueMethodByArityAndStatic(String ownerBinaryName, String methodName, int arity, boolean wantStatic) {
+    private SootUpTypeHierarchyIndex.MethodCandidate uniqueMethodByArityAndStatic(
+            String ownerBinaryName, String methodName, int arity, boolean wantStatic) {
         var matches = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
                 .filter(method -> method.methodName().equals(methodName))
                 .filter(method -> method.parameterTypes().size() == arity)
@@ -950,21 +970,44 @@ public final class CallGraphBuilder {
      */
     private boolean tryBytecodeConstructorReferenceRescue(
             MethodReferenceExpr mre, WalkContext ctx, ResolvedReferenceTypeDeclaration scopeDecl) {
-        String ownerBinaryName = BinaryNames.forResolvedDeclaration(scopeDecl);
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+        return tryBytecodeConstructorRescueWithOwner(
+                mre, ctx, BinaryNames.forResolvedDeclaration(scopeDecl),
+                () -> inferFunctionalInterfaceArity(mre), true);
+    }
+
+    /**
+     * 確定済み owner の一意 bytecode constructor による救済 (object creation / 明示 constructor
+     * invocation / constructor reference の共通実体)。owner が到達可能な scope 内 source 型で、
+     * かつ {@code arity} の constructor が classfile 上で一意なときだけ emit する。
+     *
+     * @param ownerBinaryName 救済先 owner。特定できていない場合は {@code null}
+     * @param arity 引数個数。owner の到達可能性を確認できた場合のみ評価する。負値は「推論不能」を表し
+     *     救済しない
+     */
+    private boolean tryBytecodeConstructorRescueWithOwner(
+            Node callNode,
+            WalkContext ctx,
+            String ownerBinaryName,
+            IntSupplier arity,
+            boolean viaMethodReference) {
+        if (ownerBinaryName == null) {
             return false;
         }
-        int samArity = inferFunctionalInterfaceArity(mre);
-        if (samArity < 0) {
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = reachableOwner(ownerBinaryName).orElse(null);
+        if (owner == null) {
             return false;
         }
-        var candidate = bytecodeIndex.uniqueConstructor(ownerBinaryName, samArity).orElse(null);
+        int argumentCount = arity.getAsInt();
+        if (argumentCount < 0) {
+            return false;
+        }
+        var candidate = bytecodeIndex.uniqueConstructor(ownerBinaryName, argumentCount).orElse(null);
         if (candidate == null) {
             return false;
         }
-        emitBytecodeOnlyCall(mre, ctx, owner,
-                candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor", true);
+        emitBytecodeOnlyCall(callNode, ctx, owner,
+                candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(),
+                "constructor", viaMethodReference);
         return true;
     }
 
@@ -987,21 +1030,8 @@ public final class CallGraphBuilder {
      * 親型を owner とする。
      */
     private boolean tryBytecodeExplicitCtorRescue(ExplicitConstructorInvocationStmt ecis, WalkContext ctx) {
-        String ownerBinaryName = explicitCtorOwner(ecis, ctx);
-        if (ownerBinaryName == null) {
-            return false;
-        }
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
-            return false;
-        }
-        var candidate = bytecodeIndex.uniqueConstructor(ownerBinaryName, ecis.getArguments().size()).orElse(null);
-        if (candidate == null) {
-            return false;
-        }
-        emitBytecodeOnlyCall(ecis, ctx, owner,
-                candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor", false);
-        return true;
+        return tryBytecodeConstructorRescueWithOwner(
+                ecis, ctx, explicitCtorOwner(ecis, ctx), () -> ecis.getArguments().size(), false);
     }
 
     /** 明示 constructor invocation の解決先 owner 型 (this は囲み型、super は親型)。 */
@@ -1016,7 +1046,7 @@ public final class CallGraphBuilder {
                 return null;
             }
         }
-        if (ctx.enclosingTypeNode() instanceof com.github.javaparser.ast.body.ClassOrInterfaceDeclaration cid
+        if (ctx.enclosingTypeNode() instanceof ClassOrInterfaceDeclaration cid
                 && !cid.getExtendedTypes().isEmpty()) {
             try {
                 return BinaryNames.erasureOf(cid.getExtendedTypes().get(0).resolve());
@@ -1035,17 +1065,8 @@ public final class CallGraphBuilder {
         } catch (RuntimeException | LinkageError e) {
             return false;
         }
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
-            return false;
-        }
-        var candidate = bytecodeIndex.uniqueConstructor(ownerBinaryName, oce.getArguments().size()).orElse(null);
-        if (candidate == null) {
-            return false;
-        }
-        emitBytecodeOnlyCall(oce, ctx, owner,
-                candidate.declaringType(), MethodIds.CONSTRUCTOR_TOKEN, candidate.parameterTypes(), "constructor");
-        return true;
+        return tryBytecodeConstructorRescueWithOwner(
+                oce, ctx, ownerBinaryName, () -> oce.getArguments().size(), false);
     }
 
     /**
@@ -1063,7 +1084,7 @@ public final class CallGraphBuilder {
         if (direct != null) {
             return direct;
         }
-        if (expr instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
+        if (expr instanceof EnclosedExpr enclosed) {
             return chainForwardOwner(enclosed.getInner(), ctx, depth + 1);
         }
         if (expr instanceof NameExpr nameExpr) {
@@ -1072,7 +1093,7 @@ public final class CallGraphBuilder {
             try {
                 ResolvedValueDeclaration value = nameExpr.resolve();
                 Node ast = value.toAst().orElse(null);
-                if (ast instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+                if (ast instanceof VariableDeclarator declarator) {
                     Expression initializer = declarator.getInitializer().orElse(null);
                     if (initializer != null) {
                         return chainForwardOwner(initializer, ctx, depth + 1);
@@ -1138,7 +1159,7 @@ public final class CallGraphBuilder {
         Node child = nameExpr;
         Node parent = child.getParentNode().orElse(null);
         while (parent != null) {
-            if (parent instanceof com.github.javaparser.ast.stmt.BlockStmt block) {
+            if (parent instanceof BlockStmt block) {
                 Expression initializer = declaratorBeforeInBlock(block, child, name);
                 if (initializer != null) {
                     return initializer;
@@ -1164,16 +1185,15 @@ public final class CallGraphBuilder {
      * 反映: 2026-07-22。前方参照は無効、かつ use を含まない兄弟文の宣言は
      * 対象にしない)。
      */
-    private static Expression declaratorBeforeInBlock(
-            com.github.javaparser.ast.stmt.BlockStmt block, Node child, String name) {
-        for (com.github.javaparser.ast.stmt.Statement statement : block.getStatements()) {
+    private static Expression declaratorBeforeInBlock(BlockStmt block, Node child, String name) {
+        for (Statement statement : block.getStatements()) {
             if (statement == child || statement.isAncestorOf(child)) {
                 break;
             }
-            if (statement instanceof com.github.javaparser.ast.stmt.ExpressionStmt exprStmt
+            if (statement instanceof ExpressionStmt exprStmt
                     && exprStmt.getExpression()
-                            instanceof com.github.javaparser.ast.expr.VariableDeclarationExpr varDecl) {
-                for (com.github.javaparser.ast.body.VariableDeclarator declarator : varDecl.getVariables()) {
+                            instanceof VariableDeclarationExpr varDecl) {
+                for (VariableDeclarator declarator : varDecl.getVariables()) {
                     if (declarator.getNameAsString().equals(name)) {
                         return declarator.getInitializer().orElse(null);
                     }
@@ -1192,8 +1212,7 @@ public final class CallGraphBuilder {
         if (ownerType == null) {
             return null;
         }
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerType).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+        if (reachableOwner(ownerType).isEmpty()) {
             return null;
         }
         return bytecodeIndex.fieldType(ownerType, fieldName).orElse(null);
@@ -1214,10 +1233,14 @@ public final class CallGraphBuilder {
         };
     }
 
-    /** 復元済み owner を使う method call の bytecode 救済 (chain 前進解決用)。 */
+    /**
+     * 確定済み owner を使う method call の bytecode 救済。receiver の静的型を owner とする
+     * 通常経路 ({@link #tryBytecodeMethodRescue}) と、chain 前進解決で復元した owner を使う
+     * 経路の共通実体。
+     */
     private boolean tryBytecodeMethodRescueWithOwner(MethodCallExpr mce, WalkContext ctx, String ownerBinaryName) {
-        WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerBinaryName).orElse(null);
-        if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+        WorkspaceSourceDeclarationIndex.TypeLocation owner = reachableOwner(ownerBinaryName).orElse(null);
+        if (owner == null) {
             return false;
         }
         var candidate = bytecodeIndex.uniqueMethod(ownerBinaryName, mce.getNameAsString(), mce.getArguments().size())
@@ -1225,9 +1248,8 @@ public final class CallGraphBuilder {
         if (candidate == null) {
             return false;
         }
-        // 型名 scope の static call を instance member で救済しない境界 (PR #26)
-        // を forward 経路でも対称に維持する (forward の owner は式評価由来で
-        // 型名 scope になり得ないが、guard の非対称を残さない)。
+        // 型名 scope の static call を instance member で救済しない (偽 edge 防止、PR #26)。
+        // forward 経路の owner は式評価由来で型名 scope になり得ないが、guard の非対称を残さない。
         if (!candidate.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
             return false;
         }
@@ -1265,7 +1287,7 @@ public final class CallGraphBuilder {
                 }
                 return forwardVerifyExternalChain(erasure, links);
             }
-            if (cursor instanceof com.github.javaparser.ast.expr.EnclosedExpr enclosed) {
+            if (cursor instanceof EnclosedExpr enclosed) {
                 cursor = enclosed.getInner();
                 continue;
             }
@@ -1354,8 +1376,8 @@ public final class CallGraphBuilder {
      * full classpath、{@link #sootUpIndex} 直接参照。継承 member はここでは
      * 対象外 — 見つからなければ前進を打ち切る保守側)。
      */
-    private com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate
-            uniqueDeclaredMethodOnClasspath(String ownerBinaryName, String methodName, int arity) {
+    private SootUpTypeHierarchyIndex.MethodCandidate uniqueDeclaredMethodOnClasspath(
+            String ownerBinaryName, String methodName, int arity) {
         var resolution = sootUpIndex.resolveDeclaredCallableMethods(ownerBinaryName, methodName);
         if (!resolution.isAvailable()) {
             return null;
@@ -1371,7 +1393,7 @@ public final class CallGraphBuilder {
         try {
             ResolvedValueDeclaration value = nameExpr.resolve();
             Node ast = value.toAst().orElse(null);
-            if (ast instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+            if (ast instanceof VariableDeclarator declarator) {
                 return declarator.getInitializer().orElse(null);
             }
             return null;
@@ -1409,7 +1431,7 @@ public final class CallGraphBuilder {
                 continue; // 外側の lambda が宣言している可能性があるため遡上を続ける
             }
             Node parent = lambda.getParentNode().orElse(null);
-            if (parent instanceof com.github.javaparser.ast.body.VariableDeclarator declarator) {
+            if (parent instanceof VariableDeclarator declarator) {
                 try {
                     String owner = BinaryNames.erasureOf(declarator.getType().resolve());
                     return declIndex.find(owner).isEmpty();
@@ -1460,10 +1482,10 @@ public final class CallGraphBuilder {
         }
         String fieldName = null;
         var scope = mce.getScope().get();
-        if (scope instanceof com.github.javaparser.ast.expr.NameExpr nameExpr) {
+        if (scope instanceof NameExpr nameExpr) {
             fieldName = nameExpr.getNameAsString();
-        } else if (scope instanceof com.github.javaparser.ast.expr.FieldAccessExpr fieldAccess
-                && fieldAccess.getScope() instanceof com.github.javaparser.ast.expr.ThisExpr) {
+        } else if (scope instanceof FieldAccessExpr fieldAccess
+                && fieldAccess.getScope() instanceof ThisExpr) {
             fieldName = fieldAccess.getNameAsString();
         }
         if (fieldName == null) {
@@ -1471,8 +1493,7 @@ public final class CallGraphBuilder {
         }
         try {
             String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
-            WorkspaceSourceDeclarationIndex.TypeLocation owner = declIndex.find(ownerType).orElse(null);
-            if (owner == null || !reachableContextIds.contains(owner.contextId())) {
+            if (reachableOwner(ownerType).isEmpty()) {
                 return null;
             }
             return bytecodeIndex.fieldType(ownerType, fieldName).orElse(null);
@@ -1995,42 +2016,59 @@ public final class CallGraphBuilder {
                 && methodReference.getScope() instanceof SuperExpr;
     }
 
+    /**
+     * call site の receiver が指す注入点の解決結果。receiver 名で注入点を引き当ててから、
+     * その receiver 宣言に対応する 1 件を {@link #selectSpringResolution} で選ぶ。
+     *
+     * <p>receiver 宣言の {@code resolve()} は symbol solver の実コストがかかるため 1 回だけ行う。
+     * {@code this.field} 形式は名前だけで注入点を引けるので、該当する注入点が無い場合は
+     * {@code resolve()} 自体を行わない (従来の評価順を維持する)。
+     */
     private SpringDiIndex.InjectionResolution springResolutionFor(Node callNode, WalkContext ctx) {
         if (ctx.enclosingTypeNode() == null) {
             return null;
         }
-        String receiverName = receiverNameOf(callNode);
-        if (receiverName == null) {
+        Expression scope = unwrappedCallScopeOf(callNode);
+        ResolvedValueDeclaration declaration = null;
+        String receiverName;
+        if (scope instanceof NameExpr name) {
+            try {
+                declaration = name.resolve();
+            } catch (RuntimeException | LinkageError ignored) {
+                return null;
+            }
+            if (!declaration.isField() && !declaration.isParameter()) {
+                return null;
+            }
+            receiverName = name.getNameAsString();
+        } else if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
+            receiverName = field.getNameAsString();
+        } else {
             return null;
         }
         String ownerType = BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode());
         List<SpringDiIndex.InjectionResolution> resolutions =
                 springResolutionsByReceiver.get(springReceiverKey(ownerType, receiverName));
-        return selectSpringResolution(callNode, receiverName, resolutions);
-    }
-
-    private static String receiverNameOf(Node callNode) {
-        Expression scope = callScopeOf(callNode);
-        if (scope == null) {
+        if (resolutions == null || resolutions.isEmpty()) {
             return null;
         }
-        while (scope.isEnclosedExpr()) {
-            scope = scope.asEnclosedExpr().getInner();
-        }
-        if (scope instanceof NameExpr name) {
+        if (declaration == null) {
             try {
-                var declaration = name.resolve();
-                return declaration.isField() || declaration.isParameter()
-                        ? name.getNameAsString()
-                        : null;
-            } catch (RuntimeException | LinkageError ignored) {
+                declaration = ((FieldAccessExpr) scope).resolve();
+            } catch (RuntimeException | LinkageError e) {
                 return null;
             }
         }
-        if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
-            return field.getNameAsString();
+        return selectSpringResolution(declaration, receiverName, resolutions);
+    }
+
+    /** call scope から括弧 ({@code (foo).bar()}) を剥がした receiver 式。scope が無ければ {@code null}。 */
+    private static Expression unwrappedCallScopeOf(Node callNode) {
+        Expression scope = callScopeOf(callNode);
+        while (scope != null && scope.isEnclosedExpr()) {
+            scope = scope.asEnclosedExpr().getInner();
         }
-        return null;
+        return scope;
     }
 
     /**
@@ -2039,32 +2077,9 @@ public final class CallGraphBuilder {
      * aliasより優先する。1件に決められない場合は誤ったDI候補を使わず、型階層解決へ委ねる。
      */
     private static SpringDiIndex.InjectionResolution selectSpringResolution(
-            Node callNode,
+            ResolvedValueDeclaration declaration,
             String receiverName,
             List<SpringDiIndex.InjectionResolution> resolutions) {
-        if (resolutions == null || resolutions.isEmpty()) {
-            return null;
-        }
-        Expression scope = callScopeOf(callNode);
-        if (scope == null) {
-            return null;
-        }
-        while (scope.isEnclosedExpr()) {
-            scope = scope.asEnclosedExpr().getInner();
-        }
-        ResolvedValueDeclaration declaration;
-        try {
-            if (scope instanceof NameExpr name) {
-                declaration = name.resolve();
-            } else if (scope instanceof FieldAccessExpr field && field.getScope() instanceof ThisExpr) {
-                declaration = field.resolve();
-            } else {
-                return null;
-            }
-        } catch (RuntimeException | LinkageError e) {
-            return null;
-        }
-
         if (declaration.isParameter()) {
             Node ast = declaration.toAst().orElse(null);
             int declarationLine = ast != null && ast.getBegin().isPresent() ? ast.getBegin().get().line : -1;
@@ -2169,10 +2184,8 @@ public final class CallGraphBuilder {
         // 存在し、呼出元 context から依存到達可能な場合だけ
         // (java-analyzer feature doc「solver 層の bytecode member 合成」)。external /
         // JDK / 非依存 context を workspace 全体の名前一致で source へ戻さない。
-        boolean remappable = declIndex.find(candidate.declaringType())
-                .map(owner -> reachableContextIds.contains(owner.contextId()))
-                .orElse(false);
-        return (remappable ? sourceMethodIndex.find(candidate) : java.util.Optional.<MethodSymbol>empty()).orElseGet(() -> {
+        boolean remappable = reachableOwner(candidate.declaringType()).isPresent();
+        return (remappable ? sourceMethodIndex.find(candidate) : Optional.<MethodSymbol>empty()).orElseGet(() -> {
             String signature = MethodIds.signature(
                     candidate.declaringType(),
                     candidate.methodName(),

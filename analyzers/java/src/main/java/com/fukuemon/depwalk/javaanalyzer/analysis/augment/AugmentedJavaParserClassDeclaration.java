@@ -1,19 +1,27 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
 
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.resolution.Context;
+import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.TypeSolver;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.model.SymbolReference;
+import com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl;
 import com.github.javaparser.resolution.types.ResolvedArrayType;
 import com.github.javaparser.resolution.types.ResolvedPrimitiveType;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.resolution.types.ResolvedVoidType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserClassDeclaration;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * source の class 宣言を継承し、source で解決できない method 呼び出しだけを
@@ -62,18 +70,18 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     }
 
     @Override
-    public java.util.Optional<com.github.javaparser.resolution.MethodUsage> solveMethodAsUsage(
+    public Optional<MethodUsage> solveMethodAsUsage(
             String name,
             List<ResolvedType> argumentTypes,
-            com.github.javaparser.resolution.Context invokationContext,
+            Context invokationContext,
             List<ResolvedType> typeParameterValues) {
-        java.util.Optional<com.github.javaparser.resolution.MethodUsage> solved;
+        Optional<MethodUsage> solved;
         try {
             solved = super.solveMethodAsUsage(name, argumentTypes, invokationContext, typeParameterValues);
         } catch (RuntimeException e) {
             // JavaParser は未解決を Optional.empty でなく例外で返す経路があるため、
             // 合成 fallback まで到達させる。
-            solved = java.util.Optional.empty();
+            solved = Optional.empty();
         }
         if (solved.isPresent()) {
             return solved;
@@ -84,21 +92,19 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         // 合成せず未解決のまま返す
         // (単発呼び出し側は project bytecode member index 経路が拾う)。
         try {
-            return synthesizedInHierarchy(name, argumentTypes.size())
-                    .map(com.github.javaparser.resolution.MethodUsage::new);
+            return synthesizedInHierarchy(name, argumentTypes.size()).map(MethodUsage::new);
         } catch (RuntimeException e) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
     }
 
     @Override
-    public java.util.Set<ResolvedMethodDeclaration> getDeclaredMethods() {
+    public Set<ResolvedMethodDeclaration> getDeclaredMethods() {
         // 継承した生成 member の解決は JavaParser の階層走査 (各祖先の
         // getDeclaredMethods) を通るため、宣言一覧にも bytecode-only member を
         // 合成する。source に同じ name + arity がある member は合成しない。
-        java.util.Set<ResolvedMethodDeclaration> declared =
-                new java.util.LinkedHashSet<>(super.getDeclaredMethods());
-        java.util.Set<String> sourceKeys = new java.util.HashSet<>();
+        Set<ResolvedMethodDeclaration> declared = new LinkedHashSet<>(super.getDeclaredMethods());
+        Set<String> sourceKeys = new HashSet<>();
         for (ResolvedMethodDeclaration method : declared) {
             sourceKeys.add(method.getName() + "/" + method.getNumberOfParams());
         }
@@ -157,7 +163,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     }
 
     /** {@link GenericSignatureReader.BytecodeType} を ResolvedType へ解決する。 */
-    ResolvedType resolveGenericModel(com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader.BytecodeType model) {
+    ResolvedType resolveGenericModel(GenericSignatureReader.BytecodeType model) {
         if (model.typeVariable()) {
             // 型変数は erasure (Object) へ写像し、自己写像の無限再帰を避ける。
             return referenceType("java.lang.Object");
@@ -167,7 +173,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             base = resolveBinaryName(model.binaryName());
         } else {
             var declaration = typeSolver.solveType(model.binaryName());
-            List<ResolvedType> arguments = new java.util.ArrayList<>();
+            List<ResolvedType> arguments = new ArrayList<>();
             for (var argument : model.typeArguments()) {
                 arguments.add(resolveGenericModel(argument));
             }
@@ -178,7 +184,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             if (arguments.size() > declaration.getTypeParameters().size()) {
                 arguments = arguments.subList(0, declaration.getTypeParameters().size());
             }
-            base = new com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl(declaration, arguments);
+            base = new ReferenceTypeImpl(declaration, arguments);
         }
         for (int i = 0; i < model.arrayDims(); i++) {
             base = new ResolvedArrayType(base);
@@ -211,7 +217,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     /** JavaParser の qualified name (nested は {@code .}) を binary name へ変換する。 */
     private String binaryName() {
         // AST 構造から nested を $ で連結する (BinaryNames と同じ規則)。
-        return com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames.forTypeLikeNode(getWrappedNode());
+        return BinaryNames.forTypeLikeNode(getWrappedNode());
     }
 
     /**
@@ -223,11 +229,10 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     private ResolvedType referenceType(String binaryName) {
         var declaration = typeSolver.solveType(binaryName);
         if (declaration.getTypeParameters().isEmpty()) {
-            return new com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl(declaration);
+            return new ReferenceTypeImpl(declaration);
         }
-        ResolvedType objectType = new com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl(
-                typeSolver.solveType("java.lang.Object"));
-        return new com.github.javaparser.resolution.model.typesystem.ReferenceTypeImpl(
+        ResolvedType objectType = new ReferenceTypeImpl(typeSolver.solveType("java.lang.Object"));
+        return new ReferenceTypeImpl(
                 declaration,
                 declaration.getTypeParameters().stream().map(tp -> objectType).toList());
     }

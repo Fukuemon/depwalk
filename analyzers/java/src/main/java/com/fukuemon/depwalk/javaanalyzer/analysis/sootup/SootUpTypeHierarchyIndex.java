@@ -532,20 +532,23 @@ public final class SootUpTypeHierarchyIndex {
         List<ClassType> lookupOrder = new ArrayList<>();
         lookupOrder.add(receiverType);
         hierarchy().superClassesOf(receiverType).forEach(lookupOrder::add);
-        for (ClassType ownerType : lookupOrder) {
-            Optional<JavaSootClass> owner = view().getClass(ownerType);
-            if (owner.isEmpty()) {
-                continue;
-            }
-            Optional<JavaSootMethod> match = owner.get().getMethodsByName(key.methodName()).stream()
-                    .filter(method -> method.isConcrete() && parameterTypesOf(method).equals(key.parameterTypes()))
-                    .findFirst();
-            if (match.isPresent()) {
-                return match.map(this::toCandidate);
-            }
+        Optional<MethodCandidate> inherited = firstConcreteMatch(lookupOrder, key);
+        if (inherited.isPresent()) {
+            return inherited;
         }
-        for (ClassType interfaceType : hierarchy().implementedInterfacesOf(receiverType).toList()) {
-            Optional<JavaSootClass> owner = view().getClass(interfaceType);
+        return firstConcreteMatch(hierarchy().implementedInterfacesOf(receiverType).toList(), key);
+    }
+
+    /**
+     * 与えた探索順で最初に見つかる具象宣言を返す。classpath から引けない owner は読み飛ばす。
+     *
+     * @param ownerTypes 探索順に並んだ owner 型
+     * @param key 探索する method signature
+     * @return 最初に一致した具象 method。無ければ空
+     */
+    private Optional<MethodCandidate> firstConcreteMatch(List<ClassType> ownerTypes, MethodKey key) {
+        for (ClassType ownerType : ownerTypes) {
+            Optional<JavaSootClass> owner = view().getClass(ownerType);
             if (owner.isEmpty()) {
                 continue;
             }

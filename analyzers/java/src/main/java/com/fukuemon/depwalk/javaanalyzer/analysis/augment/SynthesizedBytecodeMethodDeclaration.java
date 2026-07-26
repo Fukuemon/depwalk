@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
 
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.github.javaparser.ast.AccessSpecifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration;
@@ -155,8 +156,8 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     }
 
     @Override
-    public com.github.javaparser.ast.AccessSpecifier accessSpecifier() {
-        return com.github.javaparser.ast.AccessSpecifier.PUBLIC;
+    public AccessSpecifier accessSpecifier() {
+        return AccessSpecifier.PUBLIC;
     }
 
     @Override
