@@ -3,7 +3,7 @@
 # context/architecture.md の生成マーカー区間を置き換える。
 #
 # 手描きの依存図は実装が変わると静かに腐るため、図は必ず本スクリプトで
-# 生成する (spec #32 D8 の可視化 3 点目。判断の正本は ADR-0007)。
+# 生成する (判断の正本は ADR-0007)。
 # 冪等: 実 import が変わっていなければ再実行しても差分は出ない。
 # その性質を使って CI / pre-commit が drift を検査する。
 set -euo pipefail
@@ -34,7 +34,7 @@ edges="$(
       {
         if (index($1, prefix) != 1) next
         from = substr($1, length(prefix) + 1)
-        # フラットな責務名 package を維持する前提の再編 (spec #32 D8)。
+        # core/internal はフラットな責務名 package を維持する前提。
         # sub-package が生えたら図の粒度の前提が崩れるので、黙って捨てずに
         # 失敗させる (drift 検査を素通りさせない)。
         if (index(from, "/") != 0) {

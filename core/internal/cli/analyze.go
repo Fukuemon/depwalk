@@ -19,8 +19,9 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// cli はコンポジションルートとして ACL adapter を analyze の port へ手動 DI
-// で注入する。port の満足検証はこの配線箇所に集約する (spec #32 D6)。
+// As the composition root, cli injects the ACL adapter into the analyze
+// port by hand. The interface satisfaction check is kept here, next to the
+// wiring, rather than in the implementing package.
 var _ analyze.Source = (*protocol.Adapter)(nil)
 
 // analyzeFlags holds the complete flag surface for newAnalyzeCommand:
@@ -200,8 +201,8 @@ func formatSourceLocation(location *graph.SourceLocation) string {
 	if location.StartColumn != nil {
 		text = fmt.Sprintf("%s:%d", text, *location.StartColumn)
 	}
-	// end 位置を保持している record は範囲として併記する (Protocol は保持
-	// しているのに renderer が捨てると利用者へ届かないため)。
+	// Records that carry an end position are rendered as a range: the
+	// Protocol keeps it, so dropping it here would hide it from the user.
 	if location.EndLine != nil {
 		end := fmt.Sprintf("%d", *location.EndLine)
 		if location.EndColumn != nil {

@@ -1,11 +1,10 @@
-# 依存方向の機械検査 (spec #32 D5 / D8、判断の正本は ADR-0007)。
+# 依存方向の機械検査 (判断の正本は ADR-0007)。
 #
 # 依存規則の正本は context/architecture.md の Package Boundary。ここは
 # それを package 単位の deny ルールへ機械的に写したもので、規則を変える
 # ときは architecture.md を先に直す。
 #
-# 有効化するのは depguard のみ。他の linter の一括有効化は本 issue の
-# スコープ外 (issue #34)。
+# 有効化するのは depguard のみ (他の linter は必要になった時点で判断する)。
 #
 # 記法の約束:
 #   - `pkg` 末尾の `$` は完全一致 (既定は前方一致)。付けないと

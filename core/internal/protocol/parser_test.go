@@ -166,8 +166,9 @@ func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
 	}
 }
 
-// JSON の明示 null は省略と同義に扱う (nil slice へ decode され自動 discovery
-// へ委譲する)。空配列 [] だけを invalid とする境界を意図的な契約として固定する。
+// An explicit JSON null means the same as omitting the field: it decodes
+// to a nil slice and defers to automatic discovery. Only an empty array is
+// invalid; this pins that boundary as a deliberate contract.
 func TestParseRecordTreatsNullSourceRootsAsOmitted(t *testing.T) {
 	t.Parallel()
 

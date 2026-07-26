@@ -3,9 +3,9 @@ package analyze
 import "github.com/Fukuemon/depwalk/core/internal/graph"
 
 // Request describes one analysis run handed to the [Source] port. Every
-// field is passed through to the Analyzer request without interpretation
-// (S5); the port implementation owns the wire form (request id, schema
-// version, validation).
+// field is passed through to the Analyzer request without interpretation;
+// the port implementation owns the wire form (request id, schema version,
+// validation).
 type Request struct {
 	WorkspaceRoot string
 	SourceRoots   []string
@@ -32,7 +32,7 @@ type Outcome struct {
 // Source is the port through which the use case receives domain-typed
 // analysis results: nodes and edges are streamed to the callbacks as they
 // arrive, and the process-level outcome is returned once the stream ends.
-// The interface is defined consumer-side (spec #32 D6); the protocol
+// The interface is defined consumer-side; the protocol
 // package's ACL adapter implements it, and cli injects that adapter into
 // [New].
 type Source interface {

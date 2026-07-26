@@ -10,7 +10,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Adapter is the Adapter half of the ACL (spec #32 D6): it implements the
+// Adapter is the Adapter half of the ACL: it implements the
 // analyze.Source port by composing the wire analysisRequest,
 // running the Analyzer process through [Runner], and translating wire
 // records into domain values with the Translator (translate.go). The

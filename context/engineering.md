@@ -6,6 +6,13 @@ shared config / root task / repository quality gate の境界規約。toolchain 
 
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
 
+## Code Comment Boundary
+
+- **コード内コメントは英語で書く** (Go の doc comment 規約に合わせる)。ドキュメント・commit・PR は日本語のままでよい。ユーザーに見える文字列リテラル (CLI 出力等) は言語を変えない — 観測可能な契約であり golden test が固定している。
+- **コメントから spec / issue を引用しない** (`spec #32 D6` / `P2_01` / `D21` 等)。spec は issue close 時に削除される作業文書なので、コードから参照すると宙に浮いたリンクが残る。決定の経緯は git history と PR で辿る。
+- 理由をコメントに残すときのリンク先は **ADR と durable な正本ドキュメント** (`adr/*.md`、`context/*.md`、`design/features/*/DesignDoc_*.md`) に限る。
+- `(S5)` のような符号だけの参照はしない。読み手に伝わる言葉で書き、必要なら正本へのリンクを添える。
+
 ## Shared Config Boundary
 
 - Core の初期 shared config は Go 標準 command を優先し、専用 config を増やさない。

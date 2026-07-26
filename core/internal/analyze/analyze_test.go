@@ -272,7 +272,7 @@ func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	if result.MethodQuery.Request.StartID != "opaque-target" {
 		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
 	}
-	// 署名を省いたセレクタでも、フルシグネチャ指定と同じ探索結果になる。
+	// A selector without a signature must traverse the same as the full one.
 	if _, reached := result.MethodQuery.Result.Nodes["opaque-caller"]; !reached {
 		t.Fatalf("traversal nodes = %#v, want opaque-caller reached", result.MethodQuery.Result.Nodes)
 	}

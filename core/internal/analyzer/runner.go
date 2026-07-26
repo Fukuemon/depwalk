@@ -87,8 +87,9 @@ func (r Runner) Run(input []byte, onLine func(line []byte)) (Result, error) {
 			source = io.TeeReader(stderr, r.command.Stderr)
 		}
 		if _, err := buf.ReadFrom(source); err != nil {
-			// 転送先 writer の失敗で drain を止めると pipe が詰まり Analyzer が
-			// 終了できなくなるため、以降は転送せず EOF まで読み切る。
+			// Stopping the drain on a forwarding failure would fill the pipe
+			// and keep the Analyzer from exiting, so read on to EOF without
+			// forwarding.
 			_, _ = buf.ReadFrom(stderr)
 		}
 		stderrDone <- buf.Bytes()

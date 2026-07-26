@@ -2,7 +2,7 @@ package protocol
 
 import "github.com/Fukuemon/depwalk/core/internal/graph"
 
-// This file is the Translator half of the ACL (spec #32 D6): it maps wire
+// This file is the Translator half of the ACL: it maps wire
 // DTOs to graph-owned domain values, deep copying nested data so later
 // mutation of a protocol DTO can never change the graph. Wire-only fields
 // (schemaVersion / recordType) are dropped here and never reach the

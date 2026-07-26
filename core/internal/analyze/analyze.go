@@ -16,11 +16,11 @@ type Options struct {
 	WorkspaceRoot string
 	// SourceRoots holds the raw --source-root flag values in the order they
 	// were given. Core passes them through to analysisRequest.sourceRoots
-	// without interpreting build systems or package hierarchies (S5); an
+	// without interpreting build systems or package hierarchies; an
 	// empty slice means the flag was not given and the field is omitted.
 	SourceRoots []string
 	// Language is passed through to analysisRequest.language without
-	// interpretation (S5).
+	// interpretation.
 	Language string
 	// AnalyzerMeta holds the raw --analyzer-meta key=value flag values, in
 	// the order they were given.
@@ -64,7 +64,7 @@ type MethodQuery struct {
 
 // Runner runs the analyze use case against an injected [Source]. It is
 // published as a struct, not an interface: callers that need an abstraction
-// define one on their side (spec #32 D6).
+// define one on their side.
 type Runner struct {
 	source Source
 }
