@@ -1,10 +1,10 @@
-package analyze
+package analyze_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
+	"github.com/Fukuemon/depwalk/core/internal/analyze"
 )
 
 func TestBuildMetadata(t *testing.T) {
@@ -13,7 +13,7 @@ func TestBuildMetadata(t *testing.T) {
 	tests := []struct {
 		name    string
 		pairs   []string
-		want    protocol.Metadata
+		want    map[string]any
 		wantErr bool
 	}{
 		{
@@ -24,17 +24,17 @@ func TestBuildMetadata(t *testing.T) {
 		{
 			name:  "a single value becomes a one-element array",
 			pairs: []string{"classpath=/a.jar"},
-			want:  protocol.Metadata{"classpath": []string{"/a.jar"}},
+			want:  map[string]any{"classpath": []string{"/a.jar"}},
 		},
 		{
 			name:  "repeated keys append in flag order",
 			pairs: []string{"classpath=/a.jar", "classpath=/b.jar"},
-			want:  protocol.Metadata{"classpath": []string{"/a.jar", "/b.jar"}},
+			want:  map[string]any{"classpath": []string{"/a.jar", "/b.jar"}},
 		},
 		{
 			name:  "an empty value registers an empty array",
 			pairs: []string{"classpath="},
-			want:  protocol.Metadata{"classpath": []string{}},
+			want:  map[string]any{"classpath": []string{}},
 		},
 		{
 			name:    "an entry without = is a validation error",
@@ -44,17 +44,17 @@ func TestBuildMetadata(t *testing.T) {
 		{
 			name:  "the split happens on the first = only",
 			pairs: []string{"filter=a=b"},
-			want:  protocol.Metadata{"filter": []string{"a=b"}},
+			want:  map[string]any{"filter": []string{"a=b"}},
 		},
 		{
 			name:  "a value followed by an empty value keeps the existing value",
 			pairs: []string{"classpath=/a.jar", "classpath="},
-			want:  protocol.Metadata{"classpath": []string{"/a.jar"}},
+			want:  map[string]any{"classpath": []string{"/a.jar"}},
 		},
 		{
 			name:  "an empty value followed by a value appends onto the empty array",
 			pairs: []string{"classpath=", "classpath=/a.jar"},
-			want:  protocol.Metadata{"classpath": []string{"/a.jar"}},
+			want:  map[string]any{"classpath": []string{"/a.jar"}},
 		},
 	}
 
@@ -63,7 +63,7 @@ func TestBuildMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := BuildMetadata(tt.pairs)
+			got, err := analyze.BuildMetadata(tt.pairs)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("BuildMetadata() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -1,11 +1,11 @@
-package analyze
+package cli
 
 import (
 	"reflect"
 	"testing"
 )
 
-func TestResolveCommand(t *testing.T) {
+func TestResolveAnalyzerCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -38,18 +38,18 @@ func TestResolveCommand(t *testing.T) {
 			t.Parallel()
 
 			getenv := func(key string) string { return tt.env[key] }
-			got, err := ResolveCommand(tt.flagValue, getenv)
+			got, err := resolveAnalyzerCommand(tt.flagValue, getenv)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("ResolveCommand() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("resolveAnalyzerCommand() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Fatalf("ResolveCommand() = %q, want %q", got, tt.want)
+				t.Fatalf("resolveAnalyzerCommand() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSplitCommand(t *testing.T) {
+func TestSplitAnalyzerCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -125,15 +125,15 @@ func TestSplitCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := SplitCommand(tt.command)
+			got, err := splitAnalyzerCommand(tt.command)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("SplitCommand() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("splitAnalyzerCommand() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("SplitCommand() = %#v, want %#v", got, tt.want)
+				t.Fatalf("splitAnalyzerCommand() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}

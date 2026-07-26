@@ -1,6 +1,6 @@
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-> 最終更新: 2026-07-20 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲)
+> 最終更新: 2026-07-26 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) の設計で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲。#34 の実装追随で View の位置情報型を `graph.SourceLocation` へ更新し、`Write` の呼び出し元を CLI 層へ、formatter interface を package 内へ移した — JSON 出力のフィールド名は output 側の serialization view で不変)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
 
@@ -43,7 +43,7 @@ Design Doc の Open Question Q3「Console 出力のツリー表現フォーマ�
 
 ### 公開 entry point と Formatter / View
 
-`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → Formatter 選択 → 描画を担う。呼び出し側 (Analyze Use Case) は `Formatter` / `View` を知らない。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する。[issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定)。
+`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → formatter 選択 → 描画を担う。呼び出し側 (コンポジションルートである CLI 層) は formatter / `View` を知らず、`Write` と `RegisteredFormats` だけを使う。formatter interface は package 内に閉じており公開しない (新形式の追加は package 内の変更で完結する)。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する。[issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定)。
 
 ```go
 // core/internal/output
@@ -87,7 +87,7 @@ type NodeView struct {
     ID            string
     QualifiedName string
     Signature     string
-    Source        *protocol.SourceLocation // nil なら位置情報なし
+    Source        *graph.SourceLocation // nil なら位置情報なし
     MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
     Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (issue #22)
 }
@@ -98,8 +98,8 @@ type EdgeView struct {
     CallerID string
     CalleeID string
     Cycle    bool
-    CallSite *protocol.SourceLocation // nil なら位置情報なし
-    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (issue #22)
+    CallSite *graph.SourceLocation // nil なら位置情報なし
+    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22))
 }
 
 // CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
@@ -109,10 +109,11 @@ type CutoffView struct {
     CalleeID       string
     TargetMethodID string                   // 探索方向の接続先 (dangling する側)
     TargetMinDepth int                      // TargetMethodID の minDepth
-    CallSite       *protocol.SourceLocation // nil なら位置情報なし
+    CallSite       *graph.SourceLocation // nil なら位置情報なし
 }
 
-type Formatter interface {
+// formatter は package 内に閉じた interface (公開しない)。
+type formatter interface {
     Format(w io.Writer, v View) error
 }
 ```
@@ -285,7 +286,7 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 
 ```mermaid
 flowchart TD
-    UseCase["Analyze Use Case"] -->|"Write(w, format, Input)"| Write["output.Write<br/>(format 検証 / View 構築 / Formatter 選択)"]
+    CLI["CLI 層 (コンポジションルート)"] -->|"Write(w, format, Input)"| Write["output.Write<br/>(format 検証 / View 構築 / formatter 選択)"]
     Write --> View["View<br/>(symbol 解決済み / sort 済み)"]
     View --> Console["Console Formatter<br/>(tree 構築)"]
     View --> JSON["JSON Formatter"]
@@ -391,7 +392,7 @@ sequenceDiagram
 
 ## 主要シナリオ / フロー
 
-- 呼び出し側 (Analyze Use Case) は Traversal result と出力形式を指定して `output.Write` を呼ぶ。未対応 format は出力を書き出す前にエラーになる。
+- 呼び出し側 (CLI 層) は use case が返した Traversal result と出力形式を指定して `output.Write` を呼ぶ。未対応 format は出力を書き出す前にエラーになる。
 - 開発者 / 保守担当は Console のツリーで呼び出し関係を読む。合流は `(既出)`、循環は `(cycle)`、深さ上限は `… (depth limit: N edges cut)` で読み取れる。
 - CI パイプラインは JSON を保存・後処理する。`minDepth == 1` で直接の呼び出し元だけを抽出する、といった後処理が JSON 単体で完結する。
 - ドキュメント作成者は DOT / Mermaid (Phase4) の出力を外部レンダラに渡して図を得る。

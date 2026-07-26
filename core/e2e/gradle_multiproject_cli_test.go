@@ -16,25 +16,24 @@ import (
 )
 
 // TestGradleMultiProjectCLI is the repository-standard required E2E for
-// Issue #24 (context/project.md "Multi-project required E2E"): it drives the
+// multi-project workspaces. It drives the
 // real Core CLI binary against the real Java Analyzer jar through the
 // test-only transparent recording proxy, and verifies the captured
 // analysisRequest, the raw Analyzer JSONL / stderr / exit status, and the
 // CLI stdout / stderr / exit status in the same run for the auto-discovery,
 // explicit-override, and fatal paths.
 //
-// include / exclude の CLI flag と request 透過は Issue #22 の unit test、
-// Analyzer 側の workspace 相対 glob は実 jar test
-// (MultiModuleFixtureEquivalenceTest) で固定する。本 E2E は Issue #24 の
-// source root auto / explicit 契約に集中し、探索出力は TestCLIQueryGolden
-// で検証する。
+// The --include / --exclude flags and their passthrough into the request are
+// pinned by cli unit tests, and the Analyzer-side workspace-relative globs by
+// the real-jar MultiModuleFixtureEquivalenceTest. This E2E focuses on the
+// source root auto / explicit contract; query output is verified by
+// TestCLIQueryGolden.
 //
-// error なし非ゼロ exit・malformed stdout・参照不整合の非公開、fatal reason の
-// 維持、Java 非依存 generic failure fixture の共通 renderer は fake analyzer では
-// 実現できない実 process 観点ではないため、
-// core/internal/analyze・core/internal/cli の process contract test
-// (dangling-edge-then-error / dangling-edge-clean-exit / bad-exit /
-// error-with-details / malformed) が required gate として固定済みである。
+// Failure paths that need no real process (a non-zero exit without an error
+// record, malformed stdout, withholding a graph with dangling references,
+// keeping the fatal reason, and the language-agnostic failure renderer) are
+// covered by the process contract tests in core/internal/protocol and
+// core/internal/cli instead, which run as a required gate.
 func TestGradleMultiProjectCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -132,8 +131,9 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 		}
 		assertCapturedGraphMatches(t, explicitCapture, expected)
 
-		// auto / explicit の raw graph 同値性 (edgeId 以外)。Auto subtest の
-		// capture が無い場合は依存失敗として skip し、紛らわしい二次失敗を避ける。
+		// The auto and explicit runs must produce equivalent raw graphs (edgeId
+		// aside). Skip when the Auto subtest left no capture: that is a
+		// dependency failure, and reporting it again here would be misleading.
 		if _, err := os.Stat(filepath.Join(autoCapture, "stdout.jsonl")); err != nil {
 			t.Skipf("Auto subtest did not produce a capture: %v", err)
 		}
@@ -148,8 +148,8 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 	})
 
 	t.Run("FatalAtomicity", func(t *testing.T) {
-		// 実 Analyzer が record を先行出力した後に valid error
-		// (JAVA_INCOMPLETE_ANALYSIS) を返す workspace。proxy は record を生成しない。
+		// A workspace where the real Analyzer streams records and then returns a
+		// valid error (JAVA_INCOMPLETE_ANALYSIS). The proxy synthesizes nothing.
 		workspace := t.TempDir()
 		writeFatalWorkspace(t, workspace)
 		capture := t.TempDir()
@@ -166,7 +166,7 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 			t.Errorf("CLI must not publish the graph summary on fatal failure: %q", result.stdout)
 		}
 
-		// 実 Analyzer は先行 record を stream してから error record を出している。
+		// The real Analyzer streams records before emitting the error record.
 		records := capturedRecords(t, capture)
 		var sawMethod, sawError bool
 		var errorRecord protocol.AnalyzerError
@@ -189,15 +189,17 @@ func TestGradleMultiProjectCLI(t *testing.T) {
 			t.Fatalf("error record = %+v, want JAVA_INCOMPLETE_ANALYSIS with >=2 details", errorRecord)
 		}
 
-		// 共通 renderer: summary の後に details が配列順で並び、canonical metadata JSON を含む。
+		// The shared renderer prints the summary first, then the details in
+		// array order, each with canonical metadata JSON.
 		summary := strings.Index(result.stderr, "Error: analyzer reported a fatal error: JAVA_INCOMPLETE_ANALYSIS")
 		first := strings.Index(result.stderr, "detail[0] "+errorRecord.Details[0].Code)
 		second := strings.Index(result.stderr, "detail[1] "+errorRecord.Details[1].Code)
 		if !(summary >= 0 && summary < first && first < second) {
 			t.Errorf("CLI stderr must render summary then ordered details:\n%s", result.stderr)
 		}
-		// renderer は Analyzer 固有 key を解釈せず canonical JSON として表示する。
-		// 特定 key 名には依存せず、metadata 行の存在だけを検証する。
+		// The renderer never interprets Analyzer-specific keys; it prints them
+		// as canonical JSON. Assert only that a metadata line exists, not which
+		// keys it holds.
 		if !strings.Contains(result.stderr, "  metadata {") {
 			t.Errorf("CLI stderr must render detail metadata as canonical JSON:\n%s", result.stderr)
 		}
@@ -214,8 +216,8 @@ type cliResult struct {
 // proxy, which launches the real Analyzer jar.
 func runCLI(t *testing.T, cliPath, captureDir, javaPath, jarPath string, args ...string) cliResult {
 	t.Helper()
-	// proxyCmd は手書き quote のため、path に二重引用符が入る環境では
-	// 組み立てが壊れる。黙って壊れず明示的に失敗させる。
+	// proxyCmd is quoted by hand, so a path containing a double quote would
+	// corrupt the command. Fail explicitly rather than silently.
 	for _, part := range []string{os.Args[0], captureDir, javaPath, jarPath} {
 		if strings.Contains(part, `"`) {
 			t.Fatalf("path containing a double quote is not supported by the proxy command quoting: %q", part)
@@ -377,8 +379,9 @@ func capturedGraph(t *testing.T, captureDir string) (map[string]string, []string
 func assertCapturedGraphMatches(t *testing.T, captureDir string, expected expectedMultiModuleGraph) {
 	t.Helper()
 	methods, edges := capturedGraph(t, captureDir)
-	// expected/graph.json は fixture の完全集合。件数一致で包含検査を
-	// 集合一致へ引き上げ、余剰 method / edge の混入も検出する。
+	// expected/graph.json is the fixture's complete set. Matching the counts
+	// turns the containment check into a set equality check, so extra methods
+	// or edges are detected too.
 	if len(methods) != len(expected.Methods) {
 		t.Errorf("method count = %d, want exactly %d: %v", len(methods), len(expected.Methods), methods)
 	}

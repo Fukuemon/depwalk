@@ -6,6 +6,32 @@ pre-commit:
       run: hooks/format/run_prettier.sh
     repo-analysis:
       run: hooks/quality/validate_repo_analysis.sh
+    # Go の依存方向 gate。import かルール自体を
+    # 触ったときだけ走らせる (毎 commit で linter を起動しない)。
+    #
+    # glob は staged file に対して評価されるので、ファイル削除だけの commit
+    # では skip される。その穴は CI 側の同じ検査が塞ぐ。
+    go-depguard:
+      glob:
+        - "core/**/*.go"
+        - "core/*.go"
+        - "core/.golangci.yml"
+        - "scripts/golangci-lint.sh"
+      run: scripts/golangci-lint.sh ./...
+    # 依存図の drift 検査: 実 import が変わったのに architecture.md の
+    # 生成区間を更新していない状態を検出する。生成側 (スクリプト) と
+    # 生成先 (architecture.md) の手編集も同じ検査で拾う。
+    #
+    # lefthook の run は sh -c で実行され set -e が効かない。複数行にすると
+    # 終了コードが最後のコマンドのものになり、生成の失敗を git diff が
+    # 握り潰す (図が更新されないので差分ゼロ = 緑) ため && で連結する。
+    go-depgraph-drift:
+      glob:
+        - "core/**/*.go"
+        - "core/*.go"
+        - "scripts/depgraph.sh"
+        - "context/architecture.md"
+      run: scripts/depgraph.sh && git diff --exit-code context/architecture.md
 
 pre-push:
   commands:

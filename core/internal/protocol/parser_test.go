@@ -1,4 +1,4 @@
-package protocol
+package protocol_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 func TestParseRecord(t *testing.T) {
@@ -14,32 +16,32 @@ func TestParseRecord(t *testing.T) {
 	tests := []struct {
 		name string
 		line string
-		want Record
+		want protocol.Record
 	}{
 		{
 			name: "analysis request",
 			line: `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","include":["src/**/*.java"],"entrypoints":[{"qualifiedName":"example.App.main"}],"unknown":"ignored"}`,
-			want: AnalysisRequest{},
+			want: protocol.AnalysisRequest{},
 		},
 		{
 			name: "method symbol",
 			line: `{"schemaVersion":"1","recordType":"methodSymbol","methodId":"method:main","language":"java","symbolKind":"method","qualifiedName":"example.App.main","signature":"main():void","sourceLocation":{"path":"src/App.java","startLine":1}}`,
-			want: MethodSymbol{},
+			want: protocol.MethodSymbol{},
 		},
 		{
 			name: "call edge",
 			line: `{"schemaVersion":"1","recordType":"callEdge","edgeId":"edge:1","callerMethodId":"method:caller","calleeMethodId":"method:callee"}`,
-			want: CallEdge{},
+			want: protocol.CallEdge{},
 		},
 		{
 			name: "diagnostic",
 			line: `{"schemaVersion":"1","recordType":"diagnostic","severity":"warning","code":"UNRESOLVED","message":"unresolved symbol"}`,
-			want: Diagnostic{},
+			want: protocol.Diagnostic{},
 		},
 		{
 			name: "error",
 			line: `{"schemaVersion":"1","recordType":"error","code":"ANALYZER_FAILED","message":"failed"}`,
-			want: AnalyzerError{},
+			want: protocol.AnalyzerError{},
 		},
 	}
 
@@ -48,7 +50,7 @@ func TestParseRecord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ParseRecord([]byte(tt.line))
+			got, err := protocol.ParseRecord([]byte(tt.line))
 			if err != nil {
 				t.Fatalf("ParseRecord() error = %v", err)
 			}
@@ -150,11 +152,11 @@ func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
 	t.Parallel()
 
 	line := `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","sourceRoots":["module-b/src/main/java","module-a/src/main/java","."]}`
-	record, err := ParseRecord([]byte(line))
+	record, err := protocol.ParseRecord([]byte(line))
 	if err != nil {
 		t.Fatalf("ParseRecord() error = %v", err)
 	}
-	request, ok := record.(AnalysisRequest)
+	request, ok := record.(protocol.AnalysisRequest)
 	if !ok {
 		t.Fatalf("ParseRecord() type = %T, want AnalysisRequest", record)
 	}
@@ -164,17 +166,18 @@ func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
 	}
 }
 
-// JSON の明示 null は省略と同義に扱う (nil slice へ decode され自動 discovery
-// へ委譲する)。空配列 [] だけを invalid とする境界を意図的な契約として固定する。
+// An explicit JSON null means the same as omitting the field: it decodes
+// to a nil slice and defers to automatic discovery. Only an empty array is
+// invalid; this pins that boundary as a deliberate contract.
 func TestParseRecordTreatsNullSourceRootsAsOmitted(t *testing.T) {
 	t.Parallel()
 
 	line := `{"schemaVersion":"1","recordType":"analysisRequest","requestId":"request-1","workspaceRoot":"/workspace","language":"java","sourceRoots":null}`
-	record, err := ParseRecord([]byte(line))
+	record, err := protocol.ParseRecord([]byte(line))
 	if err != nil {
 		t.Fatalf("ParseRecord() error = %v, want null to behave as omitted", err)
 	}
-	request, ok := record.(AnalysisRequest)
+	request, ok := record.(protocol.AnalysisRequest)
 	if !ok {
 		t.Fatalf("ParseRecord() type = %T, want AnalysisRequest", record)
 	}
@@ -244,7 +247,7 @@ func TestParseRecordRoundTripsOpaqueMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			record, err := ParseRecord([]byte(tt.line))
+			record, err := protocol.ParseRecord([]byte(tt.line))
 			if err != nil {
 				t.Fatalf("ParseRecord() error = %v", err)
 			}
@@ -276,7 +279,7 @@ func TestParseRecordAcceptsTrailingNewline(t *testing.T) {
 	t.Parallel()
 
 	line := []byte("{\"schemaVersion\":\"1\",\"recordType\":\"diagnostic\",\"severity\":\"info\",\"code\":\"A\",\"message\":\"message\"}\n")
-	if _, err := ParseRecord(line); err != nil {
+	if _, err := protocol.ParseRecord(line); err != nil {
 		t.Fatalf("ParseRecord() error = %v", err)
 	}
 }
@@ -284,23 +287,23 @@ func TestParseRecordAcceptsTrailingNewline(t *testing.T) {
 func assertParseRecordValidationError(t *testing.T, line []byte) {
 	t.Helper()
 
-	var validationError ValidationError
-	if _, err := ParseRecord(line); !errors.As(err, &validationError) {
+	var validationError protocol.ValidationError
+	if _, err := protocol.ParseRecord(line); !errors.As(err, &validationError) {
 		t.Fatalf("ParseRecord() error = %v, want ValidationError", err)
 	}
 }
 
-func recordTypeName(record Record) string {
+func recordTypeName(record protocol.Record) string {
 	switch record.(type) {
-	case AnalysisRequest:
+	case protocol.AnalysisRequest:
 		return "AnalysisRequest"
-	case MethodSymbol:
+	case protocol.MethodSymbol:
 		return "MethodSymbol"
-	case CallEdge:
+	case protocol.CallEdge:
 		return "CallEdge"
-	case Diagnostic:
+	case protocol.Diagnostic:
 		return "Diagnostic"
-	case AnalyzerError:
+	case protocol.AnalyzerError:
 		return "AnalyzerError"
 	default:
 		return "unknown"
