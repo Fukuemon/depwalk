@@ -16,7 +16,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * 型解決 (design/features/java-analyzer/DesignDoc_java-analyzer.md 「型解決」) の 3 TypeSolver を構成する。
+ * 型解決 (design/features/java-analyzer/DesignDoc_java-analyzer.md 「型解決」) の 4 種類の TypeSolver
+ * ({@link ReflectionTypeSolver} / source root ごとの {@link JavaParserTypeSolver} / jar ごとの
+ * {@link JarTypeSolver} / classes directory 用の {@link ClassLoaderTypeSolver}) を構成する。
  * classpath は解析開始前に検証済みであり、jar / classes dir の存在・読み取り可否はここでは再検査
  * しない。metadata 契約上、classpath の各 entry は「依存 jar」または「classes dir (コンパイル済み
  * .class ファイルの directory)」のいずれも許容する。jar は {@link JarTypeSolver} で直接読み、

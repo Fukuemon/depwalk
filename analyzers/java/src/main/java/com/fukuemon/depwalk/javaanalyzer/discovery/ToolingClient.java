@@ -44,11 +44,22 @@ public interface ToolingClient {
 
         private final DiscoveryFailure.Phase phase;
 
+        /**
+         * 失敗 phase と固定 message から例外を生成する。
+         *
+         * @param phase 失敗した discovery の段階
+         * @param fixedMessage Analyzer が定義した固定 message (Gradle 由来の raw message を渡さない)
+         */
         public ToolingRequestException(DiscoveryFailure.Phase phase, String fixedMessage) {
             super(fixedMessage);
             this.phase = phase;
         }
 
+        /**
+         * 失敗した discovery の段階を返す。
+         *
+         * @return 生成時に与えた phase
+         */
         public DiscoveryFailure.Phase phase() {
             return phase;
         }

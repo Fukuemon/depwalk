@@ -103,7 +103,13 @@ public final class ContextScope {
         return new Scope(filesByContext, List.copyOf(allFiles), membership);
     }
 
-    /** workspace 相対の record path 表現を返す。 */
+    /**
+     * workspace 相対の record path 表現を返す。
+     *
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     * @param file workspaceRoot 配下の file
+     * @return {@code /} 区切りの workspace 相対 path
+     */
     public static String workspaceRelative(Path workspaceRoot, Path file) {
         return RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString());
     }
@@ -119,7 +125,12 @@ public final class ContextScope {
         }
     }
 
-    /** include / exclude glob を {@link PathMatcher} 一覧へ変換する。 */
+    /**
+     * include / exclude glob を {@link PathMatcher} 一覧へ変換する。
+     *
+     * @param globs workspace 相対 glob。null または空なら空一覧を返す
+     * @return glob と同順の matcher 一覧
+     */
     public static List<PathMatcher> toMatchers(List<String> globs) {
         if (globs == null || globs.isEmpty()) {
             return List.of();

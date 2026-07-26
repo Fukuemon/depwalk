@@ -44,11 +44,20 @@ public final class CallSiteInventory {
     private final Path workspaceRoot;
     private final Set<CallSiteId> ids = new LinkedHashSet<>();
 
+    /**
+     * workspace 相対 path を組み立てる基準 root を与えて inventory を作る。
+     *
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     */
     public CallSiteInventory(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
     }
 
-    /** parse 済み CU の call site を登録する (solver 処理前に呼ぶ)。 */
+    /**
+     * parse 済み CU の call site を登録する (solver 処理前に呼ぶ)。
+     *
+     * @param cu storage path を持つ parse 済み compilation unit
+     */
     public void accept(CompilationUnit cu) {
         String path = cu.getStorage()
                 .map(storage -> RelativePaths.toRecordPath(
@@ -146,7 +155,16 @@ public final class CallSiteInventory {
         }
     }
 
-    /** lexical site + semantic caller から決定的な {@link CallSiteId} を作る。 */
+    /**
+     * lexical site + semantic caller から決定的な {@link CallSiteId} を作る。
+     *
+     * @param callNode source range を持つ call 表現の AST node
+     * @param path workspace 相対 path
+     * @param kind call kind
+     * @param callerMethodId 呼び出し元の method id (未解決なら placeholder id)
+     * @return 位置・kind・caller から決まる call site id
+     * @throws IllegalStateException {@code callNode} が source range を持たない場合
+     */
     public static CallSiteId of(Node callNode, String path, CallSiteId.CallKind kind, String callerMethodId) {
         Range range = callNode.getRange()
                 .orElseThrow(() -> new IllegalStateException("call site without a source range: " + kind));
@@ -160,10 +178,21 @@ public final class CallSiteInventory {
                 callerMethodId);
     }
 
+    /**
+     * 登録済み call site かどうかを返す。
+     *
+     * @param id 照会する call site id
+     * @return 登録済みなら true
+     */
     public boolean contains(CallSiteId id) {
         return ids.contains(id);
     }
 
+    /**
+     * 登録済み call site id を登録順で返す。
+     *
+     * @return 変更不可 view
+     */
     public Set<CallSiteId> ids() {
         return java.util.Collections.unmodifiableSet(ids);
     }
@@ -190,6 +219,14 @@ public final class CallSiteInventory {
             return PLACEHOLDER_PREFIX + path + ":" + line;
         }
 
+        /**
+         * method 宣言の caller id を返す。解決できない場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
+         * @param md 対象 method 宣言
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return 正規化 signature 由来の method id、または placeholder id
+         */
         public static String methodCallerId(Node enclosingType, MethodDeclaration md, String path) {
             try {
                 ResolvedMethodDeclaration resolved = md.resolve();
@@ -200,6 +237,14 @@ public final class CallSiteInventory {
             }
         }
 
+        /**
+         * constructor 宣言の caller id を返す。解決できない場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
+         * @param cd 対象 constructor 宣言
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return {@code <init>} の method id、または placeholder id
+         */
         public static String constructorCallerId(Node enclosingType, ConstructorDeclaration cd, String path) {
             try {
                 ResolvedConstructorDeclaration resolved = cd.resolve();
@@ -210,6 +255,16 @@ public final class CallSiteInventory {
             }
         }
 
+        /**
+         * record の compact constructor の caller id を、record 成分から
+         * 引数型を復元して返す。enclosing が record 宣言でない場合や解決に
+         * 失敗した場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (record 宣言を期待する)
+         * @param ccd 対象 compact constructor 宣言
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return {@code <init>} の method id、または placeholder id
+         */
         public static String compactConstructorCallerId(Node enclosingType, CompactConstructorDeclaration ccd, String path) {
             try {
                 if (!(enclosingType instanceof RecordDeclaration rd)) {

@@ -72,14 +72,29 @@ public final class ProviderWorkspace implements AutoCloseable {
                 + "}\n";
     }
 
+    /**
+     * provider を登録する一時 init script の path を返す。
+     *
+     * @return 展開済み init script の絶対 path
+     */
     public Path initScript() {
         return initScript;
     }
 
+    /**
+     * 展開済み provider jar の path を返す。
+     *
+     * @return 一時 directory 内の provider jar path
+     */
     public Path providerJar() {
         return providerJar;
     }
 
+    /**
+     * 展開先の一時 directory を返す。
+     *
+     * @return {@link #close()} で削除される一時 directory
+     */
     public Path directory() {
         return directory;
     }

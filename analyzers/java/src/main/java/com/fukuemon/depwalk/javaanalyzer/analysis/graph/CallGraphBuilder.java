@@ -96,6 +96,17 @@ public final class CallGraphBuilder {
      * @param sourceMethodIndex 候補メソッドの source location を補完する索引
      * @param springResult Spring Bean と注入点の解決結果
      * @param solverOrigins 所有 context の solver entry と origin の対応
+     * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する
+     *     完全性 gate 用 ledger (java-analyzer feature doc「Parse・resolution・call 完全性」)
+     * @param declIndex workspace の source 宣言から型の所有 context と source location を引く索引。
+     *     bytecode 救済の対象を workspace source を持つ型に限定する判定に使う
+     * @param bytecodeIndex 呼び出し元 context の classpath 視点で bytecode member
+     *     (method / constructor / field 型 / generic 戻り型) を引く索引。source だけでは解決できない
+     *     候補の救済に使う (feature doc「solver 層の bytecode member 合成」)
+     * @param contextId 本 builder が担当する解析 context の id (救済候補の owner 検査は
+     *     {@code reachableContextIds} 側で行う)
+     * @param reachableContextIds 自 context と Gradle project 依存で推移的に到達可能な context id の集合。
+     *     救済候補の所有 context がこの集合に含まれない場合は救済を行わない
      */
     public CallGraphBuilder(
             Path workspaceRoot,

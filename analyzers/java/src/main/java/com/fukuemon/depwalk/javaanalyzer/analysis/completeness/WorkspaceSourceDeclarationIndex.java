@@ -37,6 +37,11 @@ public final class WorkspaceSourceDeclarationIndex {
     private final Path workspaceRoot;
     private final Map<String, TypeLocation> typesByBinaryName = new LinkedHashMap<>();
 
+    /**
+     * workspace 相対 path を組み立てる基準 root を与えて索引を作る。
+     *
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     */
     public WorkspaceSourceDeclarationIndex(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
     }
@@ -49,6 +54,8 @@ public final class WorkspaceSourceDeclarationIndex {
      * で cross-context の重複を検証する
      * (feature doc「Source root discovery と解析 context」)。
      *
+     * @param cu parse 済み compilation unit (storage path が無ければ何もしない)
+     * @param contextId この CU を所有する解析 context の id
      * @throws AnalyzerFatalException 異なる context が同じ binary name を宣言する場合
      */
     public void accept(CompilationUnit cu, String contextId) throws AnalyzerFatalException {
