@@ -15,7 +15,6 @@ public interface ToolingClient {
      * 対象 build の environment (Gradle version と daemon JVM major) を返す。
      *
      * @param workspaceRoot 対象 build の root directory
-     * @return build environment の安定情報
      * @throws ToolingRequestException 接続または取得に失敗した場合
      */
     BuildEnvironmentInfo buildEnvironment(Path workspaceRoot) throws ToolingRequestException;
@@ -45,9 +44,6 @@ public interface ToolingClient {
         private final DiscoveryFailure.Phase phase;
 
         /**
-         * 失敗 phase と固定 message から例外を生成する。
-         *
-         * @param phase 失敗した discovery の段階
          * @param fixedMessage Analyzer が定義した固定 message (Gradle 由来の raw message を渡さない)
          */
         public ToolingRequestException(DiscoveryFailure.Phase phase, String fixedMessage) {
@@ -55,11 +51,6 @@ public interface ToolingClient {
             this.phase = phase;
         }
 
-        /**
-         * 失敗した discovery の段階を返す。
-         *
-         * @return 生成時に与えた phase
-         */
         public DiscoveryFailure.Phase phase() {
             return phase;
         }

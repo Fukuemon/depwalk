@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * scope 内 source 型の宣言に合成される bytecode-only method
- * (java-analyzer feature doc「solver 層の bytecode member 合成」)。
+ * scope 内 source 型の宣言に合成される bytecode-only method。
+ * 本クラスの契約の正本は java-analyzer feature doc「solver 層の bytecode member 合成」。
  * SootUp が classes output から読んだ {@code MethodCandidate} を JavaParser の
  * 解決結果として振る舞わせ、Lombok 等の生成 member を含む式の型伝播
  * (chained call / stream 連鎖) を solver 層で成立させる。
@@ -29,22 +29,11 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     /** binary name → ResolvedType の変換 (primitive / array / 参照型)。 */
     public interface BytecodeTypeResolver {
-        /**
-         * erasure 済み binary name を ResolvedType へ解決する。
-         *
-         * @param binaryName primitive / 配列 / 参照型の binary name
-         * @return 対応する ResolvedType
-         */
+        /** @param binaryName erasure 済みの primitive / 配列 ({@code []} 付き) / 参照型 binary name */
         ResolvedType resolve(String binaryName);
     }
 
-    /**
-     * 戻り値も erasure で解決する合成 member を作る。
-     *
-     * @param declaringType 合成先の source 型宣言
-     * @param candidate SootUp が classes output から読んだ member 候補
-     * @param typeResolver binary name → ResolvedType の変換
-     */
+    /** 戻り値も erasure で解決する合成 member を作る。 */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,
             SootUpTypeHierarchyIndex.MethodCandidate candidate,
@@ -55,12 +44,8 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     /**
      * 戻り値の解決方法を指定して合成 member を作る。
      *
-     * @param declaringType 合成先の source 型宣言
-     * @param candidate SootUp が classes output から読んだ member 候補
-     * @param typeResolver binary name → ResolvedType の変換
-     * @param genericReturnType 戻り値だけを generic Signature 由来で解決する
-     *     supplier (feature doc「solver 層の bytecode member 合成」)。引数型は常に
-     *     {@code typeResolver} の erasure を使う。{@code null} なら戻り値も erasure
+     * @param genericReturnType 戻り値だけを generic Signature 由来で解決する supplier。
+     *     引数型は常に {@code typeResolver} の erasure を使う。{@code null} なら戻り値も erasure
      */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,

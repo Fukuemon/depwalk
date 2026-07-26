@@ -32,11 +32,8 @@ public record CallEdge(
      * 現在の schema version と record type を設定した call edge を生成する。
      *
      * @param edgeId Analyzer 内で一意な edge ID
-     * @param callerMethodId 呼び出し元 method ID
-     * @param calleeMethodId 呼び出し先 method ID
      * @param callSite 呼び出し位置。取得できなければ {@code null}
      * @param metadata dispatch や候補解決根拠。追加情報がなければ {@code null}
-     * @return protocol 出力可能な call edge
      */
     public static CallEdge of(
             String edgeId,

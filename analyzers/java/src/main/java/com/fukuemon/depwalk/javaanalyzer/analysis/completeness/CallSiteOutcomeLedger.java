@@ -71,8 +71,6 @@ public final class CallSiteOutcomeLedger {
     private final CallSiteInventory inventory;
 
     /**
-     * 分類対象となる inventory を与えて台帳を作る。
-     *
      * @param inventory commit 対象 ID の母集合となる call site inventory
      */
     public CallSiteOutcomeLedger(CallSiteInventory inventory) {

@@ -14,8 +14,6 @@ public final class ProtocolObjectMapper {
      * 未知 field を無視する ({@code analysisRequest} の未知 field 無視は protocol の規則) よう構成し、
      * 値を持たない任意 field を出力から省く ({@code testdata/analyzer-protocol/} の fixture が
      * 任意 field 不在時に key 自体を省略している慣行に合わせる) {@link ObjectMapper} を返す。
-     *
-     * @return Analyzer Protocol の入出力規則を設定した mapper
      */
     public static ObjectMapper create() {
         ObjectMapper mapper = new ObjectMapper();

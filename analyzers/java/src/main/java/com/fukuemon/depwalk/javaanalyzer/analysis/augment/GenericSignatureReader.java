@@ -52,11 +52,7 @@ public final class GenericSignatureReader {
     private final List<Path> classesOutputDirs;
     private final Map<String, Map<String, BytecodeType>> cache = new HashMap<>();
 
-    /**
-     * class file を探索する project classes output を与えて reader を作る。
-     *
-     * @param classesOutputDirs 探索順に並んだ classes output directory
-     */
+    /** @param classesOutputDirs 探索順に並んだ classes output directory (先に一致した class file を使う) */
     public GenericSignatureReader(List<Path> classesOutputDirs) {
         this.classesOutputDirs = List.copyOf(classesOutputDirs);
     }
@@ -65,10 +61,7 @@ public final class GenericSignatureReader {
      * method の generic 戻り値型を返す。Signature 属性が無い・読めない場合は
      * empty (呼び出し側は erasure を使う)。
      *
-     * @param ownerBinaryName 所有 class の binary name
-     * @param methodName method 名
-     * @param erasedParameterTypes erasure 済み引数型 (overload 識別用)
-     * @return Signature 属性から復元した戻り値型。無い・読めない場合は empty
+     * @param erasedParameterTypes erasure 済み引数型 (overload 識別に使うため宣言順)
      */
     public Optional<BytecodeType> genericReturnType(
             String ownerBinaryName, String methodName, List<String> erasedParameterTypes) {

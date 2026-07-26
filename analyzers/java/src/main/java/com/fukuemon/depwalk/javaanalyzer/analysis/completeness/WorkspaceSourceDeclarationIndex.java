@@ -38,8 +38,6 @@ public final class WorkspaceSourceDeclarationIndex {
     private final Map<String, TypeLocation> typesByBinaryName = new LinkedHashMap<>();
 
     /**
-     * workspace 相対 path を組み立てる基準 root を与えて索引を作る。
-     *
      * @param workspaceRoot 絶対・正規化済み workspace root
      */
     public WorkspaceSourceDeclarationIndex(Path workspaceRoot) {
@@ -85,7 +83,6 @@ public final class WorkspaceSourceDeclarationIndex {
         }
     }
 
-    /** binary name の scope 内 source 宣言を返す。 */
     public Optional<TypeLocation> find(String binaryName) {
         return Optional.ofNullable(typesByBinaryName.get(binaryName));
     }

@@ -18,9 +18,6 @@ public class IncompleteAnalysisException extends Exception {
     private final transient Map<String, Object> metadata;
 
     /**
-     * 未解決 call の detail と集計 metadata を保持する fatal 例外を生成する。
-     *
-     * @param message 例外 message
      * @param details 未解決 call の自己完結な detail (1 件以上)
      * @param metadata {@code error.details.metadata} へ出す集計値
      * @throws IllegalStateException {@code details} が空の場合
@@ -34,20 +31,12 @@ public class IncompleteAnalysisException extends Exception {
         this.metadata = Map.copyOf(metadata);
     }
 
-    /**
-     * 未解決 call の detail 一覧を返す。
-     *
-     * @return 変更不可 copy
-     */
+    /** 変更不可 copy。 */
     public List<FailureDetail> details() {
         return details;
     }
 
-    /**
-     * 集計 metadata を返す。
-     *
-     * @return 変更不可 copy
-     */
+    /** 変更不可 copy。 */
     public Map<String, Object> metadata() {
         return metadata;
     }

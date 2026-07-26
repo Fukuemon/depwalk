@@ -17,11 +17,6 @@ public final class RequestReader {
 
     private final ObjectMapper mapper;
 
-    /**
-     * 指定 mapper を使う request reader を生成する。
-     *
-     * @param mapper analysis request の deserialize に使う mapper
-     */
     public RequestReader(ObjectMapper mapper) {
         this.mapper = mapper;
     }
@@ -30,7 +25,6 @@ public final class RequestReader {
      * stdin の先頭 1 行を {@link AnalysisRequest} として deserialize する。未知 field は無視する。
      *
      * @param in UTF-8 JSONL の入力
-     * @return deserialize した解析要求
      * @throws IOException stdin が空、または JSON として不正な場合
      */
     public AnalysisRequest read(InputStream in) throws IOException {
