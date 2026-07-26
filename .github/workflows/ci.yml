@@ -62,7 +62,7 @@ jobs:
       - name: Dependency graph drift check
         run: |
           # 実 import が変わったのに architecture.md の生成区間を再生成して
-          # いない状態を検出する (図の腐敗を構造的に防ぐ。spec #32 D8)。
+          # いない状態を検出する (手描き図が静かに腐るのを構造的に防ぐ)。
           scripts/depgraph.sh
           if ! git diff --exit-code context/architecture.md; then
             echo "::error::context/architecture.md の依存図が実 import と一致しません。scripts/depgraph.sh を実行して結果を commit してください"
