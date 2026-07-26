@@ -115,8 +115,9 @@ func (c *recordCollector) finalize(readErr error) RunResult {
 	if readErr != nil {
 		c.setValidationError(readErr)
 	}
-	// fatal stream では先行 record を Core が全破棄するため、未完参照を別の
-	// validation failure として報告しない (Graph feature doc の fatal 契約)。
+	// A fatal stream makes Core discard every preceding record, so dangling
+	// references are not reported as a separate validation failure (the
+	// fatal contract in design/features/graph/DesignDoc_graph.md).
 	if c.result.AnalyzerError == nil {
 		if err := c.references.validate(); err != nil {
 			c.setValidationError(err)

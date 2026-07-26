@@ -6,7 +6,7 @@ pre-commit:
       run: hooks/format/run_prettier.sh
     repo-analysis:
       run: hooks/quality/validate_repo_analysis.sh
-    # Go の依存方向 gate (spec #32 D5 / D8)。import かルール自体を
+    # Go の依存方向 gate。import かルール自体を
     # 触ったときだけ走らせる (毎 commit で linter を起動しない)。
     #
     # glob は staged file に対して評価されるので、ファイル削除だけの commit

@@ -82,7 +82,8 @@ func (w *failingWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("stderr forwarding failed")
 }
 
-// 転送先 writer が失敗しても stderr は EOF まで drain され、capture が欠けない。
+// A failing forward writer must not truncate the capture: stderr is still
+// drained to EOF.
 func TestRunnerDrainsStderrWhenForwardWriterFails(t *testing.T) {
 	t.Parallel()
 
