@@ -16,7 +16,7 @@ import (
 
 // Adapter tests moved from the analyze package: they drive a fake Analyzer
 // subprocess through the full ACL (wire request composition, record
-// parsing, wire → domain translation) via the analyze.AnalysisSource port.
+// parsing, wire → domain translation) via the analyze.Source port.
 
 func fakeAnalyzerAdapter(scenario string) *Adapter {
 	return NewAdapter(analyzer.Command{
@@ -26,7 +26,7 @@ func fakeAnalyzerAdapter(scenario string) *Adapter {
 }
 
 // runAdapter collects the streamed domain values alongside the outcome.
-func runAdapter(adapter *Adapter, request analyze.AnalysisRequest) ([]graph.Node, []graph.Edge, analyze.AnalysisOutcome, error) {
+func runAdapter(adapter *Adapter, request analyze.Request) ([]graph.Node, []graph.Edge, analyze.Outcome, error) {
 	var nodes []graph.Node
 	var edges []graph.Edge
 	outcome, err := adapter.RunAnalysis(request,
@@ -39,7 +39,7 @@ func runAdapter(adapter *Adapter, request analyze.AnalysisRequest) ([]graph.Node
 func TestAdapterStreamsTranslatedDomainValues(t *testing.T) {
 	t.Parallel()
 
-	nodes, edges, outcome, err := runAdapter(fakeAnalyzerAdapter("success"), analyze.AnalysisRequest{
+	nodes, edges, outcome, err := runAdapter(fakeAnalyzerAdapter("success"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 		Metadata:      map[string]any{"classpath": []string{"/a.jar", "/b.jar"}},
@@ -70,7 +70,7 @@ func TestAdapterStreamsTranslatedDomainValues(t *testing.T) {
 func TestAdapterTranslatesAnalyzerErrorRecord(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("analyzer-error"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("analyzer-error"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -91,7 +91,7 @@ func TestAdapterTranslatesAnalyzerErrorRecord(t *testing.T) {
 func TestAdapterTranslatesStructuredFailureDetails(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("error-with-details"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("error-with-details"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -130,7 +130,7 @@ func TestAdapterKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
 	// The fake analyzer streams a dangling call edge before its fatal error
 	// record; the fatal record must be reported and the reference-
 	// completeness failure suppressed (fatal streams discard prior records).
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("dangling-edge-then-error"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("dangling-edge-then-error"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -148,7 +148,7 @@ func TestAdapterKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
 func TestAdapterReportsReferenceIncompletenessAfterCleanExit(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("dangling-edge-clean-exit"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("dangling-edge-clean-exit"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -163,7 +163,7 @@ func TestAdapterReportsReferenceIncompletenessAfterCleanExit(t *testing.T) {
 func TestAdapterReportsNonZeroExit(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("bad-exit"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("bad-exit"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -179,7 +179,7 @@ func TestAdapterReportsNonZeroExit(t *testing.T) {
 // rejected the wire request. The fake reports assertion failures by
 // exiting non-zero, and a non-zero exit is carried in the outcome rather
 // than returned as an error, so the exit code must be checked explicitly.
-func assertRequestScenarioPassed(t *testing.T, outcome analyze.AnalysisOutcome, err error) {
+func assertRequestScenarioPassed(t *testing.T, outcome analyze.Outcome, err error) {
 	t.Helper()
 
 	if err != nil {
@@ -193,7 +193,7 @@ func assertRequestScenarioPassed(t *testing.T, outcome analyze.AnalysisOutcome, 
 func TestAdapterSendsExplicitFullGraphRequestWithFilters(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 		SourceRoots:   []string{"module-b/src", "module-a/src"},
@@ -206,7 +206,7 @@ func TestAdapterSendsExplicitFullGraphRequestWithFilters(t *testing.T) {
 func TestAdapterOmitsUnsetFiltersAndEntrypoints(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-defaults"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-defaults"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -219,7 +219,7 @@ func TestAdapterOmitsUnsetFiltersAndEntrypoints(t *testing.T) {
 func TestAdapterRequestAssertionsDetectAWrongRequest(t *testing.T) {
 	t.Parallel()
 
-	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.AnalysisRequest{
+	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("request-options"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 	})
@@ -234,7 +234,7 @@ func TestAdapterRequestAssertionsDetectAWrongRequest(t *testing.T) {
 func TestAdapterMarksInvalidRequestValuesAsInputErrorBeforeAnalyzerLaunch(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, err := runAdapter(NewAdapter(analyzer.Command{Path: "definitely-not-a-real-analyzer"}), analyze.AnalysisRequest{
+	_, _, _, err := runAdapter(NewAdapter(analyzer.Command{Path: "definitely-not-a-real-analyzer"}), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
 		Include:       []string{"../outside/**"},

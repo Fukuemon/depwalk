@@ -58,6 +58,24 @@ linters:
             - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
               desc: traversal は cli に依存できません
 
+        # graphtest はテスト用の graph fixture。graph だけに依存する。
+        graphtest:
+          files:
+            - "**/internal/graphtest/**"
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: graphtest は traversal に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: graphtest は protocol に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: graphtest は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: graphtest は analyzer に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: graphtest は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: graphtest は cli に依存できません
+
         # analyze → graph / traversal のみ許可。外界との接点は analyze 側が
         # 定義する port interface で表現し、protocol (ACL) が実装する。
         analyze:
@@ -100,12 +118,28 @@ linters:
               desc: protocol は cli に依存できません
 
         # analyzer は呼ばれる側の process 制御。internal 依存を持たない。
+        #
+        # 前方一致の一括 deny (`.../core/internal/`) は使わない: 同ディレクトリの
+        # black-box テスト (package analyzer_test) が自分自身を import できなく
+        # なるため。他ルールと同じく完全一致で列挙する。
         analyzer:
           files:
             - "**/internal/analyzer/**"
           deny:
-            - pkg: github.com/Fukuemon/depwalk/core/internal/
-              desc: analyzer は他の internal package に依存できません (payload は opaque な byte 列です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph$
+              desc: analyzer は graph に依存できません (payload は opaque な byte 列です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graphtest$
+              desc: analyzer は graphtest に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: analyzer は traversal に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: analyzer は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: analyzer は protocol に依存できません (JSONL の解釈は ACL の責務です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: analyzer は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: analyzer は cli に依存できません
 
         # 未知 package の catch-all。
         #
@@ -121,6 +155,7 @@ linters:
           files:
             - "**/internal/**"
             - "!**/internal/graph/**"
+            - "!**/internal/graphtest/**"
             - "!**/internal/traversal/**"
             - "!**/internal/analyze/**"
             - "!**/internal/analyzer/**"

@@ -11,7 +11,7 @@ import (
 )
 
 // Adapter is the Adapter half of the ACL (spec #32 D6): it implements the
-// analyze.AnalysisSource port by composing the wire analysisRequest,
+// analyze.Source port by composing the wire analysisRequest,
 // running the Analyzer process through [Runner], and translating wire
 // records into domain values with the Translator (translate.go). The
 // wiring of Adapter into the analyze use case happens in cli (manual DI).
@@ -24,15 +24,15 @@ func NewAdapter(command analyzer.Command) *Adapter {
 	return &Adapter{command: command}
 }
 
-// RunAnalysis implements the analyze.AnalysisSource port.
+// RunAnalysis implements the analyze.Source port.
 func (a *Adapter) RunAnalysis(
-	request analyze.AnalysisRequest,
+	request analyze.Request,
 	onNode func(graph.Node),
 	onEdge func(graph.Edge),
-) (analyze.AnalysisOutcome, error) {
+) (analyze.Outcome, error) {
 	requestID, err := newRequestID()
 	if err != nil {
-		return analyze.AnalysisOutcome{}, err
+		return analyze.Outcome{}, err
 	}
 
 	wireRequest := AnalysisRequest{
@@ -59,7 +59,7 @@ func (a *Adapter) RunAnalysis(
 	// error — exit code 2 — before any process is launched, instead of
 	// surfacing as an untyped runtime failure.
 	if err := wireRequest.Validate(); err != nil {
-		return analyze.AnalysisOutcome{}, &analyze.InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
+		return analyze.Outcome{}, &analyze.InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
 	}
 
 	runResult, err := NewRunner(a.command).Run(wireRequest, func(record Record) {
@@ -75,9 +75,9 @@ func (a *Adapter) RunAnalysis(
 		}
 	})
 	if err != nil {
-		return analyze.AnalysisOutcome{}, err
+		return analyze.Outcome{}, err
 	}
-	return analyze.AnalysisOutcome{
+	return analyze.Outcome{
 		Diagnostics:     diagnosticsToDomain(runResult.Diagnostics),
 		Failure:         failureToDomain(runResult.AnalyzerError),
 		ValidationError: runResult.ValidationError,

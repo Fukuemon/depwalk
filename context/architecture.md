@@ -25,6 +25,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 | `core/cmd/depwalk`        | (cmd)      | `main`。Cobra root command の起動                                                         |
 | `core/internal/graph`     | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
 | `core/internal/traversal` | `domain`   | caller / callee traversal                                                                 |
+| `core/internal/graphtest` | (test)     | テスト用の graph fixture (fluent builder)。本番コードから import しない                   |
 | `core/internal/analyze`   | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
 | `core/internal/protocol`  | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
 | `core/internal/analyzer`  | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
@@ -35,6 +36,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - `graph`: 他の internal package に依存しない (wire 表現 `protocol` への import 禁止を含む)
 - `traversal` → `graph` のみ
+- `graphtest` → `graph` のみ (テスト専用。本番コードから import しない)
 - `analyze` → `graph` / `traversal` のみ。`protocol` / `analyzer` / `output` / `cli` への import 禁止 (抽象は analyze 側の port interface で表現し、`protocol` が実装する)
 - `output` → `graph` / `traversal` のみ
 - `protocol` → `analyze` (port 実装) / `analyzer` (process 起動に利用) / `graph`
@@ -50,6 +52,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 graph LR
     analyze --> graph & traversal
     cli --> analyze & analyzer & graph & output & protocol
+    graphtest --> graph
     output --> graph & traversal
     protocol --> analyze & analyzer & graph
     traversal --> graph

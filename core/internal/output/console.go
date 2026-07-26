@@ -11,10 +11,6 @@ import (
 
 type consoleFormatter struct{}
 
-func init() {
-	registerFormatter(FormatConsole, consoleFormatter{})
-}
-
 func (consoleFormatter) Format(w io.Writer, view View) error {
 	if view.Status == traversal.StatusStartNotFound {
 		_, err := fmt.Fprintf(w, "該当なし: 起点メソッドが解析結果に存在しません (%s)\n", view.Start.ID)

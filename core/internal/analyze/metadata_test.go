@@ -1,8 +1,10 @@
-package analyze
+package analyze_test
 
 import (
 	"reflect"
 	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/analyze"
 )
 
 func TestBuildMetadata(t *testing.T) {
@@ -61,7 +63,7 @@ func TestBuildMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := BuildMetadata(tt.pairs)
+			got, err := analyze.BuildMetadata(tt.pairs)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("BuildMetadata() error = %v, wantErr %v", err, tt.wantErr)
 			}

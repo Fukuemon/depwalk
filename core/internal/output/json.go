@@ -12,10 +12,6 @@ const jsonSchemaVersion = "1.0"
 
 type jsonFormatter struct{}
 
-func init() {
-	registerFormatter(FormatJSON, jsonFormatter{})
-}
-
 func (jsonFormatter) Format(w io.Writer, view View) error {
 	return json.NewEncoder(w).Encode(newJSONDocument(view))
 }

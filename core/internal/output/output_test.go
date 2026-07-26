@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/graphtest"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
@@ -127,13 +128,10 @@ func TestRegisteredFormatsReturnsRegisteredFormatNames(t *testing.T) {
 	}
 }
 
-func TestWriteBuildsViewAndCallsRegisteredFormatter(t *testing.T) {
-	const format Format = "test"
+func TestWriteBuildsViewAndCallsFormatter(t *testing.T) {
 	formatter := &recordingFormatter{}
-	registerFormatter(format, formatter)
-	t.Cleanup(func() { delete(formatters, format) })
 
-	g := graph.NewBuilder().Node("method:a").Build()
+	g := graphtest.NewBuilder().Node("method:a").Build()
 	in := Input{
 		Graph: g,
 		Result: traversal.Result{
@@ -145,26 +143,49 @@ func TestWriteBuildsViewAndCallsRegisteredFormatter(t *testing.T) {
 	}
 	var out bytes.Buffer
 
-	if err := Write(&out, format, in); err != nil {
-		t.Fatalf("Write(test) returned error: %v", err)
+	if err := write(&out, formatter, in); err != nil {
+		t.Fatalf("write() returned error: %v", err)
 	}
 	if !formatter.called || formatter.view.Start.ID != "method:a" {
 		t.Errorf("formatter call = called:%v view:%#v, want resolved method:a", formatter.called, formatter.view)
 	}
 	if out.String() != "formatted" {
-		t.Errorf("Write(test) output = %q, want formatted", out.String())
+		t.Errorf("write() output = %q, want formatted", out.String())
 	}
 }
 
 func TestWriteReturnsFormatterError(t *testing.T) {
-	const format Format = "failing-test"
 	want := errors.New("write failed")
-	registerFormatter(format, formatterFunc(func(_ io.Writer, _ View) error { return want }))
-	t.Cleanup(func() { delete(formatters, format) })
+	formatter := formatterFunc(func(_ io.Writer, _ View) error { return want })
 
-	err := Write(&bytes.Buffer{}, format, Input{Graph: graph.New()})
+	err := write(&bytes.Buffer{}, formatter, Input{Graph: graph.New()})
 	if !errors.Is(err, want) {
-		t.Errorf("Write() error = %v, want %v", err, want)
+		t.Errorf("write() error = %v, want %v", err, want)
+	}
+}
+
+// Write が実際に registry を引いて formatter へ委譲することは、
+// 上の seam テストでは覆えないのでここで押さえる。
+func TestWriteDispatchesToTheRegisteredFormatter(t *testing.T) {
+	g := graphtest.NewBuilder().Node("method:a").Build()
+	in := Input{
+		Graph: g,
+		Result: traversal.Result{
+			Status: traversal.StatusOK,
+			Nodes:  map[string]bool{"method:a": true}, Depths: map[string]int{"method:a": 0},
+			Edges: map[string]graph.Edge{}, Cycles: map[string]bool{}, DepthCutoffs: map[string]traversal.DepthCutoff{},
+		},
+		Request: traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee},
+	}
+
+	for _, format := range []Format{FormatConsole, FormatJSON} {
+		var out bytes.Buffer
+		if err := Write(&out, format, in); err != nil {
+			t.Fatalf("Write(%s) returned error: %v", format, err)
+		}
+		if out.Len() == 0 {
+			t.Errorf("Write(%s) produced no output", format)
+		}
 	}
 }
 

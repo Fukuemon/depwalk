@@ -1,13 +1,13 @@
 // Package analyze orchestrates the depwalk analyze use case: it composes
 // the analysis request, receives domain-typed analysis results through the
-// [AnalysisSource] port, assembles them into a [graph.Graph], and runs the
+// [Source] port, assembles them into a [graph.Graph], and runs the
 // method-query traversal.
 //
 // The package stays language-agnostic (S5): it treats the launch command
 // as an opaque string and analysisRequest.metadata as an opaque
 // passthrough map. It is also wire-agnostic (spec #32 D6): Analyzer
 // Protocol DTOs never appear here. The protocol package's ACL adapter
-// implements [AnalysisSource], and cli wires the two together.
+// implements [Source], and cli wires the two together.
 package analyze
 
 import (
@@ -47,11 +47,11 @@ type Options struct {
 	MaxDepth  *int
 }
 
-// AnalysisRequest describes one analysis run handed to the
-// [AnalysisSource] port. Every field is passed through to the Analyzer
-// request without interpretation (S5); the port implementation owns the
-// wire form (request id, schema version, validation).
-type AnalysisRequest struct {
+// Request describes one analysis run handed to the [Source] port. Every
+// field is passed through to the Analyzer request without interpretation
+// (S5); the port implementation owns the wire form (request id, schema
+// version, validation).
+type Request struct {
 	WorkspaceRoot string
 	SourceRoots   []string
 	Language      string
@@ -60,9 +60,9 @@ type AnalysisRequest struct {
 	Metadata      map[string]any
 }
 
-// AnalysisOutcome is the process-level outcome the [AnalysisSource] port
-// reports after the record stream ends.
-type AnalysisOutcome struct {
+// Outcome is the process-level result the [Source] port reports after the
+// record stream ends.
+type Outcome struct {
 	// Diagnostics contains non-fatal diagnostic records reported by the
 	// Analyzer, translated to domain values.
 	Diagnostics []Diagnostic
@@ -74,14 +74,14 @@ type AnalysisOutcome struct {
 	ExitCode int
 }
 
-// AnalysisSource is the port through which the use case receives
-// domain-typed analysis results: nodes and edges are streamed to the
-// callbacks as they arrive, and the process-level outcome is returned
-// once the stream ends. The interface is defined consumer-side (spec #32
-// D6); the protocol package's ACL adapter implements it, and cli injects
-// that adapter into [New].
-type AnalysisSource interface {
-	RunAnalysis(request AnalysisRequest, onNode func(graph.Node), onEdge func(graph.Edge)) (AnalysisOutcome, error)
+// Source is the port through which the use case receives domain-typed
+// analysis results: nodes and edges are streamed to the callbacks as they
+// arrive, and the process-level outcome is returned once the stream ends.
+// The interface is defined consumer-side (spec #32 D6); the protocol
+// package's ACL adapter implements it, and cli injects that adapter into
+// [New].
+type Source interface {
+	RunAnalysis(request Request, onNode func(graph.Node), onEdge func(graph.Edge)) (Outcome, error)
 }
 
 // Diagnostic is a non-fatal Analyzer diagnostic translated to domain
@@ -128,8 +128,10 @@ type InputError struct {
 	Err error
 }
 
+// Error returns the wrapped error's message.
 func (e *InputError) Error() string { return e.Err.Error() }
 
+// Unwrap returns the wrapped error so callers can inspect its cause.
 func (e *InputError) Unwrap() error { return e.Err }
 
 // Result is the outcome of a successful depwalk analyze run.
@@ -157,15 +159,15 @@ type MethodQuery struct {
 	Result  traversal.Result
 }
 
-// Runner runs the analyze use case against an injected [AnalysisSource].
-// It is published as a struct, not an interface: callers that need an
-// abstraction define one on their side (spec #32 D6).
+// Runner runs the analyze use case against an injected [Source]. It is
+// published as a struct, not an interface: callers that need an abstraction
+// define one on their side (spec #32 D6).
 type Runner struct {
-	source AnalysisSource
+	source Source
 }
 
 // New returns a [Runner] backed by source.
-func New(source AnalysisSource) Runner {
+func New(source Source) Runner {
 	return Runner{source: source}
 }
 
@@ -179,7 +181,7 @@ func New(source AnalysisSource) Runner {
 // a non-zero process exit.
 func (r Runner) Run(opts Options) (Result, error) {
 	if r.source == nil {
-		return Result{}, errors.New("analyze: an AnalysisSource is required")
+		return Result{}, errors.New("analyze: a Source is required")
 	}
 
 	metadata, err := BuildMetadata(opts.AnalyzerMeta)
@@ -187,7 +189,7 @@ func (r Runner) Run(opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	request := AnalysisRequest{
+	request := Request{
 		WorkspaceRoot: opts.WorkspaceRoot,
 		SourceRoots:   opts.SourceRoots,
 		Language:      opts.Language,

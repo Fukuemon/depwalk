@@ -1,24 +1,25 @@
-package protocol
+package protocol_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 func TestNodeFromMethodSymbol(t *testing.T) {
 	startColumn := 4
-	record := MethodSymbol{
+	record := protocol.MethodSymbol{
 		SchemaVersion: "1.0",
-		RecordType:    RecordTypeMethodSymbol,
+		RecordType:    protocol.RecordTypeMethodSymbol,
 		MethodID:      "method:a",
 		QualifiedName: "example.Service.Run",
 		Signature:     "()",
-		Source:        &SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
+		Source:        &protocol.SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
 	}
 
-	got := NodeFromMethodSymbol(record)
+	got := protocol.NodeFromMethodSymbol(record)
 	wantColumn := 4
 	want := graph.Node{
 		ID: "method:a",
@@ -35,12 +36,12 @@ func TestNodeFromMethodSymbol(t *testing.T) {
 
 func TestNodeFromMethodSymbolDeepCopiesSourceLocation(t *testing.T) {
 	startColumn := 4
-	record := MethodSymbol{
+	record := protocol.MethodSymbol{
 		MethodID: "method:a",
-		Source:   &SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
+		Source:   &protocol.SourceLocation{Path: "service.go", StartLine: 12, StartColumn: &startColumn},
 	}
 
-	got := NodeFromMethodSymbol(record)
+	got := protocol.NodeFromMethodSymbol(record)
 
 	// Mutating the protocol DTO must not change the graph-owned value.
 	record.Source.Path = "mutated.go"
@@ -53,23 +54,23 @@ func TestNodeFromMethodSymbolDeepCopiesSourceLocation(t *testing.T) {
 }
 
 func TestNodeFromMethodSymbolAllowsNilSource(t *testing.T) {
-	got := NodeFromMethodSymbol(MethodSymbol{MethodID: "method:a"})
+	got := protocol.NodeFromMethodSymbol(protocol.MethodSymbol{MethodID: "method:a"})
 	if got.Symbol.Source != nil {
 		t.Errorf("NodeFromMethodSymbol().Symbol.Source = %#v, want nil", got.Symbol.Source)
 	}
 }
 
 func TestEdgeFromCallEdge(t *testing.T) {
-	record := CallEdge{
+	record := protocol.CallEdge{
 		SchemaVersion:  "1.0",
-		RecordType:     RecordTypeCallEdge,
+		RecordType:     protocol.RecordTypeCallEdge,
 		EdgeID:         "edge:ab",
 		CallerMethodID: "method:a",
 		CalleeMethodID: "method:b",
-		CallSite:       &SourceLocation{Path: "caller.go", StartLine: 24},
+		CallSite:       &protocol.SourceLocation{Path: "caller.go", StartLine: 24},
 	}
 
-	got := EdgeFromCallEdge(record)
+	got := protocol.EdgeFromCallEdge(record)
 	want := graph.Edge{
 		ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b",
 		CallSite: &graph.SourceLocation{Path: "caller.go", StartLine: 24},
@@ -81,12 +82,12 @@ func TestEdgeFromCallEdge(t *testing.T) {
 
 func TestEdgeFromCallEdgeDeepCopiesCallSite(t *testing.T) {
 	startColumn := 7
-	record := CallEdge{
+	record := protocol.CallEdge{
 		EdgeID:   "edge:ab",
-		CallSite: &SourceLocation{Path: "caller.go", StartLine: 24, StartColumn: &startColumn},
+		CallSite: &protocol.SourceLocation{Path: "caller.go", StartLine: 24, StartColumn: &startColumn},
 	}
 
-	got := EdgeFromCallEdge(record)
+	got := protocol.EdgeFromCallEdge(record)
 
 	// Mutating the protocol DTO must not change the graph-owned value.
 	record.CallSite.Path = "mutated.go"
@@ -99,9 +100,9 @@ func TestEdgeFromCallEdgeDeepCopiesCallSite(t *testing.T) {
 }
 
 func TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata(t *testing.T) {
-	record := MethodSymbol{
+	record := protocol.MethodSymbol{
 		MethodID: "method:a",
-		Metadata: Metadata{
+		Metadata: protocol.Metadata{
 			"declarationOrigin": "projectClasses",
 			"ownerSourceLocation": map[string]any{
 				"path":      "module-a/src/Owner.java",
@@ -112,7 +113,7 @@ func TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata(t *testing.T) {
 		},
 	}
 
-	got := NodeFromMethodSymbol(record)
+	got := protocol.NodeFromMethodSymbol(record)
 
 	want := map[string]any{
 		"declarationOrigin": "projectClasses",
@@ -137,21 +138,21 @@ func TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata(t *testing.T) {
 }
 
 func TestNodeFromMethodSymbolDistinguishesOmittedAndEmptyMetadata(t *testing.T) {
-	omitted := NodeFromMethodSymbol(MethodSymbol{MethodID: "method:a"})
+	omitted := protocol.NodeFromMethodSymbol(protocol.MethodSymbol{MethodID: "method:a"})
 	if omitted.Symbol.Metadata != nil {
 		t.Fatalf("omitted metadata = %#v, want nil", omitted.Symbol.Metadata)
 	}
 
-	empty := NodeFromMethodSymbol(MethodSymbol{MethodID: "method:a", Metadata: Metadata{}})
+	empty := protocol.NodeFromMethodSymbol(protocol.MethodSymbol{MethodID: "method:a", Metadata: protocol.Metadata{}})
 	if empty.Symbol.Metadata == nil || len(empty.Symbol.Metadata) != 0 {
 		t.Fatalf("empty metadata = %#v, want non-nil empty map", empty.Symbol.Metadata)
 	}
 }
 
 func TestEdgeFromCallEdgeDeepCopiesOpaqueMetadata(t *testing.T) {
-	record := CallEdge{
+	record := protocol.CallEdge{
 		EdgeID: "edge:ab",
-		Metadata: Metadata{
+		Metadata: protocol.Metadata{
 			"resolution": "springDi",
 			"provenance": map[string]any{
 				"bean":   "exampleService",
@@ -162,7 +163,7 @@ func TestEdgeFromCallEdgeDeepCopiesOpaqueMetadata(t *testing.T) {
 		},
 	}
 
-	got := EdgeFromCallEdge(record)
+	got := protocol.EdgeFromCallEdge(record)
 
 	want := map[string]any{
 		"resolution": "springDi",
@@ -187,19 +188,19 @@ func TestEdgeFromCallEdgeDeepCopiesOpaqueMetadata(t *testing.T) {
 }
 
 func TestEdgeFromCallEdgeDistinguishesOmittedAndEmptyMetadata(t *testing.T) {
-	omitted := EdgeFromCallEdge(CallEdge{EdgeID: "edge:ab"})
+	omitted := protocol.EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab"})
 	if omitted.Metadata != nil {
 		t.Fatalf("omitted metadata = %#v, want nil", omitted.Metadata)
 	}
 
-	empty := EdgeFromCallEdge(CallEdge{EdgeID: "edge:ab", Metadata: Metadata{}})
+	empty := protocol.EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab", Metadata: protocol.Metadata{}})
 	if empty.Metadata == nil || len(empty.Metadata) != 0 {
 		t.Fatalf("empty metadata = %#v, want non-nil empty map", empty.Metadata)
 	}
 }
 
 func TestEdgeFromCallEdgeAllowsNilCallSite(t *testing.T) {
-	got := EdgeFromCallEdge(CallEdge{EdgeID: "edge:ab"})
+	got := protocol.EdgeFromCallEdge(protocol.CallEdge{EdgeID: "edge:ab"})
 	if got.CallSite != nil {
 		t.Errorf("EdgeFromCallEdge().CallSite = %#v, want nil", got.CallSite)
 	}
