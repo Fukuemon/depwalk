@@ -69,26 +69,26 @@ func newAnalyzeCommand() *cobra.Command {
 				return err
 			}
 			if flags.language == "" {
-				return &analyze.InputError{Err: errors.New("--language is required")}
+				return invalidInput("--language is required")
 			}
 			if flags.direction != string(graph.DirectionCaller) && flags.direction != string(graph.DirectionCallee) {
-				return &analyze.InputError{Err: fmt.Errorf(
+				return invalidInput(
 					"invalid --direction %q: want %q or %q",
 					flags.direction,
 					graph.DirectionCaller,
 					graph.DirectionCallee,
-				)}
+				)
 			}
 			registeredFormats := output.RegisteredFormats()
 			if !slices.Contains(registeredFormats, flags.format) {
-				return &analyze.InputError{Err: fmt.Errorf(
+				return invalidInput(
 					"invalid --format %q: registered formats: %s",
 					flags.format,
 					strings.Join(registeredFormats, ", "),
-				)}
+				)
 			}
 			if flags.maxDepth < 0 {
-				return &analyze.InputError{Err: fmt.Errorf("invalid --max-depth %d: want >= 0", flags.maxDepth)}
+				return invalidInput("invalid --max-depth %d: want >= 0", flags.maxDepth)
 			}
 			var maxDepth *int
 			if cmd.Flags().Changed("max-depth") {
@@ -156,7 +156,7 @@ func newAnalyzeCommand() *cobra.Command {
 		// Flag parsing happens before RunE, so classify parse/type failures here
 		// instead of relying on RunE's semantic validation.
 		cmd.SilenceUsage = true
-		return &analyze.InputError{Err: err}
+		return &inputError{err: err}
 	})
 
 	cmd.Flags().StringVar(&flags.analyzerCmd, "analyzer-cmd", "", "Analyzer launch command (falls back to DEPWALK_ANALYZER_CMD)")

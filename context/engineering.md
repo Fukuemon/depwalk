@@ -13,6 +13,13 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - 理由をコメントに残すときのリンク先は **ADR と durable な正本ドキュメント** (`adr/*.md`、`context/*.md`、`design/features/*/DesignDoc_*.md`) に限る。
 - `(S5)` のような符号だけの参照はしない。読み手に伝わる言葉で書き、必要なら正本へのリンクを添える。
 
+## Error Boundary
+
+- **エラーメッセージの package prefix はユーザーへの到達可否で決める**。`traversal:` / `output:` / `analyze:` のような prefix は「呼び出し側の実装ミス」を表す内部不変条件の違反にだけ付ける (これらは cli が事前検証しており、利用者には到達しない)。利用者の stderr に出るメッセージには内部 package 名を出さない。
+- **exit code への分類は cli が決める**。内層は「利用者の入力が原因」であることを型で表明するだけにし、exit code の値を知らない (`cli.ExitCode` が `analyze.InputError` と cli 自身の入力エラーの双方を 2 へ写す)。
+- **プロセスの結果を struct フィールドの `error` で運ぶときは、判定を型のメソッドへ畳む**。`analyze.Outcome` は fatal record / 非ゼロ exit / stdout 検証エラーの 3 つを持つが、優先順位 (fatal の理由を検証エラーで上書きしない) を呼び出し側に再実装させないよう `Outcome.Err()` に集約する。
+- 型で分類する必要があるエラーは struct として定義し、`errors.As` で検査できる状態を保つ (例: `protocol.ValidationError` は contract test が型として検証している)。単に文言を組み立てるだけなら `fmt.Errorf` でよい。
+
 ## Shared Config Boundary
 
 - Core の初期 shared config は Go 標準 command を優先し、専用 config を増やさない。

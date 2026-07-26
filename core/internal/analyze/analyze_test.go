@@ -230,6 +230,64 @@ func TestRunPropagatesNonZeroExit(t *testing.T) {
 	}
 }
 
+// Outcome.Err folds the three result fields into one failure. Pin the
+// precedence: getting it wrong would replace the Analyzer's own fatal reason
+// with a reference-completeness error.
+func TestOutcomeErrPrefersTheFatalReason(t *testing.T) {
+	t.Parallel()
+
+	failure := &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"}
+	tests := []struct {
+		name    string
+		outcome Outcome
+		want    string
+	}{
+		{name: "clean", outcome: Outcome{}, want: ""},
+		{
+			name:    "failure wins over exit code and validation error",
+			outcome: Outcome{Failure: failure, ExitCode: 1, ValidationError: errors.New("dangling edge")},
+			want:    failure.Error(),
+		},
+		{
+			name:    "exit code wins over validation error",
+			outcome: Outcome{ExitCode: 3, ValidationError: errors.New("dangling edge")},
+			want:    "analyzer process exited with code 3",
+		},
+		{
+			name:    "validation error on a clean exit",
+			outcome: Outcome{ValidationError: errors.New("dangling edge")},
+			want:    "analyzer stdout did not follow the analyzer protocol: dangling edge",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.outcome.Err()
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("Err() = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.want {
+				t.Fatalf("Err() = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+// The original validation error is wrapped with %w so callers can still
+// reach it with errors.Is.
+func TestOutcomeErrWrapsTheValidationError(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("dangling edge")
+	if err := (Outcome{ValidationError: want}).Err(); !errors.Is(err, want) {
+		t.Fatalf("Err() = %v, want it to wrap %v", err, want)
+	}
+}
+
 func TestRunQueryMatchesFullSignatureAndReturnsTraversal(t *testing.T) {
 	t.Parallel()
 
