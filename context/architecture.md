@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-24
+> 最終更新: 2026-07-26
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -11,7 +11,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 - CLI → Core のみに依存する。
 - Core 内: `Traversal Engine` → `Graph Engine`、`Output Engine` → `Graph Engine` / `Traversal Engine`。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
-- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録し、process 成功と stream 全体の参照完全性を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
+- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録する。stream 全体の参照完全性の**検査自体は ACL** が行い (wire record を見る責務)、use case はその結果と process 成功を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
 - Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
@@ -20,38 +20,43 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 `core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md) D8)。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
-| Package                   | 層 (概念)  | 責務                                                                                      |
-| ------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `core/cmd/depwalk`        | (cmd)      | `main`。Cobra root command の起動                                                         |
-| `core/internal/graph`     | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
-| `core/internal/traversal` | `domain`   | caller / callee traversal                                                                 |
-| `core/internal/analyze`   | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
-| `core/internal/protocol`  | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
-| `core/internal/analyzer`  | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
-| `core/internal/output`    | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
-| `core/internal/cli`       | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
+| Package                         | 層 (概念)  | 責務                                                                                      |
+| ------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `core/cmd/depwalk`              | (cmd)      | `main`。Cobra root command の起動                                                         |
+| `core/internal/graph`           | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
+| `core/internal/traversal`       | `domain`   | caller / callee traversal                                                                 |
+| `core/internal/graph/graphtest` | (test)     | graph のテスト支援 sub-package (`net/http/httptest` 相当)。本番コードから import しない   |
+| `core/internal/analyze`         | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
+| `core/internal/protocol`        | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
+| `core/internal/analyzer`        | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
+| `core/internal/output`          | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
+| `core/internal/cli`             | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
 
 依存規則 (package 単位。depguard で機械検査する):
 
 - `graph`: 他の internal package に依存しない (wire 表現 `protocol` への import 禁止を含む)
 - `traversal` → `graph` のみ
+- `graph/graphtest` → `graph` のみ (テスト支援 sub-package。本番コードから import しない)
 - `analyze` → `graph` / `traversal` のみ。`protocol` / `analyzer` / `output` / `cli` への import 禁止 (抽象は analyze 側の port interface で表現し、`protocol` が実装する)
 - `output` → `graph` / `traversal` のみ
 - `protocol` → `analyze` (port 実装) / `analyzer` (process 起動に利用) / `graph`
 - `analyzer`: 他の internal package に依存しない
 - `cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
+- `core/cmd/depwalk` は `cli` のみ。起動だけを担い、内層を直接 import しない
 - DI ライブラリ (`google/wire` 等) は導入せず、`cli` でのコンストラクタ注入による手動 DI とする
 
-依存図は手で描かず、`go list` から生成して下の生成マーカー区間に埋める (生成スクリプトと drift 検査は #34 で導入。再生成して diff が出る状態を CI で检出する):
+依存図は手で描かず、`go list` の実 import から `scripts/depgraph.sh` で生成して下の生成マーカー区間に埋める。再生成して diff が出る状態 (図の更新漏れ) は lefthook pre-commit と CI が drift として検出する:
 
 <!-- BEGIN GENERATED: core-depgraph (scripts/depgraph.sh が更新する。手編集しない) -->
 
 ```mermaid
 graph LR
-    cli --> analyze & protocol & analyzer & output
-    protocol --> analyze & analyzer & graph
+    graph_graphtest["graph/graphtest"]
     analyze --> graph & traversal
+    cli --> analyze & analyzer & graph & output & protocol
+    graph_graphtest --> graph
     output --> graph & traversal
+    protocol --> analyze & analyzer & graph
     traversal --> graph
 ```
 
@@ -71,7 +76,7 @@ Core と Analyzer の共有境界は Protocol doc、ADR、JSONL fixture、contra
 Go package や Java 実装 code を共有しない。
 
 > 依存境界の自動検査 (Go: golangci-lint + depguard、Java: ArchUnit) は [engineering.md](engineering.md) の quality gate で扱う。
-> 本節の層別構造は spec #32 の子 issue で実装する (実装完了までコードは旧配置の場合がある)。
+> Core (Go) 側の依存方向は #34 で実装済み (実 import は上の生成依存図と一致)。Java Analyzer 側の内部境界は #35 で実装するため、完了までコードは旧配置の場合がある。
 
 ## Runtime Boundary
 

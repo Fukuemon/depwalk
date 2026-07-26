@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/graph/graphtest"
 )
 
 // branchGraph is shaped so that BFS and DFS visit orders differ:
 // a -> b, a -> c, b -> d. BFS visits [a b c d], DFS visits [a b d c].
 func branchGraph() *graph.Graph {
-	return graph.NewBuilder().
+	return graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ac", "method:a", "method:c").
 		Edge("edge:bd", "method:b", "method:d").
@@ -42,7 +43,7 @@ func TestVisitOrderDFS(t *testing.T) {
 }
 
 func TestVisitOrderDoesNotRevisitOnCycle(t *testing.T) {
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").
 		Build()
@@ -56,7 +57,7 @@ func TestVisitOrderDoesNotRevisitOnCycle(t *testing.T) {
 
 func TestMinDepthsComputesShortestDistances(t *testing.T) {
 	// o -> a -> a2 -> m and o -> b -> m: minDepth(m) must be 2.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").

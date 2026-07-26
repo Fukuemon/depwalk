@@ -41,7 +41,7 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 	if err := request.Validate(); err != nil {
 		t.Fatalf("Spring fixture analysisRequest is invalid: %v", err)
 	}
-	runner := analyzer.New(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
+	runner := protocol.NewRunner(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
 	var records []protocol.Record
 	runResult, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
@@ -133,9 +133,9 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 		for _, record := range records {
 			switch typed := record.(type) {
 			case protocol.MethodSymbol:
-				callGraph.AddNode(graph.NodeFromMethodSymbol(typed))
+				callGraph.AddNode(protocol.NodeFromMethodSymbol(typed))
 			case protocol.CallEdge:
-				callGraph.AddEdge(graph.EdgeFromCallEdge(typed))
+				callGraph.AddEdge(protocol.EdgeFromCallEdge(typed))
 			}
 		}
 		caller := "java:com.example.springfixture.LombokCheckoutService#checkout()"

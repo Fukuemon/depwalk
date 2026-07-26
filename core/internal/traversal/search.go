@@ -27,7 +27,7 @@ func minDepths(g *graph.Graph, startID string, dir graph.Direction) map[string]i
 // order they were expanded: FIFO for [OrderBFS] (the default) and LIFO
 // matching recursive depth-first order for [OrderDFS]. It implements the
 // [Order] semantics of [Request] for consumers that need an ordered
-// expansion (spec D1); [Traverse] itself derives the reached set from
+// expansion; [Traverse] itself derives the reached set from
 // [minDepths] because the result contract is order-independent. Visited
 // nodes are never re-expanded.
 func visitOrder(g *graph.Graph, startID string, dir graph.Direction, order Order) []string {

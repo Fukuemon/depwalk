@@ -13,10 +13,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Fukuemon/depwalk/core/internal/analyze"
+	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 	"github.com/Fukuemon/depwalk/core/internal/output"
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
+
+// As the composition root, cli injects the ACL adapter into the analyze
+// port by hand. The interface satisfaction check is kept here, next to the
+// wiring, rather than in the implementing package.
+var _ analyze.Source = (*protocol.Adapter)(nil)
 
 // analyzeFlags holds the complete flag surface for newAnalyzeCommand:
 // Analyzer launch inputs, source filters, and method query options.
@@ -63,47 +69,56 @@ func newAnalyzeCommand() *cobra.Command {
 				return err
 			}
 			if flags.language == "" {
-				return &analyze.InputError{Err: errors.New("--language is required")}
+				return invalidInput("--language is required")
 			}
 			if flags.direction != string(graph.DirectionCaller) && flags.direction != string(graph.DirectionCallee) {
-				return &analyze.InputError{Err: fmt.Errorf(
+				return invalidInput(
 					"invalid --direction %q: want %q or %q",
 					flags.direction,
 					graph.DirectionCaller,
 					graph.DirectionCallee,
-				)}
+				)
 			}
 			registeredFormats := output.RegisteredFormats()
 			if !slices.Contains(registeredFormats, flags.format) {
-				return &analyze.InputError{Err: fmt.Errorf(
+				return invalidInput(
 					"invalid --format %q: registered formats: %s",
 					flags.format,
 					strings.Join(registeredFormats, ", "),
-				)}
+				)
 			}
 			if flags.maxDepth < 0 {
-				return &analyze.InputError{Err: fmt.Errorf("invalid --max-depth %d: want >= 0", flags.maxDepth)}
+				return invalidInput("invalid --max-depth %d: want >= 0", flags.maxDepth)
 			}
 			var maxDepth *int
 			if cmd.Flags().Changed("max-depth") {
 				maxDepth = &flags.maxDepth
 			}
 
-			result, err := analyze.Run(analyze.Options{
-				WorkspaceRoot:  workspaceRoot,
-				SourceRoots:    flags.sourceRoots,
-				Language:       protocol.Language(flags.language),
-				AnalyzerCmd:    flags.analyzerCmd,
-				AnalyzerMeta:   flags.analyzerMeta,
-				Include:        flags.include,
-				Exclude:        flags.exclude,
-				Method:         flags.method,
-				Direction:      graph.Direction(flags.direction),
-				MaxDepth:       maxDepth,
-				Format:         output.Format(flags.format),
-				Output:         cmd.OutOrStdout(),
-				AnalyzerStderr: cmd.ErrOrStderr(),
-				Getenv:         os.Getenv,
+			command, err := resolveAnalyzerCommand(flags.analyzerCmd, os.Getenv)
+			if err != nil {
+				return err
+			}
+			argv, err := splitAnalyzerCommand(command)
+			if err != nil {
+				return err
+			}
+
+			runner := analyze.New(protocol.NewAdapter(analyzer.Command{
+				Path:   argv[0],
+				Args:   argv[1:],
+				Stderr: cmd.ErrOrStderr(),
+			}))
+			result, err := runner.Run(analyze.Options{
+				WorkspaceRoot: workspaceRoot,
+				SourceRoots:   flags.sourceRoots,
+				Language:      flags.language,
+				AnalyzerMeta:  flags.analyzerMeta,
+				Include:       flags.include,
+				Exclude:       flags.exclude,
+				Method:        flags.method,
+				Direction:     graph.Direction(flags.direction),
+				MaxDepth:      maxDepth,
 			})
 			if err != nil {
 				var failure *analyze.AnalyzerFailure
@@ -116,6 +131,16 @@ func newAnalyzeCommand() *cobra.Command {
 					cmd.SilenceUsage = true
 				}
 				return err
+			}
+
+			if result.MethodQuery != nil {
+				if err := output.Write(cmd.OutOrStdout(), output.Format(flags.format), output.Input{
+					Graph:   result.Graph,
+					Result:  result.MethodQuery.Result,
+					Request: result.MethodQuery.Request,
+				}); err != nil {
+					return fmt.Errorf("write %s output: %w", flags.format, err)
+				}
 			}
 
 			for _, diagnostic := range result.Diagnostics {
@@ -131,7 +156,7 @@ func newAnalyzeCommand() *cobra.Command {
 		// Flag parsing happens before RunE, so classify parse/type failures here
 		// instead of relying on RunE's semantic validation.
 		cmd.SilenceUsage = true
-		return &analyze.InputError{Err: err}
+		return &inputError{err: err}
 	})
 
 	cmd.Flags().StringVar(&flags.analyzerCmd, "analyzer-cmd", "", "Analyzer launch command (falls back to DEPWALK_ANALYZER_CMD)")
@@ -154,17 +179,16 @@ func newAnalyzeCommand() *cobra.Command {
 // shown verbatim, never interpreted.
 func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	fmt.Fprintf(w, "Error: %s\n", failure.Error())
-	record := failure.Record
-	if record.Source != nil {
-		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(record.Source))
+	if failure.Location != nil {
+		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(failure.Location))
 	}
-	if record.Metadata != nil {
-		fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(record.Metadata))
+	if failure.Metadata != nil {
+		fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(failure.Metadata))
 	}
-	for i, detail := range record.Details {
+	for i, detail := range failure.Details {
 		fmt.Fprintf(w, "detail[%d] %s: %s\n", i, detail.Code, detail.Message)
-		if detail.Source != nil {
-			fmt.Fprintf(w, "  at %s\n", formatSourceLocation(detail.Source))
+		if detail.Location != nil {
+			fmt.Fprintf(w, "  at %s\n", formatSourceLocation(detail.Location))
 		}
 		if detail.Metadata != nil {
 			fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(detail.Metadata))
@@ -172,13 +196,13 @@ func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	}
 }
 
-func formatSourceLocation(location *protocol.SourceLocation) string {
+func formatSourceLocation(location *graph.SourceLocation) string {
 	text := fmt.Sprintf("%s:%d", location.Path, location.StartLine)
 	if location.StartColumn != nil {
 		text = fmt.Sprintf("%s:%d", text, *location.StartColumn)
 	}
-	// end 位置を保持している record は範囲として併記する (Protocol は保持
-	// しているのに renderer が捨てると利用者へ届かないため)。
+	// Records that carry an end position are rendered as a range: the
+	// Protocol keeps it, so dropping it here would hide it from the user.
 	if location.EndLine != nil {
 		end := fmt.Sprintf("%d", *location.EndLine)
 		if location.EndColumn != nil {

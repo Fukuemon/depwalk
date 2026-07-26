@@ -1,0 +1,251 @@
+# 依存方向の機械検査 (判断の正本は ADR-0007)。
+#
+# 依存規則の正本は context/architecture.md の Package Boundary。ここは
+# それを package 単位の deny ルールへ機械的に写したもので、規則を変える
+# ときは architecture.md を先に直す。
+#
+# 有効化するのは depguard のみ (他の linter は必要になった時点で判断する)。
+#
+# 記法の約束:
+#   - `pkg` 末尾の `$` は完全一致 (既定は前方一致)。付けないと
+#     `.../analyze` が `.../analyzer` まで巻き込み、違反時に誤った desc が出る。
+#   - 各ルールは `allow` (default-deny の安全網) と `deny` (既知の禁止経路 +
+#     理由メッセージ) を併用する。`allow` が無いと、新しい package を足したとき
+#     既存ルールの `deny` 列挙に載らず素通りしてしまう。`allow` には本番の
+#     依存規則に加え、black-box テストが import する自 package と graphtest を
+#     含める (depguard は _test.go も検査するため)。
+#   - _test.go も検査対象 (depguard の既定)。テストコードも依存規則に従う。
+#     ただし生成依存図 (scripts/depgraph.sh) は production の import のみを
+#     描くため、「test 専用の越境 import は lint では落ちるが図には出ない」
+#     という非対称がある。
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - depguard
+
+  settings:
+    depguard:
+      rules:
+        # graph は domain の最内層。他の internal package に依存しない。
+        graph:
+          files:
+            - "**/internal/graph/**"
+            - "!**/internal/graph/graphtest/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: graph は traversal に依存できません (依存方向は traversal → graph)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: graph は wire 表現 protocol に依存できません (ACL が domain 型へ変換します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: graph は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: graph は analyzer に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: graph は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: graph は cli に依存できません
+
+        # traversal → graph のみ許可。
+        traversal:
+          files:
+            - "**/internal/traversal/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+            - github.com/Fukuemon/depwalk/core/internal/graph/graphtest
+            - github.com/Fukuemon/depwalk/core/internal/traversal
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: traversal は protocol に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: traversal は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: traversal は analyzer に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: traversal は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: traversal は cli に依存できません
+
+        # graphtest は graph のテスト支援 sub-package (net/http/httptest 相当)。
+        # graph だけに依存する。
+        graphtest:
+          files:
+            - "**/internal/graph/graphtest/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+            - github.com/Fukuemon/depwalk/core/internal/graph/graphtest
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: graphtest は traversal に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: graphtest は protocol に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: graphtest は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: graphtest は analyzer に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: graphtest は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: graphtest は cli に依存できません
+
+        # analyze → graph / traversal のみ許可。外界との接点は analyze 側が
+        # 定義する port interface で表現し、protocol (ACL) が実装する。
+        analyze:
+          files:
+            - "**/internal/analyze/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+            - github.com/Fukuemon/depwalk/core/internal/traversal
+            - github.com/Fukuemon/depwalk/core/internal/analyze
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: analyze は protocol に依存できません (analyze が定義する port を protocol 側が実装します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: analyze は analyzer に依存できません (process 起動は protocol 経由です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: analyze は output に依存できません (出力は cli が呼びます)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: analyze は cli に依存できません
+
+        # output → graph / traversal のみ許可。
+        output:
+          files:
+            - "**/internal/output/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+            - github.com/Fukuemon/depwalk/core/internal/graph/graphtest
+            - github.com/Fukuemon/depwalk/core/internal/traversal
+            - github.com/Fukuemon/depwalk/core/internal/output
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: output は protocol に依存できません (出力する値は domain 型です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: output は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: output は analyzer に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: output は cli に依存できません
+
+        # protocol (ACL) → analyze (port 実装) / analyzer (process 起動) / graph。
+        protocol:
+          files:
+            - "**/internal/protocol/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/graph
+            - github.com/Fukuemon/depwalk/core/internal/analyze
+            - github.com/Fukuemon/depwalk/core/internal/analyzer
+            - github.com/Fukuemon/depwalk/core/internal/protocol
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: protocol は traversal に依存できません (探索は use case の責務です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: protocol は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: protocol は cli に依存できません
+
+        # analyzer は呼ばれる側の process 制御。internal 依存を持たない。
+        #
+        # 前方一致の一括 deny (`.../core/internal/`) は使わない: 同ディレクトリの
+        # black-box テスト (package analyzer_test) が自分自身を import できなく
+        # なるため。他ルールと同じく完全一致で列挙する。
+        analyzer:
+          files:
+            - "**/internal/analyzer/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/analyzer
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph$
+              desc: analyzer は graph に依存できません (payload は opaque な byte 列です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph/graphtest$
+              desc: analyzer は graphtest に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: analyzer は traversal に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: analyzer は analyze に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: analyzer は protocol に依存できません (JSONL の解釈は ACL の責務です)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: analyzer は output に依存できません
+            - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
+              desc: analyzer は cli に依存できません
+
+        # graphtest はテスト専用。本番コードから import させない。
+        #
+        # 各 package のルールへ個別に足すと、その package の *_test.go が
+        # graphtest を使えなくなる (depguard は test ファイルも検査する)。
+        # そこで `!$test` で test を除いた本番ファイルだけを対象にした専用
+        # ルールを置く。
+        no-graphtest-in-production:
+          files:
+            - "**/internal/**"
+            - "!**/internal/graph/graphtest/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph/graphtest$
+              desc: graphtest はテスト専用の fixture です。本番コードから import できません
+
+        # cmd/depwalk は cli を起動するだけの entrypoint。
+        #
+        # 他ルールは internal/** スコープなので cmd には何も当たらず、
+        # cmd から内層を直接 import しても素通りしてしまう (生成依存図も
+        # cmd を対象外にしているので気付けない)。cli だけを allow する。
+        cmd:
+          files:
+            - "**/cmd/**"
+          allow:
+            - $gostd
+            - github.com/Fukuemon/depwalk/core/internal/cli
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph$
+              desc: cmd は graph に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph/graphtest$
+              desc: cmd は graphtest に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
+              desc: cmd は traversal に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyze$
+              desc: cmd は analyze に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/analyzer$
+              desc: cmd は analyzer に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/protocol$
+              desc: cmd は protocol に依存できません (起動は cli へ委譲します)
+            - pkg: github.com/Fukuemon/depwalk/core/internal/output$
+              desc: cmd は output に依存できません (起動は cli へ委譲します)
+
+        # 未知 package の catch-all。
+        #
+        # depguard は「ルールが宣言された package だけ」を検査する default-allow
+        # なので、新しい package を足すとどの deny にも当たらず何でも import
+        # できてしまう。既知 package を除外した catch-all を置いて、新 package が
+        # 無検査のまま入るのを防ぐ (このルールに引っかかったら、上に専用ルールを
+        # 追加し、同時に architecture.md の依存規則へ追記する)。
+        #
+        # cli はコンポジションルートとして全 package を import してよいため
+        # 除外する (依存性ルールの例外ではなく最外層の役割)。
+        unknown-internal-package:
+          files:
+            - "**/internal/**"
+            - "!**/internal/graph/**"
+            - "!**/internal/traversal/**"
+            - "!**/internal/analyze/**"
+            - "!**/internal/analyzer/**"
+            - "!**/internal/protocol/**"
+            - "!**/internal/output/**"
+            - "!**/internal/cli/**"
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/
+              desc: 依存規則が未定義の package です。context/architecture.md の Package Boundary に依存方向を追記し、core/.golangci.yml へ専用ルールを追加してください
+
+# 指摘は打ち切らずに全件出す (件数制限で違反を取りこぼさないため)。
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

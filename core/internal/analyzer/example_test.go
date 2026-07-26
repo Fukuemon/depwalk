@@ -1,9 +1,13 @@
-package analyzer
+package analyzer_test
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Fukuemon/depwalk/core/internal/analyzer"
+)
 
 func ExampleNew() {
-	runner := New(Command{
+	runner := analyzer.New(analyzer.Command{
 		Path: "java",
 		Args: []string{"-jar", "analyzer.jar"},
 		Dir:  "/workspace/project",
