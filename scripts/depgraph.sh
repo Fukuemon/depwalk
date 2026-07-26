@@ -20,6 +20,11 @@ END_MARKER="<!-- END GENERATED: core-depgraph -->"
 # entrypoint で、依存規則 (architecture.md の Package Boundary) が語るのは
 # internal の package 間なので含めない。
 #
+# package 名は module prefix を落とした相対 path (例: `graph/graphtest`)。
+# Go 慣習のテスト支援 sub-package (net/http/httptest 相当) を素直に描けるよう、
+# 階層を潰さずそのまま扱う。mermaid の node id は `/` を使えないので `_` へ
+# 置換し、元の path を label として明示する。
+#
 # `.Imports` は test ファイルの import を含まない。depguard は test も検査
 # するため「test 専用の依存エッジ」は gate では捕まるが図には出ない。図は
 # production の依存方向を示すもの、という非対称を意図して受け入れている。
@@ -34,19 +39,10 @@ edges="$(
       {
         if (index($1, prefix) != 1) next
         from = substr($1, length(prefix) + 1)
-        # core/internal はフラットな責務名 package を維持する前提。
-        # sub-package が生えたら図の粒度の前提が崩れるので、黙って捨てずに
-        # 失敗させる (drift 検査を素通りさせない)。
-        if (index(from, "/") != 0) {
-          printf "depgraph: 想定外の sub-package です: %s\n", $1 > "/dev/stderr"
-          exit 1
-        }
         deps = ""
         for (i = 2; i <= NF; i++) {
           if (index($i, prefix) != 1) continue
-          to = substr($i, length(prefix) + 1)
-          if (index(to, "/") != 0) continue
-          deps = deps " " to
+          deps = deps " " substr($i, length(prefix) + 1)
         }
         # 内部依存を持たない package (graph / analyzer) は起点行を持たない。
         # 他 package からの到達先として図に現れる。
@@ -66,20 +62,32 @@ fi
 all_packages="$(
   cd "$ROOT/core"
   go list -f '{{.ImportPath}}' ./internal/... |
-    sed "s|^${MODULE_PREFIX}||" | grep -v '/' | sort -u
+    sed "s|^${MODULE_PREFIX}||" | sort -u
 )"
 linked_packages="$(printf '%s\n' "$edges" | tr ' ' '\n' | grep -v '^$' | sort -u)"
 isolated="$(comm -23 <(printf '%s\n' "$all_packages") <(printf '%s\n' "$linked_packages"))"
 
+# mermaid の node id へ正規化する (`/` は id に使えないので `_` へ)。
+node_id() { printf '%s' "$1" | tr '/' '_'; }
+
 # mermaid 本体を組み立てる。1 行 1 起点で `a --> b & c` にまとめる
 # (エッジ数ぶん行を作るより読みやすく、diff も起点単位で収まる)。
+# sub-package は id と path が食い違うので、先に label 付きで宣言する。
 mermaid="$(
+  printf '%s\n' "$all_packages" | while read -r pkg; do
+    [ -n "$pkg" ] || continue
+    case "$pkg" in
+      (*/*) printf '    %s["%s"]\n' "$(node_id "$pkg")" "$pkg" ;;
+    esac
+  done
   printf '%s\n' "$edges" | while read -r from deps; do
-    printf '    %s --> %s\n' "$from" "$(printf '%s\n' "$deps" | tr ' ' '\n' | sort -u | paste -sd '&' - | sed 's/&/ \& /g')"
+    targets="$(printf '%s\n' "$deps" | tr ' ' '\n' | grep -v '^$' | sort -u |
+      while read -r dep; do node_id "$dep"; echo; done | paste -sd '&' - | sed 's/&/ \& /g')"
+    printf '    %s --> %s\n' "$(node_id "$from")" "$targets"
   done
   if [ -n "$isolated" ]; then
     printf '%s\n' "$isolated" | while read -r pkg; do
-      [ -n "$pkg" ] && printf '    %s\n' "$pkg"
+      [ -n "$pkg" ] && printf '    %s\n' "$(node_id "$pkg")"
     done
   fi
 )"

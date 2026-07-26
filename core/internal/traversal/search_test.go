@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/graphtest"
+	"github.com/Fukuemon/depwalk/core/internal/graph/graphtest"
 )
 
 // branchGraph is shaped so that BFS and DFS visit orders differ:

@@ -27,6 +27,7 @@ linters:
         graph:
           files:
             - "**/internal/graph/**"
+            - "!**/internal/graph/graphtest/**"
           deny:
             - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
               desc: graph は traversal に依存できません (依存方向は traversal → graph)
@@ -57,10 +58,11 @@ linters:
             - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
               desc: traversal は cli に依存できません
 
-        # graphtest はテスト用の graph fixture。graph だけに依存する。
+        # graphtest は graph のテスト支援 sub-package (net/http/httptest 相当)。
+        # graph だけに依存する。
         graphtest:
           files:
-            - "**/internal/graphtest/**"
+            - "**/internal/graph/graphtest/**"
           deny:
             - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
               desc: graphtest は traversal に依存できません
@@ -127,7 +129,7 @@ linters:
           deny:
             - pkg: github.com/Fukuemon/depwalk/core/internal/graph$
               desc: analyzer は graph に依存できません (payload は opaque な byte 列です)
-            - pkg: github.com/Fukuemon/depwalk/core/internal/graphtest$
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph/graphtest$
               desc: analyzer は graphtest に依存できません
             - pkg: github.com/Fukuemon/depwalk/core/internal/traversal$
               desc: analyzer は traversal に依存できません
@@ -149,10 +151,10 @@ linters:
         no-graphtest-in-production:
           files:
             - "**/internal/**"
-            - "!**/internal/graphtest/**"
+            - "!**/internal/graph/graphtest/**"
             - "!$test"
           deny:
-            - pkg: github.com/Fukuemon/depwalk/core/internal/graphtest$
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graph/graphtest$
               desc: graphtest はテスト専用の fixture です。本番コードから import できません
 
         # 未知 package の catch-all。
@@ -169,7 +171,6 @@ linters:
           files:
             - "**/internal/**"
             - "!**/internal/graph/**"
-            - "!**/internal/graphtest/**"
             - "!**/internal/traversal/**"
             - "!**/internal/analyze/**"
             - "!**/internal/analyzer/**"

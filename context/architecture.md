@@ -20,23 +20,23 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 `core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md) D8)。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
-| Package                   | 層 (概念)  | 責務                                                                                      |
-| ------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `core/cmd/depwalk`        | (cmd)      | `main`。Cobra root command の起動                                                         |
-| `core/internal/graph`     | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
-| `core/internal/traversal` | `domain`   | caller / callee traversal                                                                 |
-| `core/internal/graphtest` | (test)     | テスト用の graph fixture (fluent builder)。本番コードから import しない                   |
-| `core/internal/analyze`   | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
-| `core/internal/protocol`  | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
-| `core/internal/analyzer`  | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
-| `core/internal/output`    | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
-| `core/internal/cli`       | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
+| Package                         | 層 (概念)  | 責務                                                                                      |
+| ------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `core/cmd/depwalk`              | (cmd)      | `main`。Cobra root command の起動                                                         |
+| `core/internal/graph`           | `domain`   | graph model (自前の `Symbol` / `SourceLocation` 値型)、node / edge 管理                   |
+| `core/internal/traversal`       | `domain`   | caller / callee traversal                                                                 |
+| `core/internal/graph/graphtest` | (test)     | graph のテスト支援 sub-package (`net/http/httptest` 相当)。本番コードから import しない   |
+| `core/internal/analyze`         | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
+| `core/internal/protocol`        | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
+| `core/internal/analyzer`        | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
+| `core/internal/output`          | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
+| `core/internal/cli`             | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
 
 依存規則 (package 単位。depguard で機械検査する):
 
 - `graph`: 他の internal package に依存しない (wire 表現 `protocol` への import 禁止を含む)
 - `traversal` → `graph` のみ
-- `graphtest` → `graph` のみ (テスト専用。本番コードから import しない)
+- `graph/graphtest` → `graph` のみ (テスト支援 sub-package。本番コードから import しない)
 - `analyze` → `graph` / `traversal` のみ。`protocol` / `analyzer` / `output` / `cli` への import 禁止 (抽象は analyze 側の port interface で表現し、`protocol` が実装する)
 - `output` → `graph` / `traversal` のみ
 - `protocol` → `analyze` (port 実装) / `analyzer` (process 起動に利用) / `graph`
@@ -50,9 +50,10 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 ```mermaid
 graph LR
+    graph_graphtest["graph/graphtest"]
     analyze --> graph & traversal
     cli --> analyze & analyzer & graph & output & protocol
-    graphtest --> graph
+    graph_graphtest --> graph
     output --> graph & traversal
     protocol --> analyze & analyzer & graph
     traversal --> graph
