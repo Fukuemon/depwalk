@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 3 module primary fixture (spec #24 P5 step 1-2) の自動 discovery と明示
+ * 3 module primary fixture の自動 discovery と明示
  * override の同値検証。実 jar (shadowJar) を子 process として両経路で実行し、
  * 固定期待集合 (testdata の expected/graph.json) と graph を照合する。
  */

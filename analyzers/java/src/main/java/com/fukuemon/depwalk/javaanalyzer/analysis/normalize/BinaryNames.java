@@ -39,8 +39,7 @@ public final class BinaryNames {
     /**
      * 型宣言 (named type or 匿名クラスの {@link ObjectCreationExpr}) の JVM binary name を計算する。
      *
-     * @param typeLikeNode named type declaration または匿名クラスを持つ object creation
-     * @return package 名と nested class segment を含む JVM binary name
+     * @return package 名と nested class segment ({@code $} 区切り) を含む JVM binary name
      * @throws IllegalArgumentException compilation unit または型宣言を特定できない場合
      */
     public static String forTypeLikeNode(Node typeLikeNode) {
@@ -83,9 +82,6 @@ public final class BinaryNames {
      * 解決済み参照型宣言の binary name。AST を持つ場合 ({@code toAst()} が非空) は
      * {@link #forTypeLikeNode(Node)} に委譲し、AST を持たない場合 (JDK reflection / jar 由来) は
      * シンボルソルバの qualified name を binary 表記 ({@code $} 区切り) に変換する。
-     *
-     * @param decl JavaParser が型解決した参照型宣言
-     * @return nested class を {@code $} で区切った JVM binary name
      */
     public static String forResolvedDeclaration(ResolvedReferenceTypeDeclaration decl) {
         Node ast = decl.toAst().orElse(null);
@@ -99,9 +95,7 @@ public final class BinaryNames {
 
     /**
      * generics erasure と配列・varargs 正規化を適用した binary 表記を返す。
-     *
-     * @param type JavaParser が型解決した型
-     * @return erasure 済み JVM binary name。配列は component type に {@code []} を付ける
+     * 配列は component type に {@code []} を付ける。
      */
     public static String erasureOf(ResolvedType type) {
         ResolvedType erased = type.erasure();

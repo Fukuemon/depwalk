@@ -14,11 +14,13 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * include / exclude 後の全 source から作る軽量な型宣言索引 (spec #24 D16 / D18)。
+ * include / exclude 後の全 source から作る軽量な型宣言索引
+ * (java-analyzer feature doc「solver 層の bytecode member 合成」/
+ * adr/0005-adopt-sootup-and-spring-di-resolution.md)。
  * binary name → (所有 context, workspace 相対 location) を保持し、AST は保持しない。
  * 正規化 method signature の索引は既存 {@code SourceMethodIndex} (methodId =
  * 正規化 signature) が正本で、本 index は型の所有 context / 到達性の制約と
- * owner source location の構築を担う (両者で spec step 1.2 の索引を構成する)。
+ * owner source location の構築を担う (両者で source 側の索引を構成する)。
  */
 public final class WorkspaceSourceDeclarationIndex {
 
@@ -35,6 +37,9 @@ public final class WorkspaceSourceDeclarationIndex {
     private final Path workspaceRoot;
     private final Map<String, TypeLocation> typesByBinaryName = new LinkedHashMap<>();
 
+    /**
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     */
     public WorkspaceSourceDeclarationIndex(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
     }
@@ -44,8 +49,11 @@ public final class WorkspaceSourceDeclarationIndex {
      *
      * <p>ContextScope の root 相対 path 検査は package 宣言と配置が一致しない
      * source や複数 top-level type を検出できないため、parse 後の実 binary name
-     * で cross-context の重複を検証する (D6)。
+     * で cross-context の重複を検証する
+     * (feature doc「Source root discovery と解析 context」)。
      *
+     * @param cu parse 済み compilation unit (storage path が無ければ何もしない)
+     * @param contextId この CU を所有する解析 context の id
      * @throws AnalyzerFatalException 異なる context が同じ binary name を宣言する場合
      */
     public void accept(CompilationUnit cu, String contextId) throws AnalyzerFatalException {
@@ -75,7 +83,6 @@ public final class WorkspaceSourceDeclarationIndex {
         }
     }
 
-    /** binary name の scope 内 source 宣言を返す。 */
     public Optional<TypeLocation> find(String binaryName) {
         return Optional.ofNullable(typesByBinaryName.get(binaryName));
     }

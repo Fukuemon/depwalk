@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * spec #27 ⑥ (P3_01 承認規則): receiver 型が取れない call の external-target
- * 分類。(i) chain 起点遡及 — 起点の静的型が scope 外なら後続 call を external
+ * java-analyzer feature doc「Parse・resolution・call 完全性」: receiver 型が取れない
+ * call の external-target 分類。(i) chain 起点遡及 — 起点の静的型が scope 外なら後続 call を external
  * へ、scope 内型が現れたら diagnostic のまま。(ii) lambda parameter — 引数先
  * functional interface が scope 外型なら external へ。
  */
@@ -105,7 +105,7 @@ class ExternalChainClassificationTest {
     void chainWithInScopeRootStaysDiagnosticWhenForwardResolutionIsAmbiguous() throws Exception {
         // Holder は scope 内 source 型。make(String) / make(Integer) の同名同
         // arity overload により bytecode 候補が一意に決まらず、chain の前進解決
-        // (P4_04) は行えない。chain 起点 h (Holder = scope 内) のため external へ
+        // は行えない。chain 起点 h (Holder = scope 内) のため external へ
         // 倒さず、make / text とも diagnostic に残す (保守側)。
         Path classes = compile("holder-src", "holder-classes",
                 Map.of(
@@ -259,7 +259,7 @@ class ExternalChainClassificationTest {
     @SuppressWarnings("unchecked")
     @Test
     void forwardResolvesChainThroughBytecodeReturnTypes() throws Exception {
-        // spec #27 P4_04: scope 内 chain の各 link を classfile の戻り値型で前進
+        // scope 内 chain の各 link を classfile の戻り値型で前進
         // 解決する。Holder.make() / Dep.text() とも source に無い bytecode-only
         // member で、make の戻り値型 Dep (classfile 由来) から text() を救済する。
         Path classes = compile("fwd-src", "fwd-classes",

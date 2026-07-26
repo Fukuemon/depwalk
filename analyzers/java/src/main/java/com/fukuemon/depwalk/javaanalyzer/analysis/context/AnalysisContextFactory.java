@@ -12,6 +12,7 @@ import com.github.javaparser.ParserConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +25,8 @@ import java.util.Set;
 /**
  * 明示 {@code sourceRoots} または discovery model から解析 context を構築する。
  * root の workspace / real-path 境界、重複、包含は TypeSolver 構築と file 列挙の
- * 前にここで確定し、filesystem 規約への fallback は行わない (spec #24 D5 / D7)。
+ * 前にここで確定し、filesystem 規約への fallback は行わない
+ * (java-analyzer feature doc「Source root discovery と解析 context」)。
  */
 public final class AnalysisContextFactory {
 
@@ -59,13 +61,17 @@ public final class AnalysisContextFactory {
             List<String> classpath,
             Map<String, Object> metadata) throws AnalyzerFatalException {
         List<Path> roots = resolveExplicitRoots(workspaceRoot, sourceRoots);
-        ParserConfiguration.LanguageLevel level = explicitLanguageLevel(metadata);
-        boolean preview = explicitPreview(metadata);
-        if (LanguageLevels.resolve(languageLevelText(metadata), preview).isEmpty()) {
+        String levelText = languageLevelText(metadata);
+        if (LanguageLevels.resolve(levelText, false).isEmpty()) {
             throw new AnalyzerFatalException(
                     JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "metadata.javaLanguageLevel with javaPreview is not supported by the parser");
+                    "metadata.javaLanguageLevel must be a canonical decimal major version supported by the parser");
         }
+        boolean preview = explicitPreview(metadata);
+        ParserConfiguration.LanguageLevel level = LanguageLevels.resolve(levelText, preview)
+                .orElseThrow(() -> new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_REQUEST,
+                        "metadata.javaLanguageLevel with javaPreview is not supported by the parser"));
         List<Path> classpathPaths = new ArrayList<>();
         List<Path> classesOutputs = new ArrayList<>();
         for (String entry : classpath) {
@@ -86,7 +92,7 @@ public final class AnalysisContextFactory {
                 List.copyOf(classpathPaths),
                 List.copyOf(classesOutputs),
                 List.of(),
-                LanguageLevels.resolve(languageLevelText(metadata), preview).orElse(level),
+                level,
                 preview);
         return new Result(List.of(context), warnings);
     }
@@ -126,77 +132,15 @@ public final class AnalysisContextFactory {
             }
 
             String contextId = project.getProjectPath() + "|main";
-            List<Path> roots = new ArrayList<>();
-            for (File dir : project.getMainJavaSourceDirectories()) {
-                Path root = dir.toPath().toAbsolutePath().normalize();
-                if (!Files.exists(root)) {
-                    warnings.add(warning(JavaDiagnosticCode.JAVA_SOURCE_ROOT_EXCLUDED,
-                            "excluded a source directory that does not exist yet in project " + project.getProjectPath()));
-                    continue;
-                }
-                if (!Files.isDirectory(root) || !Files.isReadable(root)) {
-                    throw new AnalyzerFatalException(
-                            JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
-                            "discovered source root is not a readable directory in project " + project.getProjectPath());
-                }
-                Path real = toRealPath(root, JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS);
-                if (!real.startsWith(toRealPath(workspaceRoot, JavaErrorCode.JAVA_INVALID_REQUEST))) {
-                    throw new AnalyzerFatalException(
-                            JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
-                            "in-scope project " + project.getProjectPath()
-                                    + " references a source root outside the workspace");
-                }
-                String owner = rootOwners.putIfAbsent(real, contextId);
-                if (owner != null && !owner.equals(contextId)) {
-                    throw new AnalyzerFatalException(
-                            JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
-                            "the same source root belongs to multiple analysis contexts: " + owner + " and " + contextId);
-                }
-                if (!roots.contains(real)) {
-                    roots.add(real);
-                }
-            }
+            List<Path> roots = resolveProjectRoots(project, contextId, workspaceRoot, rootOwners, warnings);
             if (roots.isEmpty()) {
                 continue;
             }
 
-            List<Path> classpathPaths = new ArrayList<>();
-            for (File entry : project.getMainCompileClasspath()) {
-                Path path = entry.toPath().toAbsolutePath().normalize();
-                if (!Files.exists(path)) {
-                    // model 取得は task を実行しないため、workspace 内の project 依存
-                    // build output は未 build だと存在しない。依存 project の型は
-                    // 依存 context の source root が solver へ入るため、workspace 内
-                    // entry の欠落は warning で除外し source 解析を継続する。
-                    // workspace 外 (external artifact) の欠落は従来どおり fatal。
-                    if (withinWorkspace(path, workspaceRoot)) {
-                        warnings.add(sootUpUnavailableWarning(contextId,
-                                "excluded an unbuilt workspace classpath entry; continuing without its bytecode in project "
-                                        + project.getProjectPath()));
-                        continue;
-                    }
-                    throw new AnalyzerFatalException(
-                            JavaErrorCode.JAVA_MISSING_JAR,
-                            "a resolved compile classpath entry is missing or unreadable in project "
-                                    + project.getProjectPath());
-                }
-                if (!Files.isReadable(path)) {
-                    throw new AnalyzerFatalException(
-                            JavaErrorCode.JAVA_MISSING_JAR,
-                            "a resolved compile classpath entry is missing or unreadable in project "
-                                    + project.getProjectPath());
-                }
-                classpathPaths.add(path);
-            }
+            List<Path> classpathPaths = resolveProjectClasspath(project, contextId, workspaceRoot, warnings);
             classpathPaths.addAll(commonEntries);
 
-            List<Path> classesOutputs = new ArrayList<>();
-            for (File output : project.getMainClassesOutputDirectories()) {
-                Path path = output.toPath().toAbsolutePath().normalize();
-                if (Files.isDirectory(path)) {
-                    classesOutputs.add(path);
-                }
-            }
+            List<Path> classesOutputs = classesOutputsOf(project);
             if (classesOutputs.isEmpty()) {
                 warnings.add(sootUpUnavailableWarning(contextId,
                         "project classes output is missing; continuing source-only for " + project.getProjectPath()));
@@ -212,10 +156,9 @@ public final class AnalysisContextFactory {
                                 + project.getSourceLanguageLevel());
             }
 
-            List<String> dependencyIds = new ArrayList<>();
-            for (String dependencyPath : project.getProjectDependencyPaths()) {
-                dependencyIds.add(dependencyPath + "|main");
-            }
+            List<String> dependencyIds = project.getProjectDependencyPaths().stream()
+                    .map(dependencyPath -> dependencyPath + "|main")
+                    .toList();
 
             contexts.put(contextId, new SourceSetAnalysisContext(
                     contextId,
@@ -250,6 +193,115 @@ public final class AnalysisContextFactory {
                     "no usable Java source root remains after discovery normalization");
         }
         return new Result(List.copyOf(contexts.values()), warnings);
+    }
+
+    /**
+     * project の main source root を検証し、workspace 内の重複なし real path として返す。
+     * 未作成の root は warning で除外し、context 間で同じ root を共有する構成は fatal とする。
+     *
+     * @param project 対象 project の model
+     * @param contextId 呼び出し元が組み立てた context id
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     * @param rootOwners root → 所有 context id。呼び出し元と共有し重複所有を検出する
+     * @param warnings 除外 root の warning 追記先
+     * @return 検証済み root (1 件も残らなければ空)
+     * @throws AnalyzerFatalException root が読めない / workspace 外 / 複数 context 所有の場合
+     */
+    private static List<Path> resolveProjectRoots(
+            DepwalkProjectModel project,
+            String contextId,
+            Path workspaceRoot,
+            Map<Path, String> rootOwners,
+            List<Diagnostic> warnings) throws AnalyzerFatalException {
+        List<Path> roots = new ArrayList<>();
+        for (File dir : project.getMainJavaSourceDirectories()) {
+            Path root = dir.toPath().toAbsolutePath().normalize();
+            if (!Files.exists(root)) {
+                warnings.add(warning(JavaDiagnosticCode.JAVA_SOURCE_ROOT_EXCLUDED,
+                        "excluded a source directory that does not exist yet in project " + project.getProjectPath()));
+                continue;
+            }
+            if (!Files.isDirectory(root) || !Files.isReadable(root)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
+                        "discovered source root is not a readable directory in project " + project.getProjectPath());
+            }
+            Path real = toRealPath(root, JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS);
+            if (!real.startsWith(toRealPath(workspaceRoot, JavaErrorCode.JAVA_INVALID_REQUEST))) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
+                        "in-scope project " + project.getProjectPath()
+                                + " references a source root outside the workspace");
+            }
+            String owner = rootOwners.putIfAbsent(real, contextId);
+            if (owner != null && !owner.equals(contextId)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_SOURCE_ROOTS,
+                        "the same source root belongs to multiple analysis contexts: " + owner + " and " + contextId);
+            }
+            if (!roots.contains(real)) {
+                roots.add(real);
+            }
+        }
+        return roots;
+    }
+
+    /**
+     * project の main compile classpath を検証済み path 一覧へ変換する。
+     *
+     * <p>model 取得は task を実行しないため、workspace 内の project 依存 build output は
+     * 未 build だと存在しない。依存 project の型は依存 context の source root が solver へ
+     * 入るため、workspace 内 entry の欠落は warning で除外し source 解析を継続する。
+     * workspace 外 (external artifact) の欠落は fatal。
+     *
+     * @param project 対象 project の model
+     * @param contextId warning へ添える context id
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     * @param warnings 除外 entry の warning 追記先
+     * @return 存在し読み取り可能な classpath entry (呼び出し元が共通 entry を追記できる可変 list)
+     * @throws AnalyzerFatalException workspace 外 entry が欠落または読めない場合
+     */
+    private static List<Path> resolveProjectClasspath(
+            DepwalkProjectModel project,
+            String contextId,
+            Path workspaceRoot,
+            List<Diagnostic> warnings) throws AnalyzerFatalException {
+        List<Path> classpathPaths = new ArrayList<>();
+        for (File entry : project.getMainCompileClasspath()) {
+            Path path = entry.toPath().toAbsolutePath().normalize();
+            if (!Files.exists(path)) {
+                if (withinWorkspace(path, workspaceRoot)) {
+                    warnings.add(sootUpUnavailableWarning(contextId,
+                            "excluded an unbuilt workspace classpath entry; continuing without its bytecode in project "
+                                    + project.getProjectPath()));
+                    continue;
+                }
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_MISSING_JAR,
+                        "a resolved compile classpath entry is missing or unreadable in project "
+                                + project.getProjectPath());
+            }
+            if (!Files.isReadable(path)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_MISSING_JAR,
+                        "a resolved compile classpath entry is missing or unreadable in project "
+                                + project.getProjectPath());
+            }
+            classpathPaths.add(path);
+        }
+        return classpathPaths;
+    }
+
+    /** model が報告した classes output のうち、実在する directory だけを返す。 */
+    private static List<Path> classesOutputsOf(DepwalkProjectModel project) {
+        List<Path> classesOutputs = new ArrayList<>();
+        for (File output : project.getMainClassesOutputDirectories()) {
+            Path path = output.toPath().toAbsolutePath().normalize();
+            if (Files.isDirectory(path)) {
+                classesOutputs.add(path);
+            }
+        }
+        return classesOutputs;
     }
 
     private static List<Path> resolveExplicitRoots(Path workspaceRoot, List<String> sourceRoots)
@@ -301,18 +353,6 @@ public final class AnalysisContextFactory {
         }
     }
 
-    private static ParserConfiguration.LanguageLevel explicitLanguageLevel(Map<String, Object> metadata)
-            throws AnalyzerFatalException {
-        String text = languageLevelText(metadata);
-        Optional<ParserConfiguration.LanguageLevel> level = LanguageLevels.resolve(text, false);
-        if (level.isEmpty()) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "metadata.javaLanguageLevel must be a canonical decimal major version supported by the parser");
-        }
-        return level.get();
-    }
-
     private static String languageLevelText(Map<String, Object> metadata) throws AnalyzerFatalException {
         Object raw = metadata == null ? null : metadata.get(METADATA_JAVA_LANGUAGE_LEVEL);
         if (!(raw instanceof List<?> list) || list.size() != 1 || !(list.get(0) instanceof String text)) {
@@ -336,7 +376,13 @@ public final class AnalysisContextFactory {
                 "metadata.javaPreview must be [\"true\"] or [\"false\"]");
     }
 
-    /** 自動 discovery 経路では language metadata の明示指定を invalid とする。 */
+    /**
+     * 自動 discovery 経路では language metadata の明示指定を invalid とする。
+     *
+     * @param metadata request の metadata (null 可)
+     * @throws AnalyzerFatalException {@code javaLanguageLevel} / {@code javaPreview} が
+     *     指定されている場合 ({@code JAVA_INVALID_REQUEST})
+     */
     public static void rejectLanguageMetadataOnDiscovery(Map<String, Object> metadata) throws AnalyzerFatalException {
         if (metadata != null
                 && (metadata.containsKey(METADATA_JAVA_LANGUAGE_LEVEL) || metadata.containsKey(METADATA_JAVA_PREVIEW))) {
@@ -363,7 +409,7 @@ public final class AnalysisContextFactory {
     private static Path parseRequestPath(String value, String what) throws AnalyzerFatalException {
         try {
             return Path.of(value);
-        } catch (java.nio.file.InvalidPathException e) {
+        } catch (InvalidPathException e) {
             throw new AnalyzerFatalException(
                     JavaErrorCode.JAVA_INVALID_REQUEST, what + " is not a valid filesystem path");
         }

@@ -10,8 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * diagnostic の code / severity の契約。parse 不能 file は spec #24 D15 により
- * request 全体の fatal ({@code JAVA_PARSE_ERROR})。未解決 symbol は解析を継続する。
+ * diagnostic の code / severity の契約。parse 不能 file は java-analyzer feature doc
+ * 「Parse・resolution・call 完全性」により request 全体の fatal
+ * ({@code JAVA_PARSE_ERROR})。未解決 symbol は解析を継続する。
  */
 class DiagnosticsTest {
 
