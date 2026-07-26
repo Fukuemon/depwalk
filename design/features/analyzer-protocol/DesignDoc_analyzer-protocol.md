@@ -1,6 +1,6 @@
 # Feature 設計: Analyzer Protocol / SPI
 
-> 最終更新: 2026-07-20 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) で metadata の JSON 透過表出 (正本: output feature doc) を現状化。2026-07-18 [issue #24](https://github.com/Fukuemon/depwalk/issues/24) で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新)
+> 最終更新: 2026-07-26 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) で metadata の JSON 透過表出 (正本: output feature doc) を現状化。2026-07-18 [issue #24](https://github.com/Fukuemon/depwalk/issues/24) で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新)
 
 Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) と関連 PR を参照する。
 

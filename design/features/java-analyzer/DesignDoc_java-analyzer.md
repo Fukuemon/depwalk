@@ -1,6 +1,6 @@
 # Feature 設計: Java Analyzer
 
-> 最終更新: 2026-07-24 / Status: 完了 (issue #32 の内部 package 構成・外部ライブラリ隔離境界を反映)
+> 最終更新: 2026-07-26 / Status: 完了 (issue #32 の内部 package 構成・外部ライブラリ隔離境界を反映)
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [#9](https://github.com/Fukuemon/depwalk/issues/9)、[#21](https://github.com/Fukuemon/depwalk/issues/21)、[#22](https://github.com/Fukuemon/depwalk/issues/22)、[#24](https://github.com/Fukuemon/depwalk/issues/24)、[#27](https://github.com/Fukuemon/depwalk/issues/27) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 

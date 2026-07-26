@@ -1,6 +1,6 @@
 # depwalk Design Doc
 
-> 最終更新: 2026-07-20 / Status: Draft
+> 最終更新: 2026-07-26 / Status: Draft
 
 本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 

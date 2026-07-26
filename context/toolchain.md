@@ -1,6 +1,6 @@
 # Toolchain
 
-> 最終更新: 2026-07-18
+> 最終更新: 2026-07-26
 
 採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
 
