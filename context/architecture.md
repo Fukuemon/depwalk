@@ -42,6 +42,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 - `protocol` → `analyze` (port 実装) / `analyzer` (process 起動に利用) / `graph`
 - `analyzer`: 他の internal package に依存しない
 - `cli` はコンポジションルートとして全 package を import してよい (依存性ルールの例外ではなく最外層の役割)
+- `core/cmd/depwalk` は `cli` のみ。起動だけを担い、内層を直接 import しない
 - DI ライブラリ (`google/wire` 等) は導入せず、`cli` でのコンストラクタ注入による手動 DI とする
 
 依存図は手で描かず、`go list` の実 import から `scripts/depgraph.sh` で生成して下の生成マーカー区間に埋める。再生成して diff が出る状態 (図の更新漏れ) は lefthook pre-commit と CI が drift として検出する:
