@@ -28,11 +28,7 @@ public class DiscoveryFailure extends Exception {
             this.reason = reason;
         }
 
-        /**
-         * Protocol 観測面へ出す安定 reason 文字列を返す。
-         *
-         * @return kebab-case の安定 category 文字列
-         */
+        /** Protocol 観測面へ出す kebab-case の安定 reason 文字列。 */
         public String reason() {
             return reason;
         }
@@ -53,11 +49,7 @@ public class DiscoveryFailure extends Exception {
             this.label = label;
         }
 
-        /**
-         * 観測面へ出す安定 phase 文字列を返す。
-         *
-         * @return kebab-case の安定 phase 文字列
-         */
+        /** 観測面へ出す kebab-case の安定 phase 文字列。 */
         public String label() {
             return label;
         }
@@ -67,10 +59,6 @@ public class DiscoveryFailure extends Exception {
     private final Phase phase;
 
     /**
-     * 安定 category・失敗 phase・固定 message から failure を生成する。
-     *
-     * @param category 安定 failure category
-     * @param phase 失敗した discovery の段階
      * @param fixedMessage Analyzer が定義した固定 message (Gradle 由来の raw message を渡さない)
      */
     public DiscoveryFailure(Category category, Phase phase, String fixedMessage) {
@@ -79,20 +67,10 @@ public class DiscoveryFailure extends Exception {
         this.phase = phase;
     }
 
-    /**
-     * 安定 failure category を返す。
-     *
-     * @return 生成時に与えた category
-     */
     public Category category() {
         return category;
     }
 
-    /**
-     * 失敗した discovery の段階を返す。
-     *
-     * @return 生成時に与えた phase
-     */
     public Phase phase() {
         return phase;
     }

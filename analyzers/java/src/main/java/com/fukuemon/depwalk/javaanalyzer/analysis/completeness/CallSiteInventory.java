@@ -46,8 +46,6 @@ public final class CallSiteInventory {
     private final Set<CallSiteId> ids = new LinkedHashSet<>();
 
     /**
-     * workspace 相対 path を組み立てる基準 root を与えて inventory を作る。
-     *
      * @param workspaceRoot 絶対・正規化済み workspace root
      */
     public CallSiteInventory(Path workspaceRoot) {
@@ -142,9 +140,7 @@ public final class CallSiteInventory {
      *
      * @param callNode source range を持つ call 表現の AST node
      * @param path workspace 相対 path
-     * @param kind call kind
      * @param callerMethodId 呼び出し元の method id (未解決なら placeholder id)
-     * @return 位置・kind・caller から決まる call site id
      * @throws IllegalStateException {@code callNode} が source range を持たない場合
      */
     public static CallSiteId of(Node callNode, String path, CallSiteId.CallKind kind, String callerMethodId) {
@@ -160,21 +156,11 @@ public final class CallSiteInventory {
                 callerMethodId);
     }
 
-    /**
-     * 登録済み call site かどうかを返す。
-     *
-     * @param id 照会する call site id
-     * @return 登録済みなら true
-     */
     public boolean contains(CallSiteId id) {
         return ids.contains(id);
     }
 
-    /**
-     * 登録済み call site id を登録順で返す。
-     *
-     * @return 変更不可 view
-     */
+    /** 登録順を保った変更不可 view。 */
     public Set<CallSiteId> ids() {
         return Collections.unmodifiableSet(ids);
     }
@@ -205,7 +191,6 @@ public final class CallSiteInventory {
          * method 宣言の caller id を返す。解決できない場合は placeholder id を返す。
          *
          * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
-         * @param md 対象 method 宣言
          * @param path placeholder 生成に使う workspace 相対 path
          * @return 正規化 signature 由来の method id、または placeholder id
          */
@@ -223,7 +208,6 @@ public final class CallSiteInventory {
          * constructor 宣言の caller id を返す。解決できない場合は placeholder id を返す。
          *
          * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
-         * @param cd 対象 constructor 宣言
          * @param path placeholder 生成に使う workspace 相対 path
          * @return {@code <init>} の method id、または placeholder id
          */
@@ -243,7 +227,6 @@ public final class CallSiteInventory {
          * 失敗した場合は placeholder id を返す。
          *
          * @param enclosingType 宣言を囲む型 (record 宣言を期待する)
-         * @param ccd 対象 compact constructor 宣言
          * @param path placeholder 生成に使う workspace 相対 path
          * @return {@code <init>} の method id、または placeholder id
          */

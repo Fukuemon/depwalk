@@ -58,6 +58,10 @@ import java.util.TreeMap;
  * <p>source file の列挙、AST 解析、型解決、Spring DI 索引化、呼び出し先候補の統合、帰属型決定、
  * 到達可能性フィルタ、{@link RecordWriter} への出力を1回の実行として調停する。
  *
+ * <p>本クラスが実装する契約の正本は java-analyzer feature doc: call site の完全性 gate と
+ * {@code allowIncompleteAnalysis} は「Parse・resolution・call 完全性」、context 分離と solver への
+ * root / classpath 登録は「Source root discovery と解析 context」。
+ *
  * <p>逐次破棄されるのは AST のみで (ファイル単位で parse し、処理後は参照を手放す)、
  * SymbolSolver の型解決キャッシュと {@link GraphAccumulator} が持つ node / edge / diagnostic は
  * 実行終了まで保持される。したがってモードを問わずグラフ本体はメモリ上に残り、モードによって
@@ -103,20 +107,14 @@ public final class AnalysisRunner {
     /**
      * 解析要求を実行し、method symbol、call edge、diagnostic を writer へ出力する。
      *
-     * @param request workspace、解析 mode、entrypoint、metadata を含む検証済み解析要求
-     * @param contextResult 構築済みの解析 context と非 fatal warning
-     * @param writer JSONL protocol record の出力先
+     * @param request preflight 検証済みの解析要求 (未検証の要求を渡してはならない)
      * @param allowIncompleteAnalysis true のとき、全救済後も残る primary diagnostic があっても
      *     request を fatal にせず、解決済み graph と診断を公開する
-     *     ({@code metadata.allowIncompleteAnalysis}、
-     *     java-analyzer feature doc「Parse・resolution・call 完全性」)
-     * @return 解析したファイル数、未解決件数、parse pre-flight 時間、context 構築時間、
-     *     call site ledger の集計 ({@link RunStats})
+     *     ({@code metadata.allowIncompleteAnalysis})
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
      * @throws IncompleteAnalysisException {@code allowIncompleteAnalysis} が false のまま、
-     *     全救済後も primary diagnostic として残る in-scope call site があった場合
-     *     (完全性 gate、java-analyzer feature doc「Parse・resolution・call 完全性」)
+     *     全救済後も primary diagnostic として残る in-scope call site があった場合 (完全性 gate)
      */
     public static RunStats run(
             AnalysisRequest request,
@@ -188,8 +186,7 @@ public final class AnalysisRunner {
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
         GraphAccumulator accumulator = new GraphAccumulator();
         // resolver とは独立した call-site inventory と source 宣言索引
-        // (feature doc「Parse・resolution・call 完全性」/
-        //  adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+        // (adr/0005-adopt-sootup-and-spring-di-resolution.md)。
         CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
         WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
@@ -267,8 +264,7 @@ public final class AnalysisRunner {
             writeReachableRecords(accumulator, request.entrypoints(), writer);
         }
 
-        // 完全性 gate (feature doc「Parse・resolution・call 完全性」):
-        // 全 entry の分類を検査し、primary
+        // 完全性 gate: 全 entry の分類を検査し、primary
         // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
@@ -281,8 +277,7 @@ public final class AnalysisRunner {
                     .count();
             throw incompleteAnalysis(primary, sootUpUnavailableContexts);
         }
-        // allowIncompleteAnalysis=true (feature doc「Parse・resolution・call 完全性」):
-        // primary diagnostic が残っても
+        // allowIncompleteAnalysis=true: primary diagnostic が残っても
         // request を fatal にせず success として完了する。解決済み edge / 明示除外は
         // 通常どおり公開され、残存 primary diagnostic は各 call site の検出時点で
         // 既に streaming 済みの diagnostic record (reportUnresolved 経由) と、
@@ -297,12 +292,7 @@ public final class AnalysisRunner {
                 ledger.summary());
     }
 
-    /**
-     * context 別 bytecode 索引の組。
-     *
-     * @param sootUpByContext context id ごとの型階層索引
-     * @param bytecodeIndexByContext context id ごとの project bytecode member 索引
-     */
+    /** context 別 bytecode 索引の組 (いずれも key は context id)。 */
     private record BytecodeIndexes(
             Map<String, SootUpTypeHierarchyIndex> sootUpByContext,
             Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext) {
@@ -326,8 +316,7 @@ public final class AnalysisRunner {
         for (SourceSetAnalysisContext context : contexts) {
             // project 所有の classes output (自 context + 依存 project の output) を
             // external jar より先に登録し、同名 class は project bytecode を優先
-            // する。member 救済の origin 検証
-            // (feature doc「solver 層の bytecode member 合成」) にも同じ一覧を渡す。
+            // する。member 救済の origin 検証にも同じ一覧を渡す。
             // 依存 project の output は classpath の形に依存せず model の project
             // 依存関係から解決する (Gradle model は依存 project を jar
             // として classpath へ返すことがあり、classpath 照合だけでは依存 output
@@ -369,8 +358,7 @@ public final class AnalysisRunner {
      * context ごとの parser (TypeSolver 付き) を構築する。
      *
      * <p>solver には自 root、Gradle project 依存で到達可能な context の root、自 context の外部 entry
-     * だけを登録し、非依存 module や異なる依存 version を混在させない
-     * (java-analyzer feature doc「Source root discovery と解析 context」)。
+     * だけを登録し、非依存 module や異なる依存 version を混在させない。
      *
      * @throws IOException solver 用の source root / classpath entry を読み取れなかった場合
      */
@@ -407,7 +395,7 @@ public final class AnalysisRunner {
     /**
      * 全 context の entry を統合した Spring DI 索引を作る。
      *
-     * <p>SootUp index は context ごとに分離する (feature doc「Source root discovery と解析 context」) が、
+     * <p>SootUp index は context ごとに分離するが、
      * Spring DI の Bean 母集合は request 全体の意味論 (module 間 DI 解決が成功条件) のため、DI 索引だけは
      * 全 context の entry を統合した index を使う。union は file を持つ context の entry だけで構成する。
      */
@@ -521,8 +509,8 @@ public final class AnalysisRunner {
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
             }
-            // feature doc「diagnostic / error code 体系」: primary diagnostic として
-            // 終端した call だけが、sanitize 済み
+            // 診断項目の正本は feature doc「diagnostic / error code 体系」。primary
+            // diagnostic として終端した call だけが、sanitize 済み
             // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
             // receiverTypeResolved) を details へ載せる。
             if (outcome.diagnosticMetadata() != null) {

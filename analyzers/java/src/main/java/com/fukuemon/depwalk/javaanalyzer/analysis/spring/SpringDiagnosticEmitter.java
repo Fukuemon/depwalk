@@ -29,9 +29,7 @@ public final class SpringDiagnosticEmitter {
     /**
      * すべての注入解決結果を診断へ変換し、解析実行中の accumulator に追加する。
      *
-     * @param result Spring Bean と注入点の解決結果
-     * @param workspaceRoot source location を相対 path にする基準 workspace
-     * @param accumulator 診断と未解決件数を蓄積する解析単位の accumulator
+     * @param workspaceRoot source location を相対 path にする基準 (絶対・正規化済み)
      */
     public static void emit(
             SpringDiIndex.Result result,

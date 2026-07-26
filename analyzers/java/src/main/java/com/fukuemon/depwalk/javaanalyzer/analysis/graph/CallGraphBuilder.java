@@ -77,6 +77,11 @@ import java.util.function.Supplier;
  * へ積み上げる。呼び出し先の型解決に AST ノードの identity が必要な場面
  * ({@link BinaryNames#forTypeLikeNode(Node)}) は、ファイルの visit 順序に依存しない純粋な構造計算で
  * 実装しているため、ファイル単位で 1 パス (declare + call-edge を同時に処理) で完結できる。
+ *
+ * <p>本クラスの契約の正本は java-analyzer feature doc: call site の終端記録と完全性 gate は
+ * 「Parse・resolution・call 完全性」、source で解決できない member の bytecode 救済は
+ * 「solver 層の bytecode member 合成」、診断 metadata の内容と sanitize 制約は
+ * 「diagnostic / error code 体系」。以下の各経路はこれらに従う。
  */
 public final class CallGraphBuilder {
 
@@ -94,21 +99,14 @@ public final class CallGraphBuilder {
     private String currentPath;
 
     /**
-     * 解析実行中に共有する索引と出力 accumulator を使う graph builder を生成する。
-     *
-     * @param workspaceRoot source location を相対化する workspace root
-     * @param attributionResolver scope 内外と帰属型を決定する resolver
-     * @param accumulator method symbol、call edge、diagnostic の出力先
-     * @param sootUpIndex bytecode 型階層から実装候補を得る索引
-     * @param sourceMethodIndex 候補メソッドの source location を補完する索引
-     * @param springResult Spring Bean と注入点の解決結果
-     * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する
-     *     完全性 gate 用 ledger (java-analyzer feature doc「Parse・resolution・call 完全性」)
+     * @param workspaceRoot source location を相対化する workspace root (絶対・正規化済み)
+     * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する完全性 gate 用 ledger。
+     *     どの経路でも call site 1 件につき必ず 1 つの終端を commit する
      * @param declIndex workspace の source 宣言から型の所有 context と source location を引く索引。
      *     bytecode 救済の対象を workspace source を持つ型に限定する判定に使う
      * @param bytecodeIndex 呼び出し元 context の classpath 視点で bytecode member
      *     (method / constructor / field 型 / generic 戻り型) を引く索引。source だけでは解決できない
-     *     候補の救済に使う (feature doc「solver 層の bytecode member 合成」)
+     *     候補の救済に使う
      * @param reachableContextIds 自 context と Gradle project 依存で推移的に到達可能な context id の集合。
      *     救済候補の所有 context がこの集合に含まれない場合は救済を行わない
      */
@@ -375,8 +373,7 @@ public final class CallGraphBuilder {
             return;
         }
 
-        // solver が合成した bytecode-only member (java-analyzer feature doc
-        // 「solver 層の bytecode member 合成」) は、既存の bytecode-only member と同じ
+        // solver が合成した bytecode-only member は、既存の bytecode-only member と同じ
         // 出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、ADR-0005)
         // で emit する。
         if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
@@ -529,8 +526,7 @@ public final class CallGraphBuilder {
             return;
         }
 
-        // solver が合成した bytecode-only member (java-analyzer feature doc「solver 層の
-        // bytecode member 合成」) への reference は、method call の synthesized 経路と
+        // solver が合成した bytecode-only member への reference は、method call の synthesized 経路と
         // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、
         // ADR-0005) で emit する (従来この経路は通常 symbol として emit され、
         // この出力契約から漏れていた)。
@@ -704,7 +700,7 @@ public final class CallGraphBuilder {
 
 
     // ------------------------------------------------------------------
-    // call-site outcome ledger (java-analyzer feature doc「Parse・resolution・call 完全性」)
+    // call-site outcome ledger
     // ------------------------------------------------------------------
 
     /** ledger 用の実効 caller (caller 不在の site は <clinit> / placeholder へ帰着)。 */
@@ -736,10 +732,8 @@ public final class CallGraphBuilder {
         for (String caller : ledgerCallers(callNode, ctx)) {
             if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
                 // caller 宣言が resolve できない site は edge を出力できないため、
-                // emitted でなく primary diagnostic として完全性 gate に残す
-                // (java-analyzer feature doc「Parse・resolution・call 完全性」)。
-                // 診断 metadata (java-analyzer feature doc「diagnostic / error code 体系」)
-                // は「call 解決の失敗段階」を表すため、
+                // emitted でなく primary diagnostic として完全性 gate に残す。
+                // 診断 metadata は「call 解決の失敗段階」を表すため、
                 // caller 宣言側の失敗であるこの経路には意図的に付けない
                 // (details の 4 項目は解決失敗系 reason にのみ載る)。
                 ledger.commitDiagnostic(
@@ -787,7 +781,7 @@ public final class CallGraphBuilder {
     }
 
     // ------------------------------------------------------------------
-    // 解決失敗の診断 metadata (java-analyzer feature doc「diagnostic / error code 体系」)
+    // 解決失敗の診断 metadata
     // ------------------------------------------------------------------
 
     /** 診断 metadata の resolutionPhase 安定値。 */
@@ -797,8 +791,7 @@ public final class CallGraphBuilder {
     static final String PHASE_CONSTRUCTOR_REFERENCE_SELECTION = "constructor-reference-selection";
 
     /**
-     * primary diagnostic へ添える sanitize 済み診断 4 項目
-     * (java-analyzer feature doc「diagnostic / error code 体系」) を構築する。
+     * primary diagnostic へ添える sanitize 済み診断 4 項目を構築する。
      * 含めるのは安定値だけ: 失敗した解決段階、resolver 例外のクラス名 (message は
      * 含めない)、receiver 式種別 (AST 型名)、receiver 静的型の取得成否。
      *
@@ -1557,7 +1550,7 @@ public final class CallGraphBuilder {
     /**
      * 要素単位に隔離可能と確認済みの resolution failure だけを diagnostic 経路へ
      * 通し、それ以外の RuntimeException は request fatal (JAVA_INTERNAL_ERROR)
-     * として伝播させる (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+     * として伝播させる。
      * LinkageError はここへ来ず
      * Main の internal error 境界で処理される。
      */
@@ -1588,9 +1581,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * java-analyzer feature doc「diagnostic / error code 体系」の診断 4 項目を
-     * streaming される {@code diagnostic} record へも
-     * 付与するオーバーロード (multi-agent review 指摘反映: 2026-07-22)。従来は
+     * 診断 4 項目を streaming される {@code diagnostic} record へも付与するオーバーロード (multi-agent review 指摘反映: 2026-07-22)。従来は
      * ledger 経由の {@code error.details} (fatal 経路) にしか乗らず、
      * {@code metadata.allowIncompleteAnalysis=true} で成功時に残る diagnostic
      * には 4 項目が欠落していた。
@@ -1603,8 +1594,7 @@ public final class CallGraphBuilder {
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
                 // PR review 指摘反映 (2026-07-22): callNode.toString() は JavaParser が
                 // 再構築した source 断片 (literal を含む) であり、sanitize 制約
-                // (error.details と同様に diagnostic record にも source 本文を含めない。
-                // java-analyzer feature doc「diagnostic / error code 体系」)
+                // (error.details と同様に diagnostic record にも source 本文を含めない)
                 // に違反しうる。安定な AST ノード種別名だけを使い、位置は既存の
                 // sourceLocation フィールドに委ねる。
                 "failed to resolve " + callNode.getClass().getSimpleName(),
@@ -1824,10 +1814,8 @@ public final class CallGraphBuilder {
      *
      * <p>型変数や wildcard は、そのままでは reference type 宣言を取得できないため erasure を使う。
      * たとえば {@code T extends ChildService} の receiver は {@code ChildService} として扱い、
-     * 上限境界に含まれない実装を dispatch 候補へ混入させない。解決できなければ {@code null} を返す。
-     *
-     * @param expr 静的 receiver 型を取得する式
-     * @return 静的型の所在情報。型解決または erasure に失敗した場合は {@code null}
+     * 上限境界に含まれない実装を dispatch 候補へ混入させない。型解決または erasure に失敗した場合は
+     * {@code null} を返す。
      */
     private TypeSite typeSiteOfExpression(Expression expr) {
         try {
@@ -2004,9 +1992,6 @@ public final class CallGraphBuilder {
      * {@code super.method()} と {@code super::method} は JVM の {@code invokespecial} に相当し、
      * 実行時のレシーバー型によるオーバーライド選択を行わない。そのため宣言先への通常 edge は保持しつつ、
      * 型階層由来の実装候補 edge だけを生成対象外とする。
-     *
-     * @param callNode 候補 edge を検討しているメソッド呼び出しまたはメソッド参照
-     * @return 明示的な {@code super} 呼び出し・参照なら {@code true}
      */
     private static boolean isExplicitSuperDispatch(Node callNode) {
         if (callNode instanceof MethodCallExpr methodCall) {
@@ -2120,11 +2105,7 @@ public final class CallGraphBuilder {
      *
      * <p>通常のreference typeはfallbackの1型だけを返す。型変数またはintersection typeでは
      * 全extends境界を返し、SootUp側で候補の積集合を取れるようにする。型解決に失敗した場合も
-     * erasure済みfallbackを保持する。
-     *
-     * @param callNode method callまたはmethod reference
-     * @param fallback erasureから得たreceiver型
-     * @return receiverが同時に満たす型の重複なし配列
+     * erasure済みfallbackを保持する。返す列は重複なし。
      */
     private static List<String> receiverTypeConstraints(Node callNode, String fallback) {
         Expression scope = callScopeOf(callNode);
@@ -2145,9 +2126,7 @@ public final class CallGraphBuilder {
      * 型変数・intersection・上限wildcardを再帰展開し、最終的なreference型境界を収集する。
      * 間接境界 ({@code T extends U}, {@code U extends A & B}) でもAとBの両方を保持する。
      *
-     * @param type 展開するreceiver型または境界型
-     * @param constraints 収集先のbinary name集合
-     * @param visiting 展開中の型変数名。循環参照を停止する
+     * @param visiting 展開中の型変数名。循環参照を停止するために呼び出し間で引き回す
      */
     private static void collectReceiverTypeConstraints(
             ResolvedType type,
@@ -2181,8 +2160,7 @@ public final class CallGraphBuilder {
 
     private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         // bytecode 候補を source 宣言へ再対応付けするのは、宣言型が scope 内 source に
-        // 存在し、呼出元 context から依存到達可能な場合だけ
-        // (java-analyzer feature doc「solver 層の bytecode member 合成」)。external /
+        // 存在し、呼出元 context から依存到達可能な場合だけ。external /
         // JDK / 非依存 context を workspace 全体の名前一致で source へ戻さない。
         boolean remappable = reachableOwner(candidate.declaringType()).isPresent();
         return (remappable ? sourceMethodIndex.find(candidate) : Optional.<MethodSymbol>empty()).orElseGet(() -> {

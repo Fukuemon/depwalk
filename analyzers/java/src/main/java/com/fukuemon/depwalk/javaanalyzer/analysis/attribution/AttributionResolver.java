@@ -24,10 +24,7 @@ public final class AttributionResolver {
     private final LiftExcludePackages liftExcludePackages;
 
     /**
-     * 解析 scope と引き上げ除外 package に基づく resolver を生成する。
-     *
-     * @param scopeFiles 解析対象 source file の正規化済み path 集合
-     * @param liftExcludePackages scope 外宣言を receiver 型へ引き上げない package 規則
+     * @param scopeFiles 解析対象 source file の正規化済み path 集合 (正規化前の path は一致しない)
      */
     public AttributionResolver(Set<Path> scopeFiles, LiftExcludePackages liftExcludePackages) {
         this.scopeFiles = scopeFiles;
@@ -41,9 +38,7 @@ public final class AttributionResolver {
     /**
      * method 呼び出し (static / instance / this / super) の帰属型を決定する。
      *
-     * @param declaringSite 解決済みメソッドの宣言型と source file
-     * @param receiverSite 呼び出し式の静的 receiver 型。取得できなければ {@code null}
-     * @return scope 内宣言、receiver への引き上げ、または省略理由を表す結果
+     * @param receiverSite 呼び出し式の静的 receiver 型。取得できなければ {@code null} (引き上げは発生しない)
      */
     public AttributionResult resolveMethod(TypeSite declaringSite, TypeSite receiverSite) {
         if (isScopeInternal(declaringSite)) {
@@ -60,9 +55,6 @@ public final class AttributionResolver {
 
     /**
      * constructor 呼び出し ({@code new Foo(...)} / {@code this(...)} / {@code super(...)}) の帰属型を決定する。
-     *
-     * @param declaringSite constructor の宣言型と source file
-     * @return scope 内の宣言型、または scope 外のため省略する結果
      */
     public AttributionResult resolveConstructor(TypeSite declaringSite) {
         if (isScopeInternal(declaringSite)) {

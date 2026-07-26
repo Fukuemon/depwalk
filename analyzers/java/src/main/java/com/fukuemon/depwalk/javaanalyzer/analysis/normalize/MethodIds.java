@@ -21,23 +21,15 @@ public final class MethodIds {
     }
 
     /**
-     * 宣言型、メソッド名、引数型から正規化 signature を生成する。
-     *
-     * @param declaringTypeBinaryName メソッドの帰属型を表す JVM binary name
-     * @param methodNameToken 通常のメソッド名または constructor・initializer token
-     * @param paramBinaryNames 宣言順の引数型 JVM binary name
-     * @return overload を区別できる決定的な signature
+     * @param methodNameToken 通常のメソッド名、または {@link #CONSTRUCTOR_TOKEN} /
+     *                        {@link #STATIC_INITIALIZER_TOKEN}
+     * @param paramBinaryNames 宣言順の erasure 済み引数型 binary name (順序が signature の一部)
      */
     public static String signature(String declaringTypeBinaryName, String methodNameToken, List<String> paramBinaryNames) {
         return declaringTypeBinaryName + "#" + methodNameToken + "(" + String.join(",", paramBinaryNames) + ")";
     }
 
-    /**
-     * 正規化 signature を Java method ID へ変換する。
-     *
-     * @param signature {@link #signature(String, String, List)} が生成した signature
-     * @return {@code java:} prefix を付けた安定 ID
-     */
+    /** @param signature {@link #signature(String, String, List)} が生成した signature */
     public static String methodId(String signature) {
         return METHOD_ID_PREFIX + signature;
     }

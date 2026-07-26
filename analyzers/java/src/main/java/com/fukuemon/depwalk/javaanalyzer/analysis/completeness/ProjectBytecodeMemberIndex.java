@@ -28,9 +28,6 @@ public final class ProjectBytecodeMemberIndex {
     private final Map<String, List<SootUpTypeHierarchyIndex.MethodCandidate>> declaredCache = new HashMap<>();
 
     /**
-     * 型階層索引と project 所有の classes output を与えて索引を作る。
-     *
-     * @param sootUpIndex 所有 context の型階層索引
      * @param classesOutputDirs この context から見える project 所有の classes
      *     output。member 救済の origin 検証と generic Signature 属性の読み取り
      *     (java-analyzer feature doc「solver 層の bytecode member 合成」) に使う

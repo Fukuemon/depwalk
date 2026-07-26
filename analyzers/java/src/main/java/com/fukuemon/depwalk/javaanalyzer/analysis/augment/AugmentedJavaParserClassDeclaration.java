@@ -25,8 +25,9 @@ import java.util.Set;
 
 /**
  * source の class 宣言を継承し、source で解決できない method 呼び出しだけを
- * 同一 context の classes output の一意 member へ fallback する宣言
- * (java-analyzer feature doc「solver 層の bytecode member 合成」)。
+ * 同一 context の classes output の一意 member へ fallback する宣言。
+ * 本クラスの契約 (合成条件・generic Signature の扱い) の正本は java-analyzer feature doc
+ * 「solver 層の bytecode member 合成」。
  * {@code instanceof JavaParserClassDeclaration} に依存する
  * solver 内部経路を壊さないため、wrapper でなく subclass にする。
  */
@@ -35,13 +36,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     private final TypeSolver typeSolver;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
 
-    /**
-     * source の class 宣言を包み、bytecode 合成の fallback を持つ宣言を作る。
-     *
-     * @param wrappedNode 対象の source class 宣言
-     * @param typeSolver 型解決に使う solver
-     * @param bytecodeIndex 同一 context の classes output を引く member 索引
-     */
+    /** @param bytecodeIndex wrappedNode と同一解析 context の classes output を引く member 索引 */
     public AugmentedJavaParserClassDeclaration(
             ClassOrInterfaceDeclaration wrappedNode,
             TypeSolver typeSolver,
@@ -145,10 +140,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         return Optional.empty();
     }
 
-    /**
-     * generic Signature (feature doc「solver 層の bytecode member 合成」) があれば
-     * 実型引数付きの戻り値 resolver で合成する。
-     */
+    /** generic Signature があれば実型引数付きの戻り値 resolver で合成する。 */
     private SynthesizedBytecodeMethodDeclaration synthesize(
             AugmentedJavaParserClassDeclaration owner, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         var genericReturn = owner.bytecodeIndex.genericReturnType(candidate);

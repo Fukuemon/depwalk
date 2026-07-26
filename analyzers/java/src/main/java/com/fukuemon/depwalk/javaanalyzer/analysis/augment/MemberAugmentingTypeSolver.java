@@ -14,10 +14,10 @@ import java.util.Map;
 /**
  * scope 内 source root の {@link JavaParserTypeSolver} を包み、source 解決した
  * class 宣言へ同一 context の classes output にしかない callable member を
- * 解決時に合成する (java-analyzer feature doc「solver 層の bytecode member 合成」)。
- * source 宣言と帰属規則 (feature doc「Source root discovery と解析 context」/
- * 「Parse・resolution・call 完全性」) は
- * 変更せず、source AST に無い member の解決だけを bytecode で補う。
+ * 解決時に合成する。本クラスの契約の正本は java-analyzer feature doc
+ * 「solver 層の bytecode member 合成」(context の対応づけは「Source root discovery と解析 context」、
+ * 帰属規則は「Parse・resolution・call 完全性」)。
+ * source 宣言と帰属規則は変更せず、source AST に無い member の解決だけを bytecode で補う。
  * 合成は {@link AugmentedJavaParserClassDeclaration#solveMethod} の fallback で
  * 行い、source で解決できる member には一切影響しない。
  */
@@ -31,10 +31,8 @@ public final class MemberAugmentingTypeSolver implements TypeSolver {
     private final Map<String, SymbolReference<ResolvedReferenceTypeDeclaration>> cache = new HashMap<>();
 
     /**
-     * source root の solver を包み、member 合成を差し込む solver を作る。
-     *
-     * @param delegate scope 内 source root の型解決を担う solver
-     * @param bytecodeIndex 同一 context の classes output を引く member 索引
+     * @param bytecodeIndex delegate と同一解析 context の classes output を引く member 索引
+     *     (別 context の索引を渡すと source と bytecode の対応が崩れる)
      */
     public MemberAugmentingTypeSolver(JavaParserTypeSolver delegate, ProjectBytecodeMemberIndex bytecodeIndex) {
         this.delegate = delegate;

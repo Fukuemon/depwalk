@@ -30,9 +30,6 @@ public final class GradleModelDiscovery {
     private final PrintStream stderr;
 
     /**
-     * Tooling API 呼び出しの seam と観測出力先を束ねて discovery を組み立てる。
-     *
-     * @param client build environment / model 取得に使う Tooling API client
      * @param stderr 安全通知と phase 観測行の出力先
      */
     public GradleModelDiscovery(ToolingClient client, PrintStream stderr) {
@@ -45,7 +42,6 @@ public final class GradleModelDiscovery {
      * Tooling API runtime を完全に bypass する。
      *
      * @param sourceRoots analysisRequest.sourceRoots (省略時 null)
-     * @return 明示 override なら true
      */
     public static boolean isExplicitOverride(List<String> sourceRoots) {
         return sourceRoots != null;
