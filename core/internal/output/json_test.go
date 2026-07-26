@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/graphtest"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
@@ -23,7 +24,7 @@ func TestJSONGolden(t *testing.T) {
 		{name: "max-depth-zero", view: jsonMaxDepthZeroView()},
 	}
 
-	formatter, ok := formatters[FormatJSON]
+	formatter, ok := formatters()[FormatJSON]
 	if !ok {
 		t.Fatal("FormatJSON formatter is not registered")
 	}
@@ -185,7 +186,7 @@ func TestJSONWriteIsDeterministicForMapInput(t *testing.T) {
 }
 
 func TestJSONWriteCarriesShortestDepthFromTraversal(t *testing.T) {
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").
@@ -211,7 +212,7 @@ func TestJSONWriteCarriesShortestDepthFromTraversal(t *testing.T) {
 }
 
 func TestJSONWriteDerivesDanglingCutoffTargetInBothDirections(t *testing.T) {
-	g := graph.NewBuilder().Edge("edge:ab", "method:a", "method:b").Build()
+	g := graphtest.NewBuilder().Edge("edge:ab", "method:a", "method:b").Build()
 	tests := []struct {
 		name       string
 		request    traversal.Request

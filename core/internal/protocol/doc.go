@@ -6,6 +6,6 @@
 // validation, and strict JSONL parsing — plus the two ACL halves (spec #32
 // D6): the Translator (translate.go) that converts wire records into
 // graph-owned domain values, and the Adapter (adapter.go) that implements
-// the analyze.AnalysisSource port by driving one Analyzer run through
+// the analyze.Source port by driving one Analyzer run through
 // [Runner]. Raw process execution is delegated to the analyzer package.
 package protocol

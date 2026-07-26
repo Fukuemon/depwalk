@@ -1,49 +1,51 @@
-package traversal
+package traversal_test
 
 import (
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/graphtest"
+	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
 func intPtr(v int) *int { return &v }
 
 func linearGraph() *graph.Graph {
 	// a -> b -> c
-	return graph.NewBuilder().
+	return graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
 		Build()
 }
 
 func TestTraverseRejectsInvalidDirection(t *testing.T) {
-	_, err := Traverse(linearGraph(), Request{StartID: "method:a", Direction: "sideways"})
+	_, err := traversal.Traverse(linearGraph(), traversal.Request{StartID: "method:a", Direction: "sideways"})
 	if err == nil {
 		t.Error("Traverse with invalid direction returned nil error, want validation error")
 	}
 }
 
 func TestTraverseRejectsNegativeMaxDepth(t *testing.T) {
-	req := Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(-1)}
-	if _, err := Traverse(linearGraph(), req); err == nil {
+	req := traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(-1)}
+	if _, err := traversal.Traverse(linearGraph(), req); err == nil {
 		t.Error("Traverse with negative maxDepth returned nil error, want validation error")
 	}
 }
 
 func TestTraverseRejectsInvalidOrder(t *testing.T) {
-	req := Request{StartID: "method:a", Direction: graph.DirectionCallee, Order: "random"}
-	if _, err := Traverse(linearGraph(), req); err == nil {
+	req := traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, Order: "random"}
+	if _, err := traversal.Traverse(linearGraph(), req); err == nil {
 		t.Error("Traverse with invalid order returned nil error, want validation error")
 	}
 }
 
 func TestTraverseReturnsStartNotFoundForMissingStart(t *testing.T) {
-	res, err := Traverse(linearGraph(), Request{StartID: "method:missing", Direction: graph.DirectionCallee})
+	res, err := traversal.Traverse(linearGraph(), traversal.Request{StartID: "method:missing", Direction: graph.DirectionCallee})
 	if err != nil {
 		t.Fatalf("Traverse returned error %v, want nil (startNotFound is not an error)", err)
 	}
-	if res.Status != StatusStartNotFound {
-		t.Errorf("Status = %q, want %q", res.Status, StatusStartNotFound)
+	if res.Status != traversal.StatusStartNotFound {
+		t.Errorf("Status = %q, want %q", res.Status, traversal.StatusStartNotFound)
 	}
 	if len(res.Nodes) != 0 {
 		t.Errorf("Nodes = %v, want empty", res.Nodes)
@@ -51,22 +53,22 @@ func TestTraverseReturnsStartNotFoundForMissingStart(t *testing.T) {
 }
 
 func TestTraverseReturnsStartNotFoundForEmptyGraph(t *testing.T) {
-	res, err := Traverse(graph.New(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res, err := traversal.Traverse(graph.New(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 	if err != nil {
 		t.Fatalf("Traverse returned error %v, want nil", err)
 	}
-	if res.Status != StatusStartNotFound {
-		t.Errorf("Status = %q, want %q", res.Status, StatusStartNotFound)
+	if res.Status != traversal.StatusStartNotFound {
+		t.Errorf("Status = %q, want %q", res.Status, traversal.StatusStartNotFound)
 	}
 }
 
 func TestTraverseCalleeDirectionReachesCallees(t *testing.T) {
-	res, err := Traverse(linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res, err := traversal.Traverse(linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
-	if res.Status != StatusOK {
-		t.Fatalf("Status = %q, want %q", res.Status, StatusOK)
+	if res.Status != traversal.StatusOK {
+		t.Fatalf("Status = %q, want %q", res.Status, traversal.StatusOK)
 	}
 	want := []string{"method:a", "method:b", "method:c"}
 	if len(res.Nodes) != len(want) {
@@ -80,7 +82,7 @@ func TestTraverseCalleeDirectionReachesCallees(t *testing.T) {
 }
 
 func TestTraverseCallerDirectionReachesCallers(t *testing.T) {
-	res, err := Traverse(linearGraph(), Request{StartID: "method:c", Direction: graph.DirectionCaller})
+	res, err := traversal.Traverse(linearGraph(), traversal.Request{StartID: "method:c", Direction: graph.DirectionCaller})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -97,14 +99,14 @@ func TestTraverseCallerDirectionReachesCallers(t *testing.T) {
 
 func TestTraverseDoesNotLoopOnCircularGraph(t *testing.T) {
 	// a -> b -> a and self loop c -> c reachable from a via b -> c.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").
 		Edge("edge:bc", "method:b", "method:c").
 		Edge("edge:cc", "method:c", "method:c").
 		Build()
 
-	res, err := Traverse(g, Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res, err := traversal.Traverse(g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -115,14 +117,14 @@ func TestTraverseDoesNotLoopOnCircularGraph(t *testing.T) {
 
 func TestTraverseUnlimitedDepthWhenMaxDepthUnset(t *testing.T) {
 	// Deep chain a -> b -> c -> d -> e.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
 		Edge("edge:cd", "method:c", "method:d").
 		Edge("edge:de", "method:d", "method:e").
 		Build()
 
-	res, err := Traverse(g, Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res, err := traversal.Traverse(g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -132,13 +134,13 @@ func TestTraverseUnlimitedDepthWhenMaxDepthUnset(t *testing.T) {
 }
 
 func TestTraverseLimitsNodesByMinDepth(t *testing.T) {
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
 		Edge("edge:cd", "method:c", "method:d").
 		Build()
 
-	res, err := Traverse(g, Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
+	res, err := traversal.Traverse(g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -157,7 +159,7 @@ func TestTraverseLimitsNodesByMinDepth(t *testing.T) {
 }
 
 func TestTraverseMaxDepthZeroKeepsOnlyStart(t *testing.T) {
-	res, err := Traverse(linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
+	res, err := traversal.Traverse(linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -168,7 +170,7 @@ func TestTraverseMaxDepthZeroKeepsOnlyStart(t *testing.T) {
 
 func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
 	// Diamond with uneven arms: o -> a -> a2 -> m (depth 3) and o -> b -> m (depth 2).
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").
@@ -176,7 +178,7 @@ func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
 		Edge("edge:bm", "method:b", "method:m").
 		Build()
 
-	res, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
+	res, err := traversal.Traverse(g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
@@ -188,7 +190,7 @@ func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
 func TestTraverseNodesIdenticalForBFSAndDFS(t *testing.T) {
 	// Uneven diamond where a DFS arm reaches m at depth 3 before the
 	// shorter depth-2 arm: the node set must not depend on the order.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").
@@ -205,11 +207,11 @@ func TestTraverseNodesIdenticalForBFSAndDFS(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			bfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderBFS})
+			bfs, err := traversal.Traverse(g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: traversal.OrderBFS})
 			if err != nil {
 				t.Fatalf("Traverse(bfs) returned error: %v", err)
 			}
-			dfs, err := Traverse(g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderDFS})
+			dfs, err := traversal.Traverse(g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: traversal.OrderDFS})
 			if err != nil {
 				t.Fatalf("Traverse(dfs) returned error: %v", err)
 			}

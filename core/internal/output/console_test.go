@@ -27,7 +27,7 @@ func TestConsoleGolden(t *testing.T) {
 		{name: "sibling-order", view: siblingOrderView()},
 	}
 
-	formatter, ok := formatters[FormatConsole]
+	formatter, ok := formatters()[FormatConsole]
 	if !ok {
 		t.Fatal("FormatConsole formatter is not registered")
 	}

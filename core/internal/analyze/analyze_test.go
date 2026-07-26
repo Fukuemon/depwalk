@@ -9,7 +9,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// fakeSource is an in-package AnalysisSource fake: it streams the
+// fakeSource is an in-package Source fake: it streams the
 // configured nodes / edges to the callbacks and returns the configured
 // outcome, recording the request it received. Process-level behavior
 // (fake Analyzer subprocesses) is tested against the ACL adapter in the
@@ -17,22 +17,22 @@ import (
 type fakeSource struct {
 	nodes   []graph.Node
 	edges   []graph.Edge
-	outcome AnalysisOutcome
+	outcome Outcome
 	err     error
 
-	gotRequest AnalysisRequest
+	gotRequest Request
 	called     bool
 }
 
 func (f *fakeSource) RunAnalysis(
-	request AnalysisRequest,
+	request Request,
 	onNode func(graph.Node),
 	onEdge func(graph.Edge),
-) (AnalysisOutcome, error) {
+) (Outcome, error) {
 	f.called = true
 	f.gotRequest = request
 	if f.err != nil {
-		return AnalysisOutcome{}, f.err
+		return Outcome{}, f.err
 	}
 	for _, node := range f.nodes {
 		onNode(node)
@@ -52,7 +52,7 @@ func successSource() *fakeSource {
 		edges: []graph.Edge{
 			{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:callee"},
 		},
-		outcome: AnalysisOutcome{
+		outcome: Outcome{
 			Diagnostics: []Diagnostic{{Severity: "warning", Code: "JAVA_UNRESOLVED_SYMBOL", Message: "unresolved"}},
 		},
 	}
@@ -117,7 +117,7 @@ func TestRunPassesRequestFieldsThroughToTheSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	want := AnalysisRequest{
+	want := Request{
 		WorkspaceRoot: workspaceRoot,
 		SourceRoots:   []string{"module-b/src", "module-a/src"},
 		Language:      "java",
@@ -147,12 +147,12 @@ func TestRunRejectsInvalidAnalyzerMetaBeforeCallingTheSource(t *testing.T) {
 	}
 }
 
-func TestRunRequiresAnAnalysisSource(t *testing.T) {
+func TestRunRequiresASource(t *testing.T) {
 	t.Parallel()
 
 	_, err := New(nil).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	if err == nil {
-		t.Fatal("Run() error = nil, want error for a missing AnalysisSource")
+		t.Fatal("Run() error = nil, want error for a missing Source")
 	}
 }
 
@@ -169,7 +169,7 @@ func TestRunPropagatesSourceError(t *testing.T) {
 func TestRunPropagatesAnalyzerFailure(t *testing.T) {
 	t.Parallel()
 
-	source := &fakeSource{outcome: AnalysisOutcome{
+	source := &fakeSource{outcome: Outcome{
 		Failure:  &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"},
 		ExitCode: 1,
 	}}
@@ -194,7 +194,7 @@ func TestRunKeepsFatalReasonOverValidationErrorAndPublishesNothing(t *testing.T)
 	source := &fakeSource{
 		nodes: []graph.Node{{ID: "method:caller"}},
 		edges: []graph.Edge{{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:missing"}},
-		outcome: AnalysisOutcome{
+		outcome: Outcome{
 			Failure:         &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"},
 			ValidationError: errors.New("dangling edge"),
 			ExitCode:        1,
@@ -213,7 +213,7 @@ func TestRunKeepsFatalReasonOverValidationErrorAndPublishesNothing(t *testing.T)
 func TestRunFailsOnValidationErrorAfterCleanExit(t *testing.T) {
 	t.Parallel()
 
-	source := &fakeSource{outcome: AnalysisOutcome{ValidationError: errors.New("dangling edge")}}
+	source := &fakeSource{outcome: Outcome{ValidationError: errors.New("dangling edge")}}
 	_, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	if err == nil || !strings.Contains(err.Error(), "analyzer stdout did not follow the analyzer protocol") {
 		t.Fatalf("Run() error = %v, want a protocol failure on clean exit", err)
@@ -223,7 +223,7 @@ func TestRunFailsOnValidationErrorAfterCleanExit(t *testing.T) {
 func TestRunPropagatesNonZeroExit(t *testing.T) {
 	t.Parallel()
 
-	source := &fakeSource{outcome: AnalysisOutcome{ExitCode: 3}}
+	source := &fakeSource{outcome: Outcome{ExitCode: 3}}
 	_, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	if err == nil || !strings.Contains(err.Error(), "exited with code 3") {
 		t.Fatalf("Run() error = %v, want error for a non-zero exit code", err)

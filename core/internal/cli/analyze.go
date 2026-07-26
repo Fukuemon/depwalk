@@ -21,7 +21,7 @@ import (
 
 // cli はコンポジションルートとして ACL adapter を analyze の port へ手動 DI
 // で注入する。port の満足検証はこの配線箇所に集約する (spec #32 D6)。
-var _ analyze.AnalysisSource = (*protocol.Adapter)(nil)
+var _ analyze.Source = (*protocol.Adapter)(nil)
 
 // analyzeFlags holds the complete flag surface for newAnalyzeCommand:
 // Analyzer launch inputs, source filters, and method query options.
@@ -94,11 +94,11 @@ func newAnalyzeCommand() *cobra.Command {
 				maxDepth = &flags.maxDepth
 			}
 
-			command, err := analyze.ResolveCommand(flags.analyzerCmd, os.Getenv)
+			command, err := resolveAnalyzerCommand(flags.analyzerCmd, os.Getenv)
 			if err != nil {
 				return err
 			}
-			argv, err := analyze.SplitCommand(command)
+			argv, err := splitAnalyzerCommand(command)
 			if err != nil {
 				return err
 			}

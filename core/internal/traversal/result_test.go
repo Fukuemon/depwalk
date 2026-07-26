@@ -1,22 +1,24 @@
-package traversal
+package traversal_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
+	"github.com/Fukuemon/depwalk/core/internal/graphtest"
+	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
-func mustTraverse(t *testing.T, g *graph.Graph, req Request) Result {
+func mustTraverse(t *testing.T, g *graph.Graph, req traversal.Request) traversal.Result {
 	t.Helper()
-	res, err := Traverse(g, req)
+	res, err := traversal.Traverse(g, req)
 	if err != nil {
 		t.Fatalf("Traverse returned error: %v", err)
 	}
 	return res
 }
 
-func edgeIDs(res Result) map[string]bool {
+func edgeIDs(res traversal.Result) map[string]bool {
 	ids := map[string]bool{}
 	for id := range res.Edges {
 		ids[id] = true
@@ -26,7 +28,7 @@ func edgeIDs(res Result) map[string]bool {
 
 func TestResultEdgesFormInducedSubgraph(t *testing.T) {
 	// a -> b -> c: every edge between reached nodes is included.
-	res := mustTraverse(t, linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	want := []string{"edge:ab", "edge:bc"}
 	if len(res.Edges) != len(want) {
@@ -40,7 +42,7 @@ func TestResultEdgesFormInducedSubgraph(t *testing.T) {
 }
 
 func TestResultPublishesReachedNodeDepths(t *testing.T) {
-	res := mustTraverse(t, linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	want := map[string]int{"method:a": 0, "method:b": 1, "method:c": 2}
 	if len(res.Depths) != len(want) {
@@ -54,7 +56,7 @@ func TestResultPublishesReachedNodeDepths(t *testing.T) {
 }
 
 func TestResultDepthsExcludeNodesBeyondMaxDepth(t *testing.T) {
-	res := mustTraverse(t, linearGraph(), Request{
+	res := mustTraverse(t, linearGraph(), traversal.Request{
 		StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(1),
 	})
 
@@ -70,7 +72,7 @@ func TestResultDepthsExcludeNodesBeyondMaxDepth(t *testing.T) {
 
 func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
 	// o -> a -> a2 -> m and o -> b -> m: the second route is shorter.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").
@@ -78,7 +80,7 @@ func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
 		Edge("edge:bm", "method:b", "method:m").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee})
 
 	if got := res.Depths["method:m"]; got != 2 {
 		t.Errorf("Depths[method:m] = %d, want shortest depth 2", got)
@@ -88,14 +90,14 @@ func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
 func TestResultDiamondKeepsAllConvergentEdges(t *testing.T) {
 	// o -> a -> m and o -> b -> m: all four edges are call relations and
 	// must survive regardless of which arm a walk expands first.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:ob", "method:o", "method:b").
 		Edge("edge:am", "method:a", "method:m").
 		Edge("edge:bm", "method:b", "method:m").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee})
 
 	if len(res.Edges) != 4 {
 		t.Fatalf("Edges = %v, want all 4 diamond edges", edgeIDs(res))
@@ -106,12 +108,12 @@ func TestResultDiamondKeepsAllConvergentEdges(t *testing.T) {
 }
 
 func TestResultSelfLoopAnnotatedAsCycle(t *testing.T) {
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bb", "method:b", "method:b").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	if !res.Cycles["edge:bb"] {
 		t.Error("self-loop edge:bb not annotated as cycle")
@@ -126,14 +128,14 @@ func TestResultSelfLoopAnnotatedAsCycle(t *testing.T) {
 
 func TestResultMutualRecursionAnnotatedAsCycle(t *testing.T) {
 	// o -> a <-> b (mutual recursion), b -> c (escape edge).
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").
 		Edge("edge:bc", "method:b", "method:c").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee})
 
 	if !res.Cycles["edge:ab"] || !res.Cycles["edge:ba"] {
 		t.Errorf("Cycles = %v, want edge:ab and edge:ba (same SCC)", res.Cycles)
@@ -150,13 +152,13 @@ func TestResultMutualRecursionAnnotatedAsCycle(t *testing.T) {
 
 func TestResultDepthCutoffRecordsBeyondLimitEdges(t *testing.T) {
 	// a -> b -> c -> d with maxDepth 2: edge c->d leads to minDepth 3.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
 		Edge("edge:cd", "method:c", "method:d").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(2)})
 
 	if _, ok := res.Edges["edge:cd"]; ok {
 		t.Error("edge:cd included in Edges, want excluded (beyond depth limit)")
@@ -171,12 +173,12 @@ func TestResultDepthCutoffRecordsBeyondLimitEdges(t *testing.T) {
 }
 
 func TestResultMaxDepthZeroCutsAllAdjacentEdges(t *testing.T) {
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ac", "method:a", "method:c").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
 
 	if len(res.Nodes) != 1 || !res.Nodes["method:a"] {
 		t.Errorf("Nodes = %v, want only start", res.Nodes)
@@ -193,12 +195,12 @@ func TestResultMaxDepthZeroKeepsStartSelfLoopAsCycleEdge(t *testing.T) {
 	// A self-loop on the start node has both endpoints reached even at
 	// maxDepth 0, so it stays in the induced edge set with a cycle
 	// annotation instead of becoming a depth cutoff.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:aa", "method:a", "method:a").
 		Edge("edge:ab", "method:a", "method:b").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee, MaxDepth: intPtr(0)})
 
 	if _, ok := res.Edges["edge:aa"]; !ok {
 		t.Error("self-loop edge:aa excluded from Edges, want included (both endpoints reached)")
@@ -212,7 +214,7 @@ func TestResultMaxDepthZeroKeepsStartSelfLoopAsCycleEdge(t *testing.T) {
 }
 
 func TestResultNoDepthCutoffsWhenUnlimited(t *testing.T) {
-	res := mustTraverse(t, linearGraph(), Request{StartID: "method:a", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	if len(res.DepthCutoffs) != 0 {
 		t.Errorf("DepthCutoffs = %v, want empty when maxDepth unset", res.DepthCutoffs)
@@ -221,12 +223,12 @@ func TestResultNoDepthCutoffsWhenUnlimited(t *testing.T) {
 
 func TestResultCallerDirectionBuildsInducedSubgraph(t *testing.T) {
 	// a -> c, b -> c: caller traversal from c reaches both callers.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:ac", "method:a", "method:c").
 		Edge("edge:bc", "method:b", "method:c").
 		Build()
 
-	res := mustTraverse(t, g, Request{StartID: "method:c", Direction: graph.DirectionCaller})
+	res := mustTraverse(t, g, traversal.Request{StartID: "method:c", Direction: graph.DirectionCaller})
 
 	if len(res.Edges) != 2 {
 		t.Fatalf("Edges = %v, want both caller edges", edgeIDs(res))
@@ -234,10 +236,10 @@ func TestResultCallerDirectionBuildsInducedSubgraph(t *testing.T) {
 }
 
 func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
-	res := mustTraverse(t, linearGraph(), Request{StartID: "method:missing", Direction: graph.DirectionCallee})
+	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:missing", Direction: graph.DirectionCallee})
 
-	if res.Status != StatusStartNotFound {
-		t.Fatalf("Status = %q, want %q", res.Status, StatusStartNotFound)
+	if res.Status != traversal.StatusStartNotFound {
+		t.Fatalf("Status = %q, want %q", res.Status, traversal.StatusStartNotFound)
 	}
 	if len(res.Nodes) != 0 || len(res.Depths) != 0 || len(res.Edges) != 0 || len(res.Cycles) != 0 || len(res.DepthCutoffs) != 0 {
 		t.Errorf("Result = %+v, want all collections empty", res)
@@ -247,7 +249,7 @@ func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
 func TestResultIdenticalForBFSAndDFS(t *testing.T) {
 	// Uneven diamond + cycle + depth limit: the full result contract
 	// (nodes, edges, cycles, cutoffs) must not depend on the visit order.
-	g := graph.NewBuilder().
+	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
 		Edge("edge:a2m", "method:a2", "method:m").
@@ -266,8 +268,8 @@ func TestResultIdenticalForBFSAndDFS(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			bfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderBFS})
-			dfs := mustTraverse(t, g, Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: OrderDFS})
+			bfs := mustTraverse(t, g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: traversal.OrderBFS})
+			dfs := mustTraverse(t, g, traversal.Request{StartID: "method:o", Direction: graph.DirectionCallee, MaxDepth: tc.maxDepth, Order: traversal.OrderDFS})
 
 			if len(bfs.Nodes) != len(dfs.Nodes) {
 				t.Fatalf("node sets differ: bfs=%v dfs=%v", bfs.Nodes, dfs.Nodes)
