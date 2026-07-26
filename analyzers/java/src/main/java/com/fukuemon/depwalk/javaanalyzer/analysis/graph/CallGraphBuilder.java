@@ -75,7 +75,8 @@ public final class CallGraphBuilder {
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final SourceMethodIndex sourceMethodIndex;
     private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
-    // source 再対応付けが参照する solver origin 境界 (spec #24 D6 / D16)。
+    // source 再対応付けが参照する solver origin 境界 (java-analyzer feature doc
+    // 「Source root discovery と解析 context」/「solver 層の bytecode member 合成」)。
     private final SolverOriginIndex solverOrigins;
     private final CallSiteOutcomeLedger ledger;
     private final WorkspaceSourceDeclarationIndex declIndex;
@@ -309,16 +310,16 @@ public final class CallGraphBuilder {
             }
             // receiver 型を (bytecode field 補完込みで) 特定できて、その型が
             // scope 内 source に存在しない場合、callee は scope 外であり
-            // 理由付き external-target として分類する (spec #24 D18)。
+            // 理由付き external-target として分類する (ADR-0005)。
             // 例: Lombok @Slf4j の log field 経由の Logger#info 呼び出し。
             String receiverOwner = bytecodeRescueOwner(mce, ctx);
             if (receiverOwner != null && declIndex.find(receiverOwner).isEmpty()) {
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
-            // spec #27 P4_04 (P3_01 承認): 解決失敗した receiver chain を bytecode
-            // candidate の戻り値型 (classfile 由来) で前進解決し、復元した owner
-            // で救済 / external 分類を試みる。根拠のない型推測は行わない。
+            // 解決失敗した receiver chain を bytecode candidate の戻り値型
+            // (classfile 由来) で前進解決し、復元した owner で救済 / external
+            // 分類を試みる。根拠のない型推測は行わない。
             if (receiverOwner == null && mce.getScope().isPresent()) {
                 String forwardOwner = chainForwardOwner(mce.getScope().get(), ctx, 0);
                 if (forwardOwner != null) {
@@ -332,7 +333,7 @@ public final class CallGraphBuilder {
                     }
                 }
             }
-            // spec #27 ⑥ (P3_01 承認規則): receiver 型が取れない call でも、
+            // receiver 型が取れない call でも、
             // (i) chain 起点の静的型が scope 外、または (ii) lambda parameter の
             // 引数先 functional interface が scope 外なら external-target へ分類
             // する。scope 内型が根拠に現れる場合は保守的に diagnostic に残す。
@@ -349,8 +350,10 @@ public final class CallGraphBuilder {
             return;
         }
 
-        // D31: solver が合成した bytecode-only member は既存 D18 と同じ出力契約
-        // (sourceLocation 省略 + owner metadata + calleeOrigin edge) で emit する。
+        // solver が合成した bytecode-only member (java-analyzer feature doc
+        // 「solver 層の bytecode member 合成」) は、既存の bytecode-only member と同じ
+        // 出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、ADR-0005)
+        // で emit する。
         if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
             // 型名 scope の static call を instance 合成 member で解決しない
             // (usage 経路は staticOnly を持たないため、emit 前にここで検査する)。
@@ -430,7 +433,7 @@ public final class CallGraphBuilder {
             resolved = ecis.resolve();
         } catch (RuntimeException e) {
             rethrowUnlessIsolableResolutionFailure(e);
-            // spec #27 ⑤: 明示 super(...) / this(...) の解決先 (親 / 自クラスの
+            // 明示 super(...) / this(...) の解決先 (親 / 自クラスの
             // 生成 constructor) を bytecode 救済してから diagnostic 化する。
             if (tryBytecodeExplicitCtorRescue(ecis, ctx)) {
                 commitEmitted(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx);
@@ -490,7 +493,7 @@ public final class CallGraphBuilder {
             resolved = mre.resolve();
         } catch (RuntimeException e) {
             rethrowUnlessIsolableResolutionFailure(e);
-            // spec #27 ④: method call と同等に bytecode 救済 → external-target
+            // method call と同等に bytecode 救済 → external-target
             // 分類を試みてから diagnostic 化する。
             if (tryBytecodeMethodReferenceRescue(mre, ctx)) {
                 commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
@@ -508,10 +511,11 @@ public final class CallGraphBuilder {
             return;
         }
 
-        // D31 で solver が合成した bytecode-only member への reference は、method
-        // call の synthesized 経路と同じ出力契約 (D21: sourceLocation 省略 +
-        // owner metadata + calleeOrigin edge) で emit する (spec #27 ④で追加。
-        // 従来この経路は通常 symbol として emit され、D21 契約から漏れていた)。
+        // solver が合成した bytecode-only member (java-analyzer feature doc「solver 層の
+        // bytecode member 合成」) への reference は、method call の synthesized 経路と
+        // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、
+        // ADR-0005) で emit する (従来この経路は通常 symbol として emit され、
+        // この出力契約から漏れていた)。
         if (resolved instanceof com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration synthesized) {
             WorkspaceSourceDeclarationIndex.TypeLocation owner =
                     declIndex.find(synthesized.candidate().declaringType()).orElse(null);
@@ -598,7 +602,7 @@ public final class CallGraphBuilder {
 
         ResolvedConstructorDeclaration resolvedCtor = selectConstructor(scopeDecl.getConstructors(), mre);
         if (resolvedCtor == null) {
-            // spec #27 ④: source 側の候補選択で決まらない場合、SAM arity の一意
+            // source 側の候補選択で決まらない場合、SAM arity の一意
             // bytecode constructor (生成 constructor 含む) を救済してから
             // diagnostic 化する。
             if (tryBytecodeConstructorReferenceRescue(mre, ctx, scopeDecl)) {
@@ -689,7 +693,7 @@ public final class CallGraphBuilder {
 
 
     // ------------------------------------------------------------------
-    // call-site outcome ledger (spec #24 D14 / D17 / D20)
+    // call-site outcome ledger (java-analyzer feature doc「Parse・resolution・call 完全性」)
     // ------------------------------------------------------------------
 
     /** ledger 用の実効 caller (caller 不在の site は <clinit> / placeholder へ帰着)。 */
@@ -719,8 +723,10 @@ public final class CallGraphBuilder {
         for (String caller : ledgerCallers(callNode, ctx)) {
             if (CallSiteInventory.CallerIdentities.isPlaceholder(caller)) {
                 // caller 宣言が resolve できない site は edge を出力できないため、
-                // emitted でなく primary diagnostic として完全性 gate に残す (D14 / D20)。
-                // spec #27 D2 の診断 metadata は「call 解決の失敗段階」を表すため、
+                // emitted でなく primary diagnostic として完全性 gate に残す
+                // (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+                // 診断 metadata (java-analyzer feature doc「diagnostic / error code 体系」)
+                // は「call 解決の失敗段階」を表すため、
                 // caller 宣言側の失敗であるこの経路には意図的に付けない
                 // (details の 4 項目は解決失敗系 reason にのみ載る)。
                 ledger.commitDiagnostic(
@@ -744,7 +750,7 @@ public final class CallGraphBuilder {
         }
     }
 
-    /** attribution を経ない external-target の明示除外 commit (D18 の field 補完経路)。 */
+    /** attribution を経ない external-target の明示除外 commit (ADR-0005 の field 補完経路)。 */
     private void commitExcludedExternal(Node callNode, CallSiteId.CallKind kind, WalkContext ctx) {
         for (String caller : ledgerCallers(callNode, ctx)) {
             ledger.commitExcluded(
@@ -772,7 +778,7 @@ public final class CallGraphBuilder {
     }
 
     // ------------------------------------------------------------------
-    // 解決失敗の診断 metadata (spec #27 D2)
+    // 解決失敗の診断 metadata (java-analyzer feature doc「diagnostic / error code 体系」)
     // ------------------------------------------------------------------
 
     /** 診断 metadata の resolutionPhase 安定値。 */
@@ -782,7 +788,8 @@ public final class CallGraphBuilder {
     static final String PHASE_CONSTRUCTOR_REFERENCE_SELECTION = "constructor-reference-selection";
 
     /**
-     * primary diagnostic へ添える sanitize 済み診断 4 項目 (spec #27 D2) を構築する。
+     * primary diagnostic へ添える sanitize 済み診断 4 項目
+     * (java-analyzer feature doc「diagnostic / error code 体系」) を構築する。
      * 含めるのは安定値だけ: 失敗した解決段階、resolver 例外のクラス名 (message は
      * 含めない)、receiver 式種別 (AST 型名)、receiver 静的型の取得成否。
      *
@@ -816,7 +823,7 @@ public final class CallGraphBuilder {
 
     /**
      * 解決失敗した method call を、scope 内 source type の到達可能な project
-     * bytecode の一意 member へ generator 非依存で救済する (spec #24 D18 / D21)。
+     * bytecode の一意 member へ generator 非依存で救済する (ADR-0005)。
      */
     private boolean tryBytecodeMethodRescue(MethodCallExpr mce, WalkContext ctx) {
         String ownerBinaryName = bytecodeRescueOwner(mce, ctx);
@@ -869,7 +876,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * 解決失敗した method reference の bytecode-only member 救済 (spec #27 ④)。
+     * 解決失敗した method reference の bytecode-only member 救済。
      * 参照先型が scope 内で到達可能な場合に、JLS 15.13.1 に沿った候補選択
      * ({@link #selectMethodReferenceCandidate}) で救済する。
      */
@@ -894,7 +901,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * method reference の候補選択 (spec #27 ④、multi-agent review 指摘反映:
+     * method reference の候補選択 (multi-agent review 指摘反映:
      * 2026-07-22)。JLS 15.13.1 の 2 つの解釈だけを候補にする:
      * <ul>
      * <li>{@code Type::m} ({@code typeNameScope=true}): static なら arity=samArity、
@@ -943,7 +950,7 @@ public final class CallGraphBuilder {
 
     /**
      * constructor reference (`Foo::new`) の候補選択が決まらない場合の
-     * bytecode-only constructor 救済 (spec #27 ④)。SAM arity の一意 constructor
+     * bytecode-only constructor 救済。SAM arity の一意 constructor
      * だけを採用する。
      */
     private boolean tryBytecodeConstructorReferenceRescue(
@@ -980,8 +987,8 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * 解決失敗した明示 constructor invocation の bytecode-only constructor 救済
-     * (spec #27 ⑤)。this(...) は囲み型、super(...) は extends 節を resolve した
+     * 解決失敗した明示 constructor invocation の bytecode-only constructor 救済。
+     * this(...) は囲み型、super(...) は extends 節を resolve した
      * 親型を owner とする。
      */
     private boolean tryBytecodeExplicitCtorRescue(ExplicitConstructorInvocationStmt ecis, WalkContext ctx) {
@@ -1047,7 +1054,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * chain の前進解決 (spec #27 P4_04)。receiver 式の静的型が取れない場合、
+     * chain の前進解決。receiver 式の静的型が取れない場合、
      * chain を再帰的に遡り、各 link を bytecode candidate の戻り値型
      * (classfile の descriptor / generic Signature 由来) で前進解決して現在の
      * call の owner 型を復元する。候補が一意でない・classfile に根拠が無い
@@ -1082,7 +1089,7 @@ public final class CallGraphBuilder {
                 // callable 内で同名宣言が一意なら、その initializer を確定 AST
                 // として前進解決する (一意でなければ shadowing の誤追跡を避けて
                 // 不採用)。local に該当が無ければ囲み型の bytecode field 型で
-                // 補完する (既存 step 3.6 と同じ classfile 根拠)。
+                // 補完する (既存の receiver 補完経路と同じ classfile 根拠)。
                 Expression initializer = uniqueLocalInitializer(nameExpr);
                 if (initializer != null) {
                     return chainForwardOwner(initializer, ctx, depth + 1);
@@ -1235,7 +1242,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * chain 起点遡及 (spec #27 ⑥ 規則 (i))。receiver が method call chain の
+     * chain 起点遡及 (external 分類規則 (i))。receiver が method call chain の
      * とき、chain を遡って最初に静的型が取れる式を探し、その型が scope 外
      * (source 宣言索引に無い) なら、root から現在の call までの中間 link を
      * {@link #forwardVerifyExternalChain} で classfile 根拠 (project 限定でない
@@ -1379,7 +1386,7 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * lambda parameter 起点の external 判定 (spec #27 ⑥ 規則 (ii)、PR review
+     * lambda parameter 起点の external 判定 (external 分類規則 (ii)、PR review
      * 指摘反映で範囲を縮小: 2026-07-22)。receiver が lambda parameter で、
      * lambda 自体が代入される変数の宣言型 (= functional interface 型そのもの)
      * が scope 外なら true。scope 内 functional interface / 判定不能は false。
@@ -1446,7 +1453,7 @@ public final class CallGraphBuilder {
             return ctx.enclosingTypeNode() != null ? BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode()) : null;
         } catch (RuntimeException | LinkageError e) {
             // receiver が source に無い bytecode-only field (Lombok logging field 等)
-            // の場合、囲み型の bytecode field 型で receiver を補完する (step 3.6)。
+            // の場合、囲み型の bytecode field 型で receiver を補完する。
             return bytecodeFieldReceiverType(mce, ctx);
         }
     }
@@ -1513,7 +1520,7 @@ public final class CallGraphBuilder {
         ownerLocation.put("path", owner.path());
         ownerLocation.put("startLine", owner.beginLine());
         symbolMetadata.put("ownerSourceLocation", ownerLocation);
-        // 定義位置を偽装しない: sourceLocation は省略し、owner 位置は metadata へ分離する (D21)。
+        // 定義位置を偽装しない: sourceLocation は省略し、owner 位置は metadata へ分離する (ADR-0005)。
         accumulator.addNode(MethodSymbol.of(
                 methodId, "java", symbolKind, qualifiedName, signature, null, symbolMetadata));
 
@@ -1534,7 +1541,8 @@ public final class CallGraphBuilder {
     /**
      * 要素単位に隔離可能と確認済みの resolution failure だけを diagnostic 経路へ
      * 通し、それ以外の RuntimeException は request fatal (JAVA_INTERNAL_ERROR)
-     * として伝播させる (spec #24 D13 / step 4.2)。LinkageError はここへ来ず
+     * として伝播させる (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+     * LinkageError はここへ来ず
      * Main の internal error 境界で処理される。
      */
     private static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
@@ -1568,7 +1576,8 @@ public final class CallGraphBuilder {
     }
 
     /**
-     * spec #27 D2 の診断 4 項目を streaming される {@code diagnostic} record へも
+     * java-analyzer feature doc「diagnostic / error code 体系」の診断 4 項目を
+     * streaming される {@code diagnostic} record へも
      * 付与するオーバーロード (multi-agent review 指摘反映: 2026-07-22)。従来は
      * ledger 経由の {@code error.details} (fatal 経路) にしか乗らず、
      * {@code metadata.allowIncompleteAnalysis=true} で成功時に残る diagnostic
@@ -1581,8 +1590,9 @@ public final class CallGraphBuilder {
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
                 // PR review 指摘反映 (2026-07-22): callNode.toString() は JavaParser が
-                // 再構築した source 断片 (literal を含む) であり、D24 sanitize 制約
-                // (error.details と同様に diagnostic record にも source 本文を含めない)
+                // 再構築した source 断片 (literal を含む) であり、sanitize 制約
+                // (error.details と同様に diagnostic record にも source 本文を含めない。
+                // java-analyzer feature doc「diagnostic / error code 体系」)
                 // に違反しうる。安定な AST ノード種別名だけを使い、位置は既存の
                 // sourceLocation フィールドに委ねる。
                 "failed to resolve " + callNode.getClass().getSimpleName(),
@@ -2165,7 +2175,8 @@ public final class CallGraphBuilder {
 
     private MethodSymbol buildCandidateMethodSymbol(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         // bytecode 候補を source 宣言へ再対応付けするのは、宣言型が scope 内 source に
-        // 存在し、呼出元 context から依存到達可能な場合だけ (spec #24 D16)。external /
+        // 存在し、呼出元 context から依存到達可能な場合だけ
+        // (java-analyzer feature doc「solver 層の bytecode member 合成」)。external /
         // JDK / 非依存 context を workspace 全体の名前一致で source へ戻さない。
         boolean remappable = declIndex.find(candidate.declaringType())
                 .map(owner -> reachableContextIds.contains(owner.contextId()))

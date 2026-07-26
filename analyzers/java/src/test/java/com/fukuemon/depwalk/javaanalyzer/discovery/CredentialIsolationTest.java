@@ -18,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * credential 非漏洩と副作用境界の negative test (spec #24 P5 step 4 / D25)。
+ * credential 非漏洩と副作用境界の negative test
+ * (java-analyzer feature doc「Gradle runtime と安全境界」/
+ * adr/0006-adopt-gradle-tooling-api-discovery.md)。
  * 高 entropy dummy marker を run ごとに生成して build logic から意図的に出力させ、
  * depwalk が生成・転送する output へ byte 一致で現れないことを検証する。
  * marker を含む test 入力 (fixture copy / gradle.properties) 自体は検査対象外。

@@ -93,7 +93,8 @@ type DepthCutoff struct {
 // deriving it from any other walk could only agree or silently diverge.
 // The Order option is therefore validated but does not alter the walk;
 // its BFS / DFS semantics live in [visitOrder] for consumers that need
-// an ordered expansion (kept per spec D1 for future tree-style output).
+// an ordered expansion (kept per the traversal feature doc
+// "フロー / シーケンス" for future tree-style output).
 func Traverse(g *graph.Graph, req Request) (Result, error) {
 	if err := validate(req); err != nil {
 		return Result{}, err

@@ -52,7 +52,8 @@ public final class TypeSolverFactory {
     /**
      * 複数 source root と classpath entry から合成 TypeSolver を生成する。
      * source root は classpath (project classes output を含む) より先に登録し、
-     * source 宣言を bytecode より優先する (spec #24 D6)。
+     * source 宣言を bytecode より優先する
+     * (java-analyzer feature doc「Source root discovery と解析 context」)。
      *
      * @param sourceRoots {@link JavaParserTypeSolver} へ登録する package hierarchy 起点 (各 1 回)
      * @param classpathEntries 検証済み jar / classes dir
@@ -66,7 +67,8 @@ public final class TypeSolverFactory {
     }
 
     /**
-     * bytecode member 合成付きの合成 TypeSolver を生成する (spec #24 D31)。
+     * bytecode member 合成付きの合成 TypeSolver を生成する
+     * (feature doc「solver 層の bytecode member 合成」)。
      * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
      * 同一 context classes output の bytecode-only member を fallback 合成する。
      */

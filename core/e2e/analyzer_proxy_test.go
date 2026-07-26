@@ -12,8 +12,8 @@ import (
 )
 
 // TestAnalyzerRecordingProxyHelperProcess is not a real test. It is re-executed
-// as a subprocess and acts as the test-only transparent recording proxy
-// (spec #24 P6): it forwards Core's stdin bytes to the real Analyzer, relays
+// as a subprocess and acts as the test-only transparent recording proxy:
+// it forwards Core's stdin bytes to the real Analyzer, relays
 // the Analyzer's stdout / stderr / exit status without transformation, and
 // only records verification copies into the given capture directory. It never
 // synthesizes, reorders, re-serializes, or filters records.

@@ -7,8 +7,8 @@ import java.util.Optional;
 
 /**
  * 1 つの解析 context の solver 構成 entry (source root / project classes /
- * external artifact) と {@link ResolvedDeclarationOrigin} の対応。P3 では
- * solver 構成時に登録だけを行い、P4 の source 再対応付けが参照する境界となる。
+ * external artifact) と {@link ResolvedDeclarationOrigin} の対応。
+ * solver 構成時に登録だけを行い、source 再対応付けが参照する境界となる。
  */
 public final class SolverOriginIndex {
 

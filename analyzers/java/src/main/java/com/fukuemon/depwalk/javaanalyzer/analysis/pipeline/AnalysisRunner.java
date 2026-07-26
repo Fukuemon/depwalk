@@ -84,7 +84,8 @@ public final class AnalysisRunner {
      * @param analyzedFileCount AST 解析と graph 生成を完了した source file 数
      * @param unresolvedCount call edge または DI 候補を解決できなかった件数
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
-     * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間 (D8 の分離計測)
+     * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間
+     *     (java-analyzer feature doc「性能方針」の段階別計測として通常解析と分離する)
      * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
      */
     public record RunStats(
@@ -102,7 +103,9 @@ public final class AnalysisRunner {
      * @param contextResult 構築済みの解析 context と非 fatal warning
      * @param writer JSONL protocol record の出力先
      * @param allowIncompleteAnalysis true のとき、全救済後も残る primary diagnostic があっても
-     *     request を fatal にせず、解決済み graph と診断を公開する ({@code metadata.allowIncompleteAnalysis}、spec #27)
+     *     request を fatal にせず、解決済み graph と診断を公開する
+     *     ({@code metadata.allowIncompleteAnalysis}、
+     *     java-analyzer feature doc「Parse・resolution・call 完全性」)
      * @return 解析したファイル数、未解決件数、pre-flight 時間
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
@@ -139,7 +142,8 @@ public final class AnalysisRunner {
 
         // context ごとの parser / TypeSolver。solver には自 root、Gradle project
         // 依存で到達可能な context の root、自 context の外部 entry だけを登録し、
-        // 非依存 module や異なる依存 version を混在させない (D6)。
+        // 非依存 module や異なる依存 version を混在させない
+        // (java-analyzer feature doc「Source root discovery と解析 context」)。
         // 各 classes output の所有 context (origin 判定用)。
         Map<Path, String> classesOutputOwners = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
@@ -150,18 +154,20 @@ public final class AnalysisRunner {
 
         long contextBuildStart = System.nanoTime();
         // SootUp index は lazy のため全 context 分を先に用意し、solver の
-        // bytecode member 合成 (D31) と builder の候補解決で同一 instance を共有する。
-        // D31 の合成は「呼出元 context の classpath 視点」で行う (依存 project の型も
+        // bytecode member 合成 (feature doc「solver 層の bytecode member 合成」) と
+        // builder の候補解決で同一 instance を共有する。
+        // 合成は「呼出元 context の classpath 視点」で行う (依存 project の型も
         // 自 context の classpath に含まれる classes output から引く)。emit 時に
-        // declIndex + 到達可能 context の検査 (D16) で owner を制約する。
+        // declIndex + 到達可能 context の検査で owner を制約する。
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = new LinkedHashMap<>();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
             // project 所有の classes output (自 context + 依存 project の output) を
             // external jar より先に登録し、同名 class は project bytecode を優先
-            // する。member 救済の origin 検証 (D16) にも同じ一覧を渡す。
+            // する。member 救済の origin 検証
+            // (feature doc「solver 層の bytecode member 合成」) にも同じ一覧を渡す。
             // 依存 project の output は classpath の形に依存せず model の project
-            // 依存関係から解決する (spec #27 ⑧: Gradle model は依存 project を jar
+            // 依存関係から解決する (Gradle model は依存 project を jar
             // として classpath へ返すことがあり、classpath 照合だけでは依存 output
             // が external artifact 扱いになって cross-module 救済が拒否されていた)。
             List<Path> projectOutputs = new ArrayList<>(context.classesOutputs());
@@ -247,7 +253,8 @@ public final class AnalysisRunner {
         LiftExcludePackages liftExcludePackages = LiftExcludePackages.fromMetadata(request.metadata());
         AttributionResolver attributionResolver = new AttributionResolver(scope.membership(), liftExcludePackages);
 
-        // SootUp index は context ごとに分離する (D6)。Spring DI の Bean 母集合は
+        // SootUp index は context ごとに分離する
+        // (feature doc「Source root discovery と解析 context」)。Spring DI の Bean 母集合は
         // request 全体の意味論 (module 間 DI 解決が成功条件) のため、DI 索引だけは
         // 全 context の entry を統合した index を使う。
         // DI 索引の union は file を持つ context の entry だけで構成する。
@@ -267,7 +274,9 @@ public final class AnalysisRunner {
                 SpringDiIndex.create(SootUpTypeHierarchyIndex.fromClasspath(List.copyOf(unionEntries)));
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
         GraphAccumulator accumulator = new GraphAccumulator();
-        // resolver とは独立した call-site inventory と source 宣言索引 (spec #24 D17 / D18)。
+        // resolver とは独立した call-site inventory と source 宣言索引
+        // (feature doc「Parse・resolution・call 完全性」/
+        //  adr/0005-adopt-sootup-and-spring-di-resolution.md)。
         CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
         WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
@@ -397,7 +406,8 @@ public final class AnalysisRunner {
             }
         }
 
-        // 完全性 gate (spec #24 D20 / D22): 全 entry の分類を検査し、primary
+        // 完全性 gate (feature doc「Parse・resolution・call 完全性」):
+        // 全 entry の分類を検査し、primary
         // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
@@ -410,7 +420,8 @@ public final class AnalysisRunner {
                     .count();
             throw incompleteAnalysis(primary, sootUpUnavailableContexts);
         }
-        // allowIncompleteAnalysis=true (spec #27): primary diagnostic が残っても
+        // allowIncompleteAnalysis=true (feature doc「Parse・resolution・call 完全性」):
+        // primary diagnostic が残っても
         // request を fatal にせず success として完了する。解決済み edge / 明示除外は
         // 通常どおり公開され、残存 primary diagnostic は各 call site の検出時点で
         // 既に streaming 済みの diagnostic record (reportUnresolved 経由) と、
@@ -441,7 +452,8 @@ public final class AnalysisRunner {
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
             }
-            // spec #27 D2: primary diagnostic として終端した call だけが、sanitize 済み
+            // feature doc「diagnostic / error code 体系」: primary diagnostic として
+            // 終端した call だけが、sanitize 済み
             // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
             // receiverTypeResolved) を details へ載せる。
             if (outcome.diagnosticMetadata() != null) {

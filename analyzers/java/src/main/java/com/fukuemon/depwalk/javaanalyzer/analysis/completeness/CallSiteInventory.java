@@ -34,7 +34,8 @@ import java.util.Set;
 
 /**
  * resolver とは独立した AST 走査で、解析対象 call kind の全 lexical site を
- * semantic caller ごとに登録する inventory (spec #24 D17 / D28)。
+ * semantic caller ごとに登録する inventory
+ * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
  * caller 導出は {@link CallerIdentities} を介して CallGraphBuilder と同じ規則を
  * 共有する。callee の型解決は一切行わない。
  */

@@ -18,7 +18,8 @@ import java.util.Optional;
 /**
  * source の class 宣言を継承し、source で解決できない method 呼び出しだけを
  * 同一 context の classes output の一意 member へ fallback する宣言
- * (spec #24 D31)。{@code instanceof JavaParserClassDeclaration} に依存する
+ * (java-analyzer feature doc「solver 層の bytecode member 合成」)。
+ * {@code instanceof JavaParserClassDeclaration} に依存する
  * solver 内部経路を壊さないため、wrapper でなく subclass にする。
  */
 public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDeclaration {
@@ -43,7 +44,9 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
             return solved;
         }
         // source AST に無い member を同一 context の classes output から合成する。
-        // 一意な name + arity の場合だけ採用し、曖昧なら合成しない (D18 と同じ規則)。
+        // 一意な name + arity の場合だけ採用し、曖昧なら合成しない
+        // (adr/0005-adopt-sootup-and-spring-di-resolution.md の
+        //  project bytecode member index と同じ規則)。
         // static context の解決 (staticOnly) では instance member を採用しない。
         return synthesizedInHierarchy(name, argumentsTypes.size())
                 .filter(synthesized -> !staticOnly || synthesized.isStatic())
@@ -71,7 +74,8 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         // 式の型伝播 (chained call) は usage 経路を通るため、宣言 fallback と
         // 同じ規則で合成 member を MethodUsage 化する。MethodUsage の構築は
         // 全 param 型を即時解決するため、classpath に無い型を含む member は
-        // 合成せず未解決のまま返す (単発呼び出し側は D18 経路が拾う)。
+        // 合成せず未解決のまま返す
+        // (単発呼び出し側は project bytecode member index 経路が拾う)。
         try {
             return synthesizedInHierarchy(name, argumentTypes.size())
                     .map(com.github.javaparser.resolution.MethodUsage::new);
@@ -128,7 +132,10 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         return Optional.empty();
     }
 
-    /** generic Signature (D32) があれば実型引数付きの戻り値 resolver で合成する。 */
+    /**
+     * generic Signature (feature doc「solver 層の bytecode member 合成」) があれば
+     * 実型引数付きの戻り値 resolver で合成する。
+     */
     private SynthesizedBytecodeMethodDeclaration synthesize(
             AugmentedJavaParserClassDeclaration owner, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         var genericReturn = owner.bytecodeIndex.genericReturnType(candidate);

@@ -20,7 +20,8 @@ import java.util.stream.Stream;
 
 /**
  * 全 context の source root から include / exclude 適用後の Java file 集合を
- * 構築する。glob と SourceLocation の基準は workspaceRoot のままとし (D4)、
+ * 構築する。glob と SourceLocation の基準は workspaceRoot のままとし
+ * (java-analyzer feature doc「Source root discovery と解析 context」)、
  * file は正規化済み絶対 path で 1 回だけ解析されるよう重複排除する。
  */
 public final class ContextScope {
@@ -79,7 +80,8 @@ public final class ContextScope {
                         continue;
                     }
                     // root 相対 path が source binary name の近似。異なる context の
-                    // 同一 binary name は現行 methodId で区別できないため fatal (D6)。
+                    // 同一 binary name は現行 methodId で区別できないため fatal
+                    // (java-analyzer feature doc「Source root discovery と解析 context」)。
                     String binaryName = RelativePaths.toRecordPath(root.relativize(absolute).toString());
                     String owner = binaryNameOwners.putIfAbsent(binaryName, context.id());
                     if (owner != null && !owner.equals(context.id())) {
