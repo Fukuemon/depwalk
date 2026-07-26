@@ -1,7 +1,9 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
 /**
- * solver entry / 解決結果の内部 origin (spec #24 D6)。P4 の source 再対応付けは
+ * solver entry / 解決結果の内部 origin
+ * (java-analyzer feature doc「Source root discovery と解析 context」)。
+ * source 再対応付けは
  * 本 origin と context 到達可能性だけを根拠にし、名前一致で external / JDK /
  * 非依存 context の宣言を workspace source へ戻さない。Protocol へは出力しない。
  *

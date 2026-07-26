@@ -7,7 +7,8 @@ import java.util.Map;
 
 /**
  * 全 resolver と bytecode 救済の完了後も primary diagnostic が残った request の
- * fatal 化 (spec #24 D20 / D22)。全未解決 call の自己完結な detail と
+ * fatal 化 (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+ * 全未解決 call の自己完結な detail と
  * 集計 metadata を保持し、{@code JAVA_INCOMPLETE_ANALYSIS} の error record へ
  * 変換される。
  */

@@ -12,7 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** spec #24 D20 / D22: 未解決 in-scope call の全件 details 付き fatal 化。 */
+/**
+ * java-analyzer feature doc「Parse・resolution・call 完全性」: 未解決 in-scope call の
+ * 全件 details 付き fatal 化。
+ */
 class IncompleteAnalysisTest {
 
     @TempDir
@@ -55,7 +58,8 @@ class IncompleteAnalysisTest {
             Map<String, Object> metadata = (Map<String, Object>) detail.get("metadata");
             assertTrue(metadata.containsKey("callKind"));
             assertTrue(metadata.containsKey("reason"));
-            // spec #27 D2: 診断 metadata (解決段階 / 例外クラス名 / receiver 式種別 /
+            // java-analyzer feature doc「diagnostic / error code 体系」: 診断 metadata
+            // (解決段階 / 例外クラス名 / receiver 式種別 /
             // receiver 型取得成否)。call 解決の失敗段階を表すため、caller 宣言側の
             // 失敗 (unresolved-caller) には載らない。exceptionClass はクラス名のみで、
             // message や source 断片を含む自由文であってはならない (他 field は
@@ -98,7 +102,7 @@ class IncompleteAnalysisTest {
     void callsUnderUnresolvableCallerDeclarationsRemainInTheCompletenessGate() throws Exception {
         // caller 宣言 (parameter 型が未解決) が placeholder へ落ちる場合、その配下の
         // call site は edge を出せないため emitted でなく primary diagnostic として
-        // fatal に残る (D14 / D20)。
+        // fatal に残る (java-analyzer feature doc「Parse・resolution・call 完全性」)。
         write("com/example/C.java", """
                 package com.example;
                 public class C {
@@ -123,7 +127,8 @@ class IncompleteAnalysisTest {
     @SuppressWarnings("unchecked")
     @Test
     void diagnosticMetadataIdentifiesFailedStagePerCallKind() throws Exception {
-        // spec #27 D2: callKind ごとに失敗段階・receiver 情報が details へ載る。
+        // java-analyzer feature doc「diagnostic / error code 体系」: callKind ごとに
+        // 失敗段階・receiver 情報が details へ載る。
         write("com/example/D.java", """
                 package com.example;
                 public class D {
@@ -153,7 +158,7 @@ class IncompleteAnalysisTest {
         assertEquals(Boolean.FALSE, metadataOf(methodCall).get("receiverTypeResolved"));
         assertTrue(((String) metadataOf(methodCall).get("exceptionClass")).matches("[\\w.$]+"));
 
-        // spec #27 ④⑤ の救済追加後は、method reference / explicit super も
+        // method reference / explicit super の救済追加後は、これらも
         // bytecode 救済を試みてから diagnostic 化するため phase は bytecode-rescue。
         Map<String, Object> methodReference = detailByCallKind(details, "method-reference");
         assertEquals("bytecode-rescue", metadataOf(methodReference).get("resolutionPhase"));
@@ -185,7 +190,8 @@ class IncompleteAnalysisTest {
     @SuppressWarnings("unchecked")
     @Test
     void allowIncompleteAnalysisPublishesPartialGraphInsteadOfFatal() throws Exception {
-        // spec #27: metadata.allowIncompleteAnalysis=["true"] のとき、primary
+        // java-analyzer feature doc「metadata 契約」:
+        // metadata.allowIncompleteAnalysis=["true"] のとき、primary
         // diagnostic が残っても request を fatal にせず、解決済み graph (edge /
         // node) と診断を公開する。graph の部分性は診断で観測可能なまま。
         write("com/example/A.java", """
@@ -216,7 +222,8 @@ class IncompleteAnalysisTest {
                         "the remaining unresolved call must stay visible as a diagnostic: " + diagnostics));
 
         // multi-agent review 指摘反映 (2026-07-22): allowIncompleteAnalysis 成功時
-        // でも D2 の診断 4 項目が streaming される diagnostic record に乗ること
+        // でも java-analyzer feature doc「diagnostic / error code 体系」の診断 4 項目が
+        // streaming される diagnostic record に乗ること
         // (従来は fatal 経路の error.details にしか乗らず、緩和時は要因分類が
         // できなかった)。
         Map<String, Object> diagnosticMetadata = (Map<String, Object>) unresolvedDiagnostic.get("metadata");

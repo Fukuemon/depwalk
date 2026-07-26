@@ -10,17 +10,19 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// TestUnresolvedCallPatternsCLI は spec #27 D4 の未解決 call パターン fixture
+// TestUnresolvedCallPatternsCLI は java-analyzer feature doc「テスト観点」の未解決
+// call パターン fixture
 // (testdata/fixtures/java/multi-module-spring-project/patterns/) を実 Core CLI +
 // 実 Analyzer jar の auto discovery で解析する。
 //
-// P2_01 時点では 5 パターン (①fluent chain / ④method reference / ⑤explicit
-// super / ⑦var+generic / ⑧cross-module Lombok) が JAVA_INCOMPLETE_ANALYSIS の
-// 未解決 10 件として固定されていた。P4_01 (④⑤の救済 fallback) と P4_02
-// (⑧: Gradle model が依存 project を jar として classpath へ返す場合に依存
-// output が external artifact 扱いになる欠陥の修正) により全件が救済され、
-// 本テストは「全パターンが bytecode-only member 契約 (D21) で edge 化される」
-// 成功期待の回帰ガードへ更新された。
+// 当初は 5 パターン (fluent chain / method reference / explicit super /
+// var+generic / cross-module Lombok) が JAVA_INCOMPLETE_ANALYSIS の未解決 10 件
+// として固定されていた。method reference / explicit super の救済 fallback と、
+// cross-module Lombok の欠陥修正 (Gradle model が依存 project を jar として
+// classpath へ返す場合に依存 output が external artifact 扱いになる) により全件が
+// 救済され、本テストは「全パターンが bytecode-only member 契約 (java-analyzer
+// feature doc「solver 層の bytecode member 合成」) で edge 化される」成功期待の
+// 回帰ガードへ更新された。
 //
 // patterns/ は root fixture の settings.gradle に含まれない独立 build であり、
 // TestGradleMultiProjectCLI の成功 graph 期待には影響しない。
@@ -35,7 +37,7 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	result := runCLI(t, cliPath, capture, javaPath, jarPath, fixture, "--language", "java")
 
 	if result.exitCode != 0 {
-		t.Fatalf("CLI exit = %d, want 0 after the spec #27 rescues; stderr:\n%s", result.exitCode, result.stderr)
+		t.Fatalf("CLI exit = %d, want 0 after the rescues; stderr:\n%s", result.exitCode, result.stderr)
 	}
 
 	records := capturedRecords(t, capture)
@@ -59,26 +61,26 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	itemGetName := "java:com.example.pat.lib.Item#getName()"
 	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
 
-	// ⑧ constructor + ⑦ var 経由 + ① chain 起点 + ④ reference で計 4 caller が
-	// getName へ到達し、ctor は ⑧ と ① の 2 caller。
+	// cross-module constructor + var 経由 + chain 起点 + method reference で計 4
+	// caller が getName へ到達し、ctor は cross-module と chain 起点の 2 caller。
 	if got := len(edges[itemCtor]); got < 2 {
-		t.Errorf("Item ctor edges = %d, want >= 2 (⑧ cross-module / ① chain 起点): %v", got, edges[itemCtor])
+		t.Errorf("Item ctor edges = %d, want >= 2 (cross-module / chain 起点): %v", got, edges[itemCtor])
 	}
 	if got := len(edges[itemGetName]); got < 3 {
-		t.Errorf("Item getName edges = %d, want >= 3 (⑧ / ⑦ var / ④ reference): %v", got, edges[itemGetName])
+		t.Errorf("Item getName edges = %d, want >= 3 (cross-module / var / method reference): %v", got, edges[itemGetName])
 	}
 	if got := len(edges[baseTaskCtor]); got != 1 {
-		t.Errorf("BaseTask ctor edges = %d, want 1 (⑤ explicit super): %v", got, edges[baseTaskCtor])
+		t.Errorf("BaseTask ctor edges = %d, want 1 (explicit super): %v", got, edges[baseTaskCtor])
 	}
 	for _, callee := range []string{itemCtor, itemGetName, baseTaskCtor} {
 		for _, edge := range edges[callee] {
 			if edge.Metadata["calleeOrigin"] != "project-bytecode-member" {
-				t.Errorf("edge to %s must follow the bytecode-only contract (D21): %+v", callee, edge)
+				t.Errorf("edge to %s must follow the bytecode-only member contract: %+v", callee, edge)
 			}
 		}
 	}
 
-	// ④ method reference の救済 edge は viaMethodReference 標識を持つ。
+	// method reference の救済 edge は viaMethodReference 標識を持つ。
 	foundReference := false
 	for _, edge := range edges[itemGetName] {
 		if edge.Metadata["viaMethodReference"] == true {

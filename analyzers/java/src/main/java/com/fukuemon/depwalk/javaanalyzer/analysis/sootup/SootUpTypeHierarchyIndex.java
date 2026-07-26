@@ -322,7 +322,8 @@ public final class SootUpTypeHierarchyIndex {
 
     /**
      * 宣言 class 自身の指定名 callable method を bytecode から列挙する
-     * (bridge / synthetic を除外)。bytecode-only member 救済 (spec #24 D18) の
+     * (bridge / synthetic を除外)。bytecode-only member 救済
+     * (adr/0005-adopt-sootup-and-spring-di-resolution.md) の
      * 照会用で、型階層は辿らない。
      *
      * @param declaringType 所有 class の binary name
@@ -358,7 +359,7 @@ public final class SootUpTypeHierarchyIndex {
 
     /**
      * 宣言 class 自身の bytecode field の型 (binary name) を返す。bytecode-only
-     * field は receiver 型解決の補完にだけ使い、node 化しない (spec #24 step 3.6)。
+     * field は receiver 型解決の補完にだけ使い、node 化しない。
      */
     public Optional<String> resolveDeclaredFieldType(String declaringType, String fieldName) {
         try {

@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * graph record 出力前の全 file parse 検証 (spec #24 D15)。1 件でも設定済み
+ * graph record 出力前の全 file parse 検証
+ * (java-analyzer feature doc「Parse・resolution・call 完全性」)。1 件でも設定済み
  * language level で parse できない file があれば request 全体を
  * {@code JAVA_PARSE_ERROR} の fatal にする。file skip / partial mode /
  * 別 level への fallback は行わない。AST は file ごとに破棄する。

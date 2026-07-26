@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * scope 内 source 型の宣言に合成される bytecode-only method (spec #24 D31)。
+ * scope 内 source 型の宣言に合成される bytecode-only method
+ * (java-analyzer feature doc「solver 層の bytecode member 合成」)。
  * SootUp が classes output から読んだ {@code MethodCandidate} を JavaParser の
  * 解決結果として振る舞わせ、Lombok 等の生成 member を含む式の型伝播
  * (chained call / stream 連鎖) を solver 層で成立させる。
@@ -39,7 +40,8 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     /**
      * @param genericReturnType 戻り値だけを generic Signature 由来で解決する
-     *     supplier (D32)。引数型は常に {@code typeResolver} の erasure を使う
+     *     supplier (feature doc「solver 層の bytecode member 合成」)。引数型は常に
+     *     {@code typeResolver} の erasure を使う
      */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,

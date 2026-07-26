@@ -113,7 +113,7 @@ Go package や Java 実装 code を共有境界にしない。
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。spec #11 は本 ADR と context への handoff を記録し、durable な判断の正本を ADR / context に移す。
+- spec 更新要否: 要。issue #11 は本 ADR と context への handoff を記録し、durable な判断の正本を ADR / context に移す。
 - context / AI 向け設定更新要否: 要。`context/project.yml`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` を本 ADR 参照として更新する。
 
 ## 関連ドキュメント / チケット
@@ -121,4 +121,4 @@ Go package や Java 実装 code を共有境界にしない。
 - [design/DesignDoc.md](../design/DesignDoc.md): Core 言語非依存、Analyzer 独立プロセス、Alternatives Considered
 - [adr/0001-analyzer-protocol-jsonl-spi.md](0001-analyzer-protocol-jsonl-spi.md): JSONL over STDIN/STDOUT の process SPI
 - [design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema の正本
-- [specs/11-core-implementation-foundation](../specs/11-core-implementation-foundation/): Core 実装基盤の決定経緯と issue 単位の作業記録
+- [issue #11](https://github.com/Fukuemon/depwalk/issues/11): Core 実装基盤の決定経緯と issue 単位の作業記録

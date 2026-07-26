@@ -118,7 +118,7 @@ public final class Main {
                 return 1;
             } catch (RuntimeException | LinkageError e) {
                 // 解析中の未捕捉 RuntimeException と LinkageError (binary 非互換等) を
-                // 継続不能な内部エラーとして扱う (spec #24 step 4.2)。他の Error は catch しない。
+                // 継続不能な内部エラーとして扱う。他の Error は catch しない。
                 return reportInternalError(writer, errStream, e);
             } catch (IOException e) {
                 // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
@@ -144,8 +144,9 @@ public final class Main {
 
     /**
      * 明示 {@code sourceRoots} なら synthetic context、省略なら Gradle build model
-     * discovery (P2_02) から解析 context を構築する。明示 root は Tooling API
-     * runtime を完全 bypass する。
+     * discovery から解析 context を構築する
+     * (java-analyzer feature doc「Source root discovery と解析 context」)。
+     * 明示 root は Tooling API runtime を完全 bypass する。
      */
     private static AnalysisContextFactory.Result buildContexts(
             AnalysisRequest request, PreflightValidator.Validated validated, PrintStream errStream)

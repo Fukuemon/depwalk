@@ -65,7 +65,7 @@ CLI helpはこの副作用と明示bypassを常時説明し、自動discoveryの
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。spec #24 の durable 設計を本 ADR と Java Analyzer feature doc へハンドオフする。
+- spec 更新要否: 要。issue #24 の durable 設計を本 ADR と Java Analyzer feature doc へハンドオフする。
 - context / AI 向け設定更新要否: 要。runtime、toolchain、test、security contract へ反映する。
 
 ## 関連ドキュメント / チケット
@@ -73,4 +73,4 @@ CLI helpはこの副作用と明示bypassを常時説明し、自動discoveryの
 - [design/DesignDoc.md](../design/DesignDoc.md): Java Analyzer の条件付き Gradle runtime
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): discovery / analysis context / 完全性の正本
 - [context/infrastructure.md](../context/infrastructure.md): trusted build、credential、network、非漏洩境界
-- [specs/24-gradle-multi-module-source-roots](../specs/24-gradle-multi-module-source-roots/): 決定経緯と issue 単位の作業記録
+- [issue #24](https://github.com/Fukuemon/depwalk/issues/24): 決定経緯と issue 単位の作業記録

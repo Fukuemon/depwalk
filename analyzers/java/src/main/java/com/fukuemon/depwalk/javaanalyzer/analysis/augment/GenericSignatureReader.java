@@ -21,7 +21,8 @@ import java.util.Optional;
 
 /**
  * project classes output の class file から method の generic Signature 属性を
- * 読み取り、合成 member の実型引数を復元する (spec #24 D32)。読み取りは
+ * 読み取り、合成 member の実型引数を復元する
+ * (java-analyzer feature doc「solver 層の bytecode member 合成」)。読み取りは
  * class 単位で lazy に行い、失敗した class は「generic 情報なし」として扱う
  * (erasure へ degrade し、解析を失敗させない)。
  */

@@ -24,7 +24,8 @@ import java.util.Set;
 /**
  * 明示 {@code sourceRoots} または discovery model から解析 context を構築する。
  * root の workspace / real-path 境界、重複、包含は TypeSolver 構築と file 列挙の
- * 前にここで確定し、filesystem 規約への fallback は行わない (spec #24 D5 / D7)。
+ * 前にここで確定し、filesystem 規約への fallback は行わない
+ * (java-analyzer feature doc「Source root discovery と解析 context」)。
  */
 public final class AnalysisContextFactory {
 

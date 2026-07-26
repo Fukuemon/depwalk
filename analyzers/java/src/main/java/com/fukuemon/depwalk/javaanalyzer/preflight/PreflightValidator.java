@@ -31,7 +31,8 @@ public final class PreflightValidator {
      * @param classpath {@code metadata.classpath} の検証済み jar / classes dir path 一覧
      * @param allowIncompleteAnalysis {@code metadata.allowIncompleteAnalysis} の検証済み値 (既定 false)。
      *     true のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、
-     *     解決済み graph と診断を確認可能な形で公開する (spec #27)
+     *     解決済み graph と診断を確認可能な形で公開する
+     *     (java-analyzer feature doc「Parse・resolution・call 完全性」)
      */
     public record Validated(List<String> classpath, boolean allowIncompleteAnalysis) {
     }
@@ -54,7 +55,8 @@ public final class PreflightValidator {
         Map<String, Object> metadata = request.metadata();
         // classpath key は明示 sourceRoots 経路で必須 (空配列可)。自動 discovery
         // 経路では context classpath を Gradle model から取得するため、任意の
-        // 共通追加 entry として扱う (spec #24 D6)。
+        // 共通追加 entry として扱う
+        // (java-analyzer feature doc「Source root discovery と解析 context」)。
         boolean explicitSourceRoots = request.sourceRoots() != null;
         if (metadata == null || !metadata.containsKey(METADATA_CLASSPATH)) {
             if (explicitSourceRoots) {
@@ -89,7 +91,8 @@ public final class PreflightValidator {
     /**
      * {@code allowIncompleteAnalysis} は key 不在なら既定値 false (完全性 gate は従来どおり fatal)。
      * 指定時は要素 1 の {@code ["true"]} / {@code ["false"]} でなければ {@code JAVA_INVALID_REQUEST}
-     * で fatal とする (spec #27、javaPreview と同じ boolean flag 表現規約)。
+     * で fatal とする (java-analyzer feature doc「metadata 契約」、javaPreview と同じ boolean flag
+     * 表現規約)。
      */
     private static boolean readAllowIncompleteAnalysis(Map<String, Object> metadata) throws AnalyzerFatalException {
         if (!metadata.containsKey(METADATA_ALLOW_INCOMPLETE_ANALYSIS)) {

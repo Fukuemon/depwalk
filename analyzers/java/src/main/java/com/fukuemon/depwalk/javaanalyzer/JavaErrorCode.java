@@ -39,8 +39,9 @@ public enum JavaErrorCode {
 
     /**
      * 全 resolver と bytecode 救済の完了後も scope 内 call が edge / 明示除外へ
-     * 確定せず primary diagnostic に残った (spec #24 D20)。全未解決 call は
-     * {@code error.details} で観測可能にする。
+     * 確定せず primary diagnostic に残った
+     * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+     * 全未解決 call は {@code error.details} で観測可能にする。
      */
     JAVA_INCOMPLETE_ANALYSIS,
 

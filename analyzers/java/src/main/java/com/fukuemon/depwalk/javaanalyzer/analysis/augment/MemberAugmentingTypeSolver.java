@@ -11,7 +11,9 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeS
 /**
  * scope 内 source root の {@link JavaParserTypeSolver} を包み、source 解決した
  * class 宣言へ同一 context の classes output にしかない callable member を
- * 解決時に合成する (spec #24 D31 決定 A)。source 宣言と帰属規則 (D6 / D14) は
+ * 解決時に合成する (java-analyzer feature doc「solver 層の bytecode member 合成」)。
+ * source 宣言と帰属規則 (feature doc「Source root discovery と解析 context」/
+ * 「Parse・resolution・call 完全性」) は
  * 変更せず、source AST に無い member の解決だけを bytecode で補う。
  * 合成は {@link AugmentedJavaParserClassDeclaration#solveMethod} の fallback で
  * 行い、source で解決できる member には一切影響しない。

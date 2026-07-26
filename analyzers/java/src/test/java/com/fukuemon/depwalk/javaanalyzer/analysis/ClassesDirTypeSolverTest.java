@@ -81,7 +81,8 @@ class ClassesDirTypeSolverTest {
                 null,
                 null);
 
-        // spec #24 D20: scope 内 call が未解決のまま残る request は成功にしない。
+        // java-analyzer feature doc「Parse・resolution・call 完全性」: scope 内 call が
+        // 未解決のまま残る request は成功にしない。
         assertEquals(1, ran.exitCode(), ran.stderr());
         assertTrue(ran.byType("error").stream()
                 .anyMatch(record -> "JAVA_INCOMPLETE_ANALYSIS".equals(record.get("code"))),

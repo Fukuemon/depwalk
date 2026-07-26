@@ -20,6 +20,7 @@
 | 8   | io 出力                             | `io`                                    |
 
 - `analysis/normalize` は段階横断の naming util (実行順に位置を持たない)
-- 補足: SootUp index の instance は段階 2 (TypeSolver 構築) が bytecode member 合成 (spec #24 D31) で
+- 補足: SootUp index の instance は段階 2 (TypeSolver 構築) が bytecode member 合成
+  (java-analyzer feature doc「solver 層の bytecode member 合成」) で
   index を要するため context 構築より先に全 context 分を生成するが、索引化は lazy のため
   段階としては 4 に位置づける

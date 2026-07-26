@@ -1,8 +1,8 @@
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-> 最終更新: 2026-07-11 / Status: 完了 (2026-07-11: spec #7 D3 により Traversal result へ node ごとの `minDepth` 公開を additive 追加)
+> 最終更新: 2026-07-11 / Status: 完了 (2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加)
 
-Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯と issue 単位の作業記録は [spec #6](../../../specs/6-traversal/) を参照する。
+Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
 
 ## メタ
 
@@ -12,7 +12,7 @@ Traversal Engine の durable な feature 設計正本。Graph Engine が保持�
 | 関連 DesignDoc | [成功条件 S1/S2](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Traversal Engine](../../DesignDoc.md#モジュール責務)、[Open Questions Q4](../../DesignDoc.md#open-questions-未決事項) |
 | 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                |
 | 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                       |
-| 関連 spec      | [specs/6-traversal](../../../specs/6-traversal/)                                                                                                                                                    |
+| 関連 issue     | [#6](https://github.com/Fukuemon/depwalk/issues/6)                                                                                                                                                  |
 | 対象モジュール | `traversal` (`core` から呼び出される)                                                                                                                                                               |
 
 ## 背景・要件解釈
@@ -36,7 +36,7 @@ depwalk の Phase1 は、指定メソッドの caller / callee を探索し、�
 - Java ソースの解析、型解決、DI 解決は行わない (`java-analyzer` の責務)。
 - Analyzer Protocol / SPI / Model schema は再定義しない (正本は analyzer-protocol feature doc と ADR-0001)。
 - Output Engine の Console / JSON / DOT / Mermaid 表現は決めない。
-- CLI `depwalk analyze` の引数、exit code、エラー表示は決めない (CLI interface spec の対象)。
+- CLI `depwalk analyze` の引数、exit code、エラー表示は決めない ([CLI feature doc](../cli/DesignDoc_cli.md) の対象)。
 - 永続ストア、キャッシュ、並列探索、分散処理は扱わない。
 
 ## 設計
@@ -45,18 +45,18 @@ depwalk の Phase1 は、指定メソッドの caller / callee を探索し、�
 
 Traversal は起点 method ID、方向 (`caller` / `callee`)、深さ上限 (任意)、探索順序 (`bfs` / `dfs`、未指定時 `bfs`) を受け取り、到達 node 集合、到達 edge 集合、status、`cycle` 注釈、`depthLimit` cutoff を返す。
 
-| 概念              | 主な field / 値                                                                                                                        | 備考                                                                                                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Traversal request | 起点 method ID、方向、深さ上限 (任意、未指定時は無制限)、探索順序 (未指定時は `bfs`)                                                   | CLI 引数名は CLI interface spec で決める                                                                                                                                 |
-| Traversal result  | 到達 node 集合 (**node ごとの `minDepth` を保持**)、到達 edge 集合、status (`ok` / `startNotFound`)、`cycle` 注釈、`depthLimit` cutoff | Output Engine が consumer。tree は保持しない。到達 node / edge 集合は順序を保証しない。`minDepth` の公開は [spec #7](../../../specs/7-output/) (D3) による additive 拡張 |
-| Cycle 注釈        | 対象 edge の集合                                                                                                                       | 到達部分グラフ内で閉路を構成する edge (self-loop、または同一 SCC 内の edge)。**到達 edge 集合にも含まれる** (呼び出し関係として実在するため除外しない)                   |
-| DepthLimit cutoff | 対象 edge の集合、接続先 node の minDepth                                                                                              | 到達 node から `minDepth > maxDepth` の node への edge。**到達 edge 集合には含まれない**。対象は edge のみで node 自体は cutoff 対象にしない                             |
+| 概念              | 主な field / 値                                                                                                                        | 備考                                                                                                                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Traversal request | 起点 method ID、方向、深さ上限 (任意、未指定時は無制限)、探索順序 (未指定時は `bfs`)                                                   | CLI 引数名は [CLI feature doc](../cli/DesignDoc_cli.md) が定める                                                                                                                         |
+| Traversal result  | 到達 node 集合 (**node ごとの `minDepth` を保持**)、到達 edge 集合、status (`ok` / `startNotFound`)、`cycle` 注釈、`depthLimit` cutoff | Output Engine が consumer。tree は保持しない。到達 node / edge 集合は順序を保証しない。`minDepth` の公開は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) による additive 拡張 |
+| Cycle 注釈        | 対象 edge の集合                                                                                                                       | 到達部分グラフ内で閉路を構成する edge (self-loop、または同一 SCC 内の edge)。**到達 edge 集合にも含まれる** (呼び出し関係として実在するため除外しない)                                   |
+| DepthLimit cutoff | 対象 edge の集合、接続先 node の minDepth                                                                                              | 到達 node から `minDepth > maxDepth` の node への edge。**到達 edge 集合には含まれない**。対象は edge のみで node 自体は cutoff 対象にしない                                             |
 
 #### 到達集合の定義
 
 結果は探索の副産物 (どの edge を辿ったか) ではなく、グラフの性質として定義する。これにより結果は探索順序 (BFS / DFS) に一切依存せず決定的になる。
 
-- **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 (複数経路で同一 node へ到達するダイヤモンド型構造) がある場合、最短の距離を採る。**Traversal result は到達 node ごとの minDepth を公開する** (consumer の JSON 出力が利用する。到達判定の内部値と同一であり、到達集合 / `cycle` / `depthLimit` の意味論は変えない — [spec #7](../../../specs/7-output/) D3 の additive 拡張)。
+- **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 (複数経路で同一 node へ到達するダイヤモンド型構造) がある場合、最短の距離を採る。**Traversal result は到達 node ごとの minDepth を公開する** (consumer の JSON 出力が利用する。到達判定の内部値と同一であり、到達集合 / `cycle` / `depthLimit` の意味論は変えない — [issue #7](https://github.com/Fukuemon/depwalk/issues/7) の additive 拡張)。
 - **到達 node 集合**: `minDepth <= maxDepth` を満たす node (maxDepth 未指定時は全到達可能 node)。起点を含む。
 - **到達 edge 集合**: 両端が到達 node 集合に属する、探索方向に沿った全 edge (誘導部分グラフ)。合流 edge も `cycle` 注釈付き edge も含む。
 - **`maxDepth=0`**: 起点 node のみを到達集合に含み、起点の隣接 edge は `depthLimit` cutoff になる。ただし起点自身への self-loop は両端が到達 node のため、誘導 edge (+ `cycle` 注釈) として到達 edge 集合に残る (誘導部分グラフ定義からの帰結)。

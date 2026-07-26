@@ -29,9 +29,9 @@ import (
 // source root auto / explicit 契約に集中し、探索出力は TestCLIQueryGolden
 // で検証する。
 //
-// step 4.4 / 4.5 / 4.6 (error なし非ゼロ exit・malformed stdout・参照不整合の
-// 非公開、fatal reason の維持、Java 非依存 generic failure fixture の共通
-// renderer) は fake analyzer では実現できない実 process 観点ではないため、
+// error なし非ゼロ exit・malformed stdout・参照不整合の非公開、fatal reason の
+// 維持、Java 非依存 generic failure fixture の共通 renderer は fake analyzer では
+// 実現できない実 process 観点ではないため、
 // core/internal/analyze・core/internal/cli の process contract test
 // (dangling-edge-then-error / dangling-edge-clean-exit / bad-exit /
 // error-with-details / malformed) が required gate として固定済みである。
