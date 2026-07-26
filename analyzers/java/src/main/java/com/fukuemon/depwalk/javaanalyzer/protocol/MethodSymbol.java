@@ -29,6 +29,7 @@ public record MethodSymbol(
         SourceLocation sourceLocation,
         Map<String, Object> metadata) implements ProtocolRecord {
 
+    /** 本 record が JSONL の {@code recordType} に設定する値。 */
     public static final String RECORD_TYPE = "methodSymbol";
 
     /**

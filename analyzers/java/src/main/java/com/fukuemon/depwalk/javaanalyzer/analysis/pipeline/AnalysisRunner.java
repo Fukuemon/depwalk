@@ -56,19 +56,20 @@ import java.util.Set;
  * <p>source file の列挙、AST 解析、型解決、Spring DI 索引化、呼び出し先候補の統合、帰属型決定、
  * 到達可能性フィルタ、{@link RecordWriter} への出力を1回の実行として調停する。
  *
- * <p>AST はファイル単位で逐次破棄する (保持するのは
- * SymbolSolver の型解決キャッシュと、node/edge/diagnostic の最小限の集計 = {@link GraphAccumulator})。
- * record の書き出しはモードによって次のように異なる:
+ * <p>逐次破棄されるのは AST のみで (ファイル単位で parse し、処理後は参照を手放す)、
+ * SymbolSolver の型解決キャッシュと {@link GraphAccumulator} が持つ node / edge / diagnostic は
+ * 実行終了まで保持される。したがってモードを問わずグラフ本体はメモリ上に残り、モードによって
+ * 変わるのは record を writer へ流す timing である:
  * <ul>
  *   <li>{@code fullGraph} (既定 / {@code reachableFromEntrypoints} かつ entrypoints 空の場合を含む):
  *       ファイル単位の解析が終わるごとに、その時点で新たに確定した node / edge / diagnostic を
- *       即座に {@link RecordWriter} へ flush する。母集合全体を待たずに record を逐次出力するため、
- *       グラフ全体をメモリ保持しない (node の重複出力を避けるため、出力済み {@code methodId} の集合
- *       のみ保持する)。</li>
+ *       即座に {@link RecordWriter} へ flush する。母集合全体の解析完了を待たずに record を逐次出力
+ *       できる (node の重複出力を避けるため、出力済み {@code methodId} の集合を別に保持する)。</li>
  *   <li>{@code reachableFromEntrypoints} (entrypoints 指定あり): 到達可能性フィルタ
- *       ({@link ReachabilityFilter}) が母集合全体の adjacency を必要とするため、node / edge は
- *       解析完了後に一括でフィルタ + 書き出しを行う。diagnostic はこのモードでも検出時に即 write
- *       する。</li>
+ *       ({@link ReachabilityFilter}) が母集合全体の adjacency を必要とするため、逐次 flush を行わず、
+ *       node / edge / diagnostic のいずれも解析完了後に一括で書き出す (node / edge はフィルタ適用後の
+ *       もの、diagnostic は {@link GraphAccumulator} に蓄積された全件)。即時 write は fullGraph モード
+ *       のみである。</li>
  * </ul>
  */
 public final class AnalysisRunner {
@@ -106,9 +107,13 @@ public final class AnalysisRunner {
      *     request を fatal にせず、解決済み graph と診断を公開する
      *     ({@code metadata.allowIncompleteAnalysis}、
      *     java-analyzer feature doc「Parse・resolution・call 完全性」)
-     * @return 解析したファイル数、未解決件数、pre-flight 時間
+     * @return 解析したファイル数、未解決件数、parse pre-flight 時間、context 構築時間、
+     *     call site ledger の集計 ({@link RunStats})
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
+     * @throws IncompleteAnalysisException {@code allowIncompleteAnalysis} が false のまま、
+     *     全救済後も primary diagnostic として残る in-scope call site があった場合
+     *     (完全性 gate、java-analyzer feature doc「Parse・resolution・call 完全性」)
      */
     public static RunStats run(
             AnalysisRequest request,

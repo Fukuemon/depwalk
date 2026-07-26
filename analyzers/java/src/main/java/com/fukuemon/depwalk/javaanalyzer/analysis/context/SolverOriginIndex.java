@@ -14,17 +14,31 @@ public final class SolverOriginIndex {
 
     private final Map<Path, ResolvedDeclarationOrigin> originsByEntry = new LinkedHashMap<>();
 
-    /** solver へ登録した entry の origin を記録する。 */
+    /**
+     * solver へ登録した entry の origin を記録する。同じ entry の再登録は無視する。
+     *
+     * @param entry solver 構成 entry (絶対・正規化して key にする)
+     * @param origin 対応付ける origin
+     */
     public void register(Path entry, ResolvedDeclarationOrigin origin) {
         originsByEntry.putIfAbsent(entry.toAbsolutePath().normalize(), origin);
     }
 
-    /** entry (source root / jar / classes dir) の origin を返す。 */
+    /**
+     * entry (source root / jar / classes dir) の origin を返す。
+     *
+     * @param entry 照会する entry
+     * @return 登録済みなら対応する origin、未登録なら empty
+     */
     public Optional<ResolvedDeclarationOrigin> originOf(Path entry) {
         return Optional.ofNullable(originsByEntry.get(entry.toAbsolutePath().normalize()));
     }
 
-    /** 登録済み entry 数 (test 用)。 */
+    /**
+     * 登録済み entry 数 (test 用)。
+     *
+     * @return 登録済み entry の件数
+     */
     public int size() {
         return originsByEntry.size();
     }

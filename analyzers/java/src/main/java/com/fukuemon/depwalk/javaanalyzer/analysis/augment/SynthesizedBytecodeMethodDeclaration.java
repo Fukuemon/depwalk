@@ -28,9 +28,22 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     /** binary name → ResolvedType の変換 (primitive / array / 参照型)。 */
     public interface BytecodeTypeResolver {
+        /**
+         * erasure 済み binary name を ResolvedType へ解決する。
+         *
+         * @param binaryName primitive / 配列 / 参照型の binary name
+         * @return 対応する ResolvedType
+         */
         ResolvedType resolve(String binaryName);
     }
 
+    /**
+     * 戻り値も erasure で解決する合成 member を作る。
+     *
+     * @param declaringType 合成先の source 型宣言
+     * @param candidate SootUp が classes output から読んだ member 候補
+     * @param typeResolver binary name → ResolvedType の変換
+     */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,
             SootUpTypeHierarchyIndex.MethodCandidate candidate,
@@ -39,9 +52,14 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     }
 
     /**
+     * 戻り値の解決方法を指定して合成 member を作る。
+     *
+     * @param declaringType 合成先の source 型宣言
+     * @param candidate SootUp が classes output から読んだ member 候補
+     * @param typeResolver binary name → ResolvedType の変換
      * @param genericReturnType 戻り値だけを generic Signature 由来で解決する
      *     supplier (feature doc「solver 層の bytecode member 合成」)。引数型は常に
-     *     {@code typeResolver} の erasure を使う
+     *     {@code typeResolver} の erasure を使う。{@code null} なら戻り値も erasure
      */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,

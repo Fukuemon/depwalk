@@ -28,6 +28,12 @@ public final class MemberAugmentingTypeSolver implements TypeSolver {
     private final java.util.Map<String, SymbolReference<ResolvedReferenceTypeDeclaration>> cache =
             new java.util.HashMap<>();
 
+    /**
+     * source root の solver を包み、member 合成を差し込む solver を作る。
+     *
+     * @param delegate scope 内 source root の型解決を担う solver
+     * @param bytecodeIndex 同一 context の classes output を引く member 索引
+     */
     public MemberAugmentingTypeSolver(JavaParserTypeSolver delegate, ProjectBytecodeMemberIndex bytecodeIndex) {
         this.delegate = delegate;
         this.bytecodeIndex = bytecodeIndex;

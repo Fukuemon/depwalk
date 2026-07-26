@@ -337,7 +337,13 @@ public final class AnalysisContextFactory {
                 "metadata.javaPreview must be [\"true\"] or [\"false\"]");
     }
 
-    /** 自動 discovery 経路では language metadata の明示指定を invalid とする。 */
+    /**
+     * 自動 discovery 経路では language metadata の明示指定を invalid とする。
+     *
+     * @param metadata request の metadata (null 可)
+     * @throws AnalyzerFatalException {@code javaLanguageLevel} / {@code javaPreview} が
+     *     指定されている場合 ({@code JAVA_INVALID_REQUEST})
+     */
     public static void rejectLanguageMetadataOnDiscovery(Map<String, Object> metadata) throws AnalyzerFatalException {
         if (metadata != null
                 && (metadata.containsKey(METADATA_JAVA_LANGUAGE_LEVEL) || metadata.containsKey(METADATA_JAVA_PREVIEW))) {

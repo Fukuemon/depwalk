@@ -27,6 +27,13 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
     private final TypeSolver typeSolver;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
 
+    /**
+     * source の class 宣言を包み、bytecode 合成の fallback を持つ宣言を作る。
+     *
+     * @param wrappedNode 対象の source class 宣言
+     * @param typeSolver 型解決に使う solver
+     * @param bytecodeIndex 同一 context の classes output を引く member 索引
+     */
     public AugmentedJavaParserClassDeclaration(
             ClassOrInterfaceDeclaration wrappedNode,
             TypeSolver typeSolver,

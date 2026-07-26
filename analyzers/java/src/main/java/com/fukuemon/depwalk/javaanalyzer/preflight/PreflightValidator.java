@@ -25,8 +25,12 @@ public final class PreflightValidator {
     }
 
     /**
-     * pre-flight 検査で確定した型付きの検証済み入力。下流 ({@code AnalysisRunner}) は raw metadata を
-     * 再 cast せず本 record の値を使う。
+     * pre-flight 検査で確定した型付きの検証済み入力。本 record の値は起動時の呼び出し側 (entry point) が
+     * 受け取り、{@code classpath} は解析 context 構築 ({@code AnalysisContextFactory}) へ、
+     * {@code allowIncompleteAnalysis} は
+     * {@link com.fukuemon.depwalk.javaanalyzer.analysis.pipeline.AnalysisRunner} の引数として渡す。
+     * ここで検証していない Java 固有 metadata ({@code liftExcludePackages} 等) は、下流が
+     * {@code request.metadata()} から改めて読み直す。
      *
      * @param classpath {@code metadata.classpath} の検証済み jar / classes dir path 一覧
      * @param allowIncompleteAnalysis {@code metadata.allowIncompleteAnalysis} の検証済み値 (既定 false)。

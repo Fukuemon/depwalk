@@ -1,8 +1,8 @@
 package com.fukuemon.depwalk.javaanalyzer.protocol;
 
 /**
- * Value object embedded in {@code methodSymbol.sourceLocation} / {@code callEdge.callSite}.
- * Not an independent JSONL record.
+ * {@code methodSymbol.sourceLocation} / {@code callEdge.callSite} に埋め込む value object。
+ * 独立した JSONL record ではない。
  *
  * @param path        workspaceRoot からの相対 path (必須)
  * @param startLine   1-based の開始行 (必須)

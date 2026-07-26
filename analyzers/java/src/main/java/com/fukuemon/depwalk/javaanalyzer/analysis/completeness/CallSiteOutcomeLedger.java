@@ -16,13 +16,17 @@ public final class CallSiteOutcomeLedger {
 
     /** primary 終端種別。 */
     public enum OutcomeKind {
+        /** edge を出力した。 */
         EMITTED,
+        /** 仕様上の根拠付きで明示除外した。 */
         EXCLUDED,
+        /** primary diagnostic として終端した (完全性 gate の対象)。 */
         DIAGNOSTIC
     }
 
     /** 仕様上の明示除外理由 (これ以外の excluded は許可しない)。 */
     public static final String REASON_EXTERNAL_TARGET = "external-target";
+    /** 帰属型が引き上げ除外 package ({@code LiftExcludePackages}) に属する場合の除外理由。 */
     public static final String REASON_LIFT_EXCLUDED_PACKAGE = "lift-excluded-package";
 
     /**
@@ -66,16 +70,31 @@ public final class CallSiteOutcomeLedger {
     private final Map<CallSiteId, Outcome> outcomes = new LinkedHashMap<>();
     private final CallSiteInventory inventory;
 
+    /**
+     * 分類対象となる inventory を与えて台帳を作る。
+     *
+     * @param inventory commit 対象 ID の母集合となる call site inventory
+     */
     public CallSiteOutcomeLedger(CallSiteInventory inventory) {
         this.inventory = inventory;
     }
 
-    /** edge を出力した entry を確定する。補助 diagnostic 併存時も EMITTED が優先される。 */
+    /**
+     * edge を出力した entry を確定する。補助 diagnostic 併存時も EMITTED が優先される。
+     *
+     * @param id inventory に登録済みの call site id
+     */
     public void commitEmitted(CallSiteId id) {
         commit(id, Outcome.emitted());
     }
 
-    /** 仕様上の根拠付き明示除外を確定する。 */
+    /**
+     * 仕様上の根拠付き明示除外を確定する。
+     *
+     * @param id inventory に登録済みの call site id
+     * @param reason {@link #REASON_EXTERNAL_TARGET} または {@link #REASON_LIFT_EXCLUDED_PACKAGE}
+     * @throws IllegalStateException 上記以外の reason を渡した場合
+     */
     public void commitExcluded(CallSiteId id, String reason) {
         if (!REASON_EXTERNAL_TARGET.equals(reason) && !REASON_LIFT_EXCLUDED_PACKAGE.equals(reason)) {
             throw new IllegalStateException("unsupported excluded reason: " + reason);
@@ -83,7 +102,15 @@ public final class CallSiteOutcomeLedger {
         commit(id, Outcome.excluded(reason));
     }
 
-    /** primary diagnostic を確定する (完全性 gate の対象)。 */
+    /**
+     * primary diagnostic を確定する (完全性 gate の対象)。
+     *
+     * @param id inventory に登録済みの call site id
+     * @param code 元 diagnostic code
+     * @param reason 安定 reason
+     * @param target 判明している場合のみ: 呼出先の自己完結な表現
+     * @param candidates 判明している場合のみ: 候補の自己完結な表現 (決定順)
+     */
     public void commitDiagnostic(CallSiteId id, String code, String reason, String target, List<String> candidates) {
         commitDiagnostic(id, code, reason, target, candidates, null);
     }
@@ -93,6 +120,13 @@ public final class CallSiteOutcomeLedger {
      * (feature doc「diagnostic / error code 体系」)。
      * {@code diagnosticMetadata} には source 本文・絶対 path・raw exception message を
      * 含めてはならない (呼び出し側が安定値だけを渡す)。
+     *
+     * @param id inventory に登録済みの call site id
+     * @param code 元 diagnostic code
+     * @param reason 安定 reason
+     * @param target 判明している場合のみ: 呼出先の自己完結な表現
+     * @param candidates 判明している場合のみ: 候補の自己完結な表現 (決定順)
+     * @param diagnosticMetadata sanitize 済み診断項目 (無ければ {@code null})
      */
     public void commitDiagnostic(
             CallSiteId id, String code, String reason, String target, List<String> candidates,
