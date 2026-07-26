@@ -1,6 +1,10 @@
 package analyze
 
-import "github.com/Fukuemon/depwalk/core/internal/graph"
+import (
+	"fmt"
+
+	"github.com/Fukuemon/depwalk/core/internal/graph"
+)
 
 // Request describes one analysis run handed to the [Source] port. Every
 // field is passed through to the Analyzer request without interpretation;
@@ -27,6 +31,26 @@ type Outcome struct {
 	ValidationError error
 	// ExitCode is the Analyzer process exit code.
 	ExitCode int
+}
+
+// Err reports the failure the run ended with, or nil when the Analyzer
+// finished cleanly.
+//
+// The order matters. A fatal Analyzer result — an error record, or a non-zero
+// exit — keeps its own reason, because the stream's reference-completeness
+// check must not mask why the Analyzer actually gave up. Callers get that
+// precedence by using this method instead of reading the fields directly.
+func (o Outcome) Err() error {
+	if o.Failure != nil {
+		return o.Failure
+	}
+	if o.ExitCode != 0 {
+		return fmt.Errorf("analyzer process exited with code %d", o.ExitCode)
+	}
+	if o.ValidationError != nil {
+		return fmt.Errorf("analyzer stdout did not follow the analyzer protocol: %w", o.ValidationError)
+	}
+	return nil
 }
 
 // Source is the port through which the use case receives domain-typed

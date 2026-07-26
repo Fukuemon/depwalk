@@ -120,17 +120,8 @@ func (r Runner) Run(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	// A fatal Analyzer outcome (error record or non-zero exit) keeps its own
-	// reason: the stream's reference-completeness validation error must not
-	// mask it, so the fatal checks run first.
-	if outcome.Failure != nil {
-		return Result{}, outcome.Failure
-	}
-	if outcome.ExitCode != 0 {
-		return Result{}, fmt.Errorf("analyzer process exited with code %d", outcome.ExitCode)
-	}
-	if outcome.ValidationError != nil {
-		return Result{}, fmt.Errorf("analyzer stdout did not follow the analyzer protocol: %w", outcome.ValidationError)
+	if err := outcome.Err(); err != nil {
+		return Result{}, err
 	}
 
 	result := Result{
