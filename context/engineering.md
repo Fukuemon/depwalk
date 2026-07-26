@@ -8,7 +8,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 ## Code Comment Boundary
 
-- **コード内コメントは英語で書く** (Go の doc comment 規約に合わせる)。ドキュメント・commit・PR は日本語のままでよい。ユーザーに見える文字列リテラル (CLI 出力等) は言語を変えない — 観測可能な契約であり golden test が固定している。
+- **コード内コメントの言語は現状 module ごとに異なる**。Core (Go) は英語 (godoc 規約に合わせた)、Java Analyzer は日本語 (設計文書と同じ語彙で解析の意味論を書けるため)。日本語への統一を [issue #40](https://github.com/Fukuemon/depwalk/issues/40) で検討中で、決まり次第この項を改訂する。ドキュメント・commit・PR は日本語。ユーザーに見える文字列リテラル (CLI 出力等) は言語を変えない — 観測可能な契約であり golden test が固定している。
 - **コメントから spec / issue を引用しない** (`spec #32 D6` / `P2_01` / `D21` 等)。spec は issue close 時に削除される作業文書なので、コードから参照すると宙に浮いたリンクが残る。決定の経緯は git history と PR で辿る。
 - 理由をコメントに残すときのリンク先は **ADR と durable な正本ドキュメント** (`adr/*.md`、`context/*.md`、`design/features/*/DesignDoc_*.md`) に限る。
 - `(S5)` のような符号だけの参照はしない。読み手に伝わる言葉で書き、必要なら正本へのリンクを添える。
