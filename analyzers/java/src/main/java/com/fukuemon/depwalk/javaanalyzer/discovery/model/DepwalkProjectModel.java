@@ -12,7 +12,7 @@ public interface DepwalkProjectModel {
     /** Gradle project path (例: {@code :app})。 */
     String getProjectPath();
 
-    /** project directory。 */
+    /** project の directory。 */
     File getProjectDirectory();
 
     /** {@code main} source set の Java source directory 一覧。 */

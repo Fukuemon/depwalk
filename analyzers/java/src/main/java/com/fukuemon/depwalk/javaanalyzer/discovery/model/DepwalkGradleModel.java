@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface DepwalkGradleModel {
 
-    /** build root directory (build identifier)。 */
+    /** build root の directory (build identifier を兼ねる)。 */
     File getBuildRootDirectory();
 
     /** Java plugin を持つ in-scope project の model 一覧。 */
