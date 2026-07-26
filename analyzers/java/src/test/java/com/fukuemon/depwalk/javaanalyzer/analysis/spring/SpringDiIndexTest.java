@@ -37,7 +37,8 @@ class SpringDiIndexTest {
     static void analyzeFixture() throws Exception {
         Path classesDir = compileLombokFixture();
         ParserConfiguration.LanguageLevel languageLevel = ParserConfiguration.LanguageLevel.JAVA_25;
-        var typeSolver = TypeSolverFactory.create(FIXTURE, List.of(classesDir.toString()), languageLevel);
+        var typeSolver = TypeSolverFactory.createForRoots(
+                List.of(FIXTURE), List.of(classesDir), languageLevel, null);
         JavaParser parser = new JavaParser(new ParserConfiguration()
                 .setLanguageLevel(languageLevel)
                 .setSymbolResolver(new JavaSymbolSolver(typeSolver)));

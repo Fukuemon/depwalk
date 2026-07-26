@@ -17,8 +17,6 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDe
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ContextScope;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.ParsePreflight;
-import com.fukuemon.depwalk.javaanalyzer.analysis.context.ResolvedDeclarationOrigin;
-import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.SourceSetAnalysisContext;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
@@ -208,20 +206,12 @@ public final class AnalysisRunner {
         }
 
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
-        Map<String, SolverOriginIndex> originsByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
-            SolverOriginIndex origins = new SolverOriginIndex();
             List<Path> solverRoots = new ArrayList<>(context.sourceRoots());
-            for (Path root : context.sourceRoots()) {
-                origins.register(root, ResolvedDeclarationOrigin.source(context.id()));
-            }
             for (String dependencyId : reachableDependencyIds(context, contextById)) {
                 SourceSetAnalysisContext dependency = contextById.get(dependencyId);
                 if (dependency != null) {
                     solverRoots.addAll(dependency.sourceRoots());
-                    for (Path root : dependency.sourceRoots()) {
-                        origins.register(root, ResolvedDeclarationOrigin.source(dependencyId));
-                    }
                 }
             }
             List<Path> solverEntries = new ArrayList<>(context.classpath());
@@ -230,19 +220,12 @@ public final class AnalysisRunner {
                     solverEntries.add(output);
                 }
             }
-            for (Path entry : solverEntries) {
-                String owner = classesOutputOwners.get(entry);
-                origins.register(entry, owner != null
-                        ? ResolvedDeclarationOrigin.projectClasses(owner)
-                        : ResolvedDeclarationOrigin.externalArtifact(entry.toString()));
-            }
             CombinedTypeSolver typeSolver = TypeSolverFactory.createForRoots(
                     solverRoots, solverEntries, context.languageLevel(), bytecodeIndexByContext.get(context.id()));
             ParserConfiguration config = new ParserConfiguration()
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
             parserByContext.put(context.id(), new JavaParser(config));
-            originsByContext.put(context.id(), origins);
         }
         long contextBuildMillis = (System.nanoTime() - contextBuildStart) / 1_000_000;
 
@@ -337,11 +320,9 @@ public final class AnalysisRunner {
                     sootUpByContext.get(context.id()),
                     sourceMethodIndex,
                     springResult,
-                    originsByContext.get(context.id()),
                     ledger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
-                    context.id(),
                     reachable));
         }
 

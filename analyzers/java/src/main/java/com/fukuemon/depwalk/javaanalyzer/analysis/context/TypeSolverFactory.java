@@ -32,47 +32,20 @@ public final class TypeSolverFactory {
     }
 
     /**
-     * workspace source と検証済み classpath を検索する合成 TypeSolver を生成する。
-     *
-     * @param workspaceRoot 対象プロジェクトの source root ({@link JavaParserTypeSolver} に渡す)
-     * @param classpathJars {@code analysisRequest.metadata.classpath} の jar / classes dir path 一覧
-     * @param languageLevel {@link JavaParserTypeSolver} が workspaceRoot 配下の依存ソース (record 等)
-     *                      を読み直す際に使う {@link ParserConfiguration.LanguageLevel} (呼び出し側の
-     *                      メインパーサ設定と一致させる。既定 {@code POPULAR} は record を構文サポート
-     *                      しないため、呼び出し側で明示的に渡す)
-     * @return reflection、source、jar、classes directory を合成した TypeSolver
-     * @throws IOException jar / classes dir の読み込みに失敗した場合 (pre-flight で存在確認済みのため通常は起きない)
-     */
-    public static CombinedTypeSolver create(
-            Path workspaceRoot, List<String> classpathJars, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
-        return createForRoots(
-                List.of(workspaceRoot),
-                classpathJars.stream().map(Path::of).toList(),
-                languageLevel);
-    }
-
-    /**
-     * 複数 source root と classpath entry から合成 TypeSolver を生成する。
+     * 複数 source root と classpath entry から、bytecode member 合成付きの合成 TypeSolver を生成する
+     * (feature doc「solver 層の bytecode member 合成」)。
      * source root は classpath (project classes output を含む) より先に登録し、
      * source 宣言を bytecode より優先する
      * (java-analyzer feature doc「Source root discovery と解析 context」)。
+     * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
+     * 同一 context classes output の bytecode-only member を fallback 合成する。
      *
      * @param sourceRoots {@link JavaParserTypeSolver} へ登録する package hierarchy 起点 (各 1 回)
      * @param classpathEntries 検証済み jar / classes dir
      * @param languageLevel 内部 parser の language level (メインパーサと一致させる)
+     * @param bytecodeIndex bytecode-only member の fallback 合成に使う索引 (不要なら null)
      * @return 合成 TypeSolver
      * @throws IOException jar / classes dir の読み込みに失敗した場合
-     */
-    public static CombinedTypeSolver createForRoots(
-            List<Path> sourceRoots, List<Path> classpathEntries, ParserConfiguration.LanguageLevel languageLevel) throws IOException {
-        return createForRoots(sourceRoots, classpathEntries, languageLevel, null);
-    }
-
-    /**
-     * bytecode member 合成付きの合成 TypeSolver を生成する
-     * (feature doc「solver 層の bytecode member 合成」)。
-     * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
-     * 同一 context classes output の bytecode-only member を fallback 合成する。
      */
     public static CombinedTypeSolver createForRoots(
             List<Path> sourceRoots,
