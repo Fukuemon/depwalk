@@ -7,7 +7,6 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDeclarationIndex;
-import com.fukuemon.depwalk.javaanalyzer.analysis.context.SolverOriginIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResult;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
@@ -75,13 +74,9 @@ public final class CallGraphBuilder {
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final SourceMethodIndex sourceMethodIndex;
     private final Map<String, List<SpringDiIndex.InjectionResolution>> springResolutionsByReceiver;
-    // source 再対応付けが参照する solver origin 境界 (java-analyzer feature doc
-    // 「Source root discovery と解析 context」/「solver 層の bytecode member 合成」)。
-    private final SolverOriginIndex solverOrigins;
     private final CallSiteOutcomeLedger ledger;
     private final WorkspaceSourceDeclarationIndex declIndex;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
-    private final String contextId;
     private final java.util.Set<String> reachableContextIds;
     /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
     private String currentPath;
@@ -95,7 +90,6 @@ public final class CallGraphBuilder {
      * @param sootUpIndex bytecode 型階層から実装候補を得る索引
      * @param sourceMethodIndex 候補メソッドの source location を補完する索引
      * @param springResult Spring Bean と注入点の解決結果
-     * @param solverOrigins 所有 context の solver entry と origin の対応
      * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する
      *     完全性 gate 用 ledger (java-analyzer feature doc「Parse・resolution・call 完全性」)
      * @param declIndex workspace の source 宣言から型の所有 context と source location を引く索引。
@@ -103,8 +97,6 @@ public final class CallGraphBuilder {
      * @param bytecodeIndex 呼び出し元 context の classpath 視点で bytecode member
      *     (method / constructor / field 型 / generic 戻り型) を引く索引。source だけでは解決できない
      *     候補の救済に使う (feature doc「solver 層の bytecode member 合成」)
-     * @param contextId 本 builder が担当する解析 context の id (救済候補の owner 検査は
-     *     {@code reachableContextIds} 側で行う)
      * @param reachableContextIds 自 context と Gradle project 依存で推移的に到達可能な context id の集合。
      *     救済候補の所有 context がこの集合に含まれない場合は救済を行わない
      */
@@ -115,22 +107,18 @@ public final class CallGraphBuilder {
             SootUpTypeHierarchyIndex sootUpIndex,
             SourceMethodIndex sourceMethodIndex,
             SpringDiIndex.Result springResult,
-            SolverOriginIndex solverOrigins,
             CallSiteOutcomeLedger ledger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
-            String contextId,
             java.util.Set<String> reachableContextIds) {
         this.workspaceRoot = workspaceRoot;
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
         this.sourceMethodIndex = sourceMethodIndex;
-        this.solverOrigins = solverOrigins;
         this.ledger = ledger;
         this.declIndex = declIndex;
         this.bytecodeIndex = bytecodeIndex;
-        this.contextId = contextId;
         this.reachableContextIds = reachableContextIds;
         this.springResolutionsByReceiver = new LinkedHashMap<>();
         for (SpringDiIndex.InjectionResolution resolution : springResult.resolutions()) {
@@ -768,10 +756,6 @@ public final class CallGraphBuilder {
                     CallSiteInventory.of(callNode, currentPath, kind, caller),
                     CallSiteOutcomeLedger.REASON_EXTERNAL_TARGET);
         }
-    }
-
-    private void commitDiagnostic(Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target) {
-        commitDiagnostic(callNode, kind, ctx, reason, target, null);
     }
 
     private void commitDiagnostic(
@@ -1582,10 +1566,6 @@ public final class CallGraphBuilder {
         throw e;
     }
 
-    private void reportUnresolved(Node callNode, WalkContext ctx) {
-        reportUnresolved(callNode, ctx, null);
-    }
-
     /**
      * java-analyzer feature doc「diagnostic / error code 体系」の診断 4 項目を
      * streaming される {@code diagnostic} record へも
@@ -1614,7 +1594,7 @@ public final class CallGraphBuilder {
 
     /**
      * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗。呼び出し式側の
-     * {@link #reportUnresolved(Node, WalkContext)} と異なり、宣言そのものが対象のため
+     * {@link #reportUnresolved(Node, WalkContext, Map)} と異なり、宣言そのものが対象のため
      * {@code relatedMethodId} は付けない。その宣言だけ skip し、解析全体は継続する。
      */
     private void reportUnresolvedDeclaration(Node declNode, String message) {

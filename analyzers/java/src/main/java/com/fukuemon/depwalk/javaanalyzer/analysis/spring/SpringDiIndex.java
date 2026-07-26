@@ -258,19 +258,6 @@ public final class SpringDiIndex {
                 resolutions);
     }
 
-    /**
-     * 複数の compilation unit を一括して収集・解決する convenience method。
-     *
-     * @param units 解析対象の compilation unit
-     * @param sootUpIndex constructor と実装型の補完に使う bytecode 型階層索引
-     * @return 全 unit を収集した DI 解決結果
-     */
-    public static Result analyze(List<CompilationUnit> units, SootUpTypeHierarchyIndex sootUpIndex) {
-        SpringDiIndex index = create(sootUpIndex);
-        units.forEach(index::accept);
-        return index.build();
-    }
-
     private List<BeanEntry> collectBeans(List<ClassOrInterfaceDeclaration> types) {
         List<BeanEntry> beans = new ArrayList<>();
         for (ClassOrInterfaceDeclaration type : types) {

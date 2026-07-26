@@ -23,16 +23,6 @@ public final class ProjectBytecodeMemberIndex {
             new java.util.HashMap<>();
 
     /**
-     * project 所有の classes output を持たない索引を作る (origin 検証で
-     * 常に救済対象外となる)。
-     *
-     * @param sootUpIndex 所有 context の型階層索引
-     */
-    public ProjectBytecodeMemberIndex(SootUpTypeHierarchyIndex sootUpIndex) {
-        this(sootUpIndex, List.of());
-    }
-
-    /**
      * 型階層索引と project 所有の classes output を与えて索引を作る。
      *
      * @param sootUpIndex 所有 context の型階層索引

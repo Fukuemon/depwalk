@@ -122,9 +122,26 @@ public final class SootUpTypeHierarchyIndex {
         }
     }
 
+    /** receiver が同時に満たす複数の上限型 (交差境界) を鍵にした照会。receiverTypes は重複排除済み。 */
+    private record IntersectionKey(
+            String declaringType,
+            List<String> receiverTypes,
+            String methodName,
+            List<String> parameterTypes) {
+        private IntersectionKey {
+            receiverTypes = List.copyOf(receiverTypes);
+            parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        private MethodKey methodKey() {
+            return new MethodKey(declaringType, methodName, parameterTypes);
+        }
+    }
+
     private final List<Path> classpath;
     private final Map<MethodKey, Resolution> methodCache = new LinkedHashMap<>();
     private final Map<DispatchKey, Resolution> receiverMethodCache = new LinkedHashMap<>();
+    private final Map<IntersectionKey, Resolution> intersectionMethodCache = new LinkedHashMap<>();
     private final Map<MethodKey, Resolution> implementationMethodCache = new LinkedHashMap<>();
     private final Map<String, Resolution> constructorCache = new LinkedHashMap<>();
     private JavaView view;
@@ -188,6 +205,9 @@ public final class SootUpTypeHierarchyIndex {
      * {@code T extends A & B} のような交差境界で、先頭境界だけを実装する型が候補へ混入することを防ぐ。
      * いずれかの境界をclasspathから解決できない場合は、境界を無視して誤候補を返さず利用不能とする。
      *
+     * <p>重複排除後の上限が1件なら積集合を取る余地がないため単一receiver版へ委譲する。これにより
+     * 呼び出し経路によらず結果キャッシュとinterface defaultの実効候補判定が共有される。
+     *
      * @param declaringType 解決済みメソッドを宣言する型のbinary name
      * @param receiverTypes call siteのreceiverが同時に満たす静的型のbinary name配列
      * @param methodName 宣言メソッド名
@@ -199,8 +219,21 @@ public final class SootUpTypeHierarchyIndex {
             List<String> receiverTypes,
             String methodName,
             List<String> parameterTypes) {
+        List<String> bounds = receiverTypes.stream().distinct().toList();
+        if (bounds.size() == 1) {
+            // 上限が 1 つなら積集合を取る余地がなく単一 receiver 版と同じ意味論になる。
+            // 委譲することで結果キャッシュと interface default の実効候補判定を共有する
+            // (交差境界だけが本メソッド固有の処理)。
+            return resolveMethod(declaringType, bounds.get(0), methodName, parameterTypes);
+        }
+        IntersectionKey key = new IntersectionKey(declaringType, bounds, methodName, parameterTypes);
+        return intersectionMethodCache.computeIfAbsent(key, this::resolveIntersectionMethodUncached);
+    }
+
+    private Resolution resolveIntersectionMethodUncached(IntersectionKey key) {
+        String declaringType = key.declaringType();
         return guardQuery(declaringType, () -> {
-            MethodKey methodKey = new MethodKey(declaringType, methodName, parameterTypes);
+            MethodKey methodKey = key.methodKey();
             ClassType declaredType = view().getIdentifierFactory().getClassType(declaringType);
             Optional<JavaSootClass> declaredClass = view().getClass(declaredType);
             if (declaredClass.isEmpty()) {
@@ -215,7 +248,7 @@ public final class SootUpTypeHierarchyIndex {
             }
 
             Map<String, ClassType> receiverIntersection = null;
-            for (String receiverName : receiverTypes.stream().distinct().toList()) {
+            for (String receiverName : key.receiverTypes()) {
                 ClassType receiverType = view().getIdentifierFactory().getClassType(receiverName);
                 Optional<JavaSootClass> receiverClass = view().getClass(receiverType);
                 if (receiverClass.isEmpty()) {
