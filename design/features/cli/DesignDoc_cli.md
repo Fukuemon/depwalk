@@ -1,6 +1,6 @@
 # Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
 
-> 最終更新: 2026-07-20 / Status: 完了 (spec #22 sync で新設。実装は spec #22 の実装フェーズが担う)
+> 最終更新: 2026-07-26 / Status: 完了 (spec #22 sync で新設。実装は spec #22 の実装フェーズが担う。#34 でグラフレベル E2E の入口が protocol.Runner へ移動し、Analyzer 起動コマンドの解決が cli へ移設)
 
 depwalk CLI の durable な feature 設計正本。`depwalk analyze` の **コマンド構造 / flag 体系 / method selector 書式 / 責務配置 (CLI 層と analyze use case) / exit code 体系 / 出力先規約 / CLI プロセス E2E の検証方針** を定義する。決定経緯と issue 単位の作業記録は [spec #22](../../../specs/22-cli-interface/) (論点 D1-D12) を参照する。
 
@@ -54,8 +54,8 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 
 ## 責務配置
 
-- **CLI 層 (`core/internal/cli`)**: flag 定義・入力 validation・エラー表示 (stderr)・exit code 判別。
-- **analyze use case (`core/internal/analyze`)**: `AnalysisRequest` 組み立て (AnalysisMode は常時 `fullGraph` を明示、`Entrypoints` は空のまま。spec #22 D6/D7)、graph 構築後の method selector 照合・`traversal.Traverse`・`output.Write` の orchestration。照合の曖昧・不一致は候補一覧を含む種別付きエラーで CLI 層へ返す。
+- **CLI 層 (`core/internal/cli`)**: flag 定義・入力 validation・エラー表示 (stderr)・exit code 判別。加えてコンポジションルートとして Analyzer 起動コマンドの解決 (ADR-0003) と ACL adapter の port への手動 DI を行い、探索結果の `output.Write` を呼ぶ (いずれも #34 で use case から移動。依存規則は [architecture.md](../../../context/architecture.md) の Package Boundary)。
+- **analyze use case (`core/internal/analyze`)**: 解析要求の組み立てと port 経由の実行、graph 構築後の method selector 照合・`traversal.Traverse` の orchestration。照合の曖昧・不一致は候補一覧を含む種別付きエラーで CLI 層へ返す。wire 表現 (`analysisRequest` の schemaVersion / requestId / AnalysisMode 常時 `fullGraph` / `Entrypoints` 空。spec #22 D6/D7) の組み立ては ACL (`core/internal/protocol`) が担う (#34)。
 - 探索方向に関わらず常時 fullGraph で解析し、方向による挙動分岐を持たない (spec #22 D6)。
 
 ## exit code 体系
@@ -73,7 +73,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 
 - `os/exec` で build 済み depwalk バイナリを実プロセス起動し、stdout / stderr / exit code を検証する (spec #22 D9。harness は #24 整備の `buildCoreCLI`/`runCLI` を再利用)。
 - console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (S3)。
-- 既存のグラフレベル E2E (`analyze.Run` 直接呼び出し) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
+- 既存のグラフレベル E2E (`protocol.Runner` を直接呼び出し、record 単位で照合する層) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
 - method selector は完全 signature、signature 省略の一意一致 / overload 曖昧性に加え、nested class の binary name (`Outer$Inner#method`) を回帰検証する。
 
 ## 上位資料からの変更点

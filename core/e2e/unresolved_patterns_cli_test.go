@@ -10,20 +10,18 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// TestUnresolvedCallPatternsCLI は spec #27 D4 の未解決 call パターン fixture
-// (testdata/fixtures/java/multi-module-spring-project/patterns/) を実 Core CLI +
-// 実 Analyzer jar の auto discovery で解析する。
+// TestUnresolvedCallPatternsCLI analyses the hard-to-resolve call pattern
+// fixture (testdata/fixtures/java/multi-module-spring-project/patterns/) with
+// the real Core CLI and the real Analyzer jar through auto discovery.
 //
-// P2_01 時点では 5 パターン (①fluent chain / ④method reference / ⑤explicit
-// super / ⑦var+generic / ⑧cross-module Lombok) が JAVA_INCOMPLETE_ANALYSIS の
-// 未解決 10 件として固定されていた。P4_01 (④⑤の救済 fallback) と P4_02
-// (⑧: Gradle model が依存 project を jar として classpath へ返す場合に依存
-// output が external artifact 扱いになる欠陥の修正) により全件が救済され、
-// 本テストは「全パターンが bytecode-only member 契約 (D21) で edge 化される」
-// 成功期待の回帰ガードへ更新された。
+// Five patterns used to be reported as unresolved: fluent chains, method
+// references, explicit super calls, var with generics, and cross-module Lombok
+// members. All of them are now rescued, so this test guards the success
+// expectation that every pattern becomes an edge under the bytecode-only
+// member contract.
 //
-// patterns/ は root fixture の settings.gradle に含まれない独立 build であり、
-// TestGradleMultiProjectCLI の成功 graph 期待には影響しない。
+// patterns/ is a standalone build that the root fixture's settings.gradle does
+// not include, so it does not affect TestGradleMultiProjectCLI's expectations.
 func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -35,7 +33,7 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	result := runCLI(t, cliPath, capture, javaPath, jarPath, fixture, "--language", "java")
 
 	if result.exitCode != 0 {
-		t.Fatalf("CLI exit = %d, want 0 after the spec #27 rescues; stderr:\n%s", result.exitCode, result.stderr)
+		t.Fatalf("CLI exit = %d, want 0 once every pattern is rescued; stderr:\n%s", result.exitCode, result.stderr)
 	}
 
 	records := capturedRecords(t, capture)
@@ -53,32 +51,33 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 		}
 	}
 
-	// 各パターンの救済結果: cross-module の生成 member が bytecode-only 契約
-	// (calleeOrigin=project-bytecode-member) で edge 化される。
+	// Rescue outcome: cross-module generated members become edges under the
+	// bytecode-only contract (calleeOrigin=project-bytecode-member).
 	itemCtor := "java:com.example.pat.lib.Item#<init>(java.lang.String,int)"
 	itemGetName := "java:com.example.pat.lib.Item#getName()"
 	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
 
-	// ⑧ constructor + ⑦ var 経由 + ① chain 起点 + ④ reference で計 4 caller が
-	// getName へ到達し、ctor は ⑧ と ① の 2 caller。
+	// Four callers reach getName (cross-module constructor, var with generics,
+	// the head of a fluent chain, and a method reference); the constructor has
+	// two callers.
 	if got := len(edges[itemCtor]); got < 2 {
-		t.Errorf("Item ctor edges = %d, want >= 2 (⑧ cross-module / ① chain 起点): %v", got, edges[itemCtor])
+		t.Errorf("Item ctor edges = %d, want >= 2 (cross-module, fluent chain head): %v", got, edges[itemCtor])
 	}
 	if got := len(edges[itemGetName]); got < 3 {
-		t.Errorf("Item getName edges = %d, want >= 3 (⑧ / ⑦ var / ④ reference): %v", got, edges[itemGetName])
+		t.Errorf("Item getName edges = %d, want >= 3 (cross-module, var, method reference): %v", got, edges[itemGetName])
 	}
 	if got := len(edges[baseTaskCtor]); got != 1 {
-		t.Errorf("BaseTask ctor edges = %d, want 1 (⑤ explicit super): %v", got, edges[baseTaskCtor])
+		t.Errorf("BaseTask ctor edges = %d, want 1 (explicit super): %v", got, edges[baseTaskCtor])
 	}
 	for _, callee := range []string{itemCtor, itemGetName, baseTaskCtor} {
 		for _, edge := range edges[callee] {
 			if edge.Metadata["calleeOrigin"] != "project-bytecode-member" {
-				t.Errorf("edge to %s must follow the bytecode-only contract (D21): %+v", callee, edge)
+				t.Errorf("edge to %s must follow the bytecode-only member contract: %+v", callee, edge)
 			}
 		}
 	}
 
-	// ④ method reference の救済 edge は viaMethodReference 標識を持つ。
+	// A rescued method reference edge carries the viaMethodReference marker.
 	foundReference := false
 	for _, edge := range edges[itemGetName] {
 		if edge.Metadata["viaMethodReference"] == true {
@@ -89,7 +88,7 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 		t.Errorf("rescued method reference edge must carry viaMethodReference: %v", edges[itemGetName])
 	}
 
-	// 完全性 gate: 全 call site が分類され、未解決ゼロで成功する。
+	// Completeness gate: every call site is classified and none stay unresolved.
 	stderrText := capturedText(t, capture, "stderr.txt")
 	if !strings.Contains(stderrText, "silentOmission=0") {
 		t.Errorf("ledger summary must report silentOmission=0:\n%s", stderrText)

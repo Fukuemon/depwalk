@@ -1,9 +1,11 @@
-package protocol
+package protocol_test
 
 import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
 func TestAnalysisRequestValidate(t *testing.T) {
@@ -15,8 +17,8 @@ func TestAnalysisRequestValidate(t *testing.T) {
 	}
 
 	req.AnalysisMode = ""
-	if got := req.Mode(); got != AnalysisModeFullGraph {
-		t.Fatalf("Mode() = %q, want %q", got, AnalysisModeFullGraph)
+	if got := req.Mode(); got != protocol.AnalysisModeFullGraph {
+		t.Fatalf("Mode() = %q, want %q", got, protocol.AnalysisModeFullGraph)
 	}
 
 	if _, err := json.Marshal(req); err != nil {
@@ -29,12 +31,12 @@ func TestAnalysisRequestValidateRejectsInvalidHeader(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  AnalysisRequest
+		req  protocol.AnalysisRequest
 	}{
-		{name: "missing request id", req: withAnalysisRequest(func(r *AnalysisRequest) { r.RequestID = "" })},
-		{name: "unsupported version", req: withAnalysisRequest(func(r *AnalysisRequest) { r.SchemaVersion = "2" })},
-		{name: "invalid record type", req: withAnalysisRequest(func(r *AnalysisRequest) { r.RecordType = RecordTypeMethodSymbol })},
-		{name: "invalid language", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Language = "go" })},
+		{name: "missing request id", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.RequestID = "" })},
+		{name: "unsupported version", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.SchemaVersion = "2" })},
+		{name: "invalid record type", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.RecordType = protocol.RecordTypeMethodSymbol })},
+		{name: "invalid language", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Language = "go" })},
 	}
 
 	for _, tt := range tests {
@@ -50,7 +52,7 @@ func TestAnalysisRequestValidateRejectsInvalidHeader(t *testing.T) {
 func TestAnalysisRequestValidateRejectsInvalidAnalysisMode(t *testing.T) {
 	t.Parallel()
 
-	req := withAnalysisRequest(func(r *AnalysisRequest) {
+	req := withAnalysisRequest(func(r *protocol.AnalysisRequest) {
 		r.AnalysisMode = "partial"
 	})
 
@@ -62,13 +64,13 @@ func TestAnalysisRequestValidateRejectsNonRelativeScopePaths(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  AnalysisRequest
+		req  protocol.AnalysisRequest
 	}{
-		{name: "absolute include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"/src/**/*.java"} })},
-		{name: "empty exclude path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Exclude = []string{""} })},
-		{name: "parent path segment", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"../src/**/*.java"} })},
-		{name: "Windows drive include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{"C:/repo/src/**/*.java"} })},
-		{name: "backslash include path", req: withAnalysisRequest(func(r *AnalysisRequest) { r.Include = []string{`src\**\*.java`} })},
+		{name: "absolute include path", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Include = []string{"/src/**/*.java"} })},
+		{name: "empty exclude path", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Exclude = []string{""} })},
+		{name: "parent path segment", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Include = []string{"../src/**/*.java"} })},
+		{name: "Windows drive include path", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Include = []string{"C:/repo/src/**/*.java"} })},
+		{name: "backslash include path", req: withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.Include = []string{`src\**\*.java`} })},
 	}
 
 	for _, tt := range tests {
@@ -99,7 +101,7 @@ func TestAnalysisRequestValidateAcceptsSourceRoots(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req := withAnalysisRequest(func(r *AnalysisRequest) { r.SourceRoots = tt.roots })
+			req := withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.SourceRoots = tt.roots })
 			if err := req.Validate(); err != nil {
 				t.Fatalf("Validate() error = %v", err)
 			}
@@ -127,7 +129,7 @@ func TestAnalysisRequestValidateRejectsInvalidSourceRoots(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req := withAnalysisRequest(func(r *AnalysisRequest) { r.SourceRoots = tt.roots })
+			req := withAnalysisRequest(func(r *protocol.AnalysisRequest) { r.SourceRoots = tt.roots })
 			assertValidateError(t, req.Validate)
 		})
 	}
@@ -137,12 +139,12 @@ func TestAnalyzerErrorValidateAcceptsFailureDetails(t *testing.T) {
 	t.Parallel()
 
 	err := validAnalyzerError()
-	err.Details = []FailureDetail{
+	err.Details = []protocol.FailureDetail{
 		{
 			Code:    "JAVA_UNRESOLVED_SYMBOL",
 			Message: "could not resolve call target",
-			Source:  &SourceLocation{Path: "module-a/src/App.java", StartLine: 10},
-			Metadata: Metadata{
+			Source:  &protocol.SourceLocation{Path: "module-a/src/App.java", StartLine: 10},
+			Metadata: protocol.Metadata{
 				"callKind":   "virtual",
 				"candidates": []any{"com.example.A", "com.example.B"},
 				"unknownKey": nil,
@@ -160,15 +162,15 @@ func TestAnalyzerErrorValidateRejectsInvalidFailureDetails(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		details []FailureDetail
+		details []protocol.FailureDetail
 	}{
-		{name: "explicit empty details", details: []FailureDetail{}},
-		{name: "missing code", details: []FailureDetail{{Message: "message"}}},
-		{name: "missing message", details: []FailureDetail{{Code: "CODE"}}},
+		{name: "explicit empty details", details: []protocol.FailureDetail{}},
+		{name: "missing code", details: []protocol.FailureDetail{{Message: "message"}}},
+		{name: "missing message", details: []protocol.FailureDetail{{Code: "CODE"}}},
 		{
 			name: "invalid source location",
-			details: []FailureDetail{
-				{Code: "CODE", Message: "message", Source: &SourceLocation{Path: "/abs/App.java", StartLine: 1}},
+			details: []protocol.FailureDetail{
+				{Code: "CODE", Message: "message", Source: &protocol.SourceLocation{Path: "/abs/App.java", StartLine: 1}},
 			},
 		},
 	}
@@ -190,7 +192,7 @@ func TestMethodSymbolValidateAcceptsBytecodeOnlySymbol(t *testing.T) {
 
 	r := validMethodSymbol()
 	r.Source = nil
-	r.Metadata = Metadata{
+	r.Metadata = protocol.Metadata{
 		"declarationOrigin": "projectClasses",
 		"ownerSourceLocation": map[string]any{
 			"path":      "module-a/src/main/java/com/example/Owner.java",
@@ -205,8 +207,8 @@ func TestMethodSymbolValidateAcceptsBytecodeOnlySymbol(t *testing.T) {
 func TestAnalysisRequestValidateRejectsEntrypointsWithoutQualifiedName(t *testing.T) {
 	t.Parallel()
 
-	req := withAnalysisRequest(func(r *AnalysisRequest) {
-		r.Entrypoints = []MethodSelector{{}}
+	req := withAnalysisRequest(func(r *protocol.AnalysisRequest) {
+		r.Entrypoints = []protocol.MethodSelector{{}}
 	})
 
 	assertValidateError(t, req.Validate)
@@ -283,7 +285,7 @@ func TestModelRecordsValidateRejectsInvalidSourceLocations(t *testing.T) {
 			name: "source path must be workspace-relative",
 			validate: func() error {
 				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "/tmp/App.java", StartLine: 1}
+				r.Source = &protocol.SourceLocation{Path: "/tmp/App.java", StartLine: 1}
 				return r.Validate()
 			},
 		},
@@ -291,7 +293,7 @@ func TestModelRecordsValidateRejectsInvalidSourceLocations(t *testing.T) {
 			name: "source path must use slash separators",
 			validate: func() error {
 				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: `src\App.java`, StartLine: 1}
+				r.Source = &protocol.SourceLocation{Path: `src\App.java`, StartLine: 1}
 				return r.Validate()
 			},
 		},
@@ -299,7 +301,7 @@ func TestModelRecordsValidateRejectsInvalidSourceLocations(t *testing.T) {
 			name: "source startLine must be positive",
 			validate: func() error {
 				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 0}
+				r.Source = &protocol.SourceLocation{Path: "src/App.java", StartLine: 0}
 				return r.Validate()
 			},
 		},
@@ -307,7 +309,7 @@ func TestModelRecordsValidateRejectsInvalidSourceLocations(t *testing.T) {
 			name: "source startColumn must be positive",
 			validate: func() error {
 				r := validMethodSymbol()
-				r.Source = &SourceLocation{Path: "src/App.java", StartLine: 1, StartColumn: &zero}
+				r.Source = &protocol.SourceLocation{Path: "src/App.java", StartLine: 1, StartColumn: &zero}
 				return r.Validate()
 			},
 		},
@@ -328,7 +330,7 @@ func TestModelRecordsValidate(t *testing.T) {
 
 	startColumn := 2
 	endLine := 4
-	source := &SourceLocation{
+	source := &protocol.SourceLocation{
 		Path:        "src/main/java/example/App.java",
 		StartLine:   3,
 		StartColumn: &startColumn,
@@ -342,12 +344,12 @@ func TestModelRecordsValidate(t *testing.T) {
 		{
 			name: "method symbol",
 			validate: func() error {
-				return MethodSymbol{
-					SchemaVersion: SchemaVersion,
-					RecordType:    RecordTypeMethodSymbol,
+				return protocol.MethodSymbol{
+					SchemaVersion: protocol.SchemaVersion,
+					RecordType:    protocol.RecordTypeMethodSymbol,
 					MethodID:      "method:example.App.main",
-					Language:      LanguageJava,
-					SymbolKind:    SymbolKindMethod,
+					Language:      protocol.LanguageJava,
+					SymbolKind:    protocol.SymbolKindMethod,
 					QualifiedName: "example.App.main",
 					Signature:     "main(java.lang.String[]):void",
 					Source:        source,
@@ -357,9 +359,9 @@ func TestModelRecordsValidate(t *testing.T) {
 		{
 			name: "call edge",
 			validate: func() error {
-				return CallEdge{
-					SchemaVersion:  SchemaVersion,
-					RecordType:     RecordTypeCallEdge,
+				return protocol.CallEdge{
+					SchemaVersion:  protocol.SchemaVersion,
+					RecordType:     protocol.RecordTypeCallEdge,
 					EdgeID:         "edge:1",
 					CallerMethodID: "method:caller",
 					CalleeMethodID: "method:callee",
@@ -370,10 +372,10 @@ func TestModelRecordsValidate(t *testing.T) {
 		{
 			name: "diagnostic",
 			validate: func() error {
-				return Diagnostic{
-					SchemaVersion:   SchemaVersion,
-					RecordType:      RecordTypeDiagnostic,
-					Severity:        SeverityWarning,
+				return protocol.Diagnostic{
+					SchemaVersion:   protocol.SchemaVersion,
+					RecordType:      protocol.RecordTypeDiagnostic,
+					Severity:        protocol.SeverityWarning,
 					Code:            "UNRESOLVED_SYMBOL",
 					Message:         "symbol could not be resolved",
 					Source:          source,
@@ -384,9 +386,9 @@ func TestModelRecordsValidate(t *testing.T) {
 		{
 			name: "error",
 			validate: func() error {
-				return AnalyzerError{
-					SchemaVersion: SchemaVersion,
-					RecordType:    RecordTypeError,
+				return protocol.AnalyzerError{
+					SchemaVersion: protocol.SchemaVersion,
+					RecordType:    protocol.RecordTypeError,
 					Code:          "ANALYZER_FAILED",
 					Message:       "analyzer failed",
 					Source:        source,
@@ -410,72 +412,72 @@ func TestModelRecordsValidate(t *testing.T) {
 func assertValidateError(t *testing.T, validate func() error) {
 	t.Helper()
 
-	var validationError ValidationError
+	var validationError protocol.ValidationError
 	if err := validate(); !errors.As(err, &validationError) {
 		t.Fatalf("Validate() error = %v, want ValidationError", err)
 	}
 }
 
-func validAnalysisRequest() AnalysisRequest {
-	return AnalysisRequest{
-		SchemaVersion: SchemaVersion,
-		RecordType:    RecordTypeAnalysisRequest,
+func validAnalysisRequest() protocol.AnalysisRequest {
+	return protocol.AnalysisRequest{
+		SchemaVersion: protocol.SchemaVersion,
+		RecordType:    protocol.RecordTypeAnalysisRequest,
 		RequestID:     "request-1",
 		WorkspaceRoot: "/workspace/project",
-		Language:      LanguageJava,
+		Language:      protocol.LanguageJava,
 		Include:       []string{"src/**/*.java"},
 		Exclude:       []string{"build/**"},
-		Entrypoints: []MethodSelector{
+		Entrypoints: []protocol.MethodSelector{
 			{QualifiedName: "example.App.main", Signature: "main(java.lang.String[]):void"},
 		},
-		AnalysisMode: AnalysisModeReachableFromEntrypoints,
-		Metadata:     Metadata{"analyzer": "java"},
+		AnalysisMode: protocol.AnalysisModeReachableFromEntrypoints,
+		Metadata:     protocol.Metadata{"analyzer": "java"},
 	}
 }
 
-func withAnalysisRequest(update func(*AnalysisRequest)) AnalysisRequest {
+func withAnalysisRequest(update func(*protocol.AnalysisRequest)) protocol.AnalysisRequest {
 	req := validAnalysisRequest()
 	update(&req)
 	return req
 }
 
-func validMethodSymbol() MethodSymbol {
-	return MethodSymbol{
-		SchemaVersion: SchemaVersion,
-		RecordType:    RecordTypeMethodSymbol,
+func validMethodSymbol() protocol.MethodSymbol {
+	return protocol.MethodSymbol{
+		SchemaVersion: protocol.SchemaVersion,
+		RecordType:    protocol.RecordTypeMethodSymbol,
 		MethodID:      "method:example.App.main",
-		Language:      LanguageJava,
-		SymbolKind:    SymbolKindMethod,
+		Language:      protocol.LanguageJava,
+		SymbolKind:    protocol.SymbolKindMethod,
 		QualifiedName: "example.App.main",
 		Signature:     "main(java.lang.String[]):void",
-		Source:        &SourceLocation{Path: "src/App.java", StartLine: 1},
+		Source:        &protocol.SourceLocation{Path: "src/App.java", StartLine: 1},
 	}
 }
 
-func validCallEdge() CallEdge {
-	return CallEdge{
-		SchemaVersion:  SchemaVersion,
-		RecordType:     RecordTypeCallEdge,
+func validCallEdge() protocol.CallEdge {
+	return protocol.CallEdge{
+		SchemaVersion:  protocol.SchemaVersion,
+		RecordType:     protocol.RecordTypeCallEdge,
 		EdgeID:         "edge:1",
 		CallerMethodID: "method:caller",
 		CalleeMethodID: "method:callee",
 	}
 }
 
-func validDiagnostic() Diagnostic {
-	return Diagnostic{
-		SchemaVersion: SchemaVersion,
-		RecordType:    RecordTypeDiagnostic,
-		Severity:      SeverityInfo,
+func validDiagnostic() protocol.Diagnostic {
+	return protocol.Diagnostic{
+		SchemaVersion: protocol.SchemaVersion,
+		RecordType:    protocol.RecordTypeDiagnostic,
+		Severity:      protocol.SeverityInfo,
 		Code:          "PARTIAL_ANALYSIS",
 		Message:       "analysis was partial",
 	}
 }
 
-func validAnalyzerError() AnalyzerError {
-	return AnalyzerError{
-		SchemaVersion: SchemaVersion,
-		RecordType:    RecordTypeError,
+func validAnalyzerError() protocol.AnalyzerError {
+	return protocol.AnalyzerError{
+		SchemaVersion: protocol.SchemaVersion,
+		RecordType:    protocol.RecordTypeError,
 		Code:          "ANALYZER_FAILED",
 		Message:       "analyzer failed",
 	}

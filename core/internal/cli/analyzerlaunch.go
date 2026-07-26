@@ -1,4 +1,4 @@
-package analyze
+package cli
 
 import (
 	"errors"
@@ -10,13 +10,13 @@ import (
 // launch command. It lives under the DEPWALK_ namespace (ADR-0003).
 const analyzerCmdEnv = "DEPWALK_ANALYZER_CMD"
 
-// ResolveCommand resolves the Analyzer launch command string.
+// resolveAnalyzerCommand resolves the Analyzer launch command string.
 //
 // Resolution order (ADR-0003): the flag value takes precedence, then the
 // DEPWALK_ANALYZER_CMD environment variable (read through getenv), and if
 // neither is set, resolution fails so the caller can reject the request
 // before starting an Analyzer process.
-func ResolveCommand(flagValue string, getenv func(string) string) (string, error) {
+func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
@@ -43,7 +43,7 @@ func isEscapableRune(r rune) bool {
 	}
 }
 
-// SplitCommand splits a resolved command string into argv without invoking
+// splitAnalyzerCommand splits a resolved command string into argv without invoking
 // a shell (ADR-0003 rejects shell injection risk). It supports single and
 // double quoting, matching common shell-word splitting semantics for the
 // subset depwalk needs.
@@ -56,7 +56,7 @@ func isEscapableRune(r rune) bool {
 // still supporting `\ ` to escape a space and `\"` / `\'` to escape a quote.
 // Inside quotes, backslashes are always literal; only the matching quote
 // character closes the quoted word.
-func SplitCommand(command string) ([]string, error) {
+func splitAnalyzerCommand(command string) ([]string, error) {
 	runes := []rune(command)
 
 	var (
