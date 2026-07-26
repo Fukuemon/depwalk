@@ -1,6 +1,6 @@
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-> 最終更新: 2026-07-11 / Status: 完了 (2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加)
+> 最終更新: 2026-07-26 / Status: 完了 (2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加)
 
 Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
 

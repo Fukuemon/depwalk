@@ -1,6 +1,6 @@
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-> 最終更新: 2026-07-25 / Status: 完了 ([issue #32](https://github.com/Fukuemon/depwalk/issues/32) の設計で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動。#34 の実装追随で参照完全性検査の担当を ACL と明記)
+> 最終更新: 2026-07-26 / Status: 完了 ([issue #32](https://github.com/Fukuemon/depwalk/issues/32) の設計で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動。#34 の実装追随で参照完全性検査の担当を ACL と明記)
 
 Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
 

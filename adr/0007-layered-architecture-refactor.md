@@ -6,7 +6,12 @@
 
 ## 決定日
 
-2026-07-24 (2026-07-25 改訂: Core の層ディレクトリ物理化を撤回。経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))
+2026-07-24
+
+改訂:
+
+- 2026-07-25: Core の層ディレクトリ物理化を撤回 (経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))
+- 2026-07-26: 要求 (成功条件 / 業務ルール / 受け入れ基準) を spec から本 ADR へ移し、自己完結させた。あわせて背景の「SootUp 型は 7 クラスへ漏れている」を実測結果で訂正 ([issue #35](https://github.com/Fukuemon/depwalk/issues/35))
 
 ## 背景
 
