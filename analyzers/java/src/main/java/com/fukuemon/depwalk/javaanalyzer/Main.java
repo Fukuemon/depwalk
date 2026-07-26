@@ -17,14 +17,17 @@ import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 import com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 import com.fukuemon.depwalk.javaanalyzer.protocol.ErrorRecord;
+import com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Java Analyzer process の entry point。
@@ -86,7 +89,7 @@ public final class Main {
                         JavaErrorCode.JAVA_GRADLE_MODEL_ERROR.code(),
                         e.userMessage(),
                         null,
-                        java.util.Map.of("reason", e.category().reason(), "phase", e.phase().label())));
+                        Map.of("reason", e.category().reason(), "phase", e.phase().label())));
                 return 1;
             }
 
@@ -105,7 +108,7 @@ public final class Main {
                 return 0;
             } catch (IncompleteAnalysisException e) {
                 writer.write(new ErrorRecord(
-                        com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema.VERSION,
+                        ProtocolSchema.VERSION,
                         ErrorRecord.RECORD_TYPE,
                         JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
                         e.getMessage(),
@@ -151,11 +154,11 @@ public final class Main {
     private static AnalysisContextFactory.Result buildContexts(
             AnalysisRequest request, PreflightValidator.Validated validated, PrintStream errStream)
             throws AnalyzerFatalException, DiscoveryFailure {
-        java.nio.file.Path workspaceRoot;
+        Path workspaceRoot;
         try {
             // root 検証・相対化と同じ基準にするため real path を使う。
-            workspaceRoot = java.nio.file.Path.of(request.workspaceRoot()).toRealPath();
-        } catch (java.io.IOException e) {
+            workspaceRoot = Path.of(request.workspaceRoot()).toRealPath();
+        } catch (IOException e) {
             throw new AnalyzerFatalException(
                     JavaErrorCode.JAVA_INVALID_REQUEST,
                     "failed to resolve the real path of analysisRequest.workspaceRoot");

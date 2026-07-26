@@ -1,6 +1,10 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
+
 import com.github.javaparser.ParserConfiguration;
+import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ClassLoaderTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
@@ -51,7 +55,7 @@ public final class TypeSolverFactory {
             List<Path> sourceRoots,
             List<Path> classpathEntries,
             ParserConfiguration.LanguageLevel languageLevel,
-            com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex bytecodeIndex)
+            ProjectBytecodeMemberIndex bytecodeIndex)
             throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
@@ -59,7 +63,7 @@ public final class TypeSolverFactory {
         for (Path root : sourceRoots) {
             JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);
             typeSolver.add(bytecodeIndex != null
-                    ? new com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver(sourceSolver, bytecodeIndex)
+                    ? new MemberAugmentingTypeSolver(sourceSolver, bytecodeIndex)
                     : sourceSolver);
         }
         // JavaParserTypeSolver が内部 parse した AST にも resolver を注入する。
@@ -68,7 +72,7 @@ public final class TypeSolverFactory {
         // "Symbol resolution not configured" の IllegalStateException になる
         // (#24 実プロジェクト検証で検出)。config は parse 時に参照されるため
         // 循環参照でも post-hoc 設定で機能する。
-        typeSolverConfig.setSymbolResolver(new com.github.javaparser.symbolsolver.JavaSymbolSolver(typeSolver));
+        typeSolverConfig.setSymbolResolver(new JavaSymbolSolver(typeSolver));
         List<Path> entries = classpathEntries.stream()
                 .map(path -> path.toAbsolutePath().normalize())
                 .toList();

@@ -7,10 +7,12 @@ import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,6 +42,18 @@ public final class ContextScope {
             Map<String, List<Path>> filesByContext,
             List<Path> allFiles,
             Set<Path> membership) {
+        /**
+         * 全 component を反復順を保ったまま防御的コピーする。membership は
+         * {@code AttributionResolver} が保持し続けるため、生成後の変更が解析結果へ
+         * 波及しないようここで確定させる。
+         */
+        public Scope {
+            Map<String, List<Path>> copiedFiles = new LinkedHashMap<>();
+            filesByContext.forEach((contextId, files) -> copiedFiles.put(contextId, List.copyOf(files)));
+            filesByContext = Collections.unmodifiableMap(copiedFiles);
+            allFiles = List.copyOf(allFiles);
+            membership = Collections.unmodifiableSet(new LinkedHashSet<>(membership));
+        }
     }
 
     /**
@@ -100,7 +114,7 @@ public final class ContextScope {
             filesByContext.put(context.id(), files);
         }
         allFiles.sort((a, b) -> workspaceRelative(workspaceRoot, a).compareTo(workspaceRelative(workspaceRoot, b)));
-        return new Scope(filesByContext, List.copyOf(allFiles), membership);
+        return new Scope(filesByContext, allFiles, membership);
     }
 
     /**
@@ -137,7 +151,7 @@ public final class ContextScope {
         }
         List<PathMatcher> matchers = new ArrayList<>();
         for (String glob : globs) {
-            matchers.add(java.nio.file.FileSystems.getDefault().getPathMatcher("glob:" + glob));
+            matchers.add(FileSystems.getDefault().getPathMatcher("glob:" + glob));
         }
         return matchers;
     }

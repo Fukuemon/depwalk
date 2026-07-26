@@ -8,6 +8,9 @@ import com.github.javaparser.resolution.model.SymbolReference;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserClassDeclaration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * scope 内 source root の {@link JavaParserTypeSolver} を包み、source 解決した
  * class 宣言へ同一 context の classes output にしかない callable member を
@@ -25,8 +28,7 @@ public final class MemberAugmentingTypeSolver implements TypeSolver {
     private TypeSolver parent;
     // hot path のため、型名ごとに augmented 宣言を 1 instance へ固定する
     // (delegate の cache と同様の identity 安定化)。
-    private final java.util.Map<String, SymbolReference<ResolvedReferenceTypeDeclaration>> cache =
-            new java.util.HashMap<>();
+    private final Map<String, SymbolReference<ResolvedReferenceTypeDeclaration>> cache = new HashMap<>();
 
     /**
      * source root の solver を包み、member 合成を差し込む solver を作る。

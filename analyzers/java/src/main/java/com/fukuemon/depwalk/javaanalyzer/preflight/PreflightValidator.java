@@ -5,6 +5,7 @@ import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -148,38 +149,42 @@ public final class PreflightValidator {
         if (!metadata.containsKey(METADATA_LIFT_EXCLUDE_PACKAGES)) {
             return;
         }
-        Object raw = metadata.get(METADATA_LIFT_EXCLUDE_PACKAGES);
-        if (!(raw instanceof List<?> rawList)) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "analysisRequest.metadata.liftExcludePackages must be a string array");
-        }
-        for (Object element : rawList) {
-            if (!(element instanceof String)) {
-                throw new AnalyzerFatalException(
-                        JavaErrorCode.JAVA_INVALID_REQUEST,
-                        "analysisRequest.metadata.liftExcludePackages element must be a string: " + element);
-            }
-        }
+        readStringArray(
+                metadata.get(METADATA_LIFT_EXCLUDE_PACKAGES),
+                "analysisRequest.metadata.liftExcludePackages must be a string array",
+                "analysisRequest.metadata.liftExcludePackages element must be a string: ");
     }
 
     private static List<String> readClasspath(Object value) throws AnalyzerFatalException {
+        return readStringArray(
+                value,
+                "analysisRequest.metadata.classpath must be a string array",
+                "classpath element must be a string: ");
+    }
+
+    /**
+     * metadata 値を文字列配列として読む。配列でない場合と要素が文字列でない場合を
+     * それぞれ {@code JAVA_INVALID_REQUEST} で fatal とする。
+     *
+     * @param value 検査対象の metadata 値
+     * @param arrayMessage 配列でない場合の error message
+     * @param elementMessagePrefix 要素が文字列でない場合の error message 前置き (末尾に値を連結する)
+     * @return 宣言順の文字列一覧
+     * @throws AnalyzerFatalException 配列でない、または文字列でない要素を含む場合
+     */
+    private static List<String> readStringArray(Object value, String arrayMessage, String elementMessagePrefix)
+            throws AnalyzerFatalException {
         if (!(value instanceof List<?> rawList)) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "analysisRequest.metadata.classpath must be a string array");
+            throw new AnalyzerFatalException(JavaErrorCode.JAVA_INVALID_REQUEST, arrayMessage);
         }
-        try {
-            return rawList.stream()
-                    .map(element -> {
-                        if (!(element instanceof String s)) {
-                            throw new IllegalArgumentException("classpath element must be a string: " + element);
-                        }
-                        return s;
-                    })
-                    .toList();
-        } catch (IllegalArgumentException e) {
-            throw new AnalyzerFatalException(JavaErrorCode.JAVA_INVALID_REQUEST, e.getMessage());
+        List<String> values = new ArrayList<>(rawList.size());
+        for (Object element : rawList) {
+            if (!(element instanceof String text)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_REQUEST, elementMessagePrefix + element);
+            }
+            values.add(text);
         }
+        return List.copyOf(values);
     }
 }
