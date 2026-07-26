@@ -9,8 +9,8 @@ import "slices"
 // to mutate (and restore) a shared registry. Adding a format means adding
 // its implementation plus one entry here; [RegisteredFormats] and the CLI's
 // --format validation pick it up automatically.
-func formatters() map[Format]Formatter {
-	return map[Format]Formatter{
+func formatters() map[Format]formatter {
+	return map[Format]formatter{
 		FormatConsole: consoleFormatter{},
 		FormatJSON:    jsonFormatter{},
 	}

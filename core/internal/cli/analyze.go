@@ -178,16 +178,16 @@ func newAnalyzeCommand() *cobra.Command {
 // shown verbatim, never interpreted.
 func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	fmt.Fprintf(w, "Error: %s\n", failure.Error())
-	if failure.Source != nil {
-		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(failure.Source))
+	if failure.Location != nil {
+		fmt.Fprintf(w, "  at %s\n", formatSourceLocation(failure.Location))
 	}
 	if failure.Metadata != nil {
 		fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(failure.Metadata))
 	}
 	for i, detail := range failure.Details {
 		fmt.Fprintf(w, "detail[%d] %s: %s\n", i, detail.Code, detail.Message)
-		if detail.Source != nil {
-			fmt.Fprintf(w, "  at %s\n", formatSourceLocation(detail.Source))
+		if detail.Location != nil {
+			fmt.Fprintf(w, "  at %s\n", formatSourceLocation(detail.Location))
 		}
 		if detail.Metadata != nil {
 			fmt.Fprintf(w, "  metadata %s\n", canonicalJSON(detail.Metadata))

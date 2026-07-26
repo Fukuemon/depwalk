@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"reflect"
@@ -164,9 +165,10 @@ func TestWriteReturnsFormatterError(t *testing.T) {
 	}
 }
 
-// Write が実際に registry を引いて formatter へ委譲することは、
-// 上の seam テストでは覆えないのでここで押さえる。
-func TestWriteDispatchesToTheRegisteredFormatter(t *testing.T) {
+// Write が registry を引いて「その format の」formatter へ委譲することを
+// 押さえる。上の seam テストは formatter を直接渡すため、registry の
+// 対応付けが入れ替わっていても気付けない。
+func TestWriteDispatchesToTheFormatterOfTheRequestedFormat(t *testing.T) {
 	g := graphtest.NewBuilder().Node("method:a").Build()
 	in := Input{
 		Graph: g,
@@ -178,14 +180,38 @@ func TestWriteDispatchesToTheRegisteredFormatter(t *testing.T) {
 		Request: traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee},
 	}
 
-	for _, format := range []Format{FormatConsole, FormatJSON} {
-		var out bytes.Buffer
-		if err := Write(&out, format, in); err != nil {
-			t.Fatalf("Write(%s) returned error: %v", format, err)
-		}
-		if out.Len() == 0 {
-			t.Errorf("Write(%s) produced no output", format)
-		}
+	tests := []struct {
+		format   Format
+		wantJSON bool
+	}{
+		{format: FormatConsole, wantJSON: false},
+		{format: FormatJSON, wantJSON: true},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.format), func(t *testing.T) {
+			var out bytes.Buffer
+			if err := Write(&out, tt.format, in); err != nil {
+				t.Fatalf("Write(%s) returned error: %v", tt.format, err)
+			}
+			if out.Len() == 0 {
+				t.Fatalf("Write(%s) produced no output", tt.format)
+			}
+			if gotJSON := json.Valid(out.Bytes()); gotJSON != tt.wantJSON {
+				t.Fatalf("Write(%s) produced JSON = %v, want %v (output: %q)", tt.format, gotJSON, tt.wantJSON, out.String())
+			}
+		})
+	}
+}
+
+// Write は formatter のエラーをそのまま呼び出し側へ返す (握り潰さない)。
+// registry 経由の経路で確認するため、必ず失敗する入力を使う。
+func TestWritePropagatesFormatterErrorThroughTheRegistry(t *testing.T) {
+	want := errors.New("writer closed")
+	failing := writerFunc(func([]byte) (int, error) { return 0, want })
+
+	err := Write(failing, FormatJSON, Input{Graph: graph.New()})
+	if !errors.Is(err, want) {
+		t.Fatalf("Write() error = %v, want the writer error", err)
 	}
 }
 
@@ -200,6 +226,12 @@ func (f *recordingFormatter) Format(w io.Writer, view View) error {
 	_, err := io.WriteString(w, "formatted")
 	return err
 }
+
+// writerFunc adapts a function to io.Writer so a test can force a write
+// failure.
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 
 type formatterFunc func(io.Writer, View) error
 
