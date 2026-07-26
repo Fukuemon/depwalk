@@ -53,7 +53,7 @@ macOS では `/tmp` と `/var/folders` が `/private` 配下への symlink で�
 - helper は assertion や fixture 生成の重複削減に使う。ただし、helper 名や table の抽象化で仕様名が隠れる場合は分割を優先する。
 - `go test -run '<TestName>/<case>'` で仕様または具体例を絞り込める命名にする。
 - **公開 API だけを検証するテストは black-box (`package <pkg>_test`) にする** (Go 公式 style guide)。非公開の関数・seam を触る必要があるときだけ同一パッケージに置く。black-box テストは自パッケージを import するため、依存方向 gate (depguard) の deny は前方一致の一括指定を避け完全一致 (`$`) で列挙する — さもないと外部テストパッケージが自分自身を import できない (#34 で検出)。
-- **複数パッケージのテストから使う fixture builder は専用パッケージに置く** (`core/internal/graphtest`)。本番パッケージの公開面をテスト都合で広げないための分離であり、本番コードから import しない。
+- **複数パッケージのテストから使う fixture builder は、対象パッケージ配下のテスト支援 sub-package に置く** (`core/internal/graph/graphtest`。Go 標準の `net/http/httptest` と同じ配置)。本番パッケージの公開面をテスト都合で広げないための分離であり、本番コードから import しない (depguard で検査)。
 
 ## Protocol contract test
 

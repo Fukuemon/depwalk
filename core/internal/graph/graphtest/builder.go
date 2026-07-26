@@ -1,9 +1,10 @@
-// Package graphtest provides call graph fixtures for tests.
+// Package graphtest provides call graph fixtures for testing code that reads
+// a [graph.Graph].
 //
-// It lives outside the graph package so that the production graph API stays
-// limited to what depwalk itself needs ([graph.Graph.AddNode] and
-// [graph.Graph.AddEdge]); the fluent builder here exists only to lay out
-// linear, diamond, circular, and deep graphs concisely in tests.
+// It is a separate package so that the production graph API stays limited to
+// what depwalk itself needs ([graph.Graph.AddNode] and [graph.Graph.AddEdge]);
+// the fluent builder here exists only to lay out linear, diamond, circular,
+// and deep graphs concisely in tests. Production code must not import it.
 package graphtest
 
 import "github.com/Fukuemon/depwalk/core/internal/graph"
