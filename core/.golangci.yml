@@ -141,6 +141,21 @@ linters:
             - pkg: github.com/Fukuemon/depwalk/core/internal/cli$
               desc: analyzer は cli に依存できません
 
+        # graphtest はテスト専用。本番コードから import させない。
+        #
+        # 各 package のルールへ個別に足すと、その package の *_test.go が
+        # graphtest を使えなくなる (depguard は test ファイルも検査する)。
+        # そこで `!$test` で test を除いた本番ファイルだけを対象にした専用
+        # ルールを置く。
+        no-graphtest-in-production:
+          files:
+            - "**/internal/**"
+            - "!**/internal/graphtest/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/Fukuemon/depwalk/core/internal/graphtest$
+              desc: graphtest はテスト専用の fixture です。本番コードから import できません
+
         # 未知 package の catch-all。
         #
         # depguard は「ルールが宣言された package だけ」を検査する default-allow

@@ -1,4 +1,3 @@
-// Package output formats traversal results for users and downstream tools.
 package output
 
 import (
@@ -20,6 +19,6 @@ func Write(w io.Writer, format Format, in Input) error {
 // write builds the shared view from in and hands it to formatter. It is the
 // seam tests use to exercise the view construction and error propagation
 // with a stub formatter, without a mutable formatter registry to patch.
-func write(w io.Writer, formatter Formatter, in Input) error {
+func write(w io.Writer, formatter formatter, in Input) error {
 	return formatter.Format(w, buildView(in))
 }

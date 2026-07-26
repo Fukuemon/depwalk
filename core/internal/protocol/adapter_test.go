@@ -29,7 +29,7 @@ func fakeAnalyzerAdapter(scenario string) *Adapter {
 func runAdapter(adapter *Adapter, request analyze.Request) ([]graph.Node, []graph.Edge, analyze.Outcome, error) {
 	var nodes []graph.Node
 	var edges []graph.Edge
-	outcome, err := adapter.RunAnalysis(request,
+	outcome, err := adapter.Run(request,
 		func(node graph.Node) { nodes = append(nodes, node) },
 		func(edge graph.Edge) { edges = append(edges, edge) },
 	)
@@ -45,7 +45,7 @@ func TestAdapterStreamsTranslatedDomainValues(t *testing.T) {
 		Metadata:      map[string]any{"classpath": []string{"/a.jar", "/b.jar"}},
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.ExitCode != 0 || outcome.Failure != nil || outcome.ValidationError != nil {
 		t.Fatalf("outcome = %+v, want clean success", outcome)
@@ -75,7 +75,7 @@ func TestAdapterTranslatesAnalyzerErrorRecord(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.Failure == nil {
 		t.Fatal("Failure = nil, want the fatal analyzer error record")
@@ -96,15 +96,15 @@ func TestAdapterTranslatesStructuredFailureDetails(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	failure := outcome.Failure
 	if failure == nil {
 		t.Fatal("Failure = nil, want structured failure")
 	}
-	wantSource := &graph.SourceLocation{Path: "module-a/src/Main.java", StartLine: 3}
-	if !reflect.DeepEqual(failure.Source, wantSource) {
-		t.Fatalf("Source = %#v, want %#v", failure.Source, wantSource)
+	wantLocation := &graph.SourceLocation{Path: "module-a/src/Main.java", StartLine: 3}
+	if !reflect.DeepEqual(failure.Location, wantLocation) {
+		t.Fatalf("Source = %#v, want %#v", failure.Location, wantLocation)
 	}
 	wantMetadata := map[string]any{"phase": "completeness"}
 	if !reflect.DeepEqual(failure.Metadata, wantMetadata) {
@@ -114,7 +114,7 @@ func TestAdapterTranslatesStructuredFailureDetails(t *testing.T) {
 		{
 			Code:     "DETAIL_CODE_B",
 			Message:  "first detail",
-			Source:   &graph.SourceLocation{Path: "module-b/src/App.java", StartLine: 12},
+			Location: &graph.SourceLocation{Path: "module-b/src/App.java", StartLine: 12},
 			Metadata: map[string]any{"kind": "virtual", "candidates": []any{"z", "a"}},
 		},
 		{Code: "DETAIL_CODE_A", Message: "second detail"},
@@ -135,7 +135,7 @@ func TestAdapterKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.Failure == nil {
 		t.Fatal("Failure = nil, want the fatal record to win")
@@ -153,7 +153,7 @@ func TestAdapterReportsReferenceIncompletenessAfterCleanExit(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.ValidationError == nil {
 		t.Fatal("ValidationError = nil, want reference-completeness failure on clean exit")
@@ -168,7 +168,7 @@ func TestAdapterReportsNonZeroExit(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.ExitCode != 3 {
 		t.Fatalf("ExitCode = %d, want 3", outcome.ExitCode)
@@ -183,7 +183,7 @@ func assertRequestScenarioPassed(t *testing.T, outcome analyze.Outcome, err erro
 	t.Helper()
 
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.ExitCode != 0 {
 		t.Fatalf("fake analyzer rejected the wire request (exit %d)", outcome.ExitCode)
@@ -224,7 +224,7 @@ func TestAdapterRequestAssertionsDetectAWrongRequest(t *testing.T) {
 		Language:      "java",
 	})
 	if err != nil {
-		t.Fatalf("RunAnalysis() error = %v", err)
+		t.Fatalf("Run() error = %v", err)
 	}
 	if outcome.ExitCode == 0 {
 		t.Fatal("ExitCode = 0, want the fake analyzer to reject a request without the expected filters")
@@ -241,7 +241,7 @@ func TestAdapterMarksInvalidRequestValuesAsInputErrorBeforeAnalyzerLaunch(t *tes
 	})
 	var inputErr *analyze.InputError
 	if !errors.As(err, &inputErr) {
-		t.Fatalf("RunAnalysis() error = %v, want *analyze.InputError", err)
+		t.Fatalf("Run() error = %v, want *analyze.InputError", err)
 	}
 }
 

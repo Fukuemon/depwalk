@@ -1,13 +1,3 @@
-// Package analyze orchestrates the depwalk analyze use case: it composes
-// the analysis request, receives domain-typed analysis results through the
-// [Source] port, assembles them into a [graph.Graph], and runs the
-// method-query traversal.
-//
-// The package stays language-agnostic (S5): it treats the launch command
-// as an opaque string and analysisRequest.metadata as an opaque
-// passthrough map. It is also wire-agnostic (spec #32 D6): Analyzer
-// Protocol DTOs never appear here. The protocol package's ACL adapter
-// implements [Source], and cli wires the two together.
 package analyze
 
 import (
@@ -46,93 +36,6 @@ type Options struct {
 	Direction graph.Direction
 	MaxDepth  *int
 }
-
-// Request describes one analysis run handed to the [Source] port. Every
-// field is passed through to the Analyzer request without interpretation
-// (S5); the port implementation owns the wire form (request id, schema
-// version, validation).
-type Request struct {
-	WorkspaceRoot string
-	SourceRoots   []string
-	Language      string
-	Include       []string
-	Exclude       []string
-	Metadata      map[string]any
-}
-
-// Outcome is the process-level result the [Source] port reports after the
-// record stream ends.
-type Outcome struct {
-	// Diagnostics contains non-fatal diagnostic records reported by the
-	// Analyzer, translated to domain values.
-	Diagnostics []Diagnostic
-	// Failure is the fatal Analyzer error record, if one was emitted.
-	Failure *AnalyzerFailure
-	// ValidationError is the first Core-side stdout validation error.
-	ValidationError error
-	// ExitCode is the Analyzer process exit code.
-	ExitCode int
-}
-
-// Source is the port through which the use case receives domain-typed
-// analysis results: nodes and edges are streamed to the callbacks as they
-// arrive, and the process-level outcome is returned once the stream ends.
-// The interface is defined consumer-side (spec #32 D6); the protocol
-// package's ACL adapter implements it, and cli injects that adapter into
-// [New].
-type Source interface {
-	RunAnalysis(request Request, onNode func(graph.Node), onEdge func(graph.Edge)) (Outcome, error)
-}
-
-// Diagnostic is a non-fatal Analyzer diagnostic translated to domain
-// values. Metadata is opaque and never interpreted by Core.
-type Diagnostic struct {
-	Severity        string
-	Code            string
-	Message         string
-	Source          *graph.SourceLocation
-	RelatedMethodID string
-	Metadata        map[string]any
-}
-
-// AnalyzerFailure is returned by [Runner.Run] when the Analyzer reports a
-// fatal error record. It preserves the full structured failure —
-// top-level code, message, source location, opaque metadata, and ordered
-// details — without interpreting Analyzer-specific codes or metadata keys.
-type AnalyzerFailure struct {
-	Code     string
-	Message  string
-	Source   *graph.SourceLocation
-	Metadata map[string]any
-	Details  []FailureDetail
-}
-
-// FailureDetail is one language-agnostic structured detail of a fatal
-// Analyzer failure.
-type FailureDetail struct {
-	Code     string
-	Message  string
-	Source   *graph.SourceLocation
-	Metadata map[string]any
-}
-
-// Error returns the top-level failure summary.
-func (e *AnalyzerFailure) Error() string {
-	return fmt.Sprintf("analyzer reported a fatal error: %s: %s", e.Code, e.Message)
-}
-
-// InputError marks an error caused by values supplied for an analysis request
-// or method query. CLI callers use it to distinguish exit code 2 failures from
-// runtime failures without interpreting error text.
-type InputError struct {
-	Err error
-}
-
-// Error returns the wrapped error's message.
-func (e *InputError) Error() string { return e.Err.Error() }
-
-// Unwrap returns the wrapped error so callers can inspect its cause.
-func (e *InputError) Unwrap() error { return e.Err }
 
 // Result is the outcome of a successful depwalk analyze run.
 type Result struct {
@@ -204,7 +107,7 @@ func (r Runner) Run(opts Options) (Result, error) {
 	// keeping the request atomic.
 	stagingGraph := graph.New()
 	methodCount, callEdgeCount := 0, 0
-	outcome, err := r.source.RunAnalysis(request,
+	outcome, err := r.source.Run(request,
 		func(node graph.Node) {
 			stagingGraph.AddNode(node)
 			methodCount++

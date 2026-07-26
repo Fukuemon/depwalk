@@ -24,7 +24,7 @@ type fakeSource struct {
 	called     bool
 }
 
-func (f *fakeSource) RunAnalysis(
+func (f *fakeSource) Run(
 	request Request,
 	onNode func(graph.Node),
 	onEdge func(graph.Edge),

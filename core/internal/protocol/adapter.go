@@ -24,8 +24,8 @@ func NewAdapter(command analyzer.Command) *Adapter {
 	return &Adapter{command: command}
 }
 
-// RunAnalysis implements the analyze.Source port.
-func (a *Adapter) RunAnalysis(
+// Run implements the analyze.Source port.
+func (a *Adapter) Run(
 	request analyze.Request,
 	onNode func(graph.Node),
 	onEdge func(graph.Edge),
@@ -95,7 +95,7 @@ func diagnosticsToDomain(records []Diagnostic) []analyze.Diagnostic {
 			Severity:        string(record.Severity),
 			Code:            record.Code,
 			Message:         record.Message,
-			Source:          copySourceLocation(record.Source),
+			Location:        copySourceLocation(record.Source),
 			RelatedMethodID: record.RelatedMethodID,
 			Metadata:        copyMetadataObject(record.Metadata),
 		})
@@ -110,14 +110,14 @@ func failureToDomain(record *AnalyzerError) *analyze.AnalyzerFailure {
 	failure := &analyze.AnalyzerFailure{
 		Code:     record.Code,
 		Message:  record.Message,
-		Source:   copySourceLocation(record.Source),
+		Location: copySourceLocation(record.Source),
 		Metadata: copyMetadataObject(record.Metadata),
 	}
 	for _, detail := range record.Details {
 		failure.Details = append(failure.Details, analyze.FailureDetail{
 			Code:     detail.Code,
 			Message:  detail.Message,
-			Source:   copySourceLocation(detail.Source),
+			Location: copySourceLocation(detail.Source),
 			Metadata: copyMetadataObject(detail.Metadata),
 		})
 	}
