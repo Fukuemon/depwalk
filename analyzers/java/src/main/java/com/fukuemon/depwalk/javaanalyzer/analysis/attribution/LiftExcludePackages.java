@@ -25,9 +25,7 @@ public final class LiftExcludePackages {
     }
 
     /**
-     * 解析要求 metadata から引き上げ除外 package を構築する。
-     *
-     * @param metadata 検証済みの analysis request metadata
+     * @param metadata 検証済みの analysis request metadata ({@code null} 可)
      * @return metadata に指定があればその値、なければ既定 package を使う規則
      */
     public static LiftExcludePackages fromMetadata(Map<String, Object> metadata) {
@@ -39,12 +37,7 @@ public final class LiftExcludePackages {
         return new LiftExcludePackages(values);
     }
 
-    /**
-     * 宣言型の binary name が除外 package に属するかを segment 単位の prefix 一致で判定する。
-     *
-     * @param declaringTypeBinaryName 判定対象の宣言型 binary name
-     * @return 引き上げ対象外なら {@code true}
-     */
+    /** 宣言型の binary name が除外 package に属するかを {@code .} 区切り segment 単位の prefix 一致で判定する。 */
     public boolean excludes(String declaringTypeBinaryName) {
         for (String prefix : prefixes) {
             if (declaringTypeBinaryName.equals(prefix) || declaringTypeBinaryName.startsWith(prefix + ".")) {

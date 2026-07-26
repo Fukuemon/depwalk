@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -72,6 +73,7 @@ public final class ProviderWorkspace implements AutoCloseable {
                 + "}\n";
     }
 
+    /** provider を登録する一時 init script の絶対 path。 */
     public Path initScript() {
         return initScript;
     }
@@ -80,6 +82,7 @@ public final class ProviderWorkspace implements AutoCloseable {
         return providerJar;
     }
 
+    /** {@link #close()} で削除される一時 directory。 */
     public Path directory() {
         return directory;
     }
@@ -107,10 +110,10 @@ public final class ProviderWorkspace implements AutoCloseable {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException e) {
-                    throw new java.io.UncheckedIOException(e);
+                    throw new UncheckedIOException(e);
                 }
             });
-        } catch (java.io.UncheckedIOException e) {
+        } catch (UncheckedIOException e) {
             throw e.getCause();
         }
     }

@@ -19,12 +19,7 @@ public final class RecordWriter implements AutoCloseable {
     private final ObjectMapper mapper;
     private final Writer out;
 
-    /**
-     * UTF-8 JSONL writer を生成する。
-     *
-     * @param out protocol record の出力先
-     * @param mapper record の serialize に使う mapper
-     */
+    /** 出力を UTF-8 で encode する JSONL writer を生成する。 */
     public RecordWriter(OutputStream out, ObjectMapper mapper) {
         this.out = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
         this.mapper = mapper;
@@ -33,7 +28,6 @@ public final class RecordWriter implements AutoCloseable {
     /**
      * record を1行の JSON として書き出し、即座に flush する。
      *
-     * @param record 出力する protocol record
      * @throws IOException serialize または出力に失敗した場合
      */
     public void write(ProtocolRecord record) throws IOException {

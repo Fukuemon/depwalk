@@ -36,6 +36,10 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.1.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.projectlombok:lombok:1.18.46")
+    // 外部ライブラリ隔離 (ADR-0007) の機械検査。archunit-junit5 の TestEngine ではなく
+    // core を使い、既存の Jupiter @Test から ArchRule.check() を呼ぶ (JUnit Platform 6 と
+    // ArchUnit の JUnit5 engine のバージョン整合を持ち込まないため)。
+    testImplementation("com.tngtech.archunit:archunit:1.4.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

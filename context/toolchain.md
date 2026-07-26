@@ -1,6 +1,6 @@
 # Toolchain
 
-> 最終更新: 2026-07-18
+> 最終更新: 2026-07-26
 
 採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
 
@@ -24,7 +24,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 
 ## 採用方針
 
-- **Java Analyzer の解析ライブラリは先行固定**: JavaParser (AST) / SymbolSolver (型解決) / SootUp (Interface Dispatch・Override 解決)。SootUp の統合範囲は確定済み (2026-07-12): 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は委譲しない。正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) (決定経緯: [spec #21 D1](../specs/21-java-dispatch-spring-di/index.md#解決済みの論点))。
+- **Java Analyzer の解析ライブラリは先行固定**: JavaParser (AST) / SymbolSolver (型解決) / SootUp (Interface Dispatch・Override 解決)。SootUp の統合範囲は確定済み (2026-07-12): 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は委譲しない。正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) (決定経緯: [issue #21](https://github.com/Fukuemon/depwalk/issues/21))。
 - **Gradle discovery stack を固定**: Tooling API client `9.6.1`、対象 Gradle `7.6.5`〜`9.6.x`、custom model provider は Gradle `7.6.5` API / Java 8 classfile とする。判断は [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)、version matrix の詳細は本書の [Gradle discovery compatibility matrix](#gradle-discovery-compatibility-matrix) を唯一の正本とする。
 - **Java / Gradle の4軸を分離**: (1) Analyzer runtime JDK 25、(2) 対象 Gradle の互換条件で選ぶ daemon JVM、(3) 対象 project の compile toolchain、(4) parser に渡す source language level / preview を独立させる。source level は `release` 優先、なければ実効 `sourceCompatibility` とし、`targetCompatibility` は parser input に使わない。4軸間の推測・代用は禁止する。
 - **Java Analyzer の実装言語は Kotlin を不採用とし Java を維持**: JDK 25 の言語機能 (sealed interface + record + pattern matching) で Kotlin の主利点が Java 単体でも得られ、JavaParser interop では Kotlin の null 安全が platform type で効かないため。判断の正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
@@ -43,7 +43,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 - bundled Tooling API client と Analyzer build wrapper: `9.6.1`
 - target Gradle: `7.6.5 <= version < 9.7.0`
 - wrapper がない build: bundled version `9.6.1` を使用
-- custom provider: Gradle `7.6.5` API baseline、Java `--release 8`、classfile major 52。compile に使う再配布 API artifact (`dev.gradleplugins:gradle-api`) は `7.6.4` が最終のため `7.6.4` へ compile する (patch release は public API 不変であり、`7.6.5` より新しい API 参照を混入させない契約はより強く満たされる。確定 2026-07-18、決定経緯は [spec #24](../specs/24-gradle-multi-module-source-roots/index.md))
+- custom provider: Gradle `7.6.5` API baseline、Java `--release 8`、classfile major 52。compile に使う再配布 API artifact (`dev.gradleplugins:gradle-api`) は `7.6.4` が最終のため `7.6.4` へ compile する (patch release は public API 不変であり、`7.6.5` より新しい API 参照を混入させない契約はより強く満たされる。確定 2026-07-18、決定経緯は [issue #24](https://github.com/Fukuemon/depwalk/issues/24))
 - Analyzer client JVM: JDK 25 固定
 - daemon JVM: target build の wrapper / Gradle 設定が選び、Gradle公式Java compatibility matrixに従う。depwalkはdownload・同梱・自動選択せず、Analyzer JDK 25を古いGradle daemonへ強制しない
 

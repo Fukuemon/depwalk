@@ -27,18 +27,16 @@ public record Diagnostic(
         String relatedMethodId,
         Map<String, Object> metadata) implements ProtocolRecord {
 
+    /** 本 record が JSONL の {@code recordType} に設定する値。 */
     public static final String RECORD_TYPE = "diagnostic";
 
     /**
      * 現在の schema version と record type を設定した diagnostic を生成する。
      *
-     * @param severity 問題の重大度
      * @param code 安定した diagnostic code
-     * @param message 人間向けの説明
      * @param sourceLocation 発生位置。特定できなければ {@code null}
      * @param relatedMethodId 関連 method ID。該当しなければ {@code null}
      * @param metadata 候補型や条件種別などの追加情報
-     * @return protocol 出力可能な diagnostic
      */
     public static Diagnostic of(
             String severity,

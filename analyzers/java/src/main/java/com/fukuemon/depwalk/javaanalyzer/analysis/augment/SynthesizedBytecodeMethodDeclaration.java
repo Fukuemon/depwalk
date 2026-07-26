@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
 
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.github.javaparser.ast.AccessSpecifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration;
@@ -12,7 +13,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * scope 内 source 型の宣言に合成される bytecode-only method (spec #24 D31)。
+ * scope 内 source 型の宣言に合成される bytecode-only method。
+ * 本クラスの契約の正本は java-analyzer feature doc「solver 層の bytecode member 合成」。
  * SootUp が classes output から読んだ {@code MethodCandidate} を JavaParser の
  * 解決結果として振る舞わせ、Lombok 等の生成 member を含む式の型伝播
  * (chained call / stream 連鎖) を solver 層で成立させる。
@@ -27,9 +29,11 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
 
     /** binary name → ResolvedType の変換 (primitive / array / 参照型)。 */
     public interface BytecodeTypeResolver {
+        /** @param binaryName erasure 済みの primitive / 配列 ({@code []} 付き) / 参照型 binary name */
         ResolvedType resolve(String binaryName);
     }
 
+    /** 戻り値も erasure で解決する合成 member を作る。 */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,
             SootUpTypeHierarchyIndex.MethodCandidate candidate,
@@ -38,8 +42,10 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     }
 
     /**
-     * @param genericReturnType 戻り値だけを generic Signature 由来で解決する
-     *     supplier (D32)。引数型は常に {@code typeResolver} の erasure を使う
+     * 戻り値の解決方法を指定して合成 member を作る。
+     *
+     * @param genericReturnType 戻り値だけを generic Signature 由来で解決する supplier。
+     *     引数型は常に {@code typeResolver} の erasure を使う。{@code null} なら戻り値も erasure
      */
     public SynthesizedBytecodeMethodDeclaration(
             ResolvedReferenceTypeDeclaration declaringType,
@@ -135,8 +141,8 @@ public final class SynthesizedBytecodeMethodDeclaration implements ResolvedMetho
     }
 
     @Override
-    public com.github.javaparser.ast.AccessSpecifier accessSpecifier() {
-        return com.github.javaparser.ast.AccessSpecifier.PUBLIC;
+    public AccessSpecifier accessSpecifier() {
+        return AccessSpecifier.PUBLIC;
     }
 
     @Override
