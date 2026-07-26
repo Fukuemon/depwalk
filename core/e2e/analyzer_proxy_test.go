@@ -20,8 +20,9 @@ import (
 func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
 	captureDir, command, malformed := proxyHelperArgs(os.Args)
 	if malformed {
-		// 引数不足のまま無言で return すると「空出力 + exit 0 の Analyzer」に
-		// 見え、空 graph の偽成功になるため非ゼロで落とす。
+		// Returning silently on missing arguments would look like an Analyzer
+		// that produced no output and exited 0, turning an empty graph into a
+		// false success. Fail loudly instead.
 		fmt.Fprintln(os.Stderr, "recording proxy: --proxy-capture requires <dir> <command...>")
 		os.Exit(97)
 	}
@@ -75,8 +76,9 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 	defer stderrFile.Close()
 
 	cmd := exec.Command(command[0], command[1:]...)
-	// capture へ写るのは Analyzer が実際に読んだ bytes。現行 Protocol は
-	// 1 行の analysisRequest を必ず読み切るため request 全体が写る。
+	// The capture holds the bytes the Analyzer actually read. The current
+	// Protocol always reads the single analysisRequest line to completion,
+	// so the whole request is captured.
 	cmd.Stdin = io.TeeReader(stdin, requestFile)
 	cmd.Stdout = io.MultiWriter(stdout, stdoutFile)
 	cmd.Stderr = io.MultiWriter(stderr, stderrFile)
@@ -104,7 +106,8 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 // unit test: echoes stdin to stdout with a prefix line, writes one stderr
 // line, and exits 3.
 func TestProxyEchoChildHelperProcess(t *testing.T) {
-	// process 全体の env を汚す t.Setenv でなく、起動引数でシナリオを指定する。
+	// Select the scenario through launch arguments rather than t.Setenv,
+	// which would pollute the environment of the whole process.
 	if !hasArg(os.Args, "--proxy-echo-child") {
 		return
 	}

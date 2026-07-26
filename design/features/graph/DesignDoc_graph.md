@@ -1,6 +1,6 @@
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-> 最終更新: 2026-07-24 / Status: 完了 ([issue #32](https://github.com/Fukuemon/depwalk/issues/32) で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動)
+> 最終更新: 2026-07-25 / Status: 完了 ([issue #32](https://github.com/Fukuemon/depwalk/issues/32) の設計で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動。#34 の実装追随で参照完全性検査の担当を ACL と明記)
 
 Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
 
@@ -72,6 +72,8 @@ type Edge struct {
 ### 構築と公開の原子性
 
 Analyze Use Case は valid な `methodSymbol` / `callEdge` を受領順に (ACL が graph 値型へ変換したものを) request 専用の **非公開 staging Graph** へ登録する。wire DTO 全件や Analyzer 側の全 graph を別途 buffer しない。Analyzer が exit `0` で終了し、fatal record がなく、stream 全体で全 edge の caller / callee 参照が揃った場合だけ staging Graph と diagnostic を公開する。
+
+検査と公開判断の担当は分かれる: stream の **参照完全性検査は ACL (`protocol`)** が行い (wire record を見る責務であり、結果は port の outcome として返す)、その結果と process 状態から **公開するかどうかを決めるのは Analyze Use Case** である (判断の正本は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md)、経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))。
 
 valid `error`、非ゼロ exit、stdout の parse / schema error の場合は参照完全性の成立を要求せず、staging Graph と先行 diagnostic をすべて破棄する。Graph Engine の公開 API から request の部分結果は観測できない。
 

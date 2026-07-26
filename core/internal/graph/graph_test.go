@@ -1,15 +1,15 @@
-package graph
+package graph_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
+	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
 func TestNodeReturnsRegisteredNode(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
 
 	got, ok := g.Node("method:a")
 	if !ok {
@@ -21,10 +21,10 @@ func TestNodeReturnsRegisteredNode(t *testing.T) {
 }
 
 func TestNodeReturnsRegisteredSymbol(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "service.go", StartLine: 12}
-	want := Symbol{QualifiedName: "example.Service.Run", Signature: "()", Source: source}
-	g := New()
-	g.AddNode(Node{ID: "method:a", Symbol: want})
+	source := &graph.SourceLocation{Path: "service.go", StartLine: 12}
+	want := graph.Symbol{QualifiedName: "example.Service.Run", Signature: "()", Source: source}
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a", Symbol: want})
 
 	got, ok := g.Node("method:a")
 	if !ok {
@@ -36,8 +36,8 @@ func TestNodeReturnsRegisteredSymbol(t *testing.T) {
 }
 
 func TestNodeAllowsNilSymbolSource(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a", Symbol: Symbol{QualifiedName: "example.Service.Run"}})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a", Symbol: graph.Symbol{QualifiedName: "example.Service.Run"}})
 
 	got, ok := g.Node("method:a")
 	if !ok {
@@ -49,7 +49,7 @@ func TestNodeAllowsNilSymbolSource(t *testing.T) {
 }
 
 func TestNodeReportsMissingNode(t *testing.T) {
-	g := New()
+	g := graph.New()
 
 	if _, ok := g.Node("method:missing"); ok {
 		t.Errorf("Node(%q) found, want not found", "method:missing")
@@ -57,7 +57,7 @@ func TestNodeReportsMissingNode(t *testing.T) {
 }
 
 func TestNodeReportsMissingNodeOnEmptyGraph(t *testing.T) {
-	g := New()
+	g := graph.New()
 
 	if _, ok := g.Node(""); ok {
 		t.Error("Node(\"\") found on empty graph, want not found")
@@ -65,9 +65,9 @@ func TestNodeReportsMissingNodeOnEmptyGraph(t *testing.T) {
 }
 
 func TestAddNodeIgnoresDuplicateID(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:a"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:a"})
 
 	got, ok := g.Node("method:a")
 	if !ok {
@@ -79,16 +79,16 @@ func TestAddNodeIgnoresDuplicateID(t *testing.T) {
 }
 
 func TestNodesReturnsEveryRegisteredNodeWithFirstRegistration(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "opaque:b", Symbol: Symbol{QualifiedName: "example.B.run"}})
-	g.AddNode(Node{ID: "opaque:a", Symbol: Symbol{QualifiedName: "example.A.run"}})
-	g.AddNode(Node{ID: "opaque:a", Symbol: Symbol{QualifiedName: "example.Replaced.run"}})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "opaque:b", Symbol: graph.Symbol{QualifiedName: "example.B.run"}})
+	g.AddNode(graph.Node{ID: "opaque:a", Symbol: graph.Symbol{QualifiedName: "example.A.run"}})
+	g.AddNode(graph.Node{ID: "opaque:a", Symbol: graph.Symbol{QualifiedName: "example.Replaced.run"}})
 
 	got := g.Nodes()
 	if len(got) != 2 {
 		t.Fatalf("len(Nodes()) = %d, want 2", len(got))
 	}
-	byID := make(map[string]Node, len(got))
+	byID := make(map[string]graph.Node, len(got))
 	for _, node := range got {
 		byID[node.ID] = node
 	}
@@ -101,15 +101,15 @@ func TestNodesReturnsEveryRegisteredNodeWithFirstRegistration(t *testing.T) {
 }
 
 func TestNeighborsReturnsCalleeEdges(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:b"})
-	g.AddNode(Node{ID: "method:c"})
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
-	g.AddEdge(Edge{ID: "edge:ac", CallerID: "method:a", CalleeID: "method:c"})
-	g.AddEdge(Edge{ID: "edge:bc", CallerID: "method:b", CalleeID: "method:c"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:b"})
+	g.AddNode(graph.Node{ID: "method:c"})
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g.AddEdge(graph.Edge{ID: "edge:ac", CallerID: "method:a", CalleeID: "method:c"})
+	g.AddEdge(graph.Edge{ID: "edge:bc", CallerID: "method:b", CalleeID: "method:c"})
 
-	got := g.Neighbors("method:a", DirectionCallee)
+	got := g.Neighbors("method:a", graph.DirectionCallee)
 	if len(got) != 2 {
 		t.Fatalf("Neighbors(a, callee) returned %d edges, want 2", len(got))
 	}
@@ -123,14 +123,14 @@ func TestNeighborsReturnsCalleeEdges(t *testing.T) {
 }
 
 func TestNeighborsReturnsCallerEdges(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:b"})
-	g.AddNode(Node{ID: "method:c"})
-	g.AddEdge(Edge{ID: "edge:ac", CallerID: "method:a", CalleeID: "method:c"})
-	g.AddEdge(Edge{ID: "edge:bc", CallerID: "method:b", CalleeID: "method:c"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:b"})
+	g.AddNode(graph.Node{ID: "method:c"})
+	g.AddEdge(graph.Edge{ID: "edge:ac", CallerID: "method:a", CalleeID: "method:c"})
+	g.AddEdge(graph.Edge{ID: "edge:bc", CallerID: "method:b", CalleeID: "method:c"})
 
-	got := g.Neighbors("method:c", DirectionCaller)
+	got := g.Neighbors("method:c", graph.DirectionCaller)
 	if len(got) != 2 {
 		t.Fatalf("Neighbors(c, caller) returned %d edges, want 2", len(got))
 	}
@@ -144,59 +144,59 @@ func TestNeighborsReturnsCallerEdges(t *testing.T) {
 }
 
 func TestNeighborsReturnsEmptyForLeafNode(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:b"})
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:b"})
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
 
-	if got := g.Neighbors("method:b", DirectionCallee); len(got) != 0 {
+	if got := g.Neighbors("method:b", graph.DirectionCallee); len(got) != 0 {
 		t.Errorf("Neighbors(b, callee) = %v, want empty", got)
 	}
-	if got := g.Neighbors("method:a", DirectionCaller); len(got) != 0 {
+	if got := g.Neighbors("method:a", graph.DirectionCaller); len(got) != 0 {
 		t.Errorf("Neighbors(a, caller) = %v, want empty", got)
 	}
 }
 
 func TestNeighborsReturnsEmptyForUnknownNode(t *testing.T) {
-	g := New()
+	g := graph.New()
 
-	if got := g.Neighbors("method:missing", DirectionCallee); len(got) != 0 {
+	if got := g.Neighbors("method:missing", graph.DirectionCallee); len(got) != 0 {
 		t.Errorf("Neighbors(missing, callee) = %v, want empty", got)
 	}
 }
 
 func TestNeighborsReturnsEmptyForInvalidDirection(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:b"})
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:b"})
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
 
-	if got := g.Neighbors("method:a", Direction("sideways")); len(got) != 0 {
+	if got := g.Neighbors("method:a", graph.Direction("sideways")); len(got) != 0 {
 		t.Errorf("Neighbors(a, invalid direction) = %v, want empty (no silent callee fallback)", got)
 	}
-	if got := g.Neighbors("method:a", Direction("")); len(got) != 0 {
+	if got := g.Neighbors("method:a", graph.Direction("")); len(got) != 0 {
 		t.Errorf("Neighbors(a, zero direction) = %v, want empty", got)
 	}
 }
 
 func TestAddEdgeIgnoresDuplicateID(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddNode(Node{ID: "method:b"})
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddNode(graph.Node{ID: "method:b"})
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
 
-	if got := g.Neighbors("method:a", DirectionCallee); len(got) != 1 {
+	if got := g.Neighbors("method:a", graph.DirectionCallee); len(got) != 1 {
 		t.Errorf("Neighbors(a, callee) returned %d edges after duplicate AddEdge, want 1", len(got))
 	}
 }
 
 func TestNeighborsReturnsRegisteredCallSite(t *testing.T) {
-	callSite := &protocol.SourceLocation{Path: "caller.go", StartLine: 24}
-	g := New()
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite})
+	callSite := &graph.SourceLocation{Path: "caller.go", StartLine: 24}
+	g := graph.New()
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b", CallSite: callSite})
 
-	got := g.Neighbors("method:a", DirectionCallee)
+	got := g.Neighbors("method:a", graph.DirectionCallee)
 	if len(got) != 1 {
 		t.Fatalf("Neighbors(method:a, callee) = %d edges, want 1", len(got))
 	}
@@ -206,10 +206,10 @@ func TestNeighborsReturnsRegisteredCallSite(t *testing.T) {
 }
 
 func TestEdgeAllowsNilCallSite(t *testing.T) {
-	g := New()
-	g.AddEdge(Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
+	g := graph.New()
+	g.AddEdge(graph.Edge{ID: "edge:ab", CallerID: "method:a", CalleeID: "method:b"})
 
-	got := g.Neighbors("method:a", DirectionCallee)
+	got := g.Neighbors("method:a", graph.DirectionCallee)
 	if len(got) != 1 {
 		t.Fatalf("Neighbors(method:a, callee) = %d edges, want 1", len(got))
 	}
@@ -219,14 +219,14 @@ func TestEdgeAllowsNilCallSite(t *testing.T) {
 }
 
 func TestSelfLoopEdgeAppearsInBothDirections(t *testing.T) {
-	g := New()
-	g.AddNode(Node{ID: "method:a"})
-	g.AddEdge(Edge{ID: "edge:aa", CallerID: "method:a", CalleeID: "method:a"})
+	g := graph.New()
+	g.AddNode(graph.Node{ID: "method:a"})
+	g.AddEdge(graph.Edge{ID: "edge:aa", CallerID: "method:a", CalleeID: "method:a"})
 
-	if got := g.Neighbors("method:a", DirectionCallee); len(got) != 1 {
+	if got := g.Neighbors("method:a", graph.DirectionCallee); len(got) != 1 {
 		t.Errorf("Neighbors(a, callee) with self-loop = %d edges, want 1", len(got))
 	}
-	if got := g.Neighbors("method:a", DirectionCaller); len(got) != 1 {
+	if got := g.Neighbors("method:a", graph.DirectionCaller); len(got) != 1 {
 		t.Errorf("Neighbors(a, caller) with self-loop = %d edges, want 1", len(got))
 	}
 }

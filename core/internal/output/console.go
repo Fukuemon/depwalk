@@ -6,15 +6,10 @@ import (
 	"slices"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
 type consoleFormatter struct{}
-
-func init() {
-	registerFormatter(FormatConsole, consoleFormatter{})
-}
 
 func (consoleFormatter) Format(w io.Writer, view View) error {
 	if view.Status == traversal.StatusStartNotFound {
@@ -54,7 +49,7 @@ type consoleTree struct {
 type consoleChild struct {
 	node     NodeView
 	edgeID   string
-	callSite *protocol.SourceLocation
+	callSite *graph.SourceLocation
 }
 
 func newConsoleTree(view View) *consoleTree {
@@ -139,7 +134,7 @@ func (tree *consoleTree) writeChildren(w io.Writer, parentID, prefix string) err
 	return nil
 }
 
-func formatNode(node NodeView, location *protocol.SourceLocation) string {
+func formatNode(node NodeView, location *graph.SourceLocation) string {
 	label := node.Signature
 	if label == "" {
 		label = node.QualifiedName

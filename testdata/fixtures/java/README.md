@@ -16,7 +16,7 @@ application — do not add real business logic here.
 | Lambda call (`viaLambda: true`)                       | `project/.../LambdaUser.java`                                             |
 
 Parse errors and unresolved in-scope calls are no longer covered as
-"continue with a partial graph" scenarios: since spec #24 (D15 / D20), an
+"continue with a partial graph" scenarios: since the parse pre-flight and completeness gate (java-analyzer feature doc, "Parse・resolution・call 完全性"), an
 unparseable file fails the whole request with `JAVA_PARSE_ERROR` and an
 unresolved in-scope call fails it with `JAVA_INCOMPLETE_ANALYSIS`. Those
 fatal paths are asserted by the Java Analyzer's own tests, so this fixture

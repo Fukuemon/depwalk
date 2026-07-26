@@ -1,30 +1,82 @@
 package analyze
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/output"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-func TestRunBuildsGraphFromFakeAnalyzer(t *testing.T) {
+// fakeSource is an in-package Source fake: it streams the
+// configured nodes / edges to the callbacks and returns the configured
+// outcome, recording the request it received. Process-level behavior
+// (fake Analyzer subprocesses) is tested against the ACL adapter in the
+// protocol package.
+type fakeSource struct {
+	nodes   []graph.Node
+	edges   []graph.Edge
+	outcome Outcome
+	err     error
+
+	gotRequest Request
+	called     bool
+}
+
+func (f *fakeSource) Run(
+	request Request,
+	onNode func(graph.Node),
+	onEdge func(graph.Edge),
+) (Outcome, error) {
+	f.called = true
+	f.gotRequest = request
+	if f.err != nil {
+		return Outcome{}, f.err
+	}
+	for _, node := range f.nodes {
+		onNode(node)
+	}
+	for _, edge := range f.edges {
+		onEdge(edge)
+	}
+	return f.outcome, nil
+}
+
+func successSource() *fakeSource {
+	return &fakeSource{
+		nodes: []graph.Node{
+			{ID: "method:caller", Symbol: graph.Symbol{QualifiedName: "example.Caller.run", Signature: "run():void"}},
+			{ID: "method:callee", Symbol: graph.Symbol{QualifiedName: "example.Callee.run", Signature: "run():void"}},
+		},
+		edges: []graph.Edge{
+			{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:callee"},
+		},
+		outcome: Outcome{
+			Diagnostics: []Diagnostic{{Severity: "warning", Code: "JAVA_UNRESOLVED_SYMBOL", Message: "unresolved"}},
+		},
+	}
+}
+
+func querySource() *fakeSource {
+	return &fakeSource{
+		nodes: []graph.Node{
+			{ID: "opaque-caller", Symbol: graph.Symbol{QualifiedName: "com.example.Controller.call", Signature: "com.example.Controller#call()"}},
+			{ID: "opaque-target", Symbol: graph.Symbol{QualifiedName: "com.example.Service.find", Signature: "com.example.Service#find(java.lang.Long)"}},
+		},
+		edges: []graph.Edge{
+			{ID: "opaque-edge", CallerID: "opaque-caller", CalleeID: "opaque-target"},
+		},
+	}
+}
+
+func TestRunBuildsGraphFromSourceRecords(t *testing.T) {
 	t.Parallel()
 
-	result, err := Run(Options{
+	result, err := New(successSource()).Run(Options{
 		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "success"),
+		Language:      "java",
 		AnalyzerMeta:  []string{"classpath=/a.jar", "classpath=/b.jar"},
-		Getenv:        func(string) string { return "" },
 	})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -44,17 +96,84 @@ func TestRunBuildsGraphFromFakeAnalyzer(t *testing.T) {
 	if _, ok := result.Graph.Node("method:callee"); !ok {
 		t.Fatal("Graph does not contain method:callee")
 	}
+	if result.MethodQuery != nil {
+		t.Fatalf("MethodQuery = %+v, want nil without Options.Method", result.MethodQuery)
+	}
 }
 
-func TestRunPropagatesAnalyzerError(t *testing.T) {
+func TestRunPassesRequestFieldsThroughToTheSource(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "analyzer-error"),
-		Getenv:        func(string) string { return "" },
+	source := successSource()
+	workspaceRoot := t.TempDir()
+	_, err := New(source).Run(Options{
+		WorkspaceRoot: workspaceRoot,
+		SourceRoots:   []string{"module-b/src", "module-a/src"},
+		Language:      "java",
+		AnalyzerMeta:  []string{"classpath=/a.jar", "classpath=/b.jar"},
+		Include:       []string{"src/**", "generated/**"},
+		Exclude:       []string{"**/vendor/**", "**/*Test.java"},
 	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := Request{
+		WorkspaceRoot: workspaceRoot,
+		SourceRoots:   []string{"module-b/src", "module-a/src"},
+		Language:      "java",
+		Include:       []string{"src/**", "generated/**"},
+		Exclude:       []string{"**/vendor/**", "**/*Test.java"},
+		Metadata:      map[string]any{"classpath": []string{"/a.jar", "/b.jar"}},
+	}
+	if !reflect.DeepEqual(source.gotRequest, want) {
+		t.Fatalf("request = %#v, want %#v", source.gotRequest, want)
+	}
+}
+
+func TestRunRejectsInvalidAnalyzerMetaBeforeCallingTheSource(t *testing.T) {
+	t.Parallel()
+
+	source := successSource()
+	_, err := New(source).Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+		AnalyzerMeta:  []string{"missing-equals"},
+	})
+	if err == nil {
+		t.Fatal("Run() error = nil, want metadata validation error")
+	}
+	if source.called {
+		t.Fatal("source was called, want validation to fail first")
+	}
+}
+
+func TestRunRequiresASource(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(nil).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
+	if err == nil {
+		t.Fatal("Run() error = nil, want error for a missing Source")
+	}
+}
+
+func TestRunPropagatesSourceError(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("launch failed")
+	_, err := New(&fakeSource{err: want}).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
+	if !errors.Is(err, want) {
+		t.Fatalf("Run() error = %v, want the source error", err)
+	}
+}
+
+func TestRunPropagatesAnalyzerFailure(t *testing.T) {
+	t.Parallel()
+
+	source := &fakeSource{outcome: Outcome{
+		Failure:  &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"},
+		ExitCode: 1,
+	}}
+	_, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	if err == nil {
 		t.Fatal("Run() error = nil, want error for an analyzer error record")
 	}
@@ -62,23 +181,26 @@ func TestRunPropagatesAnalyzerError(t *testing.T) {
 	if !errors.As(err, &failure) {
 		t.Fatalf("Run() error = %v, want *AnalyzerFailure", err)
 	}
-	if failure.Record.Code != "JAVA_FATAL" {
-		t.Fatalf("failure code = %q, want JAVA_FATAL", failure.Record.Code)
+	if failure.Code != "JAVA_FATAL" {
+		t.Fatalf("failure code = %q, want JAVA_FATAL", failure.Code)
 	}
 }
 
-func TestRunKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
+func TestRunKeepsFatalReasonOverValidationErrorAndPublishesNothing(t *testing.T) {
 	t.Parallel()
 
-	// The fake analyzer streams a dangling call edge before its fatal error
-	// record; the fatal reason must win over the reference-completeness
-	// protocol failure, and no partial result may be published.
-	result, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "dangling-edge-then-error"),
-		Getenv:        func(string) string { return "" },
-	})
+	// A fatal record and a validation error on the same stream: the fatal
+	// reason must win, and no partial result may be published.
+	source := &fakeSource{
+		nodes: []graph.Node{{ID: "method:caller"}},
+		edges: []graph.Edge{{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:missing"}},
+		outcome: Outcome{
+			Failure:         &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"},
+			ValidationError: errors.New("dangling edge"),
+			ExitCode:        1,
+		},
+	}
+	result, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	var failure *AnalyzerFailure
 	if !errors.As(err, &failure) {
 		t.Fatalf("Run() error = %v, want *AnalyzerFailure keeping the fatal reason", err)
@@ -88,146 +210,199 @@ func TestRunKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
 	}
 }
 
-func TestRunFailsOnReferenceIncompletenessAfterCleanExit(t *testing.T) {
+func TestRunFailsOnValidationErrorAfterCleanExit(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "dangling-edge-clean-exit"),
-		Getenv:        func(string) string { return "" },
-	})
+	source := &fakeSource{outcome: Outcome{ValidationError: errors.New("dangling edge")}}
+	_, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
 	if err == nil || !strings.Contains(err.Error(), "analyzer stdout did not follow the analyzer protocol") {
-		t.Fatalf("Run() error = %v, want a protocol failure for reference incompleteness on clean exit", err)
+		t.Fatalf("Run() error = %v, want a protocol failure on clean exit", err)
 	}
 }
 
 func TestRunPropagatesNonZeroExit(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "bad-exit"),
-		Getenv:        func(string) string { return "" },
-	})
-	if err == nil {
-		t.Fatal("Run() error = nil, want error for a non-zero exit code")
+	source := &fakeSource{outcome: Outcome{ExitCode: 3}}
+	_, err := New(source).Run(Options{WorkspaceRoot: t.TempDir(), Language: "java"})
+	if err == nil || !strings.Contains(err.Error(), "exited with code 3") {
+		t.Fatalf("Run() error = %v, want error for a non-zero exit code", err)
 	}
 }
 
-func TestRunRejectsMissingAnalyzerCommand(t *testing.T) {
+// Outcome.Err folds the three result fields into one failure. Pin the
+// precedence: getting it wrong would replace the Analyzer's own fatal reason
+// with a reference-completeness error.
+func TestOutcomeErrPrefersTheFatalReason(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		Getenv:        func(string) string { return "" },
-	})
-	if err == nil {
-		t.Fatal("Run() error = nil, want validation error when no analyzer command is configured")
+	failure := &AnalyzerFailure{Code: "JAVA_FATAL", Message: "boom"}
+	tests := []struct {
+		name    string
+		outcome Outcome
+		want    string
+	}{
+		{name: "clean", outcome: Outcome{}, want: ""},
+		{
+			name:    "failure wins over exit code and validation error",
+			outcome: Outcome{Failure: failure, ExitCode: 1, ValidationError: errors.New("dangling edge")},
+			want:    failure.Error(),
+		},
+		{
+			name:    "exit code wins over validation error",
+			outcome: Outcome{ExitCode: 3, ValidationError: errors.New("dangling edge")},
+			want:    "analyzer process exited with code 3",
+		},
+		{
+			name:    "validation error on a clean exit",
+			outcome: Outcome{ValidationError: errors.New("dangling edge")},
+			want:    "analyzer stdout did not follow the analyzer protocol: dangling edge",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.outcome.Err()
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("Err() = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.want {
+				t.Fatalf("Err() = %v, want %q", err, tt.want)
+			}
+		})
 	}
 }
 
-func TestRunSendsExplicitFullGraphRequestWithFilters(t *testing.T) {
+// The original validation error is wrapped with %w so callers can still
+// reach it with errors.Is.
+func TestOutcomeErrWrapsTheValidationError(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "request-options"),
-		Include:       []string{"src/**", "generated/**"},
-		Exclude:       []string{"**/vendor/**", "**/*Test.java"},
-		Getenv:        func(string) string { return "" },
-	})
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
+	want := errors.New("dangling edge")
+	if err := (Outcome{ValidationError: want}).Err(); !errors.Is(err, want) {
+		t.Fatalf("Err() = %v, want it to wrap %v", err, want)
 	}
 }
 
-func TestRunOmitsUnsetFiltersAndEntrypoints(t *testing.T) {
+func TestRunQueryMatchesFullSignatureAndReturnsTraversal(t *testing.T) {
 	t.Parallel()
 
-	_, err := Run(Options{
+	result, err := New(querySource()).Run(Options{
 		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "request-defaults"),
-		Getenv:        func(string) string { return "" },
-	})
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-}
-
-func TestRunMarksInvalidRequestValuesAsInputErrorBeforeAnalyzerLaunch(t *testing.T) {
-	t.Parallel()
-
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   "definitely-not-a-real-analyzer",
-		Include:       []string{"../outside/**"},
-		Getenv:        func(string) string { return "" },
-	})
-	var inputErr *InputError
-	if !errors.As(err, &inputErr) {
-		t.Fatalf("Run() error = %v, want *InputError", err)
-	}
-}
-
-func TestRunQueryMatchesFullSignatureAndWritesTraversalOutput(t *testing.T) {
-	t.Parallel()
-
-	var out bytes.Buffer
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-single"),
+		Language:      "java",
 		Method:        "com.example.Service#find(java.lang.Long)",
 		Direction:     graph.DirectionCaller,
-		Format:        output.FormatJSON,
-		Output:        &out,
-		Getenv:        func(string) string { return "" },
 	})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	var document struct {
-		Start string `json:"start"`
-		Nodes []struct {
-			MethodID string `json:"methodId"`
-		} `json:"nodes"`
+	if result.MethodQuery == nil {
+		t.Fatal("MethodQuery = nil, want traversal outcome for a method query")
 	}
-	if err := json.Unmarshal(out.Bytes(), &document); err != nil {
-		t.Fatalf("query output is not valid JSON: %v\n%s", err, out.String())
+	if result.MethodQuery.Request.StartID != "opaque-target" {
+		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
 	}
-	if document.Start != "opaque-target" {
-		t.Fatalf("start = %q, want opaque-target", document.Start)
+	wantNodes := map[string]bool{"opaque-target": true, "opaque-caller": true}
+	if !reflect.DeepEqual(result.MethodQuery.Result.Nodes, wantNodes) {
+		t.Fatalf("traversal nodes = %#v, want %#v", result.MethodQuery.Result.Nodes, wantNodes)
 	}
-	if got := []string{document.Nodes[0].MethodID, document.Nodes[1].MethodID}; !reflect.DeepEqual(got, []string{"opaque-caller", "opaque-target"}) {
-		t.Fatalf("node IDs = %v, want methodId-independent caller result", got)
+	if _, ok := result.MethodQuery.Result.Edges["opaque-edge"]; !ok || len(result.MethodQuery.Result.Edges) != 1 {
+		t.Fatalf("traversal edges = %#v, want only opaque-edge", result.MethodQuery.Result.Edges)
 	}
 }
 
 func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
-	_, err := Run(Options{
+	result, err := New(querySource()).Run(Options{
 		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-single"),
+		Language:      "java",
 		Method:        "com.example.Service#find",
 		Direction:     graph.DirectionCaller,
-		Format:        output.FormatConsole,
-		Output:        &out,
-		Getenv:        func(string) string { return "" },
 	})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !strings.Contains(out.String(), "com.example.Service#find(java.lang.Long)") || !strings.Contains(out.String(), "com.example.Controller#call()") {
-		t.Fatalf("console output = %q, want selected method and caller", out.String())
+	if result.MethodQuery.Request.StartID != "opaque-target" {
+		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
+	}
+	// A selector without a signature must traverse the same as the full one.
+	if _, reached := result.MethodQuery.Result.Nodes["opaque-caller"]; !reached {
+		t.Fatalf("traversal nodes = %#v, want opaque-caller reached", result.MethodQuery.Result.Nodes)
+	}
+}
+
+func TestRunQueryPassesMaxDepthToTraversal(t *testing.T) {
+	t.Parallel()
+
+	maxDepth := 0
+	result, err := New(querySource()).Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+		Method:        "com.example.Service#find(java.lang.Long)",
+		Direction:     graph.DirectionCaller,
+		MaxDepth:      &maxDepth,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := len(result.MethodQuery.Result.Nodes); got != 1 {
+		t.Fatalf("reached nodes = %d, want start-only with max-depth 0", got)
+	}
+	cutoffs := result.MethodQuery.Result.DepthCutoffs
+	if len(cutoffs) != 1 || cutoffs["opaque-edge"].Edge.CallerID != "opaque-caller" {
+		t.Fatalf("cutoffs = %#v, want the caller edge cut at depth 0", cutoffs)
+	}
+}
+
+func TestRunQueryReturnsTypedAmbiguousSelectorErrorWithCandidates(t *testing.T) {
+	t.Parallel()
+
+	source := &fakeSource{
+		nodes: []graph.Node{
+			{ID: "opaque-long", Symbol: graph.Symbol{QualifiedName: "com.example.Service.find", Signature: "com.example.Service#find(java.lang.Long)"}},
+			{ID: "opaque-string", Symbol: graph.Symbol{QualifiedName: "com.example.Service.find", Signature: "com.example.Service#find(java.lang.String)"}},
+		},
+	}
+	_, err := New(source).Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+		Method:        "com.example.Service#find",
+		Direction:     graph.DirectionCaller,
+	})
+	var inputErr *InputError
+	if !errors.As(err, &inputErr) {
+		t.Fatalf("Run() error = %v, want *InputError", err)
+	}
+	for _, candidate := range []string{
+		"com.example.Service#find(java.lang.Long)",
+		"com.example.Service#find(java.lang.String)",
+	} {
+		if !strings.Contains(err.Error(), candidate) {
+			t.Errorf("error %q missing candidate %q", err, candidate)
+		}
+	}
+}
+
+func TestRunQueryReturnsTypedNotFoundSelectorError(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(querySource()).Run(Options{
+		WorkspaceRoot: t.TempDir(),
+		Language:      "java",
+		Method:        "com.example.Missing#run",
+		Direction:     graph.DirectionCaller,
+	})
+	var inputErr *InputError
+	if !errors.As(err, &inputErr) {
+		t.Fatalf("Run() error = %v, want *InputError", err)
+	}
+	if !strings.Contains(err.Error(), "did not match any method") {
+		t.Fatalf("Run() error = %v, want not-found explanation", err)
 	}
 }
 
@@ -289,274 +464,3 @@ func TestSelectMethodReportsNestedOverloadsWithoutSignature(t *testing.T) {
 		}
 	}
 }
-
-func TestRunQueryPassesMaxDepthToTraversal(t *testing.T) {
-	t.Parallel()
-
-	maxDepth := 0
-	var out bytes.Buffer
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-single"),
-		Method:        "com.example.Service#find(java.lang.Long)",
-		Direction:     graph.DirectionCaller,
-		MaxDepth:      &maxDepth,
-		Format:        output.FormatJSON,
-		Output:        &out,
-		Getenv:        func(string) string { return "" },
-	})
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-	var document struct {
-		Nodes        []json.RawMessage `json:"nodes"`
-		DepthCutoffs []struct {
-			TargetMethodID string `json:"targetMethodId"`
-		} `json:"depthCutoffs"`
-	}
-	if err := json.Unmarshal(out.Bytes(), &document); err != nil {
-		t.Fatalf("query output is not valid JSON: %v", err)
-	}
-	if len(document.Nodes) != 1 || len(document.DepthCutoffs) != 1 || document.DepthCutoffs[0].TargetMethodID != "opaque-caller" {
-		t.Fatalf("max-depth output = nodes:%d cutoffs:%#v, want start-only with caller cutoff", len(document.Nodes), document.DepthCutoffs)
-	}
-}
-
-func TestRunQueryPropagatesOutputWriteFailure(t *testing.T) {
-	t.Parallel()
-
-	want := errors.New("write failed")
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-single"),
-		Method:        "com.example.Service#find(java.lang.Long)",
-		Direction:     graph.DirectionCaller,
-		Format:        output.FormatConsole,
-		Output:        writerFunc(func([]byte) (int, error) { return 0, want }),
-		Getenv:        func(string) string { return "" },
-	})
-	if !errors.Is(err, want) {
-		t.Fatalf("Run() error = %v, want wrapped output error", err)
-	}
-}
-
-func TestRunQueryReturnsTypedAmbiguousSelectorErrorWithCandidates(t *testing.T) {
-	t.Parallel()
-
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-overloaded"),
-		Method:        "com.example.Service#find",
-		Direction:     graph.DirectionCaller,
-		Format:        output.FormatConsole,
-		Output:        io.Discard,
-		Getenv:        func(string) string { return "" },
-	})
-	var inputErr *InputError
-	if !errors.As(err, &inputErr) {
-		t.Fatalf("Run() error = %v, want *InputError", err)
-	}
-	for _, candidate := range []string{
-		"com.example.Service#find(java.lang.Long)",
-		"com.example.Service#find(java.lang.String)",
-	} {
-		if !strings.Contains(err.Error(), candidate) {
-			t.Errorf("error %q missing candidate %q", err, candidate)
-		}
-	}
-}
-
-func TestRunQueryReturnsTypedNotFoundSelectorError(t *testing.T) {
-	t.Parallel()
-
-	_, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "query-single"),
-		Method:        "com.example.Missing#run",
-		Direction:     graph.DirectionCaller,
-		Format:        output.FormatConsole,
-		Output:        io.Discard,
-		Getenv:        func(string) string { return "" },
-	})
-	var inputErr *InputError
-	if !errors.As(err, &inputErr) {
-		t.Fatalf("Run() error = %v, want *InputError", err)
-	}
-	if !strings.Contains(err.Error(), "did not match any method") {
-		t.Fatalf("Run() error = %v, want not-found explanation", err)
-	}
-}
-
-func TestRunWithoutMethodKeepsSummaryModeAndDoesNotWriteQueryOutput(t *testing.T) {
-	t.Parallel()
-
-	var out bytes.Buffer
-	result, err := Run(Options{
-		WorkspaceRoot: t.TempDir(),
-		Language:      protocol.LanguageJava,
-		AnalyzerCmd:   fakeAnalyzerCommand(t, "success"),
-		Output:        &out,
-		Getenv:        func(string) string { return "" },
-	})
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-	if out.Len() != 0 {
-		t.Fatalf("query output = %q, want none without Method", out.String())
-	}
-	if result.MethodCount != 2 || result.CallEdgeCount != 1 {
-		t.Fatalf("summary counts = %d/%d, want 2/1", result.MethodCount, result.CallEdgeCount)
-	}
-}
-
-// fakeAnalyzerCommand returns an --analyzer-cmd string that re-invokes the
-// current test binary as a fake Analyzer process (TestFakeAnalyzerHelperProcess
-// below), keeping analyze package tests independent of a JVM.
-func fakeAnalyzerCommand(t *testing.T, scenario string) string {
-	t.Helper()
-
-	return fmt.Sprintf(`"%s" -test.run=TestFakeAnalyzerHelperProcess -- --fake-analyzer %s`, os.Args[0], scenario)
-}
-
-// TestFakeAnalyzerHelperProcess is not a real test. It is re-executed as a
-// subprocess by fakeAnalyzerCommand and acts as a minimal Analyzer Protocol
-// implementation for tests in this package.
-func TestFakeAnalyzerHelperProcess(t *testing.T) {
-	scenario := helperScenario()
-	if scenario == "" {
-		return
-	}
-
-	requestBytes, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		os.Exit(2)
-	}
-
-	switch scenario {
-	case "success":
-		fmt.Print(methodSymbolJSONL("method:caller", "example.Caller.run") +
-			methodSymbolJSONL("method:callee", "example.Callee.run") +
-			callEdgeJSONL("edge:1", "method:caller", "method:callee") +
-			diagnosticJSONL())
-		os.Exit(0)
-	case "analyzer-error":
-		fmt.Print(`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"boom"}` + "\n")
-		os.Exit(1)
-	case "dangling-edge-then-error":
-		fmt.Print(methodSymbolJSONL("method:caller", "example.Caller.run") +
-			callEdgeJSONL("edge:1", "method:caller", "method:missing") +
-			`{"schemaVersion":"1","recordType":"error","code":"JAVA_FATAL","message":"boom"}` + "\n")
-		os.Exit(1)
-	case "dangling-edge-clean-exit":
-		fmt.Print(methodSymbolJSONL("method:caller", "example.Caller.run") +
-			callEdgeJSONL("edge:1", "method:caller", "method:missing"))
-		os.Exit(0)
-	case "bad-exit":
-		os.Exit(3)
-	case "request-options":
-		assertFakeAnalyzerRequest(requestBytes, true)
-		os.Exit(0)
-	case "request-defaults":
-		assertFakeAnalyzerRequest(requestBytes, false)
-		os.Exit(0)
-	case "query-single":
-		fmt.Print(methodSymbolWithSignatureJSONL("opaque-caller", "com.example.Controller.call", "com.example.Controller#call()") +
-			methodSymbolWithSignatureJSONL("opaque-target", "com.example.Service.find", "com.example.Service#find(java.lang.Long)") +
-			callEdgeJSONL("opaque-edge", "opaque-caller", "opaque-target"))
-		os.Exit(0)
-	case "query-overloaded":
-		fmt.Print(methodSymbolWithSignatureJSONL("opaque-long", "com.example.Service.find", "com.example.Service#find(java.lang.Long)") +
-			methodSymbolWithSignatureJSONL("opaque-string", "com.example.Service.find", "com.example.Service#find(java.lang.String)"))
-		os.Exit(0)
-	default:
-		os.Exit(2)
-	}
-}
-
-func assertFakeAnalyzerRequest(requestBytes []byte, withFilters bool) {
-	var request protocol.AnalysisRequest
-	if err := json.Unmarshal(requestBytes, &request); err != nil {
-		fmt.Fprintf(os.Stderr, "decode request: %v\n", err)
-		os.Exit(2)
-	}
-	if request.AnalysisMode != protocol.AnalysisModeFullGraph {
-		fmt.Fprintf(os.Stderr, "analysisMode = %q, want fullGraph\n", request.AnalysisMode)
-		os.Exit(2)
-	}
-	if len(request.Entrypoints) != 0 {
-		fmt.Fprintf(os.Stderr, "entrypoints = %#v, want empty\n", request.Entrypoints)
-		os.Exit(2)
-	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(requestBytes, &raw); err != nil {
-		fmt.Fprintf(os.Stderr, "decode raw request: %v\n", err)
-		os.Exit(2)
-	}
-	if _, present := raw["entrypoints"]; present {
-		fmt.Fprintln(os.Stderr, "entrypoints field present, want omitted")
-		os.Exit(2)
-	}
-	if withFilters {
-		if !reflect.DeepEqual(request.Include, []string{"src/**", "generated/**"}) || !reflect.DeepEqual(request.Exclude, []string{"**/vendor/**", "**/*Test.java"}) {
-			fmt.Fprintf(os.Stderr, "filters = %#v/%#v, want ordered values\n", request.Include, request.Exclude)
-			os.Exit(2)
-		}
-		return
-	}
-	if _, present := raw["include"]; present {
-		fmt.Fprintln(os.Stderr, "include field present, want omitted")
-		os.Exit(2)
-	}
-	if _, present := raw["exclude"]; present {
-		fmt.Fprintln(os.Stderr, "exclude field present, want omitted")
-		os.Exit(2)
-	}
-}
-
-func helperScenario() string {
-	args := os.Args
-	for i, arg := range args {
-		if arg == "--fake-analyzer" && i+1 < len(args) {
-			return args[i+1]
-		}
-	}
-	return ""
-}
-
-func methodSymbolJSONL(methodID, qualifiedName string) string {
-	return fmt.Sprintf(
-		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":%q,"language":"java","symbolKind":"method","qualifiedName":%q,"signature":"run():void"}`+"\n",
-		methodID,
-		qualifiedName,
-	)
-}
-
-func methodSymbolWithSignatureJSONL(methodID, qualifiedName, signature string) string {
-	return fmt.Sprintf(
-		`{"schemaVersion":"1","recordType":"methodSymbol","methodId":%q,"language":"java","symbolKind":"method","qualifiedName":%q,"signature":%q}`+"\n",
-		methodID,
-		qualifiedName,
-		signature,
-	)
-}
-
-func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
-	return fmt.Sprintf(
-		`{"schemaVersion":"1","recordType":"callEdge","edgeId":%q,"callerMethodId":%q,"calleeMethodId":%q}`+"\n",
-		edgeID,
-		callerMethodID,
-		calleeMethodID,
-	)
-}
-
-func diagnosticJSONL() string {
-	return `{"schemaVersion":"1","recordType":"diagnostic","severity":"warning","code":"JAVA_UNRESOLVED_SYMBOL","message":"unresolved"}` + "\n"
-}
-
-type writerFunc func([]byte) (int, error)
-
-func (f writerFunc) Write(p []byte) (int, error) { return f(p) }

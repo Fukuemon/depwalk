@@ -9,8 +9,6 @@
 // depend only on this read API, not on the internal representation.
 package graph
 
-import "github.com/Fukuemon/depwalk/core/internal/protocol"
-
 // Direction selects which adjacency a graph read follows.
 type Direction string
 
@@ -27,6 +25,18 @@ type Node struct {
 	Symbol Symbol
 }
 
+// SourceLocation identifies a source range relative to the workspace root.
+// It is a graph-owned value type independent of the Analyzer wire format;
+// wire records are converted into it at the protocol boundary. StartColumn,
+// EndLine, and EndColumn are optional and nil when the Analyzer omitted them.
+type SourceLocation struct {
+	Path        string
+	StartLine   int
+	StartColumn *int
+	EndLine     *int
+	EndColumn   *int
+}
+
 // Symbol describes a method represented by a [Node]. Source is optional.
 // Metadata is an optional graph-owned opaque JSON object copied from the
 // Analyzer record; the graph, traversal, and output layers never interpret
@@ -35,7 +45,7 @@ type Node struct {
 type Symbol struct {
 	QualifiedName string
 	Signature     string
-	Source        *protocol.SourceLocation
+	Source        *SourceLocation
 	Metadata      map[string]any
 }
 
@@ -47,7 +57,7 @@ type Edge struct {
 	ID       string
 	CallerID string
 	CalleeID string
-	CallSite *protocol.SourceLocation
+	CallSite *SourceLocation
 	Metadata map[string]any
 }
 

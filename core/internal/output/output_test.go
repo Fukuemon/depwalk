@@ -2,19 +2,20 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"reflect"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
-	"github.com/Fukuemon/depwalk/core/internal/protocol"
+	"github.com/Fukuemon/depwalk/core/internal/graph/graphtest"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
 func TestBuildViewResolvesSymbolsAndSortsCollections(t *testing.T) {
-	source := &protocol.SourceLocation{Path: "a.go", StartLine: 10}
-	callSite := &protocol.SourceLocation{Path: "z.go", StartLine: 20}
+	source := &graph.SourceLocation{Path: "a.go", StartLine: 10}
+	callSite := &graph.SourceLocation{Path: "z.go", StartLine: 20}
 	nodeMetadata := map[string]any{"declarationOrigin": "projectClasses"}
 	edgeMetadata := map[string]any{"resolution": "springDi"}
 	g := graph.New()
@@ -128,13 +129,10 @@ func TestRegisteredFormatsReturnsRegisteredFormatNames(t *testing.T) {
 	}
 }
 
-func TestWriteBuildsViewAndCallsRegisteredFormatter(t *testing.T) {
-	const format Format = "test"
+func TestWriteBuildsViewAndCallsFormatter(t *testing.T) {
 	formatter := &recordingFormatter{}
-	registerFormatter(format, formatter)
-	t.Cleanup(func() { delete(formatters, format) })
 
-	g := graph.NewBuilder().Node("method:a").Build()
+	g := graphtest.NewBuilder().Node("method:a").Build()
 	in := Input{
 		Graph: g,
 		Result: traversal.Result{
@@ -146,26 +144,75 @@ func TestWriteBuildsViewAndCallsRegisteredFormatter(t *testing.T) {
 	}
 	var out bytes.Buffer
 
-	if err := Write(&out, format, in); err != nil {
-		t.Fatalf("Write(test) returned error: %v", err)
+	if err := write(&out, formatter, in); err != nil {
+		t.Fatalf("write() returned error: %v", err)
 	}
 	if !formatter.called || formatter.view.Start.ID != "method:a" {
 		t.Errorf("formatter call = called:%v view:%#v, want resolved method:a", formatter.called, formatter.view)
 	}
 	if out.String() != "formatted" {
-		t.Errorf("Write(test) output = %q, want formatted", out.String())
+		t.Errorf("write() output = %q, want formatted", out.String())
 	}
 }
 
 func TestWriteReturnsFormatterError(t *testing.T) {
-	const format Format = "failing-test"
 	want := errors.New("write failed")
-	registerFormatter(format, formatterFunc(func(_ io.Writer, _ View) error { return want }))
-	t.Cleanup(func() { delete(formatters, format) })
+	formatter := formatterFunc(func(_ io.Writer, _ View) error { return want })
 
-	err := Write(&bytes.Buffer{}, format, Input{Graph: graph.New()})
+	err := write(&bytes.Buffer{}, formatter, Input{Graph: graph.New()})
 	if !errors.Is(err, want) {
-		t.Errorf("Write() error = %v, want %v", err, want)
+		t.Errorf("write() error = %v, want %v", err, want)
+	}
+}
+
+// Write must dispatch to the formatter registered for the requested
+// format. The seam tests above pass a formatter in directly, so they stay
+// green even if the registry maps a format to the wrong formatter.
+func TestWriteDispatchesToTheFormatterOfTheRequestedFormat(t *testing.T) {
+	g := graphtest.NewBuilder().Node("method:a").Build()
+	in := Input{
+		Graph: g,
+		Result: traversal.Result{
+			Status: traversal.StatusOK,
+			Nodes:  map[string]bool{"method:a": true}, Depths: map[string]int{"method:a": 0},
+			Edges: map[string]graph.Edge{}, Cycles: map[string]bool{}, DepthCutoffs: map[string]traversal.DepthCutoff{},
+		},
+		Request: traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee},
+	}
+
+	tests := []struct {
+		format   Format
+		wantJSON bool
+	}{
+		{format: FormatConsole, wantJSON: false},
+		{format: FormatJSON, wantJSON: true},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.format), func(t *testing.T) {
+			var out bytes.Buffer
+			if err := Write(&out, tt.format, in); err != nil {
+				t.Fatalf("Write(%s) returned error: %v", tt.format, err)
+			}
+			if out.Len() == 0 {
+				t.Fatalf("Write(%s) produced no output", tt.format)
+			}
+			if gotJSON := json.Valid(out.Bytes()); gotJSON != tt.wantJSON {
+				t.Fatalf("Write(%s) produced JSON = %v, want %v (output: %q)", tt.format, gotJSON, tt.wantJSON, out.String())
+			}
+		})
+	}
+}
+
+// Write returns the formatter's error unchanged instead of swallowing it.
+// This goes through the registry path, so it uses an input that always
+// fails rather than a stub formatter.
+func TestWritePropagatesFormatterErrorThroughTheRegistry(t *testing.T) {
+	want := errors.New("writer closed")
+	failing := writerFunc(func([]byte) (int, error) { return 0, want })
+
+	err := Write(failing, FormatJSON, Input{Graph: graph.New()})
+	if !errors.Is(err, want) {
+		t.Fatalf("Write() error = %v, want the writer error", err)
 	}
 }
 
@@ -180,6 +227,12 @@ func (f *recordingFormatter) Format(w io.Writer, view View) error {
 	_, err := io.WriteString(w, "formatted")
 	return err
 }
+
+// writerFunc adapts a function to io.Writer so a test can force a write
+// failure.
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 
 type formatterFunc func(io.Writer, View) error
 

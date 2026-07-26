@@ -1,5 +1,8 @@
-// Package analyzer runs Analyzer processes through the Analyzer Protocol SPI.
+// Package analyzer runs Analyzer processes: it owns spawn, stdin / stdout /
+// stderr streaming, and exit code handling only.
 //
-// The package owns process orchestration only. Protocol records, validation,
-// and JSONL parsing are delegated to the protocol package.
+// The JSONL payload is opaque byte lines here. Composing the analysis
+// request and parsing / validating Analyzer Protocol records are the
+// protocol package's responsibility (ACL); this package depends on no
+// other internal package.
 package analyzer

@@ -33,6 +33,10 @@ func TestAnalyzeCommandBuildsGraphThroughFakeAnalyzer(t *testing.T) {
 	if got := stdout.String(); !strings.Contains(got, "analyzed 2 method(s), 1 call edge(s)") {
 		t.Fatalf("stdout = %q, want a summary of 2 methods and 1 call edge", got)
 	}
+	// Without --method only the summary is written, never traversal output.
+	if got := stdout.String(); strings.Contains(got, `"schemaVersion"`) || strings.Contains(got, `"nodes"`) {
+		t.Fatalf("stdout = %q, want no query output without --method", got)
+	}
 	if got := stderr.String(); !strings.Contains(got, "diagnostic [warning]") {
 		t.Fatalf("stderr = %q, want the propagated diagnostic", got)
 	}
