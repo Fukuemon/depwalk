@@ -22,6 +22,7 @@ description: >-
 - `references/command-matrix.md` — コマンド分類と用途の解説
 - `references/filter-scope.md` — module スコープの考え方 (workspace / monorepo の場合)
 - `references/e2e-runtime.md` — E2E の env contract (該当する場合)
+- `references/rtk.md` — bash 出力を圧縮して token を削る RTK の導入と注意 (任意 / 開発者ごとの global 設定)
 
 ## 入力
 
@@ -40,6 +41,7 @@ description: >-
 3. **コマンド解決**: `context/project.yml` の `commands` から該当コマンドを引く。表に無い操作は発明せず、ユーザーに確認するか project.yml への追記を提案する。
 4. **E2E** は `references/e2e-runtime.md` の env contract に従う (プロジェクトが E2E を持つ場合)。
 5. **pre-commit ゲート** がある場合は、hook 経由で自動実行される。手動で先に流したいときは該当コマンドを直接実行する。
+6. **出力が長いコマンド** (test / lint / `git diff` / `git log`) は、`rtk` が入っている環境なら `rtk <command>` で読む (`references/rtk.md`)。全文が必要な検証では素の命令に戻す。
 
 ## 停止条件
 

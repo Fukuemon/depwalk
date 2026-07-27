@@ -4,7 +4,7 @@ spec (`specs/<...>/index.md`) の `## 設計時の論点` テーブルから論�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-contract.md` (Spec Workflow Contract)
 - 対象 spec の `index.md` 全体
 - 必要に応じて `reconcile-upstream.md` (同 dir)
 

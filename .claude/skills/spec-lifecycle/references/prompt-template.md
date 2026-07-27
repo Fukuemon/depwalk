@@ -1,7 +1,7 @@
 # Prompt Template
 
 phase: prompts (`phase-prompts.md`) が生成する各 prompt の骨組み。生成時はこのテンプレートをコピーし、`{ }` プレースホルダを埋める。
-project 固有のレビュー CLI / branch 運用は spec / `AGENTS.md` / `workflow-git` 側に閉じ込め、本テンプレートには直書きしない。
+project 固有のレビュー CLI / branch 運用は spec / `context/project.yml` / `workflow-git` 側に閉じ込め、本テンプレートには直書きしない。
 (下記は prompt 本体のひな形。`text` fence は underscore を含む例示名をそのまま保つため)
 
 ```text
@@ -28,7 +28,7 @@ depends_on: [{依存する prompt のファイル名。依存なしなら空配�
 
 ### ステップ 0: ブランチ準備と着手記録
 
-ブランチ命名と base branch は `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` に従う。
+ブランチ命名と base branch は `context/project.yml` の `naming.branch` および `workflow-git` に従う。
 
 1. 対象 issue の `status:*` が `status:implementing` でなければ付け替え、状態遷移コメントを残す
    (`workflow-git` の `references/issue-status.md`。既に implementing なら何もしない)

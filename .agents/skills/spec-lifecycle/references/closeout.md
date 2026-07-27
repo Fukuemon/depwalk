@@ -30,6 +30,34 @@ durable な情報は sync で design / ADR / context に救出済みであるこ
 3. **削除の承認**: 削除対象・刈り取り結果・参照差し替えを提示し、承認を取る (contract の「承認の取り方」)
 4. **削除と commit**: `git rm -r specs/<issue-id>-<slug>/` し、削除 commit のメッセージに
    issue 番号を含める (例: `chore(spec): closeout #<N> — durable 成果は <反映先> へ反映済み`)
+5. **残存検査**: 残存検査を実行し、**残存ゼロを確認する** (手順を踏んだつもりで消し漏れる事故を塞ぐ最後のゲート)
+   - 消費 repo: `make -f sdd-template.mk check-specs` (実体は配布された `scripts/check-specs-residue.sh`)
+   - プロジェクトが独自の入口を持つ場合は `context/project.yml` の `commands` から解決する
+   - 終了コード: `0` 残存なし / `1` 残存あり (closeout 未実施) / `2` 検査不能 (gh の認証・権限・想定外の値)。
+     **`2` を合格として扱わない** — 検査できていないだけで、残存の有無は不明
+
+## 実装 PR に削除を含めるか、別 PR にするか
+
+`Closes #<N>` で issue を閉じる **実装 PR に spec 削除を含める**のが既定。close 時点で spec が無くなるため、
+「issue は閉じたが spec は残っている」窓が生じない。
+
+別 PR にする場合は、その窓の間だけ残存検査が `1` を返す。検査を CI の必須チェックにしているなら、
+先に削除 PR をマージするか、window の扱いを決めてから分ける。
+
+残存検査は消費 repo の CI (`.github/workflows/spec-residue.yml` — デフォルトブランチへの push + 毎週 + 手動)
+にも載っている。PR ゲートではないため、検出は「マージ後に気付く」経路になる。手元で手順 5 を回すのが一次防御。
+
+## 自動起票 workflow を使う場合
+
+消費 repo に `.github/workflows/spec-closeout.yml` (テンプレ配布分) がある場合、issue の close を
+トリガに **spec を削除する PR が自動起票される**。bot は削除せず提案するだけで、削除の可否は
+その PR をマージするかどうかで決まる。
+
+- 前提条件の確認・最終刈り取り・参照の後始末 (上記手順 1〜2) は **人が行う**。自動起票された PR の
+  チェックリストがその確認項目になる
+- 未反映の durable 成果が見つかったら PR をマージせず、先に sync してから再度 closeout する
+- spec を残す判断をしたら PR を close し、**残す理由を issue にコメントする** (残存検査は検出し続ける)
+- workflow が発火しない / 障害時は `workflow_dispatch` で issue 番号を指定して手動実行できる
 
 ## 停止条件
 
@@ -37,3 +65,4 @@ durable な情報は sync で design / ADR / context に救出済みであるこ
 - 最終刈り取りで ADR 未起票の意思決定が見つかった (ADR 化してから再開する)
 - 削除の承認が得られていない
 - 参照の差し替え先 (ADR / feature doc) が存在しない — 反映漏れの兆候。sync に戻る
+- 残存検査が `2` (検査不能) を返した — gh の認証・権限を直してから再実行する (合格扱いにしない)
