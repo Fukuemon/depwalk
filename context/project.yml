@@ -39,6 +39,10 @@ naming:
   core_packages: core/internal/{graph,traversal,analyze,protocol,analyzer,output,cli}
   analyzer_dir: analyzers/<language>/
   branch: feature/<issue-id>
+  # 統合ブランチ (default branch)。feature branch はここから切り、PR もここへ出す。
+  base_branch: develop
+  # リリース先。v1 リリースまでは中身を持たせず、初期 commit のまま据え置く。
+  release_branch: main
 
 # Quick Commands。Core の標準 command は adr/0002 を正本とする。
 # repository-level の make-like wrapper は初期導入しない。
