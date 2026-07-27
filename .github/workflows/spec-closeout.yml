@@ -16,8 +16,11 @@ name: Spec closeout
 # 起票された PR で CI を回したい場合 (required check がある repo では必須):
 #   既定の `github.token` による push / PR 作成は、GitHub 側の再帰実行防止により workflow を
 #   発火させない。repo/org secret に `CLOSEOUT_PR_TOKEN` (contents:write / pull-requests:write を
-#   持つ PAT または GitHub App token) を置くと、そちらを優先して使い CI が回る。
-#   未設定なら `github.token` にフォールバックし、PR は起票されるが CI は回らない。
+#   持つ PAT) を置くと、そちらを優先して使い CI が回る。未設定なら `github.token` へ
+#   フォールバックし、PR は起票されるが CI は回らない。
+#   GitHub App を使う場合、installation token を secret に固定しないこと。1 時間で失効し、
+#   「空でないが期限切れ」の secret がフォールバックを塞いで closeout 自体が止まる。
+#   run ごとに token を発行する step (actions/create-github-app-token 等) を足す。
 
 on:
   issues:
