@@ -12,6 +12,12 @@ name: Spec closeout
 #     (無効だと gh pr create が "GitHub Actions is not permitted to create or approve pull requests" で失敗する)
 # `issues` イベントの workflow は **デフォルトブランチ版が実行される**。本ファイルを
 # デフォルトブランチへマージするまで発火しない。
+#
+# 起票された PR で CI を回したい場合 (required check がある repo では必須):
+#   既定の `github.token` による push / PR 作成は、GitHub 側の再帰実行防止により workflow を
+#   発火させない。repo/org secret に `CLOSEOUT_PR_TOKEN` (contents:write / pull-requests:write を
+#   持つ PAT または GitHub App token) を置くと、そちらを優先して使い CI が回る。
+#   未設定なら `github.token` にフォールバックし、PR は起票されるが CI は回らない。
 
 on:
   issues:
@@ -35,6 +41,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          # push 時の認証にもこの token を使う。PAT があれば push が workflow を発火させる
+          token: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
 
       - name: Resolve spec dir from context/project.yml
         id: config
@@ -77,7 +85,7 @@ jobs:
         id: existing
         if: steps.target.outputs.found == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
           BRANCH: ${{ steps.target.outputs.branch }}
         run: |
           set -euo pipefail
@@ -100,12 +108,16 @@ jobs:
           git commit -q \
             -m "chore(spec): closeout #${ISSUE} — spec を削除" \
             -m "issue #${ISSUE} の close にともなう closeout。sync 済みかの確認は本 PR のレビューで行う。"
-          git push -q origin "$BRANCH"
+          # force で上書きする: 前回 run が PR 起票前に落ちた場合や PR を close して branch が残った
+          # 場合、同名の remote branch が残り非 fast-forward で push が拒否される (再実行しても復旧
+          # できない)。この branch 名前空間は本 workflow 専有で、直前の step が open PR 不在を
+          # 確認済みのため、レビュー中の変更を壊すことはない。
+          git push -q --force origin "$BRANCH"
 
       - name: Open deletion PR
         if: steps.target.outputs.found == 'true' && steps.existing.outputs.open == '0'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
           BRANCH: ${{ steps.target.outputs.branch }}
           DIR: ${{ steps.target.outputs.dir }}
           ISSUE: ${{ steps.target.outputs.issue }}
