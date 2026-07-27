@@ -10,13 +10,16 @@ name: Spec residue check
 # 終了コード: 0 = 残存なし / 1 = 残存あり (closeout 未実施) / 2 = 検査不能 (gh 認証・権限・想定外の値)。
 # 2 を成功扱いにしないこと (検査できていないだけで、残存の有無は不明)。
 
+# 全 branch を受けて job 側でデフォルトブランチに絞る: on.push.branches はデフォルトブランチ名を
+# 動的に解決できず、branch 名を決め打ちすると別名 (trunk 等) の消費 repo で push 検査が効かない。
+# 対象外の branch では job が skip され、runner は起動しない。
+#
+# paths filter は置かない: 本検査の主目的である「issue を閉じたが spec を消していない」ケースは
+# spec dir を触らないため、paths で絞ると最も拾いたい変更を取りこぼす。
+# あわせて paths.spec_dir を specs/ 以外にしている消費 repo でも検査が効く。
 on:
   push:
-    branches: [main, master, develop]
-    paths:
-      - "specs/**"
-      - "scripts/check-specs-residue.sh"
-      - ".github/workflows/spec-residue.yml"
+    branches: ["**"]
   schedule:
     - cron: "0 0 * * 1" # 毎週月曜 00:00 UTC — spec 削除を伴わない issue close を拾う
   workflow_dispatch:
@@ -27,6 +30,7 @@ permissions:
 
 jobs:
   check:
+    if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
