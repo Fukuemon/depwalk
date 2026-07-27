@@ -77,6 +77,20 @@
       "Shell(npx rulesync:*)",
       "Shell(pwd)",
       "Shell(rg:*)",
+      "Shell(rtk --version)",
+      "Shell(rtk cat:*)",
+      "Shell(rtk find:*)",
+      "Shell(rtk gain)",
+      "Shell(rtk git diff:*)",
+      "Shell(rtk git log:*)",
+      "Shell(rtk git show:*)",
+      "Shell(rtk git status:*)",
+      "Shell(rtk grep:*)",
+      "Shell(rtk ls:*)",
+      "Shell(rtk read:*)",
+      "Shell(rtk rg:*)",
+      "Shell(rtk test:*)",
+      "Shell(rtk tree:*)",
       "Shell(rulesync:*)",
       "Shell(stat:*)",
       "Shell(tail:*)",
@@ -87,10 +101,6 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:zenn.dev)"
     ],
-    "deny": [
-      "Shell(rm -rf /*)",
-      "Shell(rm -rf /:*)",
-      "Shell(rm -rf ~:*)"
-    ]
+    "deny": ["Shell(rm -rf /*)", "Shell(rm -rf /:*)", "Shell(rm -rf ~:*)"]
   }
 }

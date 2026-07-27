@@ -1,0 +1,146 @@
+name: Spec closeout
+
+# issue が close されたとき、その spec ディレクトリが残っていれば「削除を提案する PR」を起票する。
+#
+# 自動では消さない: 削除の前提である「durable な設計成果が design / context / ADR へ sync 済みか」は
+# 機械判定できないため、削除の可否は起票された PR をマージするかどうかで人が決める。
+# closeout 手順の正本は `spec-lifecycle` skill の references/closeout.md。
+#
+# 消費 repo 側の前提 (Settings → Actions → General):
+#   - Workflow permissions = Read and write
+#   - Allow GitHub Actions to create and approve pull requests = 有効
+#     (無効だと gh pr create が "GitHub Actions is not permitted to create or approve pull requests" で失敗する)
+# `issues` イベントの workflow は **デフォルトブランチ版が実行される**。本ファイルを
+# デフォルトブランチへマージするまで発火しない。
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: closeout 対象の issue 番号
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose-deletion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Resolve spec dir from context/project.yml
+        id: config
+        run: |
+          set -euo pipefail
+          # 固有値は直書きせず paths.spec_dir (例: specs/<issue-id>-<slug>/) の固定部分を使う
+          specs_dir=""
+          if [ -f context/project.yml ]; then
+            specs_dir="$(sed -n 's/^[[:space:]]*spec_dir:[[:space:]]*\([^#]*\).*/\1/p' context/project.yml | head -1)"
+            specs_dir="${specs_dir%%<*}"
+            specs_dir="$(printf '%s' "$specs_dir" | tr -d '"'"'"' ' | sed 's:/*$::')"
+          fi
+          echo "specs_dir=${specs_dir:-specs}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve target spec
+        id: target
+        env:
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          SPECS_DIR: ${{ steps.config.outputs.specs_dir }}
+        run: |
+          set -euo pipefail
+          if [ ! -d "$SPECS_DIR" ]; then
+            echo "$SPECS_DIR/ が無い。何もしない"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # "<issue>-" の前方一致。3-* が 31-* を拾わないようハイフンを含めて照合する
+          dir="$(find "$SPECS_DIR" -maxdepth 1 -type d -name "${ISSUE}-*" -print -quit)"
+          if [ -z "$dir" ]; then
+            echo "issue #${ISSUE} の spec は存在しない。何もしない"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue=${ISSUE}" >> "$GITHUB_OUTPUT"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+          echo "branch=chore/closeout-${ISSUE}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if a closeout PR is already open
+        id: existing
+        if: steps.target.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.target.outputs.branch }}
+        run: |
+          set -euo pipefail
+          n="$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')"
+          echo "open=${n}" >> "$GITHUB_OUTPUT"
+          [ "$n" = "0" ] || echo "既に $BRANCH の PR が open。再起票しない"
+
+      - name: Create deletion branch
+        if: steps.target.outputs.found == 'true' && steps.existing.outputs.open == '0'
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+          DIR: ${{ steps.target.outputs.dir }}
+          ISSUE: ${{ steps.target.outputs.issue }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git rm -rq "$DIR"
+          git commit -q \
+            -m "chore(spec): closeout #${ISSUE} — spec を削除" \
+            -m "issue #${ISSUE} の close にともなう closeout。sync 済みかの確認は本 PR のレビューで行う。"
+          git push -q origin "$BRANCH"
+
+      - name: Open deletion PR
+        if: steps.target.outputs.found == 'true' && steps.existing.outputs.open == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.target.outputs.branch }}
+          DIR: ${{ steps.target.outputs.dir }}
+          ISSUE: ${{ steps.target.outputs.issue }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/body.md <<BODY
+          ## Summary
+
+          issue #${ISSUE} が close されたため、\`${DIR}\` の削除を提案する。**この PR をマージするかどうかが削除の判断**であり、自動では消していない。
+
+          ## 判断してほしいこと
+
+          durable な設計成果 (IA / データモデル / フロー / アーキ判断 / 規約) が design / context / ADR に反映済みか。未反映があれば **この PR をマージせず**、先に反映してから再度 closeout する。
+
+          - [ ] durable な設計成果が design / context / ADR に反映済み
+          - [ ] 選択肢を比較して決めた判断は ADR に昇格済み
+          - [ ] この spec を指すリンクが他文書に残っていない (残っていれば issue リンクへ置換)
+          - [ ] 上記を確認した
+
+          手順の正本は \`spec-lifecycle\` skill の \`references/closeout.md\` (前提条件・最終刈り取り・参照の後始末)。
+
+          ## 却下する場合
+
+          この PR を close すれば spec は残る。ただし残存検査 (\`make -f sdd-template.mk check-specs\`) は検出し続けるため、残す理由を issue #${ISSUE} にコメントで残しておくとよい。
+
+          ## Related Issues
+
+          - Refs #${ISSUE}
+
+          ---
+          この PR は \`.github/workflows/spec-closeout.yml\` が自動起票した。
+          BODY
+          gh pr create \
+            --base "$BASE" \
+            --head "$BRANCH" \
+            --title "chore: closeout #${ISSUE} — spec を削除" \
+            --body-file /tmp/body.md

@@ -9,6 +9,7 @@ import sys
 from common import current_branch, is_protected_branch
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit"}
+WRAPPERS = {"rtk"}
 READONLY_GIT = {
     "status",
     "diff",
@@ -76,6 +77,17 @@ CHECKOUT_FLAGS_WITH_VALUE = {
     "-B",
     "-b",
 }
+
+
+def strip_wrappers(argv: list[str]) -> list[str]:
+    """`rtk git commit ...` のようなラッパー前置を剥がして素の argv にする。
+
+    RTK (bash 出力圧縮プロキシ) は `git ...` を `rtk git ...` に書き換えるため、
+    前置を剥がさないと protected branch ガードが素通りする。
+    """
+    while argv and argv[0] in WRAPPERS:
+        argv = argv[1:]
+    return argv
 
 
 def deny(reason: str) -> int:
@@ -181,6 +193,8 @@ def main() -> int:
             argv = shlex.split(command)
         except ValueError:
             argv = []
+
+        argv = strip_wrappers(argv)
 
         if not argv or argv[0] != "git":
             return 0

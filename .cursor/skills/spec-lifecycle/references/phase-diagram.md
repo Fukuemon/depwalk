@@ -5,7 +5,7 @@ spec の `## フロー / シーケンス` セクションに Mermaid 図を生�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-contract.md` (Spec Workflow Contract)
 - 対象 spec の `index.md` (要件解釈 / 機能仕様 / Appendix)
 - `diagram-rules.md` (同 dir)
 

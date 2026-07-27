@@ -5,7 +5,7 @@ PRD / Design Doc / feature doc / context / ADR 別のテーブルに差分を分
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-contract.md` (Spec Workflow Contract)
 - 対象 spec の `## 上位資料からの変更点` セクション (現状)
 - 対象 spec の他セクション (会話中の変更を拾うため)
 
