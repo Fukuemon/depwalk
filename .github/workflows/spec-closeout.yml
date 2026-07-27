@@ -1,26 +1,18 @@
 name: Spec closeout
 
-# issue が close されたとき、その spec ディレクトリが残っていれば「削除を提案する PR」を起票する。
+# issue の close 時に spec ディレクトリが残っていれば、削除を提案する PR を起票する。
+# 自動では消さない: 削除の前提 (durable な成果が design / context / ADR へ sync 済みか) は
+# 機械判定できないため、可否は PR のマージで人が決める。手順の正本は `spec-lifecycle` skill の
+# references/closeout.md、消費 repo 側の設定手順は README。
 #
-# 自動では消さない: 削除の前提である「durable な設計成果が design / context / ADR へ sync 済みか」は
-# 機械判定できないため、削除の可否は起票された PR をマージするかどうかで人が決める。
-# closeout 手順の正本は `spec-lifecycle` skill の references/closeout.md。
+# 前提: Settings → Actions → General で Workflow permissions = Read and write と
+# "Allow GitHub Actions to create and approve pull requests" を有効にする。`issues` イベントは
+# デフォルトブランチ版が実行されるため、本ファイルをマージするまで発火しない。
 #
-# 消費 repo 側の前提 (Settings → Actions → General):
-#   - Workflow permissions = Read and write
-#   - Allow GitHub Actions to create and approve pull requests = 有効
-#     (無効だと gh pr create が "GitHub Actions is not permitted to create or approve pull requests" で失敗する)
-# `issues` イベントの workflow は **デフォルトブランチ版が実行される**。本ファイルを
-# デフォルトブランチへマージするまで発火しない。
-#
-# 起票された PR で CI を回したい場合 (required check がある repo では必須):
-#   既定の `github.token` による push / PR 作成は、GitHub 側の再帰実行防止により workflow を
-#   発火させない。repo/org secret に `CLOSEOUT_PR_TOKEN` (contents:write / pull-requests:write を
-#   持つ PAT) を置くと、そちらを優先して使い CI が回る。未設定なら `github.token` へ
-#   フォールバックし、PR は起票されるが CI は回らない。
-#   GitHub App を使う場合、installation token を secret に固定しないこと。1 時間で失効し、
-#   「空でないが期限切れ」の secret がフォールバックを塞いで closeout 自体が止まる。
-#   run ごとに token を発行する step (actions/create-github-app-token 等) を足す。
+# secret CLOSEOUT_PR_TOKEN (任意、contents:write / pull-requests:write を持つ PAT):
+# 既定の github.token による push / PR 作成は再帰実行防止で workflow を発火させないため、
+# 未設定だと起票された PR に CI が回らない。GitHub App の installation token は 1 時間で失効し、
+# 期限切れの値がフォールバックを塞ぐので secret に固定せず run ごとに発行する。
 
 on:
   issues:
@@ -111,10 +103,8 @@ jobs:
           git commit -q \
             -m "chore(spec): closeout #${ISSUE} — spec を削除" \
             -m "issue #${ISSUE} の close にともなう closeout。sync 済みかの確認は本 PR のレビューで行う。"
-          # force で上書きする: 前回 run が PR 起票前に落ちた場合や PR を close して branch が残った
-          # 場合、同名の remote branch が残り非 fast-forward で push が拒否される (再実行しても復旧
-          # できない)。この branch 名前空間は本 workflow 専有で、直前の step が open PR 不在を
-          # 確認済みのため、レビュー中の変更を壊すことはない。
+          # 前回 run の残骸 branch があると非 fast-forward で詰むため force で上書きする。
+          # branch 名前空間は本 workflow 専有で、直前の step が open PR 不在を確認済み。
           git push -q --force origin "$BRANCH"
 
       - name: Open deletion PR
