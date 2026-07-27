@@ -21,7 +21,7 @@ description: 単一プロンプトを複数の非対話 CLI エージェント (
 - `references/parallel-execution.md` — 並列起動と出力収集の正準シェルパターン
 - `references/failure-handling.md` — 失敗分類とリトライ/スキップ方針、status テーブル様式
 - `references/aggregation.md` — 収集結果の汎用提示フォーマット
-- root rule の `Skill 共通契約` (正本 `.rulesync/rules/CLAUDE.md`、各 provider へ `AGENTS.md` / `CLAUDE.md` として生成) — 固有値はレジストリを読む
+- `rulesync-sync` の `references/skill-contract.md` (Skill 共通契約) — 固有値はレジストリを読む
 
 ## 入力
 

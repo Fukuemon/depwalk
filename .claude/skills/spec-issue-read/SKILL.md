@@ -16,7 +16,7 @@ Issue tracker から指定 issue を取得し、要約と推奨次アクショ�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract` — tracker (CLI / project) の参照先を確認する
+- `spec-lifecycle` の `references/spec-contract.md` (Spec Workflow Contract) — tracker (CLI / project) の参照先を確認する
 
 ## 入力
 

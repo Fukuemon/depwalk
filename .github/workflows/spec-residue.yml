@@ -1,0 +1,43 @@
+name: Spec residue check
+
+# closed issue の spec dir が削除されずに残っていないかを検査する (closeout 契約の機械検査)。
+# 実体は scripts/check-specs-residue.sh (sdd-template から実ファイルコピーで配布)。
+#
+# PR では回さない: `Closes #N` の PR を別 PR で清算する運用だと「issue は閉じたが spec は
+# 残っている」窓が生じ、無関係な PR を落とすため。デフォルトブランチへの push と定期実行で
+# 検出し、失敗は Actions の通知で気付く形にする (ゲートにしたい場合は下記メモを参照)。
+#
+# 終了コード: 0 = 残存なし / 1 = 残存あり (closeout 未実施) / 2 = 検査不能 (gh 認証・権限・想定外の値)。
+# 2 を成功扱いにしないこと (検査できていないだけで、残存の有無は不明)。
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - "specs/**"
+      - "scripts/check-specs-residue.sh"
+      - ".github/workflows/spec-residue.yml"
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 00:00 UTC — spec 削除を伴わない issue close を拾う
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check spec residue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPECS_CHECK_REPO: ${{ github.repository }}
+        run: bash scripts/check-specs-residue.sh
+# PR ゲートにする場合のメモ:
+#   pull_request トリガを足し、「issue を閉じる PR に spec 削除を含める」運用を先に徹底する
+#   (closeout.md の「実装 PR に削除を含めるか、別 PR にするか」)。徹底できていない状態で
+#   ゲートにすると、spec 削除待ちの窓の間、無関係な PR が落ちる。
