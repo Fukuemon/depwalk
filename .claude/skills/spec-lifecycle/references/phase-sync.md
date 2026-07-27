@@ -9,7 +9,7 @@ spec が `## 上位資料からの変更点` テーブルに残した「変更�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-contract.md` (Spec Workflow Contract)
 - 対象 spec の `index.md`
 - 反映候補の上位文書 (PRD / Design Doc / feature doc / context / 関連 ADR)
 

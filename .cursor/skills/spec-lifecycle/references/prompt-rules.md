@@ -56,7 +56,7 @@ spec の `## 要件の解釈` の EARS 風記述から、対応する受け入�
 ## ブランチ準備
 
 各 prompt の `## 作業ステップ` 冒頭に「ステップ 0: ブランチ準備」を入れる。
-ブランチ命名 / ベースブランチは `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` の値を使う。
+ブランチ命名 / ベースブランチは `context/project.yml` の `naming.branch` および `workflow-git` の値を使う。
 prompt にプロジェクト固有のブランチ運用 (target branch 切替手順 等) を直書きしない。
 
 ## 命名規則

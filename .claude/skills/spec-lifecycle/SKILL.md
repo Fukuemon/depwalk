@@ -22,7 +22,7 @@ gate phase の完了時に `spec-review` (fresh-context evaluator) を必ず通�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `references/spec-contract.md` (Spec Workflow Contract)
 - `context/project.yml` の `spec.phases` (実行する phase の集合と順序)
 - `references/phase-guide.md` (本プロジェクトで毎回確認する論点)
 - 各 phase の手順は実行時に該当 `references/phase-*.md` を Read する (下記実行フロー参照)

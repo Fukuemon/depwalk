@@ -17,7 +17,7 @@ description: 実装・レビュー・障害対応で得た横断的な知見 (�
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract` — 正本境界 (どの文書がどの情報の正本か) と「文書メタ情報の同期」
+- `spec-lifecycle` の `references/spec-contract.md` (Spec Workflow Contract) — 正本境界 (どの文書がどの情報の正本か) と「文書メタ情報の同期」
 - `context/project.yml` と既存の `context/*.md` — 追記先の候補と既存記述 (重複防止)
 - `styleguide-documents` skill — 書き戻す文章の品質基準
 
