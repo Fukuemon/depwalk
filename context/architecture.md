@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-26
+> 最終更新: 2026-07-28
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -76,7 +76,7 @@ Core と Analyzer の共有境界は Protocol doc、ADR、JSONL fixture、contra
 Go package や Java 実装 code を共有しない。
 
 > 依存境界の自動検査 (Go: golangci-lint + depguard、Java: ArchUnit) は [engineering.md](engineering.md) の quality gate で扱う。
-> Core (Go) 側の依存方向は #34 で実装済み (実 import は上の生成依存図と一致)。Java Analyzer 側の内部境界は #35 で実装するため、完了までコードは旧配置の場合がある。
+> Core (Go) / Java Analyzer とも実装済みで、本 doc の記述と実コードの import は一致している (Go は上の生成依存図が drift 検査で保証、Java は ArchUnit が保証)。
 
 ## Runtime Boundary
 
