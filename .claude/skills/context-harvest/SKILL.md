@@ -60,13 +60,12 @@ issue 固有の決定は spec に残す (本 skill の対象外。`Spec Workflow
 
 ### 3-2. 読み取り索引の更新
 
-索引の場所は `context/project.yml` の `paths.reading_index` (null なら本節を skip)。
+索引の場所・更新手段 (手編集か再生成か) は `spec-lifecycle` の `references/spec-contract.md`「読み取り索引の解決」に従う。
 書き戻した知見が特定 feature に紐づく場合、索引の該当エントリを同時に更新する:
 
 - 該当エントリの `read:` に書き戻し先ファイルが含まれているか確認し、無ければ足す
 - 新しい feature ならエントリを新設する (`coverage: partial` で仮置きしてよい)
 - 書き戻しで context が揃った feature は `coverage: partial` → `full` に上げる
-- `paths.reading_index_generated` が true なら索引は生成物。手編集せず `commands` の生成 task を実行する
 
 索引が実態とずれると読み取り契約 (索引 → `read:` だけを読む) が壊れ、全文読みに逆戻りする。
 
