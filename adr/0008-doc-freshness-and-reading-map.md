@@ -203,8 +203,9 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 
 - spec 更新要否: 要。[issue #40](https://github.com/Fukuemon/depwalk/issues/40) のスコープへ frontmatter 化を取り込み、索引生成器と鮮度検査は後続 issue として分割する
   - #40 (拡張): frontmatter 規約の制定・全対象文書 14 本と `templates/` 9 本への適用。`context/impact-index.yaml` は `context/reading-map.yaml` へ改名し、生成物化を前提に手で埋めない。読み直した文書のみ `verified_commit` を入れ、残りは `unverified` とする
-  - 後続 A: `scripts/reading-map.sh` — frontmatter から読み取りマップと各 README の索引区間を生成し、drift を FAIL させる (lefthook + CI)
-  - 後続 B: `scripts/doc-freshness.sh` — stale 一覧を CI の job summary に出す
+  - [#45](https://github.com/Fukuemon/depwalk/issues/45): 2 つのスクリプトを実装する。互いに独立しているため PR は分けてよい
+    - `scripts/reading-map.sh` — frontmatter から読み取りマップと各 README の索引区間を生成し、drift を FAIL させる (lefthook + CI)
+    - `scripts/doc-freshness.sh` — stale 一覧を CI の job summary に出す
 - context / AI 向け設定更新要否: 要
   - `context/README.md` の Freshness 契約を frontmatter ベースへ改訂する
   - `context/reading-map.yaml` (改名後) の冒頭コメント (育て方) を生成物である旨へ改訂する
@@ -218,4 +219,6 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 - [context/README.md](../context/README.md): 改訂対象の Freshness 契約
 - [context/impact-index.yaml](../context/impact-index.yaml): 生成物化と `context/reading-map.yaml` への改名の対象
 - [design/DesignDoc.md](../design/DesignDoc.md)
-- issue / PR: [#40](https://github.com/Fukuemon/depwalk/issues/40) (文書再編成。frontmatter 化を取り込む)
+- issue / PR:
+  - [#40](https://github.com/Fukuemon/depwalk/issues/40): 文書再編成。frontmatter 化と `reading-map.yaml` への改名を取り込む
+  - [#45](https://github.com/Fukuemon/depwalk/issues/45): 読み取りマップの生成器と鮮度検査スクリプトの実装 (#40 が前提)

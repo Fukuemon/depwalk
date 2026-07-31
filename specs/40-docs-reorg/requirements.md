@@ -99,7 +99,7 @@
 - **設計判断そのものの見直し**: ADR に記録済みの決定 (層構成 / ACL / 依存方向 / 外部ライブラリ隔離) は本 issue では再検討しない
 - **推敲による内容の変更**: 読みやすさのための書き換えで、記述している判断・制約・契約の意味を変えない。意味を変える必要が見つかったら別 issue へ切り出す
 - **sdd-template 側の変更**: 共有プロセス層 (`.rulesync/`) の改訂は対象外。テンプレ側の課題を見つけたら別 issue へ切り出す。ADR-0008 が定める `verified_commit` の更新責務 (`spec-lifecycle` の sync phase / `context-harvest`) はこれに該当し、`skill-feedback` 経由で正本へ書き戻す
-- **生成器と鮮度検査スクリプトの実装**: ADR-0008 の `scripts/reading-map.sh` (索引生成 + drift 検査) と `scripts/doc-freshness.sh` (stale 通知) は後続 issue で実装する。本 issue は入力となる frontmatter の整備までを担う
+- **生成器と鮮度検査スクリプトの実装**: ADR-0008 の `scripts/reading-map.sh` (索引生成 + drift 検査) と `scripts/doc-freshness.sh` (stale 通知) は #45 で実装する。本 issue は入力となる frontmatter の整備までを担う
 - **PRD の新規作成**: 統合モード (Why/What は DesignDoc に内包) を維持する
 
 ## 業務ルール
