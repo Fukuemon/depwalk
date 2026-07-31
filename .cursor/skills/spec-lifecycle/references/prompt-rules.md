@@ -28,8 +28,9 @@ phase: prompts (`phase-prompts.md`) で生成する prompt の粒度 / 責務境
 - 他 app / package の追加探索を要求しない
 - 検証コマンドは `context/project.yml` の `commands` にある標準 task を直接書く
 - 「既存コードを参考に」「既存実装を確認して」等の探索誘発表現を使わない
-- `## 実装コンテキスト` に列挙する path は、`context/impact-index.yaml` があれば該当 feature の
-  `read:` から採る (索引に無い path を手当たり次第に足さない。エントリが無ければ索引の整備を先に提案する)
+- `## 実装コンテキスト` に列挙する path は、読み取り索引 (`context/project.yml` の `paths.reading_index`)
+  があれば該当 feature の `read:` から採る
+  (索引に無い path を手当たり次第に足さない。エントリが無ければ索引の整備を先に提案する)
 
 ## 受け入れ基準の EARS 風書き換え
 
@@ -56,7 +57,7 @@ spec の `## 要件の解釈` の EARS 風記述から、対応する受け入�
 ## ブランチ準備
 
 各 prompt の `## 作業ステップ` 冒頭に「ステップ 0: ブランチ準備」を入れる。
-ブランチ命名 / ベースブランチは `AGENTS.md` の `Spec Workflow Contract` および `workflow-git` の値を使う。
+ブランチ命名 / ベースブランチは `context/project.yml` の `naming.branch` および `workflow-git` の値を使う。
 prompt にプロジェクト固有のブランチ運用 (target branch 切替手順 等) を直書きしない。
 
 ## 命名規則
