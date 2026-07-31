@@ -7,10 +7,12 @@ import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,7 +22,8 @@ import java.util.stream.Stream;
 
 /**
  * 全 context の source root から include / exclude 適用後の Java file 集合を
- * 構築する。glob と SourceLocation の基準は workspaceRoot のままとし (D4)、
+ * 構築する。glob と SourceLocation の基準は workspaceRoot のままとし
+ * (java-analyzer feature doc「Source root discovery と解析 context」)、
  * file は正規化済み絶対 path で 1 回だけ解析されるよう重複排除する。
  */
 public final class ContextScope {
@@ -39,6 +42,18 @@ public final class ContextScope {
             Map<String, List<Path>> filesByContext,
             List<Path> allFiles,
             Set<Path> membership) {
+        /**
+         * 全 component を反復順を保ったまま防御的コピーする。membership は
+         * {@code AttributionResolver} が保持し続けるため、生成後の変更が解析結果へ
+         * 波及しないようここで確定させる。
+         */
+        public Scope {
+            Map<String, List<Path>> copiedFiles = new LinkedHashMap<>();
+            filesByContext.forEach((contextId, files) -> copiedFiles.put(contextId, List.copyOf(files)));
+            filesByContext = Collections.unmodifiableMap(copiedFiles);
+            allFiles = List.copyOf(allFiles);
+            membership = Collections.unmodifiableSet(new LinkedHashSet<>(membership));
+        }
     }
 
     /**
@@ -79,7 +94,8 @@ public final class ContextScope {
                         continue;
                     }
                     // root 相対 path が source binary name の近似。異なる context の
-                    // 同一 binary name は現行 methodId で区別できないため fatal (D6)。
+                    // 同一 binary name は現行 methodId で区別できないため fatal
+                    // (java-analyzer feature doc「Source root discovery と解析 context」)。
                     String binaryName = RelativePaths.toRecordPath(root.relativize(absolute).toString());
                     String owner = binaryNameOwners.putIfAbsent(binaryName, context.id());
                     if (owner != null && !owner.equals(context.id())) {
@@ -98,10 +114,16 @@ public final class ContextScope {
             filesByContext.put(context.id(), files);
         }
         allFiles.sort((a, b) -> workspaceRelative(workspaceRoot, a).compareTo(workspaceRelative(workspaceRoot, b)));
-        return new Scope(filesByContext, List.copyOf(allFiles), membership);
+        return new Scope(filesByContext, allFiles, membership);
     }
 
-    /** workspace 相対の record path 表現を返す。 */
+    /**
+     * workspace 相対の record path 表現を返す。
+     *
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     * @param file workspaceRoot 配下の file
+     * @return {@code /} 区切りの workspace 相対 path
+     */
     public static String workspaceRelative(Path workspaceRoot, Path file) {
         return RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString());
     }
@@ -117,14 +139,19 @@ public final class ContextScope {
         }
     }
 
-    /** include / exclude glob を {@link PathMatcher} 一覧へ変換する。 */
+    /**
+     * include / exclude glob を {@link PathMatcher} 一覧へ変換する。
+     *
+     * @param globs workspace 相対 glob。null または空なら空一覧を返す
+     * @return glob と同順の matcher 一覧
+     */
     public static List<PathMatcher> toMatchers(List<String> globs) {
         if (globs == null || globs.isEmpty()) {
             return List.of();
         }
         List<PathMatcher> matchers = new ArrayList<>();
         for (String glob : globs) {
-            matchers.add(java.nio.file.FileSystems.getDefault().getPathMatcher("glob:" + glob));
+            matchers.add(FileSystems.getDefault().getPathMatcher("glob:" + glob));
         }
         return matchers;
     }

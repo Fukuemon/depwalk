@@ -29,6 +29,9 @@ public final class GradleModelDiscovery {
     private final ToolingClient client;
     private final PrintStream stderr;
 
+    /**
+     * @param stderr 安全通知と phase 観測行の出力先
+     */
     public GradleModelDiscovery(ToolingClient client, PrintStream stderr) {
         this.client = client;
         this.stderr = stderr;
@@ -39,7 +42,6 @@ public final class GradleModelDiscovery {
      * Tooling API runtime を完全に bypass する。
      *
      * @param sourceRoots analysisRequest.sourceRoots (省略時 null)
-     * @return 明示 override なら true
      */
     public static boolean isExplicitOverride(List<String> sourceRoots) {
         return sourceRoots != null;
@@ -52,7 +54,9 @@ public final class GradleModelDiscovery {
      * @param workspaceRoot 対象 build の root directory
      * @return provider が返した build model
      * @throws DiscoveryFailure 対応範囲外 version、daemon JVM 非互換、
-     *     provider 非互換、model 取得失敗
+     *     provider 非互換 (build / project model が不完全)、model 取得失敗、
+     *     または全 project を通じて main Java source root が 1 件も無い場合
+     *     ({@code NO_JAVA_SOURCE_ROOTS})
      */
     public DepwalkGradleModel discover(Path workspaceRoot) throws DiscoveryFailure {
         stderr.println(SAFETY_NOTICE);

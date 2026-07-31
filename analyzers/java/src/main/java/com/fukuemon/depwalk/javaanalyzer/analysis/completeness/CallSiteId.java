@@ -1,7 +1,10 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
+import java.util.Comparator;
+
 /**
- * 解析対象 call site の決定的な内部識別子 (spec #24 D17 / D28)。
+ * 解析対象 call site の決定的な内部識別子
+ * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
  * lexical site (workspace 相対 path + source range + AST call kind) と
  * semantic caller method ID の組で一意になる。initializer 内の 1 lexical call は
  * caller (constructor) ごとに別 ID へ展開される。Protocol へは出力しない。
@@ -42,33 +45,17 @@ public record CallSiteId(
         }
     }
 
+    private static final Comparator<CallSiteId> ORDER = Comparator.comparing(CallSiteId::path)
+            .thenComparingInt(CallSiteId::beginLine)
+            .thenComparingInt(CallSiteId::beginColumn)
+            .thenComparingInt(CallSiteId::endLine)
+            .thenComparingInt(CallSiteId::endColumn)
+            .thenComparing(CallSiteId::callKind)
+            .thenComparing(CallSiteId::callerMethodId);
+
     /** inventory 登録順と details 出力順を安定させる決定的順序。 */
     @Override
     public int compareTo(CallSiteId other) {
-        int c = path.compareTo(other.path);
-        if (c != 0) {
-            return c;
-        }
-        c = Integer.compare(beginLine, other.beginLine);
-        if (c != 0) {
-            return c;
-        }
-        c = Integer.compare(beginColumn, other.beginColumn);
-        if (c != 0) {
-            return c;
-        }
-        c = Integer.compare(endLine, other.endLine);
-        if (c != 0) {
-            return c;
-        }
-        c = Integer.compare(endColumn, other.endColumn);
-        if (c != 0) {
-            return c;
-        }
-        c = callKind.compareTo(other.callKind);
-        if (c != 0) {
-            return c;
-        }
-        return callerMethodId.compareTo(other.callerMethodId);
+        return ORDER.compare(this, other);
     }
 }

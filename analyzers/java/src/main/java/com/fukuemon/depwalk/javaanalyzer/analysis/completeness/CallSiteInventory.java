@@ -28,13 +28,15 @@ import com.github.javaparser.resolution.declarations.ResolvedMethodLikeDeclarati
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
  * resolver とは独立した AST 走査で、解析対象 call kind の全 lexical site を
- * semantic caller ごとに登録する inventory (spec #24 D17 / D28)。
+ * semantic caller ごとに登録する inventory
+ * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
  * caller 導出は {@link CallerIdentities} を介して CallGraphBuilder と同じ規則を
  * 共有する。callee の型解決は一切行わない。
  */
@@ -43,11 +45,18 @@ public final class CallSiteInventory {
     private final Path workspaceRoot;
     private final Set<CallSiteId> ids = new LinkedHashSet<>();
 
+    /**
+     * @param workspaceRoot 絶対・正規化済み workspace root
+     */
     public CallSiteInventory(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
     }
 
-    /** parse 済み CU の call site を登録する (solver 処理前に呼ぶ)。 */
+    /**
+     * parse 済み CU の call site を登録する (solver 処理前に呼ぶ)。
+     *
+     * @param cu storage path を持つ parse 済み compilation unit
+     */
     public void accept(CompilationUnit cu) {
         String path = cu.getStorage()
                 .map(storage -> RelativePaths.toRecordPath(
@@ -57,77 +66,58 @@ public final class CallSiteInventory {
     }
 
     private void walk(Node node, String path, Node enclosingType, List<String> callers) {
-        if (node instanceof TypeDeclaration<?> td) {
-            recurse(node, path, td, List.of());
-            return;
-        }
-        if (node instanceof MethodDeclaration md) {
-            recurse(node, path, enclosingType, List.of(CallerIdentities.methodCallerId(enclosingType, md, path)));
-            return;
-        }
-        if (node instanceof ConstructorDeclaration cd) {
-            recurse(node, path, enclosingType, List.of(CallerIdentities.constructorCallerId(enclosingType, cd, path)));
-            return;
-        }
-        if (node instanceof CompactConstructorDeclaration ccd) {
-            recurse(node, path, enclosingType,
-                    List.of(CallerIdentities.compactConstructorCallerId(enclosingType, ccd, path)));
-            return;
-        }
-        if (node instanceof InitializerDeclaration id) {
-            recurse(node, path, enclosingType, id.isStatic()
-                    ? List.of(CallerIdentities.staticInitializerId(enclosingType))
-                    : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
-            return;
-        }
-        if (node instanceof FieldDeclaration fd) {
-            recurse(node, path, enclosingType, fd.isStatic()
-                    ? List.of(CallerIdentities.staticInitializerId(enclosingType))
-                    : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
-            return;
-        }
-        if (node instanceof EnumConstantDeclaration) {
+        switch (node) {
+            case TypeDeclaration<?> td -> recurse(node, path, td, List.of());
+            case MethodDeclaration md ->
+                    recurse(node, path, enclosingType, List.of(CallerIdentities.methodCallerId(enclosingType, md, path)));
+            case ConstructorDeclaration cd ->
+                    recurse(node, path, enclosingType,
+                            List.of(CallerIdentities.constructorCallerId(enclosingType, cd, path)));
+            case CompactConstructorDeclaration ccd ->
+                    recurse(node, path, enclosingType,
+                            List.of(CallerIdentities.compactConstructorCallerId(enclosingType, ccd, path)));
+            case InitializerDeclaration id ->
+                    recurse(node, path, enclosingType, id.isStatic()
+                            ? List.of(CallerIdentities.staticInitializerId(enclosingType))
+                            : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
+            case FieldDeclaration fd ->
+                    recurse(node, path, enclosingType, fd.isStatic()
+                            ? List.of(CallerIdentities.staticInitializerId(enclosingType))
+                            : CallerIdentities.instanceInitializerCallerIds(enclosingType, path));
             // enum constant の引数評価は <clinit> 意味論。
-            recurse(node, path, enclosingType, List.of(CallerIdentities.staticInitializerId(enclosingType)));
-            return;
-        }
-        if (node instanceof LambdaExpr) {
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof MethodCallExpr mce) {
-            register(mce, path, CallSiteId.CallKind.METHOD_CALL, enclosingType, callers);
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof MethodReferenceExpr mre) {
-            register(mre, path, CallSiteId.CallKind.METHOD_REFERENCE, enclosingType, callers);
-            recurse(node, path, enclosingType, callers);
-            return;
-        }
-        if (node instanceof ObjectCreationExpr oce) {
-            register(oce, path, CallSiteId.CallKind.OBJECT_CREATION, enclosingType, callers);
-            for (Node argument : oce.getArguments()) {
-                walk(argument, path, enclosingType, callers);
+            case EnumConstantDeclaration enumConstant ->
+                    recurse(node, path, enclosingType, List.of(CallerIdentities.staticInitializerId(enclosingType)));
+            case LambdaExpr lambda -> recurse(node, path, enclosingType, callers);
+            case MethodCallExpr mce -> {
+                register(mce, path, CallSiteId.CallKind.METHOD_CALL, enclosingType, callers);
+                recurse(node, path, enclosingType, callers);
             }
-            oce.getScope().ifPresent(scope -> walk(scope, path, enclosingType, callers));
-            if (oce.getAnonymousClassBody().isPresent()) {
-                for (BodyDeclaration<?> member : oce.getAnonymousClassBody().get()) {
-                    walk(member, path, oce, List.of());
+            case MethodReferenceExpr mre -> {
+                register(mre, path, CallSiteId.CallKind.METHOD_REFERENCE, enclosingType, callers);
+                recurse(node, path, enclosingType, callers);
+            }
+            case ObjectCreationExpr oce -> {
+                register(oce, path, CallSiteId.CallKind.OBJECT_CREATION, enclosingType, callers);
+                for (Node argument : oce.getArguments()) {
+                    walk(argument, path, enclosingType, callers);
+                }
+                oce.getScope().ifPresent(scope -> walk(scope, path, enclosingType, callers));
+                if (oce.getAnonymousClassBody().isPresent()) {
+                    for (BodyDeclaration<?> member : oce.getAnonymousClassBody().get()) {
+                        walk(member, path, oce, List.of());
+                    }
                 }
             }
-            return;
-        }
-        if (node instanceof ExplicitConstructorInvocationStmt ecis) {
-            register(ecis, path, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, enclosingType, callers);
-            for (Node argument : ecis.getArguments()) {
-                walk(argument, path, enclosingType, callers);
+            case ExplicitConstructorInvocationStmt ecis -> {
+                register(ecis, path, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, enclosingType, callers);
+                for (Node argument : ecis.getArguments()) {
+                    walk(argument, path, enclosingType, callers);
+                }
+                // qualified super (`expr.super(...)`) の outer 式内の call も登録する。
+                ecis.getExpression().ifPresent(expression -> walk(expression, path, enclosingType, callers));
             }
-            // qualified super (`expr.super(...)`) の outer 式内の call も登録する。
-            ecis.getExpression().ifPresent(expression -> walk(expression, path, enclosingType, callers));
-            return;
+            default -> recurse(node, path, enclosingType, callers);
         }
-        recurse(node, path, enclosingType, callers);
     }
 
     private void recurse(Node node, String path, Node enclosingType, List<String> callers) {
@@ -145,7 +135,14 @@ public final class CallSiteInventory {
         }
     }
 
-    /** lexical site + semantic caller から決定的な {@link CallSiteId} を作る。 */
+    /**
+     * lexical site + semantic caller から決定的な {@link CallSiteId} を作る。
+     *
+     * @param callNode source range を持つ call 表現の AST node
+     * @param path workspace 相対 path
+     * @param callerMethodId 呼び出し元の method id (未解決なら placeholder id)
+     * @throws IllegalStateException {@code callNode} が source range を持たない場合
+     */
     public static CallSiteId of(Node callNode, String path, CallSiteId.CallKind kind, String callerMethodId) {
         Range range = callNode.getRange()
                 .orElseThrow(() -> new IllegalStateException("call site without a source range: " + kind));
@@ -163,8 +160,9 @@ public final class CallSiteInventory {
         return ids.contains(id);
     }
 
+    /** 登録順を保った変更不可 view。 */
     public Set<CallSiteId> ids() {
-        return java.util.Collections.unmodifiableSet(ids);
+        return Collections.unmodifiableSet(ids);
     }
 
     /**
@@ -189,6 +187,13 @@ public final class CallSiteInventory {
             return PLACEHOLDER_PREFIX + path + ":" + line;
         }
 
+        /**
+         * method 宣言の caller id を返す。解決できない場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return 正規化 signature 由来の method id、または placeholder id
+         */
         public static String methodCallerId(Node enclosingType, MethodDeclaration md, String path) {
             try {
                 ResolvedMethodDeclaration resolved = md.resolve();
@@ -199,6 +204,13 @@ public final class CallSiteInventory {
             }
         }
 
+        /**
+         * constructor 宣言の caller id を返す。解決できない場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (type 宣言または anonymous class の生成式)
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return {@code <init>} の method id、または placeholder id
+         */
         public static String constructorCallerId(Node enclosingType, ConstructorDeclaration cd, String path) {
             try {
                 ResolvedConstructorDeclaration resolved = cd.resolve();
@@ -209,6 +221,15 @@ public final class CallSiteInventory {
             }
         }
 
+        /**
+         * record の compact constructor の caller id を、record 成分から
+         * 引数型を復元して返す。enclosing が record 宣言でない場合や解決に
+         * 失敗した場合は placeholder id を返す。
+         *
+         * @param enclosingType 宣言を囲む型 (record 宣言を期待する)
+         * @param path placeholder 生成に使う workspace 相対 path
+         * @return {@code <init>} の method id、または placeholder id
+         */
         public static String compactConstructorCallerId(Node enclosingType, CompactConstructorDeclaration ccd, String path) {
             try {
                 if (!(enclosingType instanceof RecordDeclaration rd)) {

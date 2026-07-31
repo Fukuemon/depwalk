@@ -27,7 +27,7 @@ Core と Analyzer は別プロセスとし、Analyzer SPI は JSONL over STDIN/S
 - record の受信者は対応済み major version の未知 field を無視し、未対応 major version を拒否する。
 - 任意 field の追加は互換変更、必須 field の追加・削除、field 型変更、field 意味論変更、record type 削除は breaking change とする。
 
-### 状態追記 (spec #24 sync、2026-07-18)
+### 状態追記 (issue #24 sync、2026-07-18)
 
 JSONL の transport streaming と request 単位の成功結果公開を分離する。
 
@@ -37,7 +37,7 @@ JSONL の transport streaming と request 単位の成功結果公開を分離�
 - valid `error`、非ゼロ exit、stdout の parse / schema error は、それ以前の graph record と diagnostic をすべて無効にする。fatal stream には参照完全性を要求せず staging Graph を破棄する。
 - request fatal でも観測可能にする情報は Protocol 共通 `error.details` (`code` / `message` 必須、`sourceLocation` / opaque `metadata` 任意) に正規化し、Core / CLI は Analyzer 固有 code に分岐せず汎用表示する。
 
-Protocol / Model の具体 schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。決定経緯は [spec #8](../specs/8-analyzer-protocol/) に残す。
+Protocol / Model の具体 schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) に残す。
 
 ## 代替案
 
@@ -70,12 +70,12 @@ Protocol / Model の具体 schema は [Analyzer Protocol / SPI feature doc](../d
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。spec #8 の durable 成果を feature doc / ADR 正本へハンドオフし、spec 側は決定時スナップショットへ降格する。
+- spec 更新要否: 要。issue #8 の durable 成果を feature doc / ADR 正本へハンドオフし、spec 側は決定時スナップショットへ降格する。
 - context / AI 向け設定更新要否: 要。`context/testing.md` に protocol contract test の正本観点を追記する。
 
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): Core 言語非依存、Analyzer 独立プロセス、Communication Protocol
 - [design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema の正本
-- [specs/8-analyzer-protocol](../specs/8-analyzer-protocol/): 決定経緯と issue 単位の作業記録
-- [specs/24-gradle-multi-module-source-roots](../specs/24-gradle-multi-module-source-roots/): request 原子性と failure detail の決定経緯
+- [issue #8](https://github.com/Fukuemon/depwalk/issues/8): 決定経緯と issue 単位の作業記録
+- [issue #24](https://github.com/Fukuemon/depwalk/issues/24): request 原子性と failure detail の決定経緯

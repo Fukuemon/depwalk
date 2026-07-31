@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * spec #27 ④⑤: method reference / explicit constructor invocation の resolve
+ * java-analyzer feature doc「Parse・resolution・call 完全性」:
+ * method reference / explicit constructor invocation の resolve
  * 失敗時に、method call と同等の bytecode 救済と external-target 分類を
  * 試みてから diagnostic 化する。BytecodeOnlyMemberTest と同じく generator
  * 非依存 (完全 source の classes + member を削った解析対象 source) で検証する。

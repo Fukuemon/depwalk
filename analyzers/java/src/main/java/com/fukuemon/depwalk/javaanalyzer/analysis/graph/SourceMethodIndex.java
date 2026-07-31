@@ -30,9 +30,8 @@ public final class SourceMethodIndex {
     private final Map<String, MethodSymbol> symbolsByMethodId = new LinkedHashMap<>();
 
     /**
-     * 指定した workspace を基準に source location を相対 path へ正規化する索引を生成する。
-     *
-     * @param workspaceRoot 解析対象 workspace の絶対・正規化済み root path
+     * @param workspaceRoot source location を相対化する基準。絶対・正規化済みであること
+     *     (未正規化だと relativize が失敗する)
      */
     public SourceMethodIndex(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
@@ -80,9 +79,7 @@ public final class SourceMethodIndex {
 
     /**
      * bytecode から得たメソッド候補に対応するソースシンボルを返す。
-     *
-     * @param candidate 宣言型・メソッド名・引数型で識別された bytecode 上の候補
-     * @return 対応するソース宣言が索引済みならそのシンボル、scope 外または未解決なら空
+     * scope 外または型解決に失敗して未索引の場合は空。
      */
     public Optional<MethodSymbol> find(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         String signature = MethodIds.signature(

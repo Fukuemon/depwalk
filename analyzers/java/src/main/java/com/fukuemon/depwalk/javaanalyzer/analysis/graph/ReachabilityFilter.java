@@ -34,10 +34,7 @@ public final class ReachabilityFilter {
 
     /**
      * entrypoint selector を node に照合し、callee 方向の到達可能部分 graph を返す。
-     *
-     * @param accumulator 解析対象全体の node と edge
-     * @param entrypoints 到達可能性探索の開始 selector
-     * @return 到達可能 node・edge と未一致 selector
+     * どの node にも一致しなかった selector は除外せず {@code unmatchedSelectors} で返す。
      */
     public static Result apply(GraphAccumulator accumulator, List<MethodSelector> entrypoints) {
         Map<String, MethodSymbol> allNodes = accumulator.nodesByMethodId();

@@ -25,7 +25,7 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 
 **shell-word 分割の字句規則** (2026-07-12 追記、同日 PR レビュー指摘により規則を修正): 空白 (space / tab / newline) を語の区切りとする。single quote / double quote は語の結合に使え、quote 内の空白は区切りにならない (quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote のみが特別)。quote 外の backslash は、直後の 1 文字が特殊文字 (space / tab / newline / single quote / double quote / backslash) の場合に限り escape として働き、それ以外の文字が続く場合 (文字列末尾を含む) はリテラルの backslash として扱う。これにより `C:\jdk\bin\java.exe` のような quote 不要の Windows 絶対パスを無傷で分割できる。未終端の quote は validation error として実行前に拒否する。変数展開・glob 展開・コマンド置換は一切行わない。実装と contract test は `core/internal/cli` の `splitAnalyzerCommand` を正本とする (#34 で `core/internal/analyze` から移設: 起動コマンドの解決は use case ではなくコンポジションルートの責務)。
 
-具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と metadata 合成規則は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を正本とする。決定経緯は [spec #9](../specs/9-java-analyzer/) に残す。
+具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と metadata 合成規則は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を正本とする。決定経緯は [issue #9](https://github.com/Fukuemon/depwalk/issues/9) に残す。
 
 ## 代替案
 
@@ -55,7 +55,7 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。spec #9 の durable 成果を feature doc / ADR 正本へハンドオフし、spec 側は決定時スナップショットへ降格する。
+- spec 更新要否: 要。issue #9 の durable 成果を feature doc / ADR 正本へハンドオフし、spec 側は決定時スナップショットへ降格する。
 - context / AI 向け設定更新要否: 要。`context/project.yml` の Quick Commands (開発起動 / E2E) を本決定に沿って更新する。
 
 ## 関連ドキュメント / チケット
@@ -63,4 +63,4 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 - [design/DesignDoc.md](../design/DesignDoc.md): 成功条件 S5、設計原則 P1-P4
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): 起動契約 / metadata 契約の具体名の正本
 - [adr/0001-analyzer-protocol-jsonl-spi.md](0001-analyzer-protocol-jsonl-spi.md): JSONL over STDIN/STDOUT の process SPI
-- [specs/9-java-analyzer](../specs/9-java-analyzer/): 決定経緯と issue 単位の作業記録
+- [issue #9](https://github.com/Fukuemon/depwalk/issues/9): 決定経緯と issue 単位の作業記録
