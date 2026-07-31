@@ -43,9 +43,9 @@
 
 ## skill 作成時のフォーマット契約
 
-- `name` は kebab-case、`anthropic` / `claude` を含めない (Anthropic 規約)
-- `description` は third-person、「何をする + いつ起動」両方を含める (1024字以内)
-- `targets: ["*"]` を frontmatter に置く (本リポジトリの skill 規約)
-- SKILL.md 本体は **200 行未満**、詳細は `references/<topic>.md` へ1階層深さで分離
-- 必須セクション: `いつ使うか` / `先に読むもの` / `実行フロー` / `停止条件`
-- project 固有名 (CLI / path / framework) を直書きせず、`AGENTS.md` の `Spec Workflow Contract` の値を参照する
+正本は `skill-contract.md` (Skill 共通契約 — name / description / 行数 / 必須セクション / 重複禁止)。ここには再掲しない。
+
+## 常時ロードされるもの / されないもの
+
+- `rules/CLAUDE.md` (root rule) は **毎ターン全文ロードされる**。規範の本文を足さず、正本へのポインタ 1 行に畳む
+- 規範の本文は skill の `references/<topic>.md` に置き、必要になった phase / トピックで Read させる (現行の 2 大契約は `spec-lifecycle` の `references/spec-contract.md` と `rulesync-sync` の `references/skill-contract.md`)

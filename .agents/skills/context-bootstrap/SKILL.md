@@ -20,7 +20,7 @@ description: >-
 
 - `styleguide-documents` skill
 - `design/DesignDoc.md` (Why/What/How の前提)
-- `.rulesync/rules/CLAUDE.md` の `Spec Workflow Contract`
+- `spec-lifecycle` の `references/spec-contract.md` (Spec Workflow Contract)
 - `templates/context/*.md` / `templates/context/project.yml` (生成元スケルトン)
 
 ## 実行フロー

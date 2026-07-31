@@ -21,13 +21,14 @@ PROMPT="$(cat "$OUT/prompt.txt")"   # step2 で固定済みのプロンプト本
 
 run_agent() {           # $1=id  $2=timeout秒  $3...=invocation（registry から $PROMPT 展開済み）
   local id="$1" tmo="$2"; shift 2
-  if [ -n "$TIMEOUT" ]; then          # timeout runner があるとき
-    "$TIMEOUT" "$tmo" "$@" </dev/null >"$OUT/$id.out" 2>&1
-  else                                # runner 不在: 素の起動はハングを打ち切れない。下記「timeout runner の解決」に従い background runner 方式へ切り替える前提
-    "$@" </dev/null >"$OUT/$id.out" 2>&1
-  fi
+  # timeout runner 前提。素の起動 (fallback) は置かない — ハングを打ち切れず `wait` が
+  # 無限に止まるため。runner 不在時は下記「background runner を使う場合」の方式に切り替える。
+  "$TIMEOUT" "$tmo" "$@" </dev/null >"$OUT/$id.out" 2>&1
   echo $? >"$OUT/$id.exit"
 }
+
+# runner 不在のまま本パターンを走らせない (無制限起動の予防線)
+[ -n "$TIMEOUT" ] || { echo "timeout runner が無い: background runner 方式に切り替える" >&2; exit 2; }
 
 # レジストリの各 enabled エージェントについて、invocation を argv に展開して起動する。
 # 下の <...> は context/ai-agents.md の invocation を展開した実引数 (CLI 名・flag をここに直書きしない)。
@@ -52,7 +53,7 @@ elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT=gtimeout   # coreutils (b
 else TIMEOUT=""; fi   # どれも無ければ background runner 方式に切り替える
 ```
 
-- `$TIMEOUT` が空だと `run_agent` の素の起動は **ハングを打ち切れず `wait` が無限に止まりうる** (中核原則「timeout を各エージェントに適用」を満たせない)。macOS は GNU `timeout` 非搭載が既定のためこの分岐は頻繁に通る。したがって runner 不在時は次のいずれかを **必須** とする:
+- `$TIMEOUT` が空のまま正準シェルパターンを走らせてはいけない (**ハングを打ち切れず `wait` が無限に止まる** — 中核原則「timeout を各エージェントに適用」を満たせない)。上の sample は空なら `exit 2` で止まる。macOS は GNU `timeout` 非搭載が既定のためこの分岐は頻繁に通る。runner 不在時は次のいずれかを **必須** とする:
   - (推奨) 下記「background runner を使う場合」の方式に切り替え、harness 側の timeout に各エージェントの打ち切りを委ねる。打ち切られた場合は `<id>.exit` に timeout 相当 (124) を書き、失敗分類を成立させる。
   - background runner も無い実行環境では、timeout runner (coreutils の `gtimeout` 等) の導入を `停止条件` として促す (無制限起動のまま続行しない)。
 - coreutils が multi-call binary (`coreutils timeout ...`) の環境では、その呼び出しを `$TIMEOUT` に読み替える。
