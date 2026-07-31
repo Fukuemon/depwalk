@@ -17,7 +17,7 @@ cwc-long-running-agents の "Fresh-Context Evaluator" パターンに沿った s
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-lifecycle` の `references/spec-contract.md` (Spec Workflow Contract)
 - subagent 定義 `spec-reviewer` (観点の正本。fallback 時にのみ本文を Read する)
 
 ## 入力

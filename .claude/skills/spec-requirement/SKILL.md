@@ -16,7 +16,7 @@ description: >-
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-lifecycle` の `references/spec-contract.md` (Spec Workflow Contract)
 - `context/project.yml` の `tracker` (起票先の CLI / project)
 - `templates/requirements/template.md`
 - `references/intake-checklist.md`

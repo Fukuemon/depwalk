@@ -43,7 +43,7 @@
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract`
+- `spec-contract.md` (Spec Workflow Contract)
 - `prompt-rules.md` (同 dir) — 分割 / 命名 / 自己完結性のルール
 - `prompt-template.md` (同 dir) — prompt 本体テンプレート
 - `antipatterns.md` (同 dir) — 生成 prompt の `## 絶対ルール` に注入する実装制約

@@ -16,7 +16,8 @@ description: AI 設定の正本 `.rulesync/` を編集し、AGENTS.md / CLAUDE.m
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Documents (正本)` 節 — `.rulesync/rules/CLAUDE.md` が正本で生成先は触らない原則
+- root rule (`.rulesync/rules/CLAUDE.md`) の `Documents (正本)` 節 — 正本は `.rulesync/` で生成先は触らない原則
+- `references/skill-contract.md` — skill / rule を書くときの契約 (Skill 共通契約)
 - `references/rulesync-layout.md` — `.rulesync/` 配下の構造と編集先判断
 - `references/generate-and-verify.md` — `npx rulesync generate` 実行と差分確認手順
 
@@ -29,7 +30,7 @@ description: AI 設定の正本 `.rulesync/` を編集し、AGENTS.md / CLAUDE.m
 
 0. **repo 種別の判定**: `.rulesync/rules/CLAUDE.md` が symlink なら消費 repo で作業している。
    - 編集は symlink 経由で **sdd-template 側の実体** に入る (消費 repo では未追跡のため commit できない)
-   - 変更の commit は sdd-template repo 側で行い、消費 repo では生成物のみ commit する (`AGENTS.md` の「共有プロセス層の正本」)
+   - 変更の commit は sdd-template repo 側で行い、消費 repo では生成物のみ commit する (root rule の「共有プロセス層を変更するとき」)
 1. **編集対象の決定** (`references/rulesync-layout.md`):
    - リポジトリ横断のルール → `.rulesync/rules/CLAUDE.md` (root rule)
    - 新規 skill → `.rulesync/skills/<skill-name>/SKILL.md` + `references/`

@@ -701,6 +701,104 @@ prefix_rule(
     justification = "Generated from Rulesync permission.bash: df:*",
 )
 
+# rtk gain
+prefix_rule(
+    pattern = ["rtk", "gain"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk gain",
+)
+
+# rtk --version
+prefix_rule(
+    pattern = ["rtk", "--version"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk --version",
+)
+
+# rtk git status:*
+prefix_rule(
+    pattern = ["rtk", "git", "status:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk git status:*",
+)
+
+# rtk git diff:*
+prefix_rule(
+    pattern = ["rtk", "git", "diff:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk git diff:*",
+)
+
+# rtk git log:*
+prefix_rule(
+    pattern = ["rtk", "git", "log:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk git log:*",
+)
+
+# rtk git show:*
+prefix_rule(
+    pattern = ["rtk", "git", "show:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk git show:*",
+)
+
+# rtk ls:*
+prefix_rule(
+    pattern = ["rtk", "ls:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk ls:*",
+)
+
+# rtk tree:*
+prefix_rule(
+    pattern = ["rtk", "tree:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk tree:*",
+)
+
+# rtk cat:*
+prefix_rule(
+    pattern = ["rtk", "cat:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk cat:*",
+)
+
+# rtk read:*
+prefix_rule(
+    pattern = ["rtk", "read:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk read:*",
+)
+
+# rtk grep:*
+prefix_rule(
+    pattern = ["rtk", "grep:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk grep:*",
+)
+
+# rtk rg:*
+prefix_rule(
+    pattern = ["rtk", "rg:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk rg:*",
+)
+
+# rtk find:*
+prefix_rule(
+    pattern = ["rtk", "find:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk find:*",
+)
+
+# rtk test:*
+prefix_rule(
+    pattern = ["rtk", "test:*"],
+    decision = "allow",
+    justification = "Generated from Rulesync permission.bash: rtk test:*",
+)
+
 # rm:*
 prefix_rule(
     pattern = ["rm:*"],

@@ -5,7 +5,7 @@ PRD / Design Doc / feature doc / context / ADR と整合をとった上でスキ
 
 ## 先に読むもの
 
-- `AGENTS.md` の `Spec Workflow Contract` — 正本 path / templates (target は `context/project.yml` の `domains`)
+- `spec-contract.md` (Spec Workflow Contract) — 正本 path / templates (target は `context/project.yml` の `domains`)
 - `reconcile-upstream.md` (同 dir) — 上位文書整合の手順
 - 対象 issue (なければ phase 1 intake で `spec-issue-read` を先に呼ぶ)
 
