@@ -135,6 +135,25 @@ verified_commit: <sha> | unverified
 
 鮮度検査は pre-commit には載せない。commit を跨いで初めて意味を持つ検査であり、毎 commit で `git log` を回す価値がない。
 
+#### 前提: 生成物を formatter の対象外にする
+
+**drift 検査を成立させるには、生成物が pre-commit の formatter に触られないことが前提になる。** これを満たさないと検査は恒久的に FAIL する。
+
+`scripts/depgraph.sh` が成功しているのは、マーカー区間の置換だけが理由ではない。**生成物が mermaid のコードフェンスであり、prettier が触らない形式だった**ことが効いている。本 ADR の生成物は markdown のテーブルと YAML であり、この前提を引き継げない。
+
+prettier 3.6.2 での実測 (2026-08-01):
+
+| 生成形式               | prettier の挙動                                  | drift 検査 |
+| ---------------------- | ------------------------------------------------ | ---------- |
+| mermaid コードフェンス | 触らない                                         | 成立する   |
+| markdown テーブル      | 列幅を揃え直す                                   | **壊れる** |
+| YAML ファイル          | 引用符の統一・配列の折り返し・空白の正規化を行う | **壊れる** |
+| md 内の yaml フェンス  | 同上 (フェンス内でも整形する)                    | **壊れる** |
+
+生成 → formatter が整形 → 再生成で元に戻る、の ping-pong になり、`git diff --exit-code` が常に非ゼロになる。同じ現象は rulesync 生成物で既に発生しており ([issue #46](https://github.com/Fukuemon/depwalk/issues/46))、14 ファイルが該当する。
+
+したがって **生成物を `.prettierignore` へ登録し、整形の責務を生成器に一任する**。この対応は [issue #46](https://github.com/Fukuemon/depwalk/issues/46) が扱い、**[issue #45](https://github.com/Fukuemon/depwalk/issues/45) の前提条件とする**。生成器を先に書くと、必ずこの ping-pong に突き当たる。
+
 #### pre-commit の対象範囲
 
 drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であるため、`go-depgraph-drift` のように `core/**/*.go` へ絞る glob 設計は取れない。glob は `design/**/*.md` / `context/**/*.{md,yaml}` / 生成スクリプト自身に広げ、**毎 commit で全対象文書の frontmatter をパースする**前提とする。対象は 14 ファイルで、YAML の先頭ブロックを読むだけなので lint 起動を伴う depguard と違いコストは無視できる。
@@ -201,6 +220,17 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 
 ## 実装・運用への反映
 
+着手順序は次のとおり。**[#46](https://github.com/Fukuemon/depwalk/issues/46) を先頭に置く**のは掃除のためではなく、生成物と formatter の境界が決まらないと [#45](https://github.com/Fukuemon/depwalk/issues/45) の drift 検査が成立しないため (上記「前提: 生成物を formatter の対象外にする」)。
+
+| 順  | issue      | 内容                                                                     |
+| --- | ---------- | ------------------------------------------------------------------------ |
+| 1   | #46        | `.prettierignore` で生成物を除外し、rulesync 生成物の drift 検査を入れる |
+| 2   | #40 (一部) | frontmatter を 2〜3 本へ先行適用し、schema を検証する                    |
+| 3   | #45        | 検証済みの schema を入力に生成器と鮮度検査を書く                         |
+| 4   | #40 (残り) | schema を全対象文書 14 本と `templates/` 9 本へ展開する                  |
+
+2 と 4 を分けるのは、14 本へ手で frontmatter を付けた後に schema の不備が見つかると 14 本をやり直すことになるため。
+
 - spec 更新要否: 要。[issue #40](https://github.com/Fukuemon/depwalk/issues/40) のスコープへ frontmatter 化を取り込み、索引生成器と鮮度検査は後続 issue として分割する
   - #40 (拡張): frontmatter 規約の制定・全対象文書 14 本と `templates/` 9 本への適用。`context/impact-index.yaml` は `context/reading-map.yaml` へ改名し、生成物化を前提に手で埋めない。読み直した文書のみ `verified_commit` を入れ、残りは `unverified` とする
   - [#45](https://github.com/Fukuemon/depwalk/issues/45): 2 つのスクリプトを実装する。互いに独立しているため PR は分けてよい
@@ -221,4 +251,5 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 - [design/DesignDoc.md](../design/DesignDoc.md)
 - issue / PR:
   - [#40](https://github.com/Fukuemon/depwalk/issues/40): 文書再編成。frontmatter 化と `reading-map.yaml` への改名を取り込む
-  - [#45](https://github.com/Fukuemon/depwalk/issues/45): 読み取りマップの生成器と鮮度検査スクリプトの実装 (#40 が前提)
+  - [#45](https://github.com/Fukuemon/depwalk/issues/45): 読み取りマップの生成器と鮮度検査スクリプトの実装 (#46 と #40 の frontmatter 適用が前提)
+  - [#46](https://github.com/Fukuemon/depwalk/issues/46): 生成物の drift 検査と `.prettierignore` の境界。#45 の前提条件
