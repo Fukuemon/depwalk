@@ -28,6 +28,20 @@ spec は **issue 単位** の文書、design (PRD / Design Doc / feature doc / c
 
 spec / ADR / context の本文を更新したら、対象文書の `更新日` / `ステータス` / `## 設計フェーズ状況` / `## レビュー` / `## 変更履歴` (存在するもの) を同時に更新する。他 issue / 他 spec への参照を追加した場合は、関連資料・未確定事項の状態も同期する。本文だけ更新してメタ情報が古いまま、を残さない。
 
+## 読み取り索引の解決
+
+読み取り索引 (「何を読めば足りるか」のルーティング表) を参照・更新する skill は、場所と更新手段を次の順で解決する。**この規則の正本は本節であり、各 skill には再掲しない。**
+
+| 状態                                          | 解決                                                             |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| `context/project.yml` に `reading_index` 無し | `context/impact-index.yaml` を索引とみなす (後方互換の既定)      |
+| `reading_index.path` が `null`                | 索引を使わない。索引に触れるステップは skip する                 |
+| `reading_index.path` にパス                   | そのパスを索引とする                                             |
+| `reading_index.generated` が `false` / 未設定 | 索引を手で更新する                                               |
+| `reading_index.generated` が `true`           | 索引を**手編集せず** `reading_index.generate_command` を実行する |
+
+キーが無いことを「索引なし」と解釈しない。キーが増える前から索引を持つ repo で、索引の更新が黙って止まるため。索引を持たないことは明示的な `path: null` で表す。`generated: true` なのに `generate_command` が未設定なら、コマンドを推測せずユーザーに確認する。
+
 ## Phase Gate ルール
 
 - phase の集合・順序は `context/project.yml` の `spec.phases` が正本 (未設定時は `spec-lifecycle` の既定列)
