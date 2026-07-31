@@ -124,6 +124,10 @@ paths:
   spec_prompts: specs/<issue-id>-<slug>/prompts/
   spec_requirements: specs/<issue-id>-<slug>/requirements.md # 任意
   spec_review: specs/<issue-id>-<slug>/review.md # 任意
+  # 読み取り索引。#40 で context/reading-map.yaml へ改名し、#45 で生成物にする。
+  # 正本は adr/0008-doc-freshness-and-reading-map.md。
+  reading_index: context/impact-index.yaml
+  reading_index_generated: false # #45 で生成器を入れたら true にする
 
 templates:
   prd: templates/prd/template.md
