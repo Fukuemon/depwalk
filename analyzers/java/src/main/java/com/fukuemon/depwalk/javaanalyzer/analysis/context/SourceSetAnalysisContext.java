@@ -6,7 +6,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * 1 つの解析 context (spec #24 D6)。discovery 経路では Gradle project /
+ * 1 つの解析 context
+ * (java-analyzer feature doc「Source root discovery と解析 context」)。
+ * discovery 経路では Gradle project /
  * {@code main} source set ごとに 1 つ、明示 root 経路では全 root を共有する
  * 1 つの synthetic context になる。識別子は Analyzer 内部専用で Protocol
  * record へは出力しない。

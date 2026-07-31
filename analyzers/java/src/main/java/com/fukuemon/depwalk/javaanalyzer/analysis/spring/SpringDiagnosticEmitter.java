@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,9 +29,7 @@ public final class SpringDiagnosticEmitter {
     /**
      * すべての注入解決結果を診断へ変換し、解析実行中の accumulator に追加する。
      *
-     * @param result Spring Bean と注入点の解決結果
-     * @param workspaceRoot source location を相対 path にする基準 workspace
-     * @param accumulator 診断と未解決件数を蓄積する解析単位の accumulator
+     * @param workspaceRoot source location を相対 path にする基準 (絶対・正規化済み)
      */
     public static void emit(
             SpringDiIndex.Result result,
@@ -97,7 +96,7 @@ public final class SpringDiagnosticEmitter {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("injectedType", resolution.injectionPoint().injectedType());
         metadata.put("targetName", resolution.injectionPoint().targetName());
-        metadata.put("resolution", resolution.status().name().toLowerCase(java.util.Locale.ROOT));
+        metadata.put("resolution", resolution.status().name().toLowerCase(Locale.ROOT));
         List<String> candidateTypes = resolution.candidates().stream()
                 .map(candidate -> candidate.bean().implementationType())
                 .distinct()

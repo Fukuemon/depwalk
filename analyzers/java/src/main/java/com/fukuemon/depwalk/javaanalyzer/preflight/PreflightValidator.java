@@ -5,6 +5,7 @@ import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,13 +26,18 @@ public final class PreflightValidator {
     }
 
     /**
-     * pre-flight 検査で確定した型付きの検証済み入力。下流 ({@code AnalysisRunner}) は raw metadata を
-     * 再 cast せず本 record の値を使う。
+     * pre-flight 検査で確定した型付きの検証済み入力。本 record の値は起動時の呼び出し側 (entry point) が
+     * 受け取り、{@code classpath} は解析 context 構築 ({@code AnalysisContextFactory}) へ、
+     * {@code allowIncompleteAnalysis} は
+     * {@link com.fukuemon.depwalk.javaanalyzer.analysis.pipeline.AnalysisRunner} の引数として渡す。
+     * ここで検証していない Java 固有 metadata ({@code liftExcludePackages} 等) は、下流が
+     * {@code request.metadata()} から改めて読み直す。
      *
      * @param classpath {@code metadata.classpath} の検証済み jar / classes dir path 一覧
      * @param allowIncompleteAnalysis {@code metadata.allowIncompleteAnalysis} の検証済み値 (既定 false)。
      *     true のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、
-     *     解決済み graph と診断を確認可能な形で公開する (spec #27)
+     *     解決済み graph と診断を確認可能な形で公開する
+     *     (java-analyzer feature doc「Parse・resolution・call 完全性」)
      */
     public record Validated(List<String> classpath, boolean allowIncompleteAnalysis) {
     }
@@ -54,7 +60,8 @@ public final class PreflightValidator {
         Map<String, Object> metadata = request.metadata();
         // classpath key は明示 sourceRoots 経路で必須 (空配列可)。自動 discovery
         // 経路では context classpath を Gradle model から取得するため、任意の
-        // 共通追加 entry として扱う (spec #24 D6)。
+        // 共通追加 entry として扱う
+        // (java-analyzer feature doc「Source root discovery と解析 context」)。
         boolean explicitSourceRoots = request.sourceRoots() != null;
         if (metadata == null || !metadata.containsKey(METADATA_CLASSPATH)) {
             if (explicitSourceRoots) {
@@ -89,7 +96,8 @@ public final class PreflightValidator {
     /**
      * {@code allowIncompleteAnalysis} は key 不在なら既定値 false (完全性 gate は従来どおり fatal)。
      * 指定時は要素 1 の {@code ["true"]} / {@code ["false"]} でなければ {@code JAVA_INVALID_REQUEST}
-     * で fatal とする (spec #27、javaPreview と同じ boolean flag 表現規約)。
+     * で fatal とする (java-analyzer feature doc「metadata 契約」、javaPreview と同じ boolean flag
+     * 表現規約)。
      */
     private static boolean readAllowIncompleteAnalysis(Map<String, Object> metadata) throws AnalyzerFatalException {
         if (!metadata.containsKey(METADATA_ALLOW_INCOMPLETE_ANALYSIS)) {
@@ -141,38 +149,42 @@ public final class PreflightValidator {
         if (!metadata.containsKey(METADATA_LIFT_EXCLUDE_PACKAGES)) {
             return;
         }
-        Object raw = metadata.get(METADATA_LIFT_EXCLUDE_PACKAGES);
-        if (!(raw instanceof List<?> rawList)) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "analysisRequest.metadata.liftExcludePackages must be a string array");
-        }
-        for (Object element : rawList) {
-            if (!(element instanceof String)) {
-                throw new AnalyzerFatalException(
-                        JavaErrorCode.JAVA_INVALID_REQUEST,
-                        "analysisRequest.metadata.liftExcludePackages element must be a string: " + element);
-            }
-        }
+        readStringArray(
+                metadata.get(METADATA_LIFT_EXCLUDE_PACKAGES),
+                "analysisRequest.metadata.liftExcludePackages must be a string array",
+                "analysisRequest.metadata.liftExcludePackages element must be a string: ");
     }
 
     private static List<String> readClasspath(Object value) throws AnalyzerFatalException {
+        return readStringArray(
+                value,
+                "analysisRequest.metadata.classpath must be a string array",
+                "classpath element must be a string: ");
+    }
+
+    /**
+     * metadata 値を文字列配列として読む。配列でない場合と要素が文字列でない場合を
+     * それぞれ {@code JAVA_INVALID_REQUEST} で fatal とする。
+     *
+     * @param value 検査対象の metadata 値
+     * @param arrayMessage 配列でない場合の error message
+     * @param elementMessagePrefix 要素が文字列でない場合の error message 前置き (末尾に値を連結する)
+     * @return 宣言順の文字列一覧
+     * @throws AnalyzerFatalException 配列でない、または文字列でない要素を含む場合
+     */
+    private static List<String> readStringArray(Object value, String arrayMessage, String elementMessagePrefix)
+            throws AnalyzerFatalException {
         if (!(value instanceof List<?> rawList)) {
-            throw new AnalyzerFatalException(
-                    JavaErrorCode.JAVA_INVALID_REQUEST,
-                    "analysisRequest.metadata.classpath must be a string array");
+            throw new AnalyzerFatalException(JavaErrorCode.JAVA_INVALID_REQUEST, arrayMessage);
         }
-        try {
-            return rawList.stream()
-                    .map(element -> {
-                        if (!(element instanceof String s)) {
-                            throw new IllegalArgumentException("classpath element must be a string: " + element);
-                        }
-                        return s;
-                    })
-                    .toList();
-        } catch (IllegalArgumentException e) {
-            throw new AnalyzerFatalException(JavaErrorCode.JAVA_INVALID_REQUEST, e.getMessage());
+        List<String> values = new ArrayList<>(rawList.size());
+        for (Object element : rawList) {
+            if (!(element instanceof String text)) {
+                throw new AnalyzerFatalException(
+                        JavaErrorCode.JAVA_INVALID_REQUEST, elementMessagePrefix + element);
+            }
+            values.add(text);
         }
+        return List.copyOf(values);
     }
 }

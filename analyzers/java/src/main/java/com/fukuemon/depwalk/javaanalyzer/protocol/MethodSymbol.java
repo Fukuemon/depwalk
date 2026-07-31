@@ -29,19 +29,18 @@ public record MethodSymbol(
         SourceLocation sourceLocation,
         Map<String, Object> metadata) implements ProtocolRecord {
 
+    /** 本 record が JSONL の {@code recordType} に設定する値。 */
     public static final String RECORD_TYPE = "methodSymbol";
 
     /**
      * 現在の schema version と record type を設定した method symbol を生成する。
      *
      * @param methodId signature から生成した安定 ID
-     * @param language 対象言語
      * @param symbolKind method、constructor、initializer などの種別
      * @param qualifiedName 表示用の完全修飾名
      * @param signature overload を区別する正規化 signature
      * @param sourceLocation 宣言位置。scope 外なら {@code null}
      * @param metadata 継承元などの追加情報
-     * @return protocol 出力可能な method symbol
      */
     public static MethodSymbol of(
             String methodId,

@@ -9,14 +9,18 @@ import java.util.List;
  */
 public interface DepwalkProjectModel {
 
+    /** Gradle project path (例: {@code :app})。 */
     String getProjectPath();
 
     File getProjectDirectory();
 
+    /** {@code main} source set の Java source directory 一覧。 */
     List<File> getMainJavaSourceDirectories();
 
+    /** {@code main.compileClasspath} を解決した file 一覧。 */
     List<File> getMainCompileClasspath();
 
+    /** {@code main} source set の classes output directory 一覧。 */
     List<File> getMainClassesOutputDirectories();
 
     /** {@code main.compileClasspath} 上の project 依存の Gradle project path。 */
@@ -25,5 +29,6 @@ public interface DepwalkProjectModel {
     /** {@code release} 優先、なければ実効 {@code sourceCompatibility}。 */
     String getSourceLanguageLevel();
 
+    /** {@code compileJava} の compiler 引数に {@code --enable-preview} を含むか。 */
     boolean isPreviewEnabled();
 }

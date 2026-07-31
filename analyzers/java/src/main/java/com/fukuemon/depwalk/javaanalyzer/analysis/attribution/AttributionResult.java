@@ -28,12 +28,6 @@ public record AttributionResult(
         OMIT_OUT_OF_SCOPE
     }
 
-    /**
-     * scope 内の宣言型へ帰属する結果を生成する。
-     *
-     * @param binaryName 宣言型の binary name
-     * @return scope 内宣言を表す結果
-     */
     public static AttributionResult scopeInternal(String binaryName) {
         return new AttributionResult(Outcome.SCOPE_INTERNAL, binaryName, false, null);
     }
@@ -41,37 +35,23 @@ public record AttributionResult(
     /**
      * scope 内の receiver 型へ引き上げる結果を生成する。
      *
-     * @param receiverBinaryName 帰属先 receiver 型の binary name
-     * @param declaringTypeBinaryName scope 外にある元の宣言型 binary name
-     * @return inherited metadata を持つ引き上げ結果
+     * @param declaringTypeBinaryName scope 外にある引き上げ元の宣言型 binary name
      */
     public static AttributionResult lifted(String receiverBinaryName, String declaringTypeBinaryName) {
         return new AttributionResult(Outcome.LIFTED, receiverBinaryName, true, declaringTypeBinaryName);
     }
 
-    /**
-     * 除外 package のため出力しない結果を生成する。
-     *
-     * @return 除外 package による省略結果
-     */
+    /** 除外 package のため出力しない結果を生成する。 */
     public static AttributionResult omitExcluded() {
         return new AttributionResult(Outcome.OMIT_EXCLUDED, null, false, null);
     }
 
-    /**
-     * 宣言型と receiver 型が scope 外のため出力しない結果を生成する。
-     *
-     * @return scope 外による省略結果
-     */
+    /** 宣言型と receiver 型が共に scope 外のため出力しない結果を生成する。 */
     public static AttributionResult omitOutOfScope() {
         return new AttributionResult(Outcome.OMIT_OUT_OF_SCOPE, null, false, null);
     }
 
-    /**
-     * graph 出力対象外かを返す。
-     *
-     * @return いずれかの省略結果なら {@code true}
-     */
+    /** graph 出力対象外 (いずれかの omit 分岐) かを返す。 */
     public boolean isOmitted() {
         return outcome == Outcome.OMIT_EXCLUDED || outcome == Outcome.OMIT_OUT_OF_SCOPE;
     }

@@ -118,11 +118,7 @@ final class SpringAnnotations {
     /**
      * 型解決できないannotation名を、明示importまたは対応対象packageのwildcard importから復元する。
      * wildcard importは任意のpackage名を推測せず、この解析器が意味を理解するSpring・MyBatis
-     * annotationだけを候補にする。複数候補が残る場合は誤認を避けて未解決とする。
-     *
-     * @param imports compilation unitのimport宣言
-     * @param simpleName sourceに記述されたannotationの単純名
-     * @return 一意に復元できたFQN。候補なしまたは曖昧なら空
+     * annotationだけを候補にする。候補なしまたは複数候補が残る場合は、誤認を避けて空を返す。
      */
     private static Optional<String> importedFqn(
             List<ImportDeclaration> imports,

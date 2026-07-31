@@ -46,7 +46,7 @@ public enum JavaDiagnosticCode {
     /**
      * diagnostic の既定 severity を返す。
      *
-     * @return {@code info}、{@code warning}、{@code partialFailure} のいずれか
+     * @return {@code info} または {@code warning} (現在の定数はこの 2 種のみを持つ)
      */
     public String severity() {
         return severity;

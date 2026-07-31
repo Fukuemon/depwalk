@@ -1,6 +1,6 @@
 # Codebase Architecture
 
-> 最終更新: 2026-07-26
+> 最終更新: 2026-07-28
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
@@ -18,7 +18,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 ### Core の package 構成と依存方向 (Go)
 
-`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [spec #32](../specs/32-architecture-refactor/index.md) D8)。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
+`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
 | Package                         | 層 (概念)  | 責務                                                                                      |
 | ------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
@@ -67,7 +67,7 @@ graph LR
 `analyzers/java` の `javaanalyzer` 配下は、解析パイプラインの段階別 package (`analysis/` 配下) と入出力・起動系 (`protocol` / `io` / `preflight` / `discovery`) で構成する。段階の実行順は `analysis/pipeline` (Runner) だけが知る。外部ライブラリの隔離は次の 3 段階とする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)):
 
 - **SootUp**: `analysis/sootup` (adapter) に完全に封じ込め、facade が自前型で公開する。他 package から `sootup.*` の import 禁止
-- **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.tooling.*` は discovery のみ)
+- **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.*` は discovery のみ。jar が `org.gradle.api` / `util` / `internal` も同梱するため tooling 配下限定にしない)
 - **JavaParser / SymbolSolver**: 解析エンジンの中核として `analysis` 配下では自由に使ってよい。`analysis` の外への import は禁止
 
 言語別 Analyzer 実装は `analyzers/<language>/` に置く。
@@ -76,7 +76,7 @@ Core と Analyzer の共有境界は Protocol doc、ADR、JSONL fixture、contra
 Go package や Java 実装 code を共有しない。
 
 > 依存境界の自動検査 (Go: golangci-lint + depguard、Java: ArchUnit) は [engineering.md](engineering.md) の quality gate で扱う。
-> Core (Go) 側の依存方向は #34 で実装済み (実 import は上の生成依存図と一致)。Java Analyzer 側の内部境界は #35 で実装するため、完了までコードは旧配置の場合がある。
+> Core (Go) / Java Analyzer とも実装済みで、本 doc の記述と実コードの import は一致している (Go は上の生成依存図が drift 検査で保証、Java は ArchUnit が保証)。
 
 ## Runtime Boundary
 

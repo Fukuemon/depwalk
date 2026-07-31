@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -95,7 +96,6 @@ public final class SpringDiIndex {
             BeanKind kind,
             String declaringType,
             String factoryMethodName) {
-        /** collection component を防御的コピーして Bean 定義を生成する。 */
         public BeanDefinition {
             names = List.copyOf(names);
             qualifiers = List.copyOf(qualifiers);
@@ -126,7 +126,6 @@ public final class SpringDiIndex {
             boolean bytecodeGenerated,
             String sourcePath,
             int sourceLine) {
-        /** receiver name 配列を防御的コピーして注入点を生成する。 */
         public InjectionPoint {
             receiverNames = List.copyOf(receiverNames);
         }
@@ -135,11 +134,9 @@ public final class SpringDiIndex {
     /**
      * 注入候補となった Bean と、その候補を得た解析根拠。
      *
-     * @param bean 候補 Bean の定義
      * @param provenance 候補を導出した解析器名の重複なし配列
      */
     public record BeanCandidate(BeanDefinition bean, List<String> provenance) {
-        /** provenance を防御的コピーして候補を生成する。 */
         public BeanCandidate {
             provenance = List.copyOf(provenance);
         }
@@ -148,9 +145,7 @@ public final class SpringDiIndex {
     /**
      * 1つの注入点に対する候補一覧と解決状態。
      *
-     * @param injectionPoint 解決対象の注入点
      * @param candidates 選択規則の適用後に残った候補
-     * @param status 解決状態
      * @param reason 曖昧または未解決になった理由。理由が不要なら {@code null}
      */
     public record InjectionResolution(
@@ -158,24 +153,16 @@ public final class SpringDiIndex {
             List<BeanCandidate> candidates,
             ResolutionStatus status,
             String reason) {
-        /** candidate 配列を防御的コピーして解決結果を生成する。 */
         public InjectionResolution {
             candidates = List.copyOf(candidates);
         }
     }
 
-    /**
-     * 解析対象全体から構築した Spring DI 索引の不変スナップショット。
-     *
-     * @param beans 検出した Bean 定義
-     * @param injections 検出した注入点
-     * @param resolutions 各注入点の候補解決結果
-     */
+    /** 解析対象全体から構築した Spring DI 索引の不変スナップショット。 */
     public record Result(
             List<BeanDefinition> beans,
             List<InjectionPoint> injections,
             List<InjectionResolution> resolutions) {
-        /** すべての collection component を防御的コピーしてスナップショットを生成する。 */
         public Result {
             beans = List.copyOf(beans);
             injections = List.copyOf(injections);
@@ -203,12 +190,7 @@ public final class SpringDiIndex {
         this.sootUpIndex = sootUpIndex;
     }
 
-    /**
-     * 指定した bytecode 型階層索引を constructor と実装型の補完に使う空の DI 索引を生成する。
-     *
-     * @param sootUpIndex project class と依存 class を検索する bytecode 型階層索引
-     * @return compilation unit を順次受け付ける空の DI 索引
-     */
+    /** 指定した bytecode 型階層索引を constructor と実装型の補完に使う空の DI 索引を生成する。 */
     public static SpringDiIndex create(SootUpTypeHierarchyIndex sootUpIndex) {
         return new SpringDiIndex(sootUpIndex);
     }
@@ -218,8 +200,6 @@ public final class SpringDiIndex {
      *
      * <p>呼び出し後に compilation unit やその AST node への参照は保持しない。型解決不能な必須情報で
      * 例外が発生した場合は呼び出し元へ伝播し、解析実行単位の diagnostic へ変換させる。
-     *
-     * @param unit 収集対象の compilation unit
      */
     public void accept(CompilationUnit unit) {
         List<ClassOrInterfaceDeclaration> types = unit.findAll(ClassOrInterfaceDeclaration.class);
@@ -235,11 +215,7 @@ public final class SpringDiIndex {
         injectionPoints.addAll(collectedInjections);
     }
 
-    /**
-     * 収集済み情報へ候補選択規則を適用し、不変の解決結果を返す。
-     *
-     * @return Bean、注入点、注入解決結果を決定的順序に並べたスナップショット
-     */
+    /** 収集済み情報へ候補選択規則を適用し、決定的順序に並べた不変スナップショットを返す。 */
     public Result build() {
         List<BeanEntry> sortedBeans = beanEntries.stream()
                 .sorted(Comparator.comparing(entry -> beanSortKey(entry.definition())))
@@ -256,19 +232,6 @@ public final class SpringDiIndex {
                 sortedBeans.stream().map(BeanEntry::definition).toList(),
                 sortedInjections,
                 resolutions);
-    }
-
-    /**
-     * 複数の compilation unit を一括して収集・解決する convenience method。
-     *
-     * @param units 解析対象の compilation unit
-     * @param sootUpIndex constructor と実装型の補完に使う bytecode 型階層索引
-     * @return 全 unit を収集した DI 解決結果
-     */
-    public static Result analyze(List<CompilationUnit> units, SootUpTypeHierarchyIndex sootUpIndex) {
-        SpringDiIndex index = create(sootUpIndex);
-        units.forEach(index::accept);
-        return index.build();
     }
 
     private List<BeanEntry> collectBeans(List<ClassOrInterfaceDeclaration> types) {
@@ -340,11 +303,7 @@ public final class SpringDiIndex {
     /**
      * configuration class と factory method の両方に宣言された条件annotationを統合する。
      * class側の条件は配下の全Beanへ適用されるため、methodに直接付いた条件だけを保持すると
-     * 実行時に存在しない可能性があるBeanを一意候補と誤判定する。
-     *
-     * @param configuration factory methodを宣言するconfiguration class
-     * @param method Beanを生成するfactory method
-     * @return 条件annotationのFQNを重複なく辞書順に並べた一覧
+     * 実行時に存在しない可能性があるBeanを一意候補と誤判定する。返す一覧は重複なしの辞書順。
      */
     private static List<String> factoryConditionTypes(
             ClassOrInterfaceDeclaration configuration,
@@ -357,7 +316,7 @@ public final class SpringDiIndex {
     private static Optional<String> factoryImplementationType(MethodDeclaration method) {
         Set<String> returnedTypes = new LinkedHashSet<>();
         for (ReturnStmt returnStmt : method.findAll(ReturnStmt.class)) {
-            if (!isDirectMethodReturn(returnStmt, method) || returnStmt.getExpression().isEmpty()) {
+            if (!belongsToCallable(returnStmt, method) || returnStmt.getExpression().isEmpty()) {
                 continue;
             }
             if (returnStmt.getExpression().get() instanceof ObjectCreationExpr creation) {
@@ -369,17 +328,6 @@ public final class SpringDiIndex {
             }
         }
         return returnedTypes.size() == 1 ? Optional.of(returnedTypes.iterator().next()) : Optional.empty();
-    }
-
-    private static boolean isDirectMethodReturn(ReturnStmt returnStmt, MethodDeclaration method) {
-        Node current = returnStmt.getParentNode().orElse(null);
-        while (current != null && current != method) {
-            if (current instanceof LambdaExpr || current instanceof MethodDeclaration) {
-                return false;
-            }
-            current = current.getParentNode().orElse(null);
-        }
-        return current == method;
     }
 
     private List<InjectionPoint> collectInjections(List<ClassOrInterfaceDeclaration> types) {
@@ -435,19 +383,12 @@ public final class SpringDiIndex {
         if (instanceFields.isEmpty()) {
             return;
         }
-        List<VariableDeclarator> requiredFields = type.getFields().stream()
-                .filter(field -> !field.isStatic())
-                .flatMap(field -> field.getVariables().stream()
-                        .filter(variable -> isRequiredConstructorField(field, variable)))
-                .filter(variable -> variable.getInitializer().isEmpty())
+        List<VariableDeclarator> requiredFields = instanceFields.stream()
+                .filter(SpringDiIndex::isRequiredConstructorField)
                 .toList();
         String ownerType = BinaryNames.forTypeLikeNode(type);
-        List<String> requiredTypes = requiredFields.stream()
-                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
-                .toList();
-        List<String> allInstanceTypes = instanceFields.stream()
-                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
-                .toList();
+        List<String> requiredTypes = erasedTypesOf(requiredFields);
+        List<String> allInstanceTypes = erasedTypesOf(instanceFields);
         SootUpTypeHierarchyIndex.Resolution constructors = sootUpIndex.resolveConstructors(ownerType);
         if (!constructors.isAvailable()) {
             return;
@@ -479,15 +420,23 @@ public final class SpringDiIndex {
      * {@code @RequiredArgsConstructor}は未初期化のfinal fieldに加えて、未初期化の
      * {@code @NonNull} fieldもconstructor引数に含める。
      *
-     * @param field field宣言。複数variable宣言時のmodifierと宣言annotationを保持する
-     * @param variable 判定対象のvariable
-     * @return required constructorの候補fieldなら{@code true}
+     * @param variable 判定対象のvariable。modifierと宣言annotationは親のfield宣言が保持する
      */
-    private static boolean isRequiredConstructorField(FieldDeclaration field, VariableDeclarator variable) {
+    private static boolean isRequiredConstructorField(VariableDeclarator variable) {
+        if (!(variable.getParentNode().orElse(null) instanceof FieldDeclaration field)) {
+            return false;
+        }
         return field.isFinal()
                 || SpringAnnotations.has(field, LOMBOK_NON_NULL)
                 || variable.getType().getAnnotations().stream()
                         .anyMatch(annotation -> LOMBOK_NON_NULL.equals(SpringAnnotations.fqn(annotation)));
+    }
+
+    /** field 宣言順のまま erasure 済み型 binary name へ写す。 */
+    private static List<String> erasedTypesOf(List<VariableDeclarator> variables) {
+        return variables.stream()
+                .map(variable -> BinaryNames.erasureOf(variable.getType().resolve()))
+                .toList();
     }
 
     private void collectFieldInjections(ClassOrInterfaceDeclaration type, List<InjectionPoint> injections) {
@@ -578,10 +527,7 @@ public final class SpringDiIndex {
      * constructor または setter の注入parameterについて、parameter自身と
      * {@code this.field = parameter} 形式で代入されるfieldを同じ呼び出しレシーバーとして収集する。
      * nested callable 内の代入は別スコープなので対象外とする。
-     *
-     * @param callable 注入parameterを宣言するconstructorまたはmethod
-     * @param parameter 注入対象parameter
-     * @return parameter名を先頭に、代入先field名をsource順で重複なく並べた一覧
+     * 返す一覧はparameter名を先頭に、代入先field名をsource順で重複なく並べる。
      */
     private static List<String> receiverNamesOf(Node callable, Parameter parameter) {
         Set<String> names = new LinkedHashSet<>();
@@ -596,6 +542,10 @@ public final class SpringDiIndex {
         return List.copyOf(names);
     }
 
+    /**
+     * node が指定 callable の直下スコープに属するかを判定する。間に別の callable
+     * (constructor / method / lambda) が挟まる node は nested スコープの所有物として除外する。
+     */
     private static boolean belongsToCallable(Node node, Node callable) {
         Node current = node.getParentNode().orElse(null);
         while (current != null && current != callable) {
@@ -698,11 +648,7 @@ public final class SpringDiIndex {
         Set<String> types = new LinkedHashSet<>();
         types.add(BinaryNames.forTypeLikeNode(type));
         try {
-            type.resolve().getAllAncestors().stream()
-                    .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
-                    .filter(java.util.Objects::nonNull)
-                    .map(BinaryNames::forResolvedDeclaration)
-                    .forEach(types::add);
+            addAncestorTypes(type.resolve(), types);
         } catch (RuntimeException | LinkageError ignored) {
             // 未解決 ancestor は候補にせず、解決できた型だけを中間索引へ保持する。
         }
@@ -716,17 +662,22 @@ public final class SpringDiIndex {
             try {
                 ResolvedReferenceTypeDeclaration declaration = type.asReferenceType().getTypeDeclaration().orElse(null);
                 if (declaration != null) {
-                    declaration.getAllAncestors().stream()
-                            .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
-                            .filter(java.util.Objects::nonNull)
-                            .map(BinaryNames::forResolvedDeclaration)
-                            .forEach(types::add);
+                    addAncestorTypes(declaration, types);
                 }
             } catch (RuntimeException | LinkageError ignored) {
                 // return type 自体は保持済み。未解決 ancestor だけを除外する。
             }
         }
         return Set.copyOf(types);
+    }
+
+    /** 解決済み宣言の全 ancestor のうち、宣言を引ける型の binary name を収集する。 */
+    private static void addAncestorTypes(ResolvedReferenceTypeDeclaration declaration, Set<String> types) {
+        declaration.getAllAncestors().stream()
+                .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
+                .filter(Objects::nonNull)
+                .map(BinaryNames::forResolvedDeclaration)
+                .forEach(types::add);
     }
 
     private static Set<String> annotationTypesOf(ClassOrInterfaceDeclaration type) {
@@ -744,11 +695,11 @@ public final class SpringDiIndex {
         return bean.beanType() + "#" + String.join(",", bean.names());
     }
 
-    private static int lineOf(com.github.javaparser.ast.Node node) {
+    private static int lineOf(Node node) {
         return node.getBegin().map(position -> position.line).orElse(0);
     }
 
-    private static String sourcePathOf(com.github.javaparser.ast.Node node) {
+    private static String sourcePathOf(Node node) {
         return node.findCompilationUnit()
                 .flatMap(CompilationUnit::getStorage)
                 .map(storage -> storage.getPath().toAbsolutePath().normalize().toString())

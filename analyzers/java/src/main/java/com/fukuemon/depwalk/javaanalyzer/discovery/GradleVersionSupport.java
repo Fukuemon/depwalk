@@ -30,6 +30,10 @@ public final class GradleVersionSupport {
     /**
      * target Gradle と選択済み daemon JVM major の組が Gradle 公式互換範囲内か
      * を返す。判定不能な version は empty。
+     *
+     * @param gradleVersion BuildEnvironment が報告した version 文字列
+     * @param daemonJavaMajor daemon JVM の Java major version
+     * @return 互換範囲内なら true。Gradle version を判定できない場合は empty
      */
     public static Optional<Boolean> isDaemonJvmCompatible(String gradleVersion, int daemonJavaMajor) {
         Optional<int[]> parsed = parseVersion(gradleVersion);

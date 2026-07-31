@@ -14,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * spec #24 D18 / D21: scope 内 source type の bytecode-only member を generator
+ * ADR-0005 (adr/0005-adopt-sootup-and-spring-di-resolution.md): scope 内 source type の
+ * bytecode-only member を generator
  * 名に依存せず救済し、定義位置を偽装しない。fixture は annotation を使わず、
  * 「完全な source を compile した classes output」と「member を削った解析対象
  * source」の組で generator 非依存の経路を検証する。
@@ -87,7 +88,8 @@ class BytecodeOnlyMemberTest {
     @SuppressWarnings("unchecked")
     @Test
     void resolvesChainedCallsThroughSynthesizedMembers() throws Exception {
-        // D31: bytecode-only member の戻り値型が solver へ伝播し、連鎖呼び出し
+        // java-analyzer feature doc「solver 層の bytecode member 合成」:
+        // bytecode-only member の戻り値型が solver へ伝播し、連鎖呼び出し
         // (owner.getName().isEmpty()) の外側も解決できる。
         Path build = temp.resolve("chain-src");
         write(build, "com/example/Owner.java", """
@@ -130,7 +132,8 @@ class BytecodeOnlyMemberTest {
 
     @Test
     void resolvesInheritedSynthesizedMembersThroughHierarchyWalk() throws Exception {
-        // D31: 親 class の bytecode-only member (継承した生成 getter) は
+        // java-analyzer feature doc「solver 層の bytecode member 合成」:
+        // 親 class の bytecode-only member (継承した生成 getter) は
         // getDeclaredMethods への合成経由で階層走査から解決できる。
         Path build = temp.resolve("inherit-src");
         write(build, "com/example/Base.java", """
@@ -182,7 +185,8 @@ class BytecodeOnlyMemberTest {
 
     @Test
     void genericElementTypeIsRecoveredFromSignatureAttribute() throws Exception {
-        // D32: 合成 member の generic 戻り値は Signature 属性から実型引数を
+        // java-analyzer feature doc「solver 層の bytecode member 合成」:
+        // 合成 member の generic 戻り値は Signature 属性から実型引数を
         // 復元するため、要素型が scope 内型の連鎖 (getItems().get(0).ping())
         // も edge として解決できる。
         Path build = temp.resolve("generic-src");
@@ -262,7 +266,8 @@ class BytecodeOnlyMemberTest {
     @Test
     void doesNotRescueMembersThatExistOnlyInExternalArtifacts() throws Exception {
         // 同じ binary name の class が external jar にだけ存在する場合、その
-        // member を project bytecode として救済しない (D16: origin 検証)。
+        // member を project bytecode として救済しない (origin 検証。java-analyzer
+        // feature doc「solver 層の bytecode member 合成」)。
         Path build = temp.resolve("jar-src");
         write(build, "com/example/Owner.java", """
                 package com.example;

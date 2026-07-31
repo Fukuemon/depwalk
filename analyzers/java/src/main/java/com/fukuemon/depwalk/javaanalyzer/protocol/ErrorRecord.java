@@ -24,14 +24,13 @@ public record ErrorRecord(
         Map<String, Object> metadata,
         List<FailureDetail> details) implements ProtocolRecord {
 
+    /** 本 record が JSONL の {@code recordType} に設定する値。 */
     public static final String RECORD_TYPE = "error";
 
     /**
      * source location と metadata を持たない fatal error を生成する。
      *
      * @param code 安定した fatal error code
-     * @param message 人間向けの説明
-     * @return protocol 出力可能な error record
      */
     public static ErrorRecord of(String code, String message) {
         return new ErrorRecord(ProtocolSchema.VERSION, RECORD_TYPE, code, message, null, null, null);
@@ -41,10 +40,8 @@ public record ErrorRecord(
      * 任意の source location と metadata を含む fatal error を生成する。
      *
      * @param code 安定した fatal error code
-     * @param message 人間向けの説明
      * @param sourceLocation 発生位置。特定できなければ {@code null}
      * @param metadata 追加情報。なければ {@code null}
-     * @return protocol 出力可能な error record
      */
     public static ErrorRecord of(String code, String message, SourceLocation sourceLocation, Map<String, Object> metadata) {
         return new ErrorRecord(ProtocolSchema.VERSION, RECORD_TYPE, code, message, sourceLocation, metadata, null);
