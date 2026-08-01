@@ -29,9 +29,9 @@ Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling A
 
 自動 discovery は trusted build 前提である。build logic は利用者権限で評価され、repository credential、network、cache、daemon JVM 選択、任意の副作用は Gradle に委譲される。depwalk は credential を受領・保存せず、Gradle stdout / stderr を Protocol / CLIへ転送しない。raw exception は sanitize する。非漏洩保証は depwalk が生成・転送する artifact に限定し、任意 build logic の sandbox は提供しない。
 
-CLI helpはこの副作用と明示bypassを常時説明し、自動discoveryの各runではbuild評価前にAnalyzer stderrへ、build logic評価、repository / credential resolution、network、cacheを利用し得ることを安定した定型文で通知する。discoveryの開始・終了と安定categoryは観測可能にするが、Gradle由来の自由文は転送しない。
+CLI help はこの副作用と明示 bypass を常時説明する。自動 discovery の各 run では、build 評価の前に Analyzer stderr へ通知を出す。通知は「build logic 評価、repository / credential resolution、network、cache を利用し得る」ことを安定した定型文で伝える。discoveryの開始・終了と安定categoryは観測可能にするが、Gradle由来の自由文は転送しない。
 
-範囲外またはversion判定不能、provider非互換、daemon JVM非互換は`JAVA_GRADLE_MODEL_ERROR`の安定reason `unsupported-gradle-version` / `provider-incompatible` / `daemon-jvm-incompatible`でfatalにする。reasonの分類粒度は判定できたphaseに従う: version / daemon JVMはmodel要求前のpre-flightで、provider非互換はmodel検証で判定する。provider load中にGradle側で顕在化した失敗は原因を特定できないため`model-request-failed` / `connection-failed`として報告し、詳細をraw exceptionから推測しない。wrapper不在のbuildは同梱`9.6.1`で評価されるため、意図しないGradle versionでのbuild評価を避けたい場合はwrapperの利用または明示`sourceRoots`を推奨する。明示`sourceRoots`経路はwrapper判定を含めmatrix全体をbypassする。
+次の 3 つはいずれも `JAVA_GRADLE_MODEL_ERROR` の fatal とし、安定 reason で区別する。範囲外または version 判定不能は `unsupported-gradle-version`、provider 非互換は `provider-incompatible`、daemon JVM 非互換は `daemon-jvm-incompatible`。reasonの分類粒度は判定できたphaseに従う: version / daemon JVMはmodel要求前のpre-flightで、provider非互換はmodel検証で判定する。provider load中にGradle側で顕在化した失敗は原因を特定できないため`model-request-failed` / `connection-failed`として報告し、詳細をraw exceptionから推測しない。wrapper不在のbuildは同梱`9.6.1`で評価されるため、意図しないGradle versionでのbuild評価を避けたい場合はwrapperの利用または明示`sourceRoots`を推奨する。明示`sourceRoots`経路はwrapper判定を含めmatrix全体をbypassする。
 
 ## 代替案
 

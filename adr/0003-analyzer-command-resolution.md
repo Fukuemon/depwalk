@@ -12,7 +12,7 @@
 
 ADR-0001 で Core と Analyzer を JSONL over STDIN/STDOUT の process SPI で結合すると決めたが、Core 側には「どの Analyzer をどう起動するか」を決める配線がまだ無かった (`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけ)。Java Analyzer を初号機として Core から実行するには、この起動コマンド解決の配線が必要になる。
 
-Design Doc の成功条件 S5 は「**2 つ目以降**の言語 Analyzer 追加時に Core モジュールへ差分が発生しないこと」を求める。初号機 (Java) 導入に伴う言語非依存な初回配線自体は S5 の対象外だが、この初回配線を言語固有の作り (例: `java` コマンドや jar path を Core に埋め込む) にしてしまうと、2 つ目以降の Analyzer 追加時に Core への分岐追加が避けられなくなる。したがって初回配線の設計そのものが S5 の担保方法を左右する。
+Design Doc の成功条件 S5 は「**2 つ目以降**の言語 Analyzer 追加時に Core モジュールへ差分が発生しないこと」を求める。初号機 (Java) 導入に伴う言語非依存な初回配線自体は S5 の対象外である。ただしこの初回配線を言語固有の作り (例: `java` コマンドや jar path を Core に埋め込む) にしてしまうと、2 つ目以降の Analyzer 追加時に Core への分岐追加が避けられなくなる。したがって初回配線の設計そのものが S5 の担保方法を左右する。
 
 ## 決定
 

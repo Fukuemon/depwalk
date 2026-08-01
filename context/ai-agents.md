@@ -5,7 +5,7 @@ description: 非対話 CLI エージェントの invocation / routing / timeout 
 keywords: [AI agent, Codex, Claude, Cursor, orchestrate]
 governs:
   - .claude/agents
-verified_commit: unverified
+verified_commit: 9654928
 ---
 
 # AI Agents Registry
