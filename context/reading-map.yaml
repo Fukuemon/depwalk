@@ -16,10 +16,6 @@ paths:
       - context/engineering.md
       - context/infrastructure.md
     keywords: [CI, Gradle daemon, infrastructure, lefthook, quality gate, secret, shared config, コメント規約, 運用]
-  analyzers/java:
-    docs:
-      - design/features/java-analyzer/DesignDoc_java-analyzer.md
-    keywords: [Gradle Tooling API, Java, JavaParser, SootUp, Spring, discovery]
   analyzers/java/build.gradle.kts:
     docs:
       - context/infrastructure.md
@@ -41,6 +37,62 @@ paths:
     docs:
       - context/architecture.md
     keywords: [ArchUnit, architecture, depguard, package boundary, 依存方向]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/attribution:
+    docs:
+      - design/features/java-analyzer/protocol-mapping.md
+    keywords: [diagnostic, dispatch, metadata, methodId, signature, symbolKind, 帰属型]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment:
+    docs:
+      - design/features/java-analyzer/analysis.md
+    keywords: [DI, SootUp, Spring, SymbolSolver, bytecode, 型解決, 完全性]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness:
+    docs:
+      - design/features/java-analyzer/analysis.md
+    keywords: [DI, SootUp, Spring, SymbolSolver, bytecode, 型解決, 完全性]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/context:
+    docs:
+      - design/features/java-analyzer/analysis.md
+    keywords: [DI, SootUp, Spring, SymbolSolver, bytecode, 型解決, 完全性]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph:
+    docs:
+      - design/features/java-analyzer/protocol-mapping.md
+    keywords: [diagnostic, dispatch, metadata, methodId, signature, symbolKind, 帰属型]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/normalize:
+    docs:
+      - design/features/java-analyzer/protocol-mapping.md
+    keywords: [diagnostic, dispatch, metadata, methodId, signature, symbolKind, 帰属型]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline:
+    docs:
+      - design/features/java-analyzer/DesignDoc_java-analyzer.md
+    keywords: [Gradle Tooling API, Java, JavaParser, SootUp, Spring, discovery]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope:
+    docs:
+      - design/features/java-analyzer/DesignDoc_java-analyzer.md
+    keywords: [Gradle Tooling API, Java, JavaParser, SootUp, Spring, discovery]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/sootup:
+    docs:
+      - design/features/java-analyzer/analysis.md
+    keywords: [DI, SootUp, Spring, SymbolSolver, bytecode, 型解決, 完全性]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring:
+    docs:
+      - design/features/java-analyzer/analysis.md
+    keywords: [DI, SootUp, Spring, SymbolSolver, bytecode, 型解決, 完全性]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery:
+    docs:
+      - design/features/java-analyzer/discovery.md
+    keywords: [Gradle, Tooling API, classpath, composite build, discovery, source root]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io:
+    docs:
+      - design/features/java-analyzer/protocol-mapping.md
+    keywords: [diagnostic, dispatch, metadata, methodId, signature, symbolKind, 帰属型]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight:
+    docs:
+      - design/features/java-analyzer/DesignDoc_java-analyzer.md
+    keywords: [Gradle Tooling API, Java, JavaParser, SootUp, Spring, discovery]
+  analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol:
+    docs:
+      - design/features/java-analyzer/protocol-mapping.md
+    keywords: [diagnostic, dispatch, metadata, methodId, signature, symbolKind, 帰属型]
   analyzers/java/src/test:
     docs:
       - context/testing.md
