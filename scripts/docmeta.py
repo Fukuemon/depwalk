@@ -40,6 +40,9 @@ def _parse_frontmatter(text: str) -> dict | None:
 
     data: dict = {}
     current_list_key: str | None = None
+    # 「値が空のキー」は、ブロック配列の開始とも「値の書き忘れ」とも読める。
+    # 後続に要素が 1 つも来なければ後者とみなすため、候補を覚えておく。
+    empty_keys: set[str] = set()
     for raw in m.group(1).splitlines():
         line = raw.rstrip()
         if not line.strip() or line.lstrip().startswith("#"):
@@ -48,6 +51,7 @@ def _parse_frontmatter(text: str) -> dict | None:
         # ブロック配列の要素 ("  - value")
         if current_list_key and line.lstrip().startswith("- "):
             data[current_list_key].append(_strip_quotes(line.lstrip()[2:].strip()))
+            empty_keys.discard(current_list_key)
             continue
 
         if ":" not in line:
@@ -60,6 +64,7 @@ def _parse_frontmatter(text: str) -> dict | None:
 
         if rest == "":
             data[key] = []
+            empty_keys.add(key)
             current_list_key = key
         elif rest.startswith("[") and rest.endswith("]"):
             inner = rest[1:-1].strip()
@@ -68,6 +73,11 @@ def _parse_frontmatter(text: str) -> dict | None:
         else:
             data[key] = _strip_quotes(rest)
             current_list_key = None
+
+    # 要素の来なかった空キーは「書き忘れ」として未設定に倒す。空配列のまま残すと、
+    # `verified_commit:` (値なし) が「設定済み」に見えて片欠け検査をすり抜ける。
+    for key in empty_keys:
+        data[key] = None
     return data
 
 
