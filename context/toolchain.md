@@ -1,6 +1,18 @@
-# Toolchain
+---
+type: context
+title: Toolchain
+keywords: [toolchain, mise, Go, Gradle, JDK, build, scaffold]
+governs:
+  - mise.toml
+  - core/go.mod
+  - analyzers/java/build.gradle
+  - analyzers/java/build.gradle.kts
+  - analyzers/java/settings.gradle
+  - analyzers/java/settings.gradle.kts
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26
+# Toolchain
 
 採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
 
