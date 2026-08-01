@@ -9,23 +9,12 @@ governs:
   - core/internal/analyze
   - core/internal/analyzer
   - testdata
-verified_commit: unverified
+verified_commit: dcb2a35
 ---
 
 # Feature 設計: Analyzer Protocol / SPI
 
-Analyzer SPI、JSONL Communication Protocol、Model schema の 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) と関連 PR を参照する。
-
-## メタ
-
-| 項目           | 値                                                                                                                                                                                                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#why--what)                                                                                                                                                                                        |
-| 関連 DesignDoc | [Communication Protocol](../../DesignDoc.md#communication-protocol)、[モジュール責務](../../DesignDoc.md#モジュール責務)、[設計原則](../../DesignDoc.md#設計原則-design-principles)                                                                             |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[infrastructure](../../../context/infrastructure.md)                                                                      |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)                                                                                                                                                                                                    |
-| 関連 issue     | [#8](https://github.com/Fukuemon/depwalk/issues/8)、[#21](https://github.com/Fukuemon/depwalk/issues/21) (gap の発見)、[#24](https://github.com/Fukuemon/depwalk/issues/24)、[#22](https://github.com/Fukuemon/depwalk/issues/22) (metadata passthrough の実装) |
-| 対象モジュール | `analyzer-protocol`                                                                                                                                                                                                                                             |
+Analyzer SPI、JSONL Communication Protocol、Model schema の 設計正本。本 doc は Protocol / SPI / Model の正本である。
 
 ## 背景・要件解釈
 
@@ -56,7 +45,7 @@ depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プ
 
 ### データ構造 / コンテンツモデル
 
-Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱う。全 record は `schemaVersion` と `recordType` を必須 field に持つ。Phase1 の `schemaVersion` は `"1"` とする。
+Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱う。全 record は `schemaVersion` と `recordType` を必須 field に持つ。現行の `schemaVersion` は `"1"`。
 
 #### Core -> Analyzer
 
@@ -64,11 +53,11 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 | field           | 必須/任意 | 説明                                                                                |
 | --------------- | --------- | ----------------------------------------------------------------------------------- |
-| `schemaVersion` | 必須      | Protocol version。Phase1 は `"1"`                                                   |
+| `schemaVersion` | 必須      | Protocol version。現行は `"1"`                                                      |
 | `recordType`    | 必須      | `analysisRequest`                                                                   |
 | `requestId`     | 必須      | 解析要求を識別する ID                                                               |
 | `workspaceRoot` | 必須      | 解析対象 repository root                                                            |
-| `language`      | 必須      | 対象言語。Phase1 は `java`                                                          |
+| `language`      | 必須      | 対象言語。現行は `java` のみ                                                        |
 | `sourceRoots`   | 任意      | `workspaceRoot` からの相対 source root 配列。指定時は Analyzer discovery を置換する |
 | `include`       | 任意      | `workspaceRoot` からの相対 path glob 配列                                           |
 | `exclude`       | 任意      | `workspaceRoot` からの相対除外 path glob 配列                                       |
@@ -100,7 +89,7 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 | `schemaVersion`  | 必須      | Protocol version                                      |
 | `recordType`     | 必須      | `methodSymbol`                                        |
 | `methodId`       | 必須      | Analyzer が決定的に生成する stable ID                 |
-| `language`       | 必須      | 対象言語。Phase1 は `java`                            |
+| `language`       | 必須      | 対象言語。現行は `java` のみ                          |
 | `symbolKind`     | 必須      | `method` / `constructor` / `function` / `initializer` |
 | `qualifiedName`  | 必須      | 表示・debug 用の完全修飾名                            |
 | `signature`      | 必須      | overload を区別できる正規化済み signature             |
@@ -123,9 +112,9 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み `methodSymbol` を参照する。未解決 symbol は `diagnostic` として表現する。
 
-**`metadata` の Core 内保持 (決定済み 2026-07-14)**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。#21 が解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。実装は [Issue #22](https://github.com/Fukuemon/depwalk/issues/22) の D11 が担う。
+**`metadata` の Core 内保持**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。
 
-`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定。表出の正本は [Output feature doc](../output/DesignDoc_output.md))。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) を正本とする。
+`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する で決定。表出の正本は [Output feature doc](../output/DesignDoc_output.md))。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) を正本とする。
 
 #### `SourceLocation`
 
@@ -214,7 +203,7 @@ flowchart TD
 | field 意味論の変更  | 非互換 | major version bump の対象                                                                    |
 | record type の削除  | 非互換 | major version bump の対象                                                                    |
 
-Handshake / capability negotiation は Phase1 では採用しない。
+Handshake / capability negotiation は採用しない。
 
 ## 主要シナリオ / フロー
 
