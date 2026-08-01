@@ -32,6 +32,11 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
+def _is_sha(value: object) -> bool:
+    """不変の commit 参照か。短縮 SHA を許すため 7 文字以上とする。"""
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{7,40}", value))
+
+
 def _parse_frontmatter(text: str) -> dict | None:
     """先頭の frontmatter を dict で返す。無ければ None。"""
     m = FRONTMATTER_RE.match(text)
@@ -108,6 +113,28 @@ def load_docs(root: pathlib.Path) -> list[dict]:
                 f"{rel}: {missing} が欠けています。"
                 "鮮度検査の対象外にするなら governs と verified_commit の両方を外してください"
             )
+
+        if governs is not None:
+            # governs: [] や governs: core/foo (スカラー) は「対象だが実質空」に
+            # なる。前者は文書が黙って一覧から消え、後者は文字列が 1 文字ずつ
+            # パスとして走査される。どちらも設定ミスなので error にする。
+            if not isinstance(governs, list) or not governs:
+                raise DocMetaError(
+                    f"{rel}: governs は 1 件以上のリストで書いてください "
+                    "(スカラーや空リストは不可)"
+                )
+            # verified_commit が HEAD / ブランチ名だと git が毎回解決し直すため、
+            # HEAD..HEAD が常に空になって永久に「一致」と報告される。
+            if verified != "unverified" and not _is_sha(verified):
+                raise DocMetaError(
+                    f"{rel}: verified_commit には commit SHA か unverified を書いてください "
+                    f"(可変の参照は使えません): {verified!r}"
+                )
+
+        # description は索引生成の入力。title で代替すると索引が文書名の羅列に
+        # なり「何を読めば足りるか」の判断に使えない (ADR-0008 決定 1)。
+        if not meta.get("description"):
+            raise DocMetaError(f"{rel}: description が必要です (索引の 1 行説明)")
 
         docs.append(
             {

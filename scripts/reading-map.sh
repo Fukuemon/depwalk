@@ -28,8 +28,21 @@ import sys
 sys.path.insert(0, str(pathlib.Path(sys.argv[1]) / "scripts"))
 from docmeta import DocMetaError, load_docs  # noqa: E402
 
-BEGIN = "<!-- BEGIN GENERATED: context-index (scripts/reading-map.sh が更新する。手編集しない) -->"
-END = "<!-- END GENERATED: context-index -->"
+# 生成する索引: (対象 README, マーカー名, 索引に載せる文書の判定, リンクの作り方)
+INDEXES = [
+    (
+        "context/README.md",
+        "context-index",
+        lambda d: d["path"].startswith("context/") and not d["path"].endswith("/README.md"),
+        lambda d: d["path"].split("/", 1)[1],
+    ),
+    (
+        "design/features/README.md",
+        "features-index",
+        lambda d: d["path"].startswith("design/features/") and not d["path"].endswith("/README.md"),
+        lambda d: d["path"].split("design/features/", 1)[1],
+    ),
+]
 
 root = pathlib.Path(sys.argv[1])
 try:
@@ -81,24 +94,26 @@ if exempt:
 
 (root / "context" / "reading-map.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-# --- context/README.md のマーカー区間 -------------------------------------
-readme = root / "context" / "README.md"
-text = readme.read_text(encoding="utf-8")
-if text.count(BEGIN) != 1 or text.count(END) != 1:
-    sys.exit(f"reading-map: {readme} の生成マーカーが 1 組ではありません")
+# --- 各 README の索引マーカー区間 -----------------------------------------
+for rel_readme, marker, belongs, link_of in INDEXES:
+    readme = root / rel_readme
+    begin = f"<!-- BEGIN GENERATED: {marker} (scripts/reading-map.sh が更新する。手編集しない) -->"
+    end = f"<!-- END GENERATED: {marker} -->"
 
-index_lines = [BEGIN, ""]
-for d in sorted((x for x in docs if x["path"].startswith("context/")), key=lambda x: x["path"]):
-    name = d["path"].split("/", 1)[1]
-    if name == "README.md":
-        continue  # 索引自身は載せない
-    desc = d["description"] or d["title"] or ""
-    index_lines.append(f"- [{name}]({name}) — {desc}" if desc else f"- [{name}]({name})")
-index_lines += ["", END]
+    text = readme.read_text(encoding="utf-8")
+    if text.count(begin) != 1 or text.count(end) != 1:
+        sys.exit(f"reading-map: {rel_readme} の生成マーカー ({marker}) が 1 組ではありません")
 
-start = text.index(BEGIN)
-stop = text.index(END) + len(END)
-readme.write_text(text[:start] + "\n".join(index_lines) + text[stop:], encoding="utf-8")
+    # description は docmeta 側で必須にしているのでフォールバックを置かない。
+    # title で代替すると索引が文書名の羅列になり、判断に使えなくなる。
+    index_lines = [begin, ""]
+    for d in sorted((x for x in docs if belongs(x)), key=lambda x: x["path"]):
+        index_lines.append(f"- [{link_of(d)}]({link_of(d)}) — {d['description']}")
+    index_lines += ["", end]
+
+    start = text.index(begin)
+    stop = text.index(end) + len(end)
+    readme.write_text(text[:start] + "\n".join(index_lines) + text[stop:], encoding="utf-8")
 
 print(f"reading-map: {len(by_path)} パス / {len(docs)} 文書から生成しました")
 PY

@@ -129,12 +129,13 @@ paths:
   spec_requirements: specs/<issue-id>-<slug>/requirements.md # 任意
   spec_review: specs/<issue-id>-<slug>/review.md # 任意
 
-# 読み取り索引。#40 で context/reading-map.yaml へ改名し、#45 で生成物にする。
-# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
+# 読み取りマップ (「何を読めば足りるか」のルーティング表)。
+# 各文書の frontmatter から生成する。判断の正本は
+# adr/0008-doc-freshness-and-reading-map.md。
 reading_index:
-  path: context/impact-index.yaml # #40 で context/reading-map.yaml へ
-  generated: false # #45 で生成器を入れたら true にする
-  generate_command: null # #45 で scripts/reading-map.sh を設定する
+  path: context/reading-map.yaml
+  generated: true # 手編集しない。skill は generate_command を実行する
+  generate_command: bash scripts/reading-map.sh
 
 templates:
   prd: templates/prd/template.md
