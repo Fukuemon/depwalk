@@ -85,7 +85,7 @@ paths:
   core/internal/output:
     docs:
       - design/features/output/DesignDoc_output.md
-    keywords: [Console, DOT, EdgeView, JSON, Mermaid, NodeView, output]
+    keywords: [Console, EdgeView, JSON, NodeView, formatter, output]
   core/internal/protocol:
     docs:
       - design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md

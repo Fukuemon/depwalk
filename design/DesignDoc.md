@@ -49,17 +49,17 @@ depwalk はこの調査を自動化することを目的とする。
 | --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | S1  | 指定メソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる | サンプル Java/Spring プロジェクトで、既知の呼び出し元集合と CLI 出力が一致する (Traversal Engine 層の到達集合照合は [feature doc](features/traversal/DesignDoc_traversal.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する) |
 | S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                                                                                                                                                                                                     |
-| S3  | 呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる                     | 各形式でパース / レンダリング可能な出力が得られる (Output Engine 層の照合は [feature doc](features/output/DesignDoc_output.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する)                                               |
-| S4  | Spring DI 経由の呼び出し先を実体まで解決できる (Phase2 以降)                     | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                           |
+| S3  | 呼び出しグラフを Console / JSON で出力できる                                     | 各形式でパース可能な出力が得られる (Output Engine 層の照合は [feature doc](features/output/DesignDoc_output.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する)                                                              |
+| S4  | Spring DI 経由の呼び出し先を実体まで解決できる                                   | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                           |
 | S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | **2 つ目以降**の言語 Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)。初号機 (Java) 導入時の言語非依存な初回配線 (`depwalk analyze` command / Analyzer 起動コマンド解決) は対象外とする                                    |
 
 ### スコープ
 
-#### やること (Phase1 起点)
+#### やること
 
 - Java/Spring Boot を対象とした静的解析
 - メソッドの呼び出し元 (caller) 探索 / 呼び出し先 (callee) 探索
-- 呼び出しグラフの出力 (Console / JSON、続いて DOT / Mermaid)
+- 呼び出しグラフの出力 (Console / JSON)
 - 言語別 Analyzer をプラグインとして追加できる Core / Protocol
 
 #### やらないこと
@@ -74,18 +74,18 @@ depwalk はこの調査を自動化することを目的とする。
 | --- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | G1  | 特定メソッドの呼び出し元を再帰的に探索できる | `UserService.findById` ← `UserController.getUser` / `AdminController.getUser` / `UserBatch.execute` |
 | G2  | 特定メソッドの呼び出し先を探索できる         | `UserController.getUser` → `UserService.findById` / `UserMapper.toResponse` / `AuditService.record` |
-| G3  | 呼び出しグラフを出力できる                   | 出力形式: Console / JSON / DOT / Mermaid                                                            |
+| G3  | 呼び出しグラフを出力できる                   | 出力形式: Console / JSON                                                                            |
 | G4  | 言語ごとの解析実装を追加できる               | 将来対象: Java / Kotlin / TypeScript / Vue / Go                                                     |
 
 ## Non Goals
 
-Phase1 では以下を対象外とする。
+以下は対象外とする。
 
 - 実行時計測系: Runtime Trace、APM
 - 動的解析系: Reflection 解析、AspectJ Runtime 解析、実行時 Proxy 解析
 - 提供形態: IDE Plugin、Web UI
 
-本ツールは **CLI に限定**する。グラフの可視化は出力形式 (DOT / Mermaid) の生成までを担い、ビューワ自体は提供しない。
+本ツールは **CLI に限定**する。グラフの可視化は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](../adr/0010-defer-graph-visualization.md))。
 
 ## Background
 
@@ -96,7 +96,7 @@ Phase1 では以下を対象外とする。
 ### 設計上の前提
 
 - 解析は **静的解析**で行う (実行時情報には依存しない)。
-- 対象は **JVM 言語を先行**し、Phase1 で Java/Spring Boot を扱う。Kotlin / TypeScript / Vue / Go は将来対象。
+- 対象は **JVM 言語を先行**し、まず Java/Spring Boot を扱う。Kotlin / TypeScript / Vue / Go は将来対象。
 - 言語ごとの解析は、その言語のランタイム上で動く **独立した Analyzer プロセス**が担う。Core は特定言語ランタイムに依存しない。
 - Core と Analyzer は、共通データモデル (`MethodSymbol` / `CallEdge`) と Protocol diagnostics (`diagnostic` / `error`) のみを介して結合する。
 
@@ -116,7 +116,7 @@ flowchart TD
     dev -->|"メソッドを指定して実行"| sys
     ci -->|"バッチ実行"| sys
     sys -->|"ソースを読み取り解析"| src
-    sys -->|"caller/callee グラフを出力<br/>Console / JSON / DOT / Mermaid"| dev
+    sys -->|"caller/callee グラフを出力<br/>Console / JSON"| dev
     sys -->|"レポート出力"| ci
 ```
 
@@ -131,7 +131,7 @@ flowchart TD
     core <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge / diagnostics"| spi["Analyzer SPI<br/>(プラグイン境界)"]
     spi --> ja["Java Analyzer (独立プロセス)<br/>JavaParser / SymbolSolver / SootUp<br/>Gradle Tooling API (自動 discovery 時のみ)"]
     ja -->|"AST 解析・型解決・DI 解決"| src[("Java / Spring ソース")]
-    core -->|"Console / JSON / DOT / Mermaid"| out["出力"]
+    core -->|"Console / JSON"| out["出力"]
 ```
 
 ## モジュール責務
@@ -143,7 +143,7 @@ flowchart TD
 | CLI              | 引数解析、実行制御、Core 呼び出し                                                                                                      | コマンドライン I/F | Core                                                                                                                      |
 | Graph Engine     | Node 管理 / Edge 管理 / Graph 生成                                                                                                     | グラフ構造 API     | Model                                                                                                                     |
 | Traversal Engine | Caller 探索 / Callee 探索 (BFS / DFS)                                                                                                  | 探索 API           | Graph Engine                                                                                                              |
-| Output Engine    | Console / JSON / DOT / Mermaid への出力                                                                                                | 出力 API           | Graph Engine, Traversal Engine, Model                                                                                     |
+| Output Engine    | Console / JSON への出力                                                                                                                | 出力 API           | Graph Engine, Traversal Engine, Model                                                                                     |
 | Model            | `MethodSymbol` / `CallEdge` / `SourceLocation` の定義 (Analyzer 出力の共通データモデル)                                                | データ型           | なし                                                                                                                      |
 | Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領                                         | Protocol (JSONL)   | Model                                                                                                                     |
 | Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成。source root 未指定時は Gradle build model から解析 context を discovery する | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp。自動 discovery 時のみ Gradle Tooling API / Gradle daemon / 一時 custom model provider |
@@ -209,14 +209,14 @@ landscape より下の詳細は以下を正本とする。本 doc には重複�
 
 feature 単位の設計 (データ構造・主要シナリオ / フロー) は [design/features/](features/) を正本とする。
 
-| Feature                              | 文書                                                                                        | 状態                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Caller / Callee 探索                 | [DesignDoc_traversal.md](features/traversal/DesignDoc_traversal.md)                         | 完了                               |
-| 呼び出しグラフのデータモデル (Graph) | [DesignDoc_graph.md](features/graph/DesignDoc_graph.md)                                     | 完了                               |
-| 出力形式 (Console/JSON/DOT/Mermaid)  | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了 (DOT / Mermaid 実装は Phase4) |
-| Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了                               |
-| Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了                               |
-| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                           | 完了 (実装は #22)                  |
+| Feature                              | 文書                                                                                        | 状態              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------- |
+| Caller / Callee 探索                 | [DesignDoc_traversal.md](features/traversal/DesignDoc_traversal.md)                         | 完了              |
+| 呼び出しグラフのデータモデル (Graph) | [DesignDoc_graph.md](features/graph/DesignDoc_graph.md)                                     | 完了              |
+| 出力形式 (Console / JSON)            | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了              |
+| Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了              |
+| Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了              |
+| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                           | 完了 (実装は #22) |
 
 ### Engineering Context (How: 横断規約)
 
@@ -243,14 +243,19 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 ### Future Work (Rollout Plan)
 
-Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spec で確定する。
+提供範囲を広げる順序。番号は振らない — 順序が入れ替わったときに番号だけが残って実態とずれるため。各項目の完了条件は着手時の issue で確定する。
 
-| Phase              | 提供 / 追加                                                                                                                                                                     | 主技術                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Phase1             | Caller 探索 / Callee 探索 / JSON 出力                                                                                                                                           | JavaParser ベース                   |
-| 後続 feature (#21) | 型階層補完 (SootUp) → Spring 絞り込みの順で Interface Dispatch / Override 解決と Spring Bean / DI 解決を実装 ([ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md)) | SootUp + SymbolSolver + Spring 解析 |
-| Phase4             | グラフ出力 (DOT / Mermaid)                                                                                                                                                      | Output Engine 拡張                  |
-| Phase5             | Multi Language (Kotlin / TypeScript / Vue / Go)                                                                                                                                 | 言語別 Analyzer 追加                |
+**次にやること**
+
+1. **解析精度の強化** — framework 由来の暗黙の呼び出し (アノテーション駆動 / Mapper interface / lambda / method reference) を拾う。edge が 1 本欠けると答えが間違うため、出力や速度より先に効く
+2. **グラフの永続化 (commit SHA 単位)** — 再解析を避け、2 時点の差分 (= その PR で影響範囲がどう変わったか) に答えられるようにする。[ADR-0002](../adr/0002-core-implementation-foundation.md) の「永続ストアを持たない」を変えるため着手時に ADR が要る
+3. **CI 連携** — SHA ごとのグラフを Artifact 化し、PR へ影響範囲をコメントする。2 の上に乗る (2 なしでは毎回フル解析になり実用に耐えない)
+
+**その先**
+
+- CLI の使い勝手 (解析中の進捗表示 / method selector が曖昧なときの候補選択 / 結果の絞り込み)
+- 可視化の再導入 — 形式は決めない。DOT / Mermaid は外部レンダラへの依存を利用者に負わせるため、自己完結した単一 HTML を含めて選び直す (判断の正本は [ADR-0010](../adr/0010-defer-graph-visualization.md))
+- Multi Language (Kotlin / TypeScript / Vue / Go)
 
 ### Open Questions (未決事項)
 
