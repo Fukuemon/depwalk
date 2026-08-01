@@ -74,6 +74,7 @@
 ---
 type: feature-design # design-doc | feature-design | context
 title: Graph Engine
+description: 呼び出しグラフの node / edge が持つ属性と wire → 値型の変換契約 # 索引の 1 行説明
 status: 完了 # design 系のみ
 keywords: [graph, Symbol, SourceLocation]
 governs:
@@ -81,6 +82,8 @@ governs:
 verified_commit: <sha> | unverified
 ---
 ```
+
+`description` は索引の生成に使う 1 行説明である (2026-08-01 追加)。決定 4 の索引は `- [file](link) — description` の形で出力するため、説明の出所が frontmatter 側に必要になる。`title` で代替すると索引が文書名の羅列になり、「何を読めば足りるか」の判断に使えない。OKF v0.1 の予約フィールドでもあるため名前をそれに合わせる。
 
 `type` の値域に `index` を置かない。索引の実体 (`context/reading-map.yaml`) は本 frontmatter を入力とする生成物であり、自身が frontmatter を持つ対象ではないためである。
 
@@ -101,13 +104,27 @@ verified_commit: <sha> | unverified
 
 `context/README.md` のように**人手の本文と生成マーカー区間が同居する文書**は、frontmatter が安定しているだけでは足りない。決定 4 のとおり README のファイル一覧は生成対象であり、生成物は markdown テーブルなので prettier が列幅を揃え直す (上記の実測)。frontmatter が無傷でも、テーブル部分で ping-pong が起きて drift 検査が壊れる。
 
-[issue #45](https://github.com/Fukuemon/depwalk/issues/45) は着手時にこの境界を解く必要がある。取りうる案は次の 3 つで、判断は #45 に委ねる。
+**決定 (2026-08-01)**: マーカー区間は**テーブルではなく箇条書きで出力する**。prettier 3.6.2 が正規形の箇条書きを一切変更しないことを実測で確認した。
 
-| 案                                       | 得られるもの                       | 失うもの                                           |
-| ---------------------------------------- | ---------------------------------- | -------------------------------------------------- |
-| 生成器が出力を prettier に通してから書く | 人手の本文の整形が残り、除外も不要 | 生成器が prettier に依存する                       |
-| 生成区間を含む README を除外する         | 実装が単純                         | その README の人手の本文が prettier の対象外になる |
-| マーカー内をテーブル以外の形式で出力する | 除外も prettier 依存も不要         | 表形式の読みやすさを失う                           |
+```markdown
+<!-- BEGIN GENERATED: context-index -->
+
+- [architecture.md](architecture.md) — package / runtime boundary, 依存方向
+- [toolchain.md](toolchain.md) — toolchain 一覧, build 構成
+
+<!-- END GENERATED: context-index -->
+```
+
+これは `scripts/depgraph.sh` が成功した理由そのもの、すなわち **formatter が触らない形式を選ぶ**という発想である。formatter と整形規則を一致させにいく (生成器を prettier に依存させる) より、そもそも衝突しない形式を選ぶほうが壊れにくい。失うのは表形式の読みやすさだが、索引としては箇条書きで足りる。
+
+検討した他案と却下理由:
+
+| 案                                       | 却下理由                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 生成器が出力を prettier に通してから書く | 冪等性は確認できたが、生成器が npx / prettier のバージョンに依存する (hook 側の pin とずれると再発する) |
+| 生成区間を含む README を除外する         | その README の人手の本文まで prettier の対象外になる。対象 README は今後増える                          |
+
+なお `context/reading-map.yaml` は**ファイル全体が生成物**なので本節の対象外であり、他の生成物と同じく `.prettierignore` へ入れる。判断が要るのは人手の本文と同居するマーカー区間だけである。
 
 #### `verified_commit` の初期値
 
