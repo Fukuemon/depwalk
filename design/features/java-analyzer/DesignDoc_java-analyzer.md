@@ -8,14 +8,60 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: a515089
+verified_commit: 906d77a
 ---
 
 # Feature 設計: Java Analyzer
 
-Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の 設計正本。本 doc が Java Analyzer 設計の正本である。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本。
+Java/Spring のソースを読み、メソッドの呼び出し関係を抽出する言語別 Analyzer の設計正本。
 
-本 doc は Java 固有の discovery、metadata、解析完全性を定める。
+共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本。本 doc は Java 固有の部分だけを扱う。
+
+## 前提: この doc を読むのに必要な語
+
+Java の静的解析に固有の語が多いため、先に整理する。
+
+### 解析の 3 段
+
+Java のソースから「どのメソッドがどのメソッドを呼んでいるか」を出すには、3 段階を踏む。
+
+| 段                | やること                                                                               | 使うもの                       |
+| ----------------- | -------------------------------------------------------------------------------------- | ------------------------------ |
+| 1. 構文を読む     | ソースを構文木 (AST) にする。「ここにメソッド呼び出しがある」まで分かる                | **JavaParser**                 |
+| 2. 型を決める     | その呼び出しが**どの型の**どのメソッドか決める。`user.save()` の `user` が何型かを解く | **SymbolSolver**               |
+| 3. 実装候補を絞る | interface 越しの呼び出しについて、実装クラスの候補を挙げる                             | **SootUp** / Spring の DI 情報 |
+
+2 が解けないと呼び出し先が特定できず、edge を出せない。**この doc の大半は「2 と 3 をどこまで、どう解くか」の規則**である。
+
+### 型解決に必要な入力
+
+| 語                    | 意味                                                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **classpath**         | 型を解決するために参照する場所の一覧。依存ライブラリの jar と、コンパイル済みクラスの置き場からなる                                                                        |
+| **classes directory** | コンパイル済みの `.class` ファイルが置かれるディレクトリ (Gradle なら `build/classes/java/main`)。**classes output** も同じものを指す                                      |
+| **bytecode member**   | ソースには現れないが `.class` には存在するメソッドやコンストラクタ。Lombok が生成する getter / コンストラクタが典型。ソースだけ見ても分からないため、`.class` を読んで補う |
+| **source root**       | 解析対象のソースが置かれたディレクトリ (`src/main/java` 等)                                                                                                                |
+
+依存ライブラリのソースは手元にないため、型解決は `.class` を読んで行う。classpath が欠けると「型が分からない」呼び出しが増え、edge が落ちる。
+
+### 結果の扱いに使う語
+
+| 語              | 意味                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **adjacency**   | 隣接関係。「どの node からどの node へ edge が伸びているか」の対応表                                                                       |
+| **provenance**  | その edge が**どういう根拠で出たか** (ソースの呼び出しから直接か、Spring の DI 解決を経たか等)。同じ edge が複数の経路で出たときに統合する |
+| **完全性 gate** | 解析しきれなかった呼び出しが残ったまま結果を返さないための検査。未解決が残れば失敗として扱う                                               |
+| **救済**        | 一次的に解決できなかった呼び出しを、別の手段 (`.class` を読む等) で解き直すこと                                                            |
+
+### 範囲と失敗の扱い
+
+| 語                     | 意味                                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **workspace**          | 解析の起点となるディレクトリ。利用者が `depwalk analyze <path>` で渡したもの                                                                               |
+| **scope (解析 scope)** | node として出す対象の範囲。**scope 内**は自分のコード、**scope 外**は依存ライブラリや JDK。scope 外のメソッドは原則 node にしない (影響調査に使わないため) |
+| **record**             | Analyzer が stdout へ 1 行ずつ出す JSONL の 1 件。`methodSymbol` / `callEdge` / `diagnostic` / `error` の 4 種                                             |
+| **diagnostic**         | 解析を続けられる問題の報告。出しても結果は返る                                                                                                             |
+| **fatal**              | 解析を続けられない問題。`error` record を出して非ゼロ exit し、**それまでに出した record ごと破棄される**                                                  |
 
 ## 背景・要件解釈
 
@@ -139,6 +185,51 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 - **実行時生成実装 (マーカー対象は後続 issue で拡張)**: Spring Data 等の実行時生成実装は宣言メソッドへの edge のみを保持し、疑似実装ノードは合成しない。既知の runtime-provided マーカーは Spring Data `Repository` 型階層に加え、MyBatis `@Mapper` インターフェース (フレームワークによるランタイムプロキシ生成でソースに実装クラスが存在しない点で Spring Data と同構造、決定済み 2026-07-14) を対象とする。マーカーに合致する場合は diagnostic の理由を「未解決」ではなく「runtime-provided」として区別する。`@FeignClient` 等その他フレームワークへの拡張は引き続き後続とする。
 
 ## 主要シナリオ / フロー
+
+### 起動から結果を返すまで
+
+Core が Analyzer を 1 回呼ぶと何が起きるかの全体像。各段の詳細は子 doc へ委譲する。
+
+```mermaid
+sequenceDiagram
+    participant Core
+    participant Analyzer as Java Analyzer
+    participant Gradle as Gradle (build model)
+    participant FS as 解析対象のソース / .class
+
+    Core->>Analyzer: process 起動 + stdin へ analysisRequest を 1 件送って close
+    Analyzer->>Analyzer: 入力検証 (preflight)
+
+    alt sourceRoots の明示あり
+        Note over Analyzer: Gradle を呼ばない (discovery を bypass)
+    else 明示なし
+        Analyzer->>Gradle: build model を問い合わせ
+        Gradle-->>Analyzer: source root / classpath / classes output
+        Note over Analyzer,Gradle: 対象の build logic が評価される<br/>(discovery.md の安全境界)
+    end
+
+    Analyzer->>FS: ソースを読む (read-only)
+    Analyzer->>Analyzer: 1. JavaParser で AST 化
+    Analyzer->>FS: .class を読む (型解決 / bytecode member)
+    Analyzer->>Analyzer: 2. SymbolSolver で型を解決
+    Analyzer->>Analyzer: 3. SootUp と Spring で実装候補を絞る
+
+    loop 解析できたものから
+        Analyzer-->>Core: stdout へ methodSymbol / callEdge を JSONL で逐次出力
+    end
+    Analyzer-->>Core: 非致命の問題は diagnostic を逐次出力
+
+    alt 未解決が残らない
+        Analyzer-->>Core: exit 0
+    else 未解決が残る / 解析不能
+        Analyzer-->>Core: error record を出力して非ゼロ exit
+        Note over Core: Core は先行 record ごと破棄する
+    end
+```
+
+出力は**逐次**である。解析が全部終わってからまとめて返すのではなく、確定したものから流す。ただし `reachableFromEntrypoints` だけは到達判定に全体が要るため例外で、詳細は「analysisMode の意味論」節に置く。
+
+### 個別の規則
 
 - Core が Analyzer process を起動し stdin へ `analysisRequest` を 1 件送信して close する。Java Analyzer は対象 Java ソースを read-only で解析し、結果を stdout へ JSONL で逐次出力する。
 - 呼び出し先の型が解決できたとき、`methodSymbol` (caller / callee 双方) と、両者を参照する `callEdge` を出力する。

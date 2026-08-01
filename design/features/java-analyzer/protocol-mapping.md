@@ -11,7 +11,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io
-verified_commit: a515089
+verified_commit: 906d77a
 ---
 
 # Java Analyzer: Protocol への写像
@@ -20,7 +20,14 @@ verified_commit: a515089
 
 同じメソッドが常に同じ `methodId` になること (正規化)、呼び出しをどの型に帰属させるか、どの metadata を載せるか、失敗をどの code で報告するかを定める。
 
-wire schema そのものは [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) が正本であり、本 doc は Java 固有の写像規則だけを扱う。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。
+wire schema そのものは [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) が正本であり、本 doc は Java 固有の写像規則だけを扱う。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。用語 (adjacency / provenance / dispatch) は親 doc の「前提」節を参照する。
+
+## この doc が答えること
+
+- 同じメソッドが常に同じ ID になるようにするには、名前をどう正規化するか
+- 継承や interface があるとき、呼び出しを**どの型のメソッド**として記録するか (帰属型)
+- どこまでを node として出し、どこから先を切るか
+- 解析中に起きた問題を、どの code で報告するか
 
 ## 正規化規則 (methodId / signature)
 
@@ -53,15 +60,17 @@ Java の overload 解決は erasure ベースであり、erasure だけで overl
 | 宣言サイトが scope 外で、宣言型が引き上げ除外 package                                         | 出力しない                                            | `userService.toString` (`java.lang.Object#toString`) / `equals` / `hashCode`                                                                                                            |
 | 宣言サイトが scope 外で、レシーバの静的型も scope 外                                          | 出力しない (`methodSymbol` / `callEdge` とも出さない) | `String#equals` / `List#add`                                                                                                                                                            |
 
-**引き上げ除外 package**: 既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする。除外判定は宣言型の binary name に対する `.` 区切り segment 単位の prefix 一致で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
+### 引き上げから外す package
 
-**その他の呼び出し形**:
+既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする。除外判定は宣言型の binary name に対する `.` 区切り segment 単位の prefix 一致で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
+
+### その他の呼び出し形
 
 - static メソッド: 「レシーバ」を参照した型とみなして同一規則を適用する。
 - `this.foo` / `super.foo`: 宣言サイトが scope 内なら宣言型に帰属するため揺れない。
 - `new Foo` (constructor): constructor は継承されないため引き上げは発生しない。`Foo` が scope 内なら `com.example.Foo#<init>(...)` を callee とし、scope 外 (`new ArrayList<>` 等) なら出力しない。
 
-**根拠**:
+### なぜこの規則にするか
 
 - 宣言サイト基準の根拠: 「常にレシーバ型へ帰属」だと scope 内継承 (override なし) で実在しない node が合成され node 分裂を招く。「常に根の基底へ集約」だと override した node が dead node になり影響調査ができない。実際の宣言サイトを使えばどちらの病理も起きない。
 - 引き上げを scope 外に限る根拠: 引き上げは「宣言が jar の中にあって node にできない」問題を解くためだけに使う。継承元が scope 外であることは `methodSymbol.metadata` に保持する (例: `declaringType: "org.springframework.data.repository.CrudRepository"`, `inherited: true`)。
@@ -69,9 +78,13 @@ Java の overload 解決は erasure ベースであり、erasure だけで overl
 - 未解決との区別: scope 外呼び出しの省略は「解析できなかった」ではなく「仕様として出力しない」ため、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` は出さない。型解決自体に失敗した場合のみ `diagnostic` とする。
 - protocol 整合: 出力する `callEdge` の caller / callee はいずれも出力済み `methodSymbol` を参照するため、「valid な `callEdge` は解決済み `methodSymbol` を参照する」という契約を満たす。
 
-**既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは委譲しない (。、2026-07-12)。本 doc を正本とする。
+### 既知の制約: override は追えない
 
-**node 母集合 (列挙方法)**: `fullGraph` の `methodSymbol` は次の和集合とする。
+静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは委譲しない (。、2026-07-12)。本 doc を正本とする。
+
+### どのメソッドを node として出すか
+
+`fullGraph` の `methodSymbol` は次の和集合とする。
 
 1. **宣言列挙**: scope 内で宣言された method / constructor / static initializer のすべて。呼ばれていないメソッドも node として出力する (caller が 0 件であることを示せる = S1 の用途に必要)。
 2. **call site 由来**: 引き上げで生じた node (scope 内型に帰属する、宣言が scope 外のメソッド)。これらは scope 内に宣言が存在しないため宣言列挙では出せず、実際に呼び出された箇所からのみ生成する。呼ばれていない継承 library メソッドは node 化しない。
@@ -110,7 +123,9 @@ DI 解決を行わない経路では、interface / 抽象メソッド呼び出�
 
 成功条件 S4「Spring DI 経由の呼び出し先を実体まで解決できる」は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲で満たす。DI 解決を行わない経路では宣言型止まりになるのが仕様である。
 
-**dispatch 標識の拡張**: 複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。宣言型 edge の既存 metadata は変更しない。追加する実装候補 edge の metadata は次で固定する。本 doc を正本とする。
+### 実装候補が複数あるとき
+
+複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。宣言型 edge の既存 metadata は変更しない。追加する実装候補 edge の metadata は次で固定する。本 doc を正本とする。
 
 | key              | 型       | 値 / 規則                                                                                                             |
 | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -177,4 +192,6 @@ language level の欠落・invalid・曖昧・JavaParser 非対応 (preview を�
 
 jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲の型解決が失敗し、継続すると「未解決だらけの、一見成功した結果」が出て利用者が不完全なグラフを正と誤認するリスクが高いため。`diagnostic.sourceLocation` と `relatedMethodId` を可能な範囲で埋め、未解決の発生箇所を追跡できるようにする。
 
-**未解決 call の診断 metadata**: `JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目 — `resolutionPhase` (失敗した解決段階) / `exceptionClass` (resolver 例外のクラス名のみ、message は含めない) / `receiverKind` (receiver 式種別、AST ノード種別名または実装で定義した固定表記) / `receiverTypeResolved` (receiver 型取得成否、真偽値) — を含める。診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` (後述) で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は成功時に streaming される `diagnostic` record へ同じ内容で含める (multi-agent review 指摘反映、2026-07-22 追加)。** metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
+### 未解決の呼び出しに付ける診断情報
+
+`JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目 — `resolutionPhase` (失敗した解決段階) / `exceptionClass` (resolver 例外のクラス名のみ、message は含めない) / `receiverKind` (receiver 式種別、AST ノード種別名または実装で定義した固定表記) / `receiverTypeResolved` (receiver 型取得成否、真偽値) — を含める。診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は同じ内容で含める。** 出力先は成功時に逐次出力される `diagnostic` record になる。 metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
