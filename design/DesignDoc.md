@@ -6,7 +6,7 @@ status: Draft
 keywords: [landscape, モジュール責務, 設計原則, Phase]
 governs:
   - design/features
-verified_commit: 8848e08
+verified_commit: 9654928
 ---
 
 # depwalk Design Doc
