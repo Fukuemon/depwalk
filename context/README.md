@@ -1,6 +1,7 @@
 ---
 type: context
 title: Engineering Context Library
+description: context ライブラリの位置づけと Producer / Consumer 契約
 keywords: [context, 規約, 索引]
 # governs / verified_commit は持たない。索引部分は生成物、本文は各 context 文書の
 # 検査が守るため、本ファイル自体は鮮度検査の対象外 (ADR-0008 決定 4)。
@@ -24,15 +25,16 @@ keywords: [context, 規約, 索引]
 
 ## ファイル一覧
 
-| ファイル                               | 内容                                                                    |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| [project.yml](project.yml)             | プロジェクト固有値 (repo / 命名 / コマンド / 対象ドメイン / トラッカー) |
-| [architecture.md](architecture.md)     | codebase architecture: package / runtime boundary, 依存方向             |
-| [toolchain.md](toolchain.md)           | toolchain 一覧, build 構成, scaffold policy                             |
-| [engineering.md](engineering.md)       | root task boundary, shared config boundary, repository quality gate     |
-| [testing.md](testing.md)               | test 責務分担, test runtime contract                                    |
-| [infrastructure.md](infrastructure.md) | infra / deployment / environment / operations / security 契約           |
-| [ai-agents.md](ai-agents.md)           | 非対話 CLI エージェントの invocation / routing / timeout 契約           |
+各文書の frontmatter (`description`) から生成する。手で編集しても次回の生成で消える。
+frontmatter を持たない文書 (`project.yml` / 移行前の `*.md`) はまだ載らない ([issue #40](https://github.com/Fukuemon/depwalk/issues/40) で解消する)。
+
+<!-- BEGIN GENERATED: context-index (scripts/reading-map.sh が更新する。手編集しない) -->
+
+- [toolchain.md](toolchain.md) — 標準 toolchain と build 構成、Gradle discovery の互換 matrix
+
+<!-- END GENERATED: context-index -->
+
+- [project.yml](project.yml) — プロジェクト固有値 (repo / 命名 / コマンド / 対象ドメイン / トラッカー)
 
 ## Producer / Consumer 契約
 

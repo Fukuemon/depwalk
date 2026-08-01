@@ -6,13 +6,14 @@
 
 ## 一覧
 
-| Feature                                      | 文書                                                                               | Phase                                | 状態 |
-| -------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------ | ---- |
-| Analyzer Protocol / SPI                      | [DesignDoc_analyzer-protocol.md](analyzer-protocol/DesignDoc_analyzer-protocol.md) | Phase1                               | 完了 |
-| Graph (呼び出しグラフのデータモデル)         | [DesignDoc_graph.md](graph/DesignDoc_graph.md)                                     | Phase1                               | 完了 |
-| Traversal (Caller / Callee 探索)             | [DesignDoc_traversal.md](traversal/DesignDoc_traversal.md)                         | Phase1                               | 完了 |
-| Output (Console / JSON / DOT / Mermaid 出力) | [DesignDoc_output.md](output/DesignDoc_output.md)                                  | Phase1 (DOT / Mermaid 実装は Phase4) | 完了 |
-| CLI Interface (analyze コマンドの flag 体系) | [DesignDoc_cli.md](cli/DesignDoc_cli.md)                                           | Phase1 (実装は #22)                  | 完了 |
+各 feature doc の frontmatter (`description`) から生成する。手で編集しても次回の生成で消える。
+frontmatter を持たない feature doc はまだ載らない ([issue #40](https://github.com/Fukuemon/depwalk/issues/40) で解消する)。
+
+<!-- BEGIN GENERATED: features-index (scripts/reading-map.sh が更新する。手編集しない) -->
+
+- [graph/DesignDoc_graph.md](graph/DesignDoc_graph.md) — node / edge が持つ属性と、wire record → graph 値型の変換契約・公開の原子性
+
+<!-- END GENERATED: features-index -->
 
 各 feature は `design/features/<feature>/` ディレクトリに集約する。design doc は `DesignDoc_<feature>.md`、付随するコンテンツ正本は `<feature>/reference/` に置く。
 
