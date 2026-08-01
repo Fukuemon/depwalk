@@ -12,7 +12,7 @@ governs:
   # Java release は model-provider 側、同梱 Gradle の版は wrapper が持つ。
   - analyzers/java/model-provider/build.gradle.kts
   - analyzers/java/gradle/wrapper/gradle-wrapper.properties
-verified_commit: unverified
+verified_commit: 9b9d79d
 ---
 
 # Toolchain
@@ -32,10 +32,10 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 | Language (Java Analyzer)  | Java (JVM)                                | Analyzer runtime JDK 25 / Gradle (Kotlin DSL) + Shadow plugin / 単一 fat jar配布。JavaParser / SymbolSolver / SootUp / Gradle Tooling API `9.6.1` を利用 |
 | Gradle discovery provider | Java 8 classfile                          | Gradle `7.6.5` API baseline (compile は `7.6.4` artifact、詳細は下記 matrix)。対象 Gradle は `7.6.5`〜`9.6.x`、一時 init script から注入                 |
 | CLI framework             | `github.com/spf13/cobra`                  | 初期 runtime dependency は Cobra のみに抑える                                                                                                            |
-| Linter                    | `go vet` / `golangci-lint`                | `golangci-lint` は開発ツール候補として扱う                                                                                                               |
+| Linter                    | `go vet` / `golangci-lint`                | `golangci-lint` は導入済み。depguard で依存方向を機械検査する ([engineering.md](engineering.md) の quality gate)                                         |
 | Formatter                 | `gofmt` / `go fmt`                        | Go 標準 formatter を正とする                                                                                                                             |
 | Unit test                 | Go 標準 `testing`                         | 手書き fake / golden fixture / contract test で開始する                                                                                                  |
-| E2E                       | Go 標準 `testing` から CLI fixture を実行 | 具体 CLI 引数は後続の CLI interface spec で確定                                                                                                          |
+| E2E                       | Go 標準 `testing` から CLI fixture を実行 | 実装は `core/e2e`。CLI 引数の正本は [CLI feature doc](../design/features/cli/DesignDoc_cli.md)                                                           |
 
 ## 採用方針
 
@@ -49,7 +49,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 - JSONL parser / validator は安定版の `encoding/json` で開始する。ただし、`encoding/json` v1 の duplicate key 許容、invalid UTF-8 置換、struct field の case-insensitive matching を Protocol contract として採用しない。
 - `encoding/json/v2` と `encoding/json/jsontext` は初期採用しない。Go 1.25 時点では experimental であり、`GOEXPERIMENT=jsonv2` が不要になった時点で strict JSONL parser の実装候補として再評価する。
 - Runtime dependency は初期状態で `github.com/spf13/cobra` のみに限定する。設定ファイル / env binding が要件化されるまでは `viper` を導入しない。
-- 開発ツールの version 固定方法は CI 設計時に決める。`golangci-lint` と `govulncheck` は runtime dependency ではなく、quality gate 用の候補として扱う。
+- `golangci-lint` は runtime dependency ではなく quality gate として導入済み。version は `scripts/golangci-lint.sh` で pin する。`govulncheck` は未導入で、引き続き候補として扱う。
 
 ## Gradle discovery compatibility matrix
 
@@ -68,7 +68,17 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 | Gradle `8.14.5` | JDK 17     | 同上                                                          |
 | Gradle `9.6.1`  | JDK 25     | 同上                                                          |
 
-範囲外・version判定不能なcustom distribution、provider load失敗、daemon JVM非互換は、それぞれ `JAVA_GRADLE_MODEL_ERROR` の安定reason `unsupported-gradle-version` / `provider-incompatible` / `daemon-jvm-incompatible` でfatalにする。対応下限・上限を変えるときは本表、ADR-0006、Java Analyzer feature docを同時更新する。明示 `sourceRoots` 経路はwrapper判定、Tooling API、provider load、daemon matrixを完全bypassする。
+次の 3 つはいずれも `JAVA_GRADLE_MODEL_ERROR` の fatal とし、安定 reason で区別する。
+
+| 状況                                            | 安定 reason                  |
+| ----------------------------------------------- | ---------------------------- |
+| 範囲外 / version 判定不能な custom distribution | `unsupported-gradle-version` |
+| provider の load 失敗                           | `provider-incompatible`      |
+| daemon JVM の非互換                             | `daemon-jvm-incompatible`    |
+
+対応下限・上限を変えるときは本表、ADR-0006、Java Analyzer feature doc を同時に更新する。
+
+明示 `sourceRoots` 経路は、wrapper 判定・Tooling API・provider load・daemon matrix をすべて bypass する。
 
 ### 実装上の互換性ハマりどころ (#24 実測)
 
