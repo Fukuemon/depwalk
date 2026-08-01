@@ -12,11 +12,11 @@ verified_commit: 9b9d79d
 
 # Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
 
-depwalk CLI の durable な feature 設計正本。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層と analyze use case)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
+depwalk CLI の設計正本。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層と analyze use case)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
 
 ## 背景・要件解釈
 
-depwalk の中核機能は traversal / output / 解析パイプラインに分かれて実装されている。CLI はそれらを `analyze` コマンド 1 本へ結合し、S1 (caller 探索) / S2 (callee 探索) / S3 (機械パース可能な出力) を利用者から見える形で達成させる層である。
+depwalk の中核機能は traversal / output / 解析パイプラインに分かれて実装されている。CLI はそれらを `analyze` コマンド 1 本へ結合し、[DesignDoc](../../DesignDoc.md) の成功条件 S1 (呼び出し元の網羅的な列挙) / S2 (呼び出し先の列挙) / S3 (Console・JSON 等での出力) を、利用者から見える形で達成させる層である。
 
 ## コマンド構造と flag 体系
 
@@ -26,6 +26,8 @@ depwalk の中核機能は traversal / output / 解析パイプラインに分�
 depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta k=v ...]
                 [--source-root <rel> ...] [--include <glob> ...] [--exclude <glob> ...]
                 [--method <selector>] [--direction caller|callee] [--max-depth <n>] [--format console|json]
+```
+
 | flag          | 型                         | 既定値                               | 説明                                                                                                           |
 | ------------- | -------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | `--method`    | string                     | (未指定なら現行のサマリ動作)         | method selector (下記書式)。省略時は件数サマリ + diagnostics のみ (後方互換)                                   |
@@ -35,7 +37,11 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 | `--include`   | string array (repeatable)  | なし (未指定時は request に載せない) | workspace 相対 path glob。指定順のまま `analysisRequest.include` へ透過                                        |
 | `--exclude`   | string array (repeatable)  | なし (未指定時は request に載せない) | workspace 相対 path glob。指定順のまま `analysisRequest.exclude` へ透過                                        |
 
-解析対象を指定する flag (`--analyzer-cmd` / `--language` / `--analyzer-meta` / `--source-root`) と、探索を指定する flag (`--method` / `--direction` / `--max-depth` / `--format`) は独立している。Analyzer 起動契約の正本は [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
+flag は 2 群に分かれ、互いに独立している。
+
+- **解析対象を指定する群**: `--analyzer-cmd` / `--language` / `--analyzer-meta` / `--source-root`
+- **探索を指定する群**: `--method` / `--direction` / `--max-depth` / `--format`
+  Analyzer 起動契約の正本は [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
 
 `sourceRoots` / `include` / `exclude` の意味論の正本は [Analyzer Protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の `analysisRequest` 節。CLI は glob・path の意味解釈を行わず透過のみを担う。
 
@@ -71,7 +77,6 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 ## テスト (CLI プロセス E2E)
 
 - `os/exec` で build 済み depwalk バイナリを実プロセス起動し、stdout / stderr / exit code を検証する (harness の `buildCoreCLI` / `runCLI` を再利用する)。
-- console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (S3)。
+- console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (成功条件 S3 の CLI レベルでの担保)。
 - 既存のグラフレベル E2E (`protocol.Runner` を直接呼び出し、record 単位で照合する層) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
 - method selector は完全 signature、signature 省略の一意一致 / overload 曖昧性に加え、nested class の binary name (`Outer$Inner#method`) を回帰検証する。
-```

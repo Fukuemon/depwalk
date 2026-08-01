@@ -11,11 +11,22 @@ verified_commit: 9b9d79d
 
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現 (Design Doc Open Question Q3 の解)、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
+Output Engine の設計正本。
+
+## 4 つの出力形式
+
+| 形式        | 何か                                                                                       | 誰が読むか            |
+| ----------- | ------------------------------------------------------------------------------------------ | --------------------- |
+| **Console** | 端末にそのまま表示するツリー表現                                                           | 人                    |
+| **JSON**    | 機械処理向けの構造化データ                                                                 | スクリプト / 他ツール |
+| **DOT**     | Graphviz というグラフ描画ツールが読むテキスト形式。`dot -Tpng` 等で画像に変換する          | 描画ツール経由で人    |
+| **Mermaid** | Markdown 内に埋め込めるグラフ記法。GitHub や多くの Markdown ビューアがそのまま図として描く | ドキュメント経由で人  |
+
+DOT と Mermaid は**それ自体が図ではなくテキスト**であり、外部のレンダラに渡して初めて図になる。depwalk はテキストの生成までを担い、描画は行わない。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現 (Design Doc Open Question Q3 の解)、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
 
 ## 背景・要件解釈
 
-調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる (成功条件 S3 / Goal G3)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
+調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる」)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
 
 Design Doc の Open Question Q3「Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)」は本 doc の「Console ツリー表現」節が解であり、以後本 doc を正本とする。
 

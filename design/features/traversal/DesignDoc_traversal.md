@@ -11,13 +11,22 @@ verified_commit: 9b9d79d
 
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
+Traversal Engine の設計正本。
+
+## 探索とは
+
+[Graph Engine](../graph/DesignDoc_graph.md) が保持する呼び出しグラフを、起点メソッドから **edge を辿って関係するメソッドを集める**のが探索である。方向が 2 つある。
+
+- **caller 方向** = 「このメソッドを呼んでいるのは誰か」を遡る。変更の影響範囲を知りたいときに使う
+- **callee 方向** = 「このメソッドが何を呼んでいるか」を下る。処理の流れを追いたいときに使う
+
+いずれも 1 段で止まらず再帰的に辿るため、「A を変えると最終的に誰が影響を受けるか」が分かる。ただし呼び出しは循環しうる (A が B を呼び B が A を呼ぶ) ので、無限に辿らない打ち切りが要る。その打ち切りをどう定義するかが本 doc の中心である。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
 
 本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本である。全体像は [DesignDoc](../../DesignDoc.md)、Core の package 境界は [architecture](../../../context/architecture.md) を参照する。
 
 ## 背景・要件解釈
 
-depwalk は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件 (S1 / S2) にしている。
+depwalk は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件にしている ([DesignDoc](../../DesignDoc.md) の S1「呼び出し元の網羅的な列挙」と S2「呼び出し先の列挙」)。
 
 この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI (analyzer-protocol feature) が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
 

@@ -15,7 +15,16 @@ verified_commit: 9b9d79d
 
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-Graph Engine の durable な feature 設計正本。
+Graph Engine の設計正本。
+
+## 呼び出しグラフとは
+
+**呼び出しグラフ** (call graph) は「どのメソッドがどのメソッドを呼んでいるか」を表した有向グラフである。
+
+- **node** = メソッド 1 つ。`com.example.UserService#findById(java.lang.Long)` のような単位
+- **edge** = 呼び出し 1 つ。`A --> B` は「A が B を呼んでいる」を表す
+
+このグラフがあると「このメソッドを変更したら誰が壊れるか」を、edge を逆向きに辿るだけで機械的に answer できる。depwalk が Analyzer に解析させて構築するのがこのグラフであり、Graph Engine はその**保持と読み取り**を担う。探索そのものは [Traversal Engine](../traversal/DesignDoc_traversal.md) の責務である。
 
 定義するのは 2 つある。1 つは Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフで、**node / edge が保持する属性**。もう 1 つは wire record から graph 値型への変換契約である。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本である。
 

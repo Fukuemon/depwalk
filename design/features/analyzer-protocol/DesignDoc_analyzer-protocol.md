@@ -14,7 +14,7 @@ verified_commit: unverified
 
 # Feature 設計: Analyzer Protocol / SPI
 
-Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) と関連 PR を参照する。
+Analyzer SPI、JSONL Communication Protocol、Model schema の 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) と関連 PR を参照する。
 
 ## メタ
 
