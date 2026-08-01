@@ -37,7 +37,7 @@ depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プ
 
 - Java 固有の AST 解析、型解決、DI 解決の方式は定義しない。
 - Graph Engine、Traversal Engine、Output Engine の内部構造は定義しない。
-- Console / DOT / Mermaid の出力表現は定義しない。
+- 出力表現は定義しない (正本は [output feature doc](../output/DesignDoc_output.md))。
 - Core 実装言語、package manager、test framework は定義しない。
 - Reflection、AspectJ Runtime、実行時 Proxy の動的解析は扱わない。
 
