@@ -1,49 +1,43 @@
 ---
 type: feature-design
-title: "Output (Console / JSON / DOT / Mermaid)"
+title: "Output (Console / JSON)"
 description: 出力形式ごとの表示規則と、graph / traversal から View への変換契約
 status: 完了
-keywords: [output, Console, JSON, DOT, Mermaid, NodeView, EdgeView]
+keywords: [output, Console, JSON, NodeView, EdgeView, formatter]
 governs:
   - core/internal/output
-verified_commit: 9b9d79d
+verified_commit: dcb2a35
 ---
 
-# Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
+# Feature 設計: Output (Console / JSON 出力)
 
 Output Engine の設計正本。
 
-## 4 つの出力形式
+## 2 つの出力形式
 
-| 形式        | 何か                                                                                       | 誰が読むか            |
-| ----------- | ------------------------------------------------------------------------------------------ | --------------------- |
-| **Console** | 端末にそのまま表示するツリー表現                                                           | 人                    |
-| **JSON**    | 機械処理向けの構造化データ                                                                 | スクリプト / 他ツール |
-| **DOT**     | Graphviz というグラフ描画ツールが読むテキスト形式。`dot -Tpng` 等で画像に変換する          | 描画ツール経由で人    |
-| **Mermaid** | Markdown 内に埋め込めるグラフ記法。GitHub や多くの Markdown ビューアがそのまま図として描く | ドキュメント経由で人  |
+| 形式        | 何か                             | 誰が読むか            |
+| ----------- | -------------------------------- | --------------------- |
+| **Console** | 端末にそのまま表示するツリー表現 | 人                    |
+| **JSON**    | 機械処理向けの構造化データ       | スクリプト / 他ツール |
 
-DOT と Mermaid は**それ自体が図ではなくテキスト**であり、外部のレンダラに渡して初めて図になる。depwalk はテキストの生成までを担い、描画は行わない。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現 (Design Doc Open Question Q3 の解)、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](../../../adr/0010-defer-graph-visualization.md))。
 
 ## 背景・要件解釈
 
-調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる」)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
-
-Design Doc の Open Question Q3「Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)」は本 doc の「Console ツリー表現」節が解であり、以後本 doc を正本とする。
+調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理用途 (JSON) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON で出力できる」)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
 
 ## スコープ
 
 ### やること
 
 - Output package の公開 entry point と Formatter / View の構造。
-- Console のツリー表現 (tree 構築規則・標識・行の書式) — Q3 の正本。
+- Console のツリー表現 (tree 構築規則・標識・行の書式)。
 - JSON 出力の schema と版管理・後方互換方針・要素順序の決定性。
-- DOT / Mermaid が表現すべき意味の要件 (G-1〜G-7)。
 - 該当なし / 到達なし / 未対応 format のエラー境界。
 
 ### やらないこと
 
-- グラフのビューワ提供 (DOT / Mermaid は構文生成まで — Non Goals)。
-- DOT / Mermaid の具体構文 (ノード形状 / 色 / 線種) — 実装時に確定する。
+- グラフのビューワ提供、および図として描く形式の生成 (Non Goals / ADR-0010)。
 - 探索の意味論 (正本は [traversal feature doc](../traversal/DesignDoc_traversal.md))。
 - graph が保持する属性の定義 (正本は [graph feature doc](../graph/DesignDoc_graph.md))。
 - CLI の引数名 / exit code / エラー表示先 (正本は [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
@@ -62,8 +56,6 @@ type Format string
 const (
     FormatConsole Format = "console"
     FormatJSON    Format = "json"
-    FormatDOT     Format = "dot"     // 未実装 (定数のみ)
-    FormatMermaid Format = "mermaid" // 未実装 (定数のみ)
 )
 
 type Input struct {
@@ -177,7 +169,7 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 - 該当なし / 到達なしの分岐は各 Formatter の内部で行う (`View.Status` / `Edges` / `Cutoffs` の 3 つを見る)。見せ方が形式ごとに異なるため、`Write` は status で分岐しない。
 - exit code とエラー表示先は CLI の責務。
 
-### Console ツリー表現 (Q3 の正本)
+### Console ツリー表現
 
 Traversal result は tree ではなく集合であるため、tree 化の規則を Output 側の仕様として定義する。
 
@@ -273,20 +265,6 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `schemaVersion` は **Analyzer Protocol と独立の採番** (Protocol は Analyzer ↔ Core、本 schema は Core ↔ 利用者の契約で、変更理由が独立)。
 - field の追加は後方互換 (additive、minor)。削除 / 意味変更 / 型変更は破壊的変更 (major)。利用者は未知 field を無視できることを前提にする。
 
-### DOT / Mermaid の I/F 要件 (未実装)
-
-具体構文は実装時に決める。実装は次を満たすこと (I/F の手直しを不要にするための意味要件)。
-
-| #   | 要件                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------- |
-| G-1 | 到達 node / edge 集合をグラフとしてそのまま描く (tree に潰さない。Console の tree 構築規則は適用しない) |
-| G-2 | 起点 node を他と区別できる                                                                              |
-| G-3 | `cycle` 注釈付き edge を他と区別できる                                                                  |
-| G-4 | `depthLimit` cutoff がある node に「続きがある」ことを示せる (cutoff 先の名前は出せない)                |
-| G-5 | node ラベルは `signature`、欠落時は `qualifiedName` → `methodId` の順に fallback (Console と同じ規則)   |
-| G-6 | 同一 Result から常に同一のバイト列を出力する (要素順序は id の辞書順)                                   |
-| G-7 | 外部ツール (Graphviz / Mermaid レンダラ) がパース可能な構文であること                                   |
-
 ### 画面・デザイン
 
 非該当。depwalk は CLI ツールであり、ビューワは提供しない (Non Goals)。
@@ -299,7 +277,6 @@ flowchart TD
     Write --> View["View<br/>(symbol 解決済み / sort 済み)"]
     View --> Console["Console Formatter<br/>(tree 構築)"]
     View --> JSON["JSON Formatter"]
-    View --> DOT["DOT / Mermaid Formatter<br/>(未実装)"]
     Write -->|"symbol / callSite を解決"| Graph["Graph Engine"]
 ```
 
@@ -321,7 +298,6 @@ flowchart TD
     F --> G["format に対応する Formatter を選ぶ"]
     G --> H["Console: View から tree を構築して描画<br/>(「Console ツリー表現」節。下図)"]
     G --> I["JSON: フラットな graph を描画<br/>(nodes/edges/depthCutoffs。「JSON 出力」節)"]
-    G --> J["DOT / Mermaid: 到達 graph を描画<br/>(未実装。tree 化しない。「DOT / Mermaid の I/F 要件」節)"]
     H --> K["各 Formatter は View.Status / Edges / Cutoffs を見て<br/>startNotFound (該当なし) と 到達なし を形式ごとに表現する<br/>(到達なし = Edges 空 かつ Cutoffs 空。<br/>Edges 空でも Cutoffs 非空なら cutoff ケース。「エラー境界」節 / 「Console ツリー表現」節の規則 8)"]
     I --> K
     J --> K
@@ -404,7 +380,6 @@ sequenceDiagram
 - 呼び出し側 (CLI 層) は use case が返した Traversal result と出力形式を指定して `output.Write` を呼ぶ。未対応 format は出力を書き出す前にエラーになる。
 - 開発者 / 保守担当は Console のツリーで呼び出し関係を読む。合流は `(既出)`、循環は `(cycle)`、深さ上限は `… (depth limit: N edges cut)` で読み取れる。
 - CI パイプラインは JSON を保存・後処理する。`minDepth == 1` で直接の呼び出し元だけを抽出する、といった後処理が JSON 単体で完結する。
-- ドキュメント作成者は DOT / Mermaid の出力を外部レンダラに渡して図を得る (未実装)。
 
 ## テスト観点
 
