@@ -92,9 +92,22 @@ verified_commit: <sha> | unverified
 
 全 14 本へ展開する前に、性質の異なる 3 本 (`design/features/graph/`、`context/toolchain.md`、`context/README.md`) へ先行適用して schema を検証した。
 
-- **frontmatter は prettier で変化しない**。3 本とも prettier 3.6.2 適用後も frontmatter は 1 文字も変わらなかった (本文のテーブルは整形される)。したがって [issue #45](https://github.com/Fukuemon/depwalk/issues/45) の生成器は frontmatter をそのままパースしてよく、人手の文書を `.prettierignore` へ入れる必要はない
-- **`governs` を持たない文書が実在する** (`context/README.md`)。パーサは `governs` / `verified_commit` の欠落を許容し、その文書を鮮度検査の対象外として扱う必要がある
-- **`governs` は単一 package とは限らない**。`context/toolchain.md` は Gradle の `.gradle` / `.gradle.kts` 両方を含む 6 パスを持つ。存在しないパスを列挙してもよい (ビルドスクリプトの記法は project により異なるため) 前提で、パーサは実在チェックを行わない
+- **frontmatter 自体は prettier で変化しない**。3 本とも prettier 3.6.2 適用後も frontmatter は 1 文字も変わらなかった。したがって [issue #45](https://github.com/Fukuemon/depwalk/issues/45) の生成器は frontmatter をそのままパースしてよい。**ただしこれは「人手の文書を `.prettierignore` へ入れなくてよい」ことを意味しない** — 下記「生成区間を含む文書の整形」を参照
+- **`governs` を持たない文書が実在する** (`context/README.md`)。パーサは `governs` と `verified_commit` の**両方が欠けている場合だけ**鮮度検査の対象外として扱う。片方だけ欠けている状態は設定ミス (キー名の typo / 移行時の書き漏れ) として **error にする**。片欠けを黙って対象外にすると、governed な文書が stale 一覧から静かに消え、未確認の棚卸しという目的が崩れる
+- **`governs` は単一 package とは限らない**。`context/toolchain.md` は 6 パスを持ち、そこには `analyzers/java/model-provider/build.gradle.kts` や `gradle-wrapper.properties` のように「本文が正本として記録している値の出所」も含める。**その文書が語っている契約の実装場所をすべて挙げる**のが基準であり、文書が置かれた package だけではない (`design/features/graph/` が変換契約と公開の原子性も定義するため `protocol` / `analyze` を含むのが例)
+- パーサは `governs` のパスが実在するかを検査しない。ビルドスクリプトの記法差 (`.gradle` / `.gradle.kts`) など project 側の事情を吸収するため。ただし文書の著者は実在するパスを書く
+
+#### 生成区間を含む文書の整形
+
+`context/README.md` のように**人手の本文と生成マーカー区間が同居する文書**は、frontmatter が安定しているだけでは足りない。決定 4 のとおり README のファイル一覧は生成対象であり、生成物は markdown テーブルなので prettier が列幅を揃え直す (上記の実測)。frontmatter が無傷でも、テーブル部分で ping-pong が起きて drift 検査が壊れる。
+
+[issue #45](https://github.com/Fukuemon/depwalk/issues/45) は着手時にこの境界を解く必要がある。取りうる案は次の 3 つで、判断は #45 に委ねる。
+
+| 案                                       | 得られるもの                       | 失うもの                                           |
+| ---------------------------------------- | ---------------------------------- | -------------------------------------------------- |
+| 生成器が出力を prettier に通してから書く | 人手の本文の整形が残り、除外も不要 | 生成器が prettier に依存する                       |
+| 生成区間を含む README を除外する         | 実装が単純                         | その README の人手の本文が prettier の対象外になる |
+| マーカー内をテーブル以外の形式で出力する | 除外も prettier 依存も不要         | 表形式の読みやすさを失う                           |
 
 #### `verified_commit` の初期値
 
@@ -113,22 +126,22 @@ verified_commit: <sha> | unverified
 
 コードに直接紐づかない context 文書は、その文書が語る対象の設定ファイルを監視対象にする。これにより実質すべての対象文書が `governs` を持てる。対象は `> 最終更新` ヘッダを持つ 14 本 (`design/` 7 本 + `context/` 7 本) とし、割り当ては次のとおり。
 
-| 文書                                 | governs                                                                                  |
-| ------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `design/DesignDoc.md`                | `design/features/` (feature の増減で landscape を見直す)                                 |
-| `design/features/graph/`             | `core/internal/graph`                                                                    |
-| `design/features/traversal/`         | `core/internal/traversal`                                                                |
-| `design/features/output/`            | `core/internal/output`                                                                   |
-| `design/features/cli/`               | `core/internal/cli`, `core/cmd/depwalk`                                                  |
-| `design/features/analyzer-protocol/` | `core/internal/protocol`, `core/internal/analyze`, `core/internal/analyzer`, `testdata/` |
-| `design/features/java-analyzer/`     | `analyzers/java/`                                                                        |
-| `context/architecture.md`            | `core/internal/`, `analyzers/java/src/main/`, `core/.golangci.yml`                       |
-| `context/toolchain.md`               | `mise.toml`, `core/go.mod`, `analyzers/java/build.gradle*`                               |
-| `context/engineering.md`             | `lefthook.yml`, `.github/workflows/`, `scripts/`, `hooks/`                               |
-| `context/testing.md`                 | `core/e2e/`, `testdata/`, `analyzers/java/src/test/`                                     |
-| `context/infrastructure.md`          | `.github/workflows/`, `analyzers/java/build.gradle*`                                     |
-| `context/ai-agents.md`               | `.claude/agents/` (下記の注意を参照)                                                     |
-| `context/README.md`                  | なし (索引部分は生成物。決定 4 を参照)                                                   |
+| 文書                                 | governs                                                                                                                                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design/DesignDoc.md`                | `design/features/` (feature の増減で landscape を見直す)                                                                                                                                 |
+| `design/features/graph/`             | `core/internal/graph`, `core/internal/protocol`, `core/internal/analyze` (変換契約と公開の原子性も本 doc が定義するため)                                                                 |
+| `design/features/traversal/`         | `core/internal/traversal`                                                                                                                                                                |
+| `design/features/output/`            | `core/internal/output`                                                                                                                                                                   |
+| `design/features/cli/`               | `core/internal/cli`, `core/cmd/depwalk`                                                                                                                                                  |
+| `design/features/analyzer-protocol/` | `core/internal/protocol`, `core/internal/analyze`, `core/internal/analyzer`, `testdata/`                                                                                                 |
+| `design/features/java-analyzer/`     | `analyzers/java/`                                                                                                                                                                        |
+| `context/architecture.md`            | `core/internal/`, `analyzers/java/src/main/`, `core/.golangci.yml`                                                                                                                       |
+| `context/toolchain.md`               | `mise.toml`, `core/go.mod`, `analyzers/java` の build 定義 (`build.gradle.kts` / `settings.gradle.kts` / `model-provider/build.gradle.kts` / `gradle/wrapper/gradle-wrapper.properties`) |
+| `context/engineering.md`             | `lefthook.yml`, `.github/workflows/`, `scripts/`, `hooks/`                                                                                                                               |
+| `context/testing.md`                 | `core/e2e/`, `testdata/`, `analyzers/java/src/test/`                                                                                                                                     |
+| `context/infrastructure.md`          | `.github/workflows/`, `analyzers/java/build.gradle*`                                                                                                                                     |
+| `context/ai-agents.md`               | `.claude/agents/` (下記の注意を参照)                                                                                                                                                     |
+| `context/README.md`                  | なし (索引部分は生成物。決定 4 を参照)                                                                                                                                                   |
 
 `context/ai-agents.md` の `governs` には制約がある。この文書が語る subagent 定義の**正本は sdd-template リポジトリ**にあり、本リポジトリの `.rulesync/` は symlink で commit しない。したがって検出できるのは「再生成された生成物 (`.claude/agents/`) が変わったこと」までであり、正本側の変更そのものは追えない。この限界を承知のうえで生成物を監視対象にする。
 

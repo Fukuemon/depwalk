@@ -5,6 +5,10 @@ status: 完了
 keywords: [graph, Node, Edge, Symbol, CallSite, SourceLocation]
 governs:
   - core/internal/graph
+  # 本 doc は graph データモデルに加えて wire → 値型の変換契約と
+  # staging / 公開の原子性も定義する。その実装は下の 2 package にある。
+  - core/internal/protocol
+  - core/internal/analyze
 verified_commit: unverified
 ---
 
