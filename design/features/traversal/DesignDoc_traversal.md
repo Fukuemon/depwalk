@@ -46,7 +46,7 @@ depwalk は、指定メソッドの caller / callee を探索し、既知の呼�
 
 - Java ソースの解析、型解決、DI 解決は行わない (`java-analyzer` の責務)。
 - Analyzer Protocol / SPI / Model schema は再定義しない (正本は analyzer-protocol feature doc と ADR-0001)。
-- Output Engine の Console / JSON / DOT / Mermaid 表現は決めない。
+- Output Engine の表現形式は決めない (正本は [output feature doc](../output/DesignDoc_output.md))。
 - CLI `depwalk analyze` の引数、exit code、エラー表示は決めない ([CLI feature doc](../cli/DesignDoc_cli.md) の対象)。
 - 永続ストア、キャッシュ、並列探索、分散処理は扱わない。
 
@@ -145,7 +145,7 @@ sequenceDiagram
 - 呼び出し側は起点メソッド、探索方向、深さ上限、探索順序を指定して Traversal Engine を呼び出す。探索順序を未指定にした場合は BFS、深さ上限を未指定にした場合は無制限として扱う。
 - 起点メソッドが graph に存在しない場合、Traversal Engine は空の到達集合と `startNotFound` status を返す。Graph が空の場合も同様に `startNotFound` として扱う。
 - Traversal Engine は caller または callee 方向に graph を辿り、到達 node 集合 (minDepth <= maxDepth の node)、到達 edge 集合 (到達 node 間の誘導 edge)、`cycle` 注釈 (閉路を構成する edge)、`depthLimit` cutoff を返す。
-- Output Engine は Traversal 結果を受け取り、Console / JSON / DOT / Mermaid の各形式へ変換する。Console tree が必要な場合も、tree 構築は Output 側で行う (Traversal は tree 表現を保持しない)。
+- Output Engine は Traversal 結果を受け取り、Console / JSON へ変換する。Console tree が必要な場合も、tree 構築は Output 側で行う (Traversal は tree 表現を保持しない)。
 
 ## テスト観点
 
