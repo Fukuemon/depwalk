@@ -4,10 +4,10 @@
 
 ## 対象差分の取得
 
-| 対象            | 取得コマンド                                                                                                    |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| 現ブランチ diff | `git diff <base>...HEAD` (`<base>` は既定ブランチ。`context/project.yml` の Naming/branch 参照)                 |
-| PR              | `gh pr diff <番号>` (CLI は `context/project.yml` の `tracker.cli`)                                             |
+| 対象            | 取得コマンド                                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 現ブランチ diff | `git diff <base>...HEAD` (`<base>` は既定ブランチ。`context/project.yml` の Naming/branch 参照)                         |
+| PR              | `gh pr diff <番号>` (CLI は `context/project.yml` の `tracker.cli`)                                                     |
 | spec            | 当該 spec 本体 (`context/project.yml` の `paths`、既定 `specs/<issue-id>-<slug>/index.md`) + 関連 design の内容 |
 
 ### 大きい差分の分割

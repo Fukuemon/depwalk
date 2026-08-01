@@ -1,0 +1,18 @@
+# Prettier の対象外。
+#
+# 生成物は整形の責務を生成器に一任する。prettier と生成器の整形規則が食い違うと
+# 「生成 -> prettier が整形 -> 再生成で元に戻る」の ping-pong になり、生成物の
+# drift 検査 (再生成して git diff) が恒久的に FAIL する。
+# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
+
+# rulesync 生成物 (正本は .rulesync/。scripts/generate.sh が生成する)
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.mcp.json
+
+# Gradle wrapper / fixture の build 生成物
+testdata/fixtures/java/**/build/

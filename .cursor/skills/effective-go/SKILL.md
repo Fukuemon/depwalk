@@ -2,7 +2,6 @@
 name: effective-go
 description: Go コードの作成・レビュー・リファクタリング時に、公式ベストプラクティスと整合済みの Go 規約 (ファイル分割・責務分離・godoc) を適用する。"Go を書く" / "Go のレビュー" / "godoc" / "effective-go" で起動する。
 ---
-
 # Effective Go
 
 本テンプレートの Go 規約。公式ベストプラクティス (Effective Go / Google Go Style Guide /

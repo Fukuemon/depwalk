@@ -32,13 +32,13 @@ spec / ADR / context の本文を更新したら、対象文書の `更新日` /
 
 読み取り索引 (「何を読めば足りるか」のルーティング表) を参照・更新する skill は、場所と更新手段を次の順で解決する。**この規則の正本は本節であり、各 skill には再掲しない。**
 
-| 状態                                          | 解決                                                             |
-| --------------------------------------------- | ---------------------------------------------------------------- |
-| `context/project.yml` に `reading_index` 無し | `context/impact-index.yaml` を索引とみなす (後方互換の既定)      |
-| `reading_index.path` が `null`                | 索引を使わない。索引に触れるステップは skip する                 |
-| `reading_index.path` にパス                   | そのパスを索引とする                                             |
-| `reading_index.generated` が `false` / 未設定 | 索引を手で更新する                                               |
-| `reading_index.generated` が `true`           | 索引を**手編集せず** `reading_index.generate_command` を実行する |
+| 状態                                       | 解決                                                          |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `context/project.yml` に `reading_index` 無し | `context/impact-index.yaml` を索引とみなす (後方互換の既定)   |
+| `reading_index.path` が `null`             | 索引を使わない。索引に触れるステップは skip する              |
+| `reading_index.path` にパス                | そのパスを索引とする                                          |
+| `reading_index.generated` が `false` / 未設定 | 索引を手で更新する                                            |
+| `reading_index.generated` が `true`        | 索引を**手編集せず** `reading_index.generate_command` を実行する |
 
 キーが無いことを「索引なし」と解釈しない。キーが増える前から索引を持つ repo で、索引の更新が黙って止まるため。索引を持たないことは明示的な `path: null` で表す。`generated: true` なのに `generate_command` が未設定なら、コマンドを推測せずユーザーに確認する。
 

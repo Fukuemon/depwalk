@@ -4,7 +4,6 @@ description: >-
   テンプレートからプロダクトの PRD とトップレベル Design Doc を作成・更新し、独立 PRD の要否 (Why/What を Design
   Doc に統合するか) を判定する。"PRD 書いて" / "Design Doc 作って" / "Why/What/How を整理" で起動する。
 ---
-
 # Design Doc
 
 プロダクトの **Why / What / How** を確定し、PRD と Design Doc を template から生成・更新する。要件規模に応じて、独立 PRD を作るか、Design Doc に Why/What を統合するかを判定する。
