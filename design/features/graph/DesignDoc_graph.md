@@ -1,6 +1,14 @@
-# Feature 設計: Graph (呼び出しグラフのデータモデル)
+---
+type: feature-design
+title: "Graph (呼び出しグラフのデータモデル)"
+status: 完了
+keywords: [graph, Node, Edge, Symbol, CallSite, SourceLocation]
+governs:
+  - core/internal/graph
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 ([issue #32](https://github.com/Fukuemon/depwalk/issues/32) の設計で SourceLocation を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動。#34 の実装追随で参照完全性検査の担当を ACL と明記)
+# Feature 設計: Graph (呼び出しグラフのデータモデル)
 
 Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
 
@@ -122,3 +130,12 @@ flowchart TD
 | [issue #24](https://github.com/Fukuemon/depwalk/issues/24) | 追記                              | `Symbol.Metadata` の deep copy、非公開 staging Graph への1-pass変換、成功時公開、fatal時破棄、正常streamの参照完全性を反映                                                                                       |
 | [issue #22](https://github.com/Fukuemon/depwalk/issues/22) | 追記                              | `Edge.Metadata` (`callEdge.metadata` の opaque 保持、Symbol 側と同じ deep copy 方針) を追加し、JSON 出力への透過表出 (正本: output feature doc) を明記                                                           |
 | [issue #32](https://github.com/Fukuemon/depwalk/issues/32) | 変更 (改訂)                       | `SourceLocation` を protocol 型再利用から graph 自前型へ改訂し、wire → 値型変換の所在を Analyze Use Case 層から platform 層 ACL へ移動 (層規約は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md)) |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+| 日付       | 変更内容                                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-26 | [issue #32](https://github.com/Fukuemon/depwalk/issues/32) の設計で `SourceLocation` を domain 自前型へ改訂し、変換の所在を platform 層 ACL へ移動 |
+| 2026-07-26 | [issue #34](https://github.com/Fukuemon/depwalk/issues/34) の実装追随で、参照完全性検査の担当を ACL と明記                                         |
