@@ -10,7 +10,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: a515089
+verified_commit: 906d77a
 ---
 
 # Java Analyzer: 解析エンジン
@@ -19,7 +19,14 @@ verified_commit: a515089
 
 JavaParser と SymbolSolver で型を解決し、SootUp で型階層・override・interface 実装候補を索引し、Spring の DI で候補を絞り込む。解決できなかった call をどう扱うか (救済するか、未解決として完全性 gate に残すか) も本 doc が定める。
 
-解決結果を Protocol の record へ写す規則は [protocol-mapping.md](protocol-mapping.md)。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。
+解決結果を Protocol の record へ写す規則は [protocol-mapping.md](protocol-mapping.md)。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。用語 (JavaParser / SymbolSolver / SootUp / bytecode member / 救済 / 完全性 gate) は親 doc の「前提」節を参照する。
+
+## この doc が答えること
+
+- `user.save()` の `user` が何型か、どう決めるか (型解決)
+- ソースに現れない Lombok 生成メソッドをどう解くか (bytecode member の合成)
+- interface 越しの呼び出しで、実装クラスの候補をどう絞るか (Spring DI)
+- 解決できなかった呼び出しをどう扱うか。救済するか、未解決として結果を失敗にするか
 
 ## 型解決
 
@@ -86,11 +93,17 @@ source にない生成 member は、call site から要求された member だ�
 
 全救済後にも primary diagnostic outcome が残る場合、既定では成功 graph を返さず `JAVA_INCOMPLETE_ANALYSIS` の request fatal とする。未解決 call は内部 `CallSiteId` 順で並べるが、ID 自体は Protocol へ出力しない。各共通 `error.details` には、source location、元 diagnostic code / message、opaque metadata の reason / call kind / 判明済み target / candidate を自己完結形式で含める。内容は top-level metadata の total / reasonCounts と一致させる。`silentOmission` は常に 0 でなければならない。
 
-**完全性 gate の opt-in 緩和**: `metadata.allowIncompleteAnalysis` が `true` の場合、primary diagnostic が残っても request を fatal にせず、解決済み edge / 明示除外を含む graph を成功として公開する。残存する primary diagnostic は、検出時点で通常どおり `diagnostic` record (`JAVA_UNRESOLVED_SYMBOL` warning) として streaming 済みであり、graph が部分的であることは隠さない。stderr の call-site summary (`callSiteSummary`) には終端種別・理由別の集計 (`emitted` / `excluded[...]` / `diagnostic[...]`) が既定で出力され、`silentOmission == 0` の不変条件は緩和時も維持する。既定値は `false` (従来の fatal 挙動を維持、後方互換)。この flag は完全性 gate の判定タイミングだけを変える opt-in であり、outcome ledger の分類ロジック・帰属意味論・emit される edge の正しさ (推測による false edge の禁止) には影響しない。
+### 未解決を許して結果を返す (opt-in)
 
-**救済・除外分類の適用範囲拡大**: bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。
+`metadata.allowIncompleteAnalysis` が `true` の場合、primary diagnostic が残っても request を fatal にせず、解決済み edge / 明示除外を含む graph を成功として公開する。残存する primary diagnostic は、検出時点で通常どおり `diagnostic` record (`JAVA_UNRESOLVED_SYMBOL` warning) として streaming 済みであり、graph が部分的であることは隠さない。stderr の call-site summary (`callSiteSummary`) には、終端種別・理由別の集計 (`emitted` / `excluded[...]` / `diagnostic[...]`) を既定で出力する。`silentOmission == 0` の不変条件は緩和時も維持する。既定値は `false` (従来の fatal 挙動を維持、後方互換)。この flag は完全性 gate の判定タイミングだけを変える opt-in であり、outcome ledger の分類ロジック・帰属意味論・emit される edge の正しさ (推測による false edge の禁止) には影響しない。
 
-**receiver 型不明時の external-target 判定規則**: receiver 型が取得できない call は、次の順で分類を試みてから diagnostic 化する。いずれも classfile / 確定 AST のみを根拠とし、推測による型付けは行わない。
+### 救済と除外分類が効く範囲
+
+bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。
+
+### 呼び出し元の型が分からないとき
+
+receiver 型が取得できない call は、次の順で分類を試みてから diagnostic 化する。いずれも classfile / 確定 AST のみを根拠とし、推測による型付けは行わない。
 
 1. **chain の前進解決**: receiver chain の各 link を project bytecode candidate の戻り値型 (descriptor / generic Signature 由来) で前進解決し、owner 型を復元できたら通常の救済 / external 分類を適用する。候補が一意でない link・primitive / 配列戻り値・project 外 classfile の link では前進しない。暗黙 this link は囲み型、型不明の単純名は確定 AST の initializer (囲み callable 内で同名宣言が一意の場合のみ) または囲み型の bytecode field 型で補完する。
 2. **起点遡及の external 判定**: 前進解決できない場合、chain・変数 initializer・`this.field` を遡って最初に静的型が取れる起点を探し、その型が scope 外 (source 宣言索引に無い) なら `external-target` 除外へ分類する。起点が scope 内型・暗黙 this、または起点の型も取れない場合は保守的に diagnostic に残す。
