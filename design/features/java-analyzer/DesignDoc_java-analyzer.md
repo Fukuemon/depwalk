@@ -1,12 +1,14 @@
 ---
 type: feature-design
 title: "Java Analyzer"
-description: Java/Spring 解析の内部構成と、SootUp / Gradle Tooling API / JavaParser の隔離境界
+description: Java/Spring 解析の全体構成と、外部ライブラリの隔離境界・起動契約・性能方針
 status: 完了
 keywords: [Java, Spring, SootUp, JavaParser, Gradle Tooling API, discovery]
 governs:
-  - analyzers/java
-verified_commit: 998ef66
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
+verified_commit: a515089
 ---
 
 # Feature 設計: Java Analyzer
@@ -49,6 +51,14 @@ Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言�
 
 ## 設計
 
+### 詳細の所在
+
+本 doc は Java Analyzer 全体の骨格 (実装基盤・package 境界・起動契約・性能) を持つ。個別の規則は次へ委譲する。
+
+- [discovery.md](discovery.md) — 解析対象のソースと classpath をどう決めるか (Gradle build model と安全境界)
+- [analysis.md](analysis.md) — ソースから呼び出し関係をどう解決するか (型解決 / Spring DI / 完全性)
+- [protocol-mapping.md](protocol-mapping.md) — 解析結果を Protocol の record へどう写すか (正規化 / 帰属型 / metadata / diagnostic)
+
 ### 実装基盤
 
 - **build tool**: Gradle (Kotlin DSL)。`gradlew` wrapper を同梱し、CI に Gradle 本体の事前インストールを要求しない。
@@ -71,104 +81,6 @@ Core は `--analyzer-cmd` (CLI flag) → `DEPWALK_ANALYZER_CMD` (環境変数) �
 
 metadata passthrough も同様の言語非依存原則に従う。Core は `--analyzer-meta key=value` で `analysisRequest.metadata` へ素通しするだけで、key / value の意味を解釈しない。
 
-### metadata 契約
-
-`--analyzer-meta key=value` の合成規則 (Core が metadata の JSON を組み立てる規則):
-
-- 値は常に JSON 配列に積む。1 回だけ指定した場合も要素 1 の配列になる (`--analyzer-meta classpath=/a.jar` → `{"classpath": ["/a.jar"]}`)。
-- 同一 key の繰り返しは、指定順に配列へ追加する。
-- 値が空文字列の場合、その key を空配列として登録する (`--analyzer-meta classpath=` → `{"classpath": []}`)。
-- 同一 key の繰り返しと空値 (`key=`) が混在する場合: 空値指定はその key を (未登録の場合のみ) 空配列として登録する。既登録の値をリセットしない。よって `classpath=/a.jar` → `classpath=` は `["/a.jar"]`、`classpath=` → `classpath=/a.jar` も `["/a.jar"]`。
-- 分割は最初の `=` で行う (value 側に `=` を含んでよい)。`=` を含まない指定は validation error として実行前に拒否する。
-
-Java 固有の `metadata` key:
-
-| key                       | 型          | 必須/任意                                                                               | 意味                                                                                                                                                                                                                                |
-| ------------------------- | ----------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `classpath`               | string 配列 | 明示 `sourceRoots` 時は **必須** (空配列可)。自動 discovery 時は任意の共通 extra        | 依存 jar / classes dir の path。自動 discovery では model の compile classpath / classes output を使用する                                                                                                                          |
-| `javaLanguageLevel`       | string 配列 | 明示 `sourceRoots` 時は **必須** (要素 1)。自動 discovery 時は指定禁止                  | parser に渡す canonical source language level。Analyzer / daemon JVM から推測しない                                                                                                                                                 |
-| `javaPreview`             | string 配列 | 明示 `sourceRoots` 時のみ任意 (要素 1 の `true` / `false`)。自動 discovery 時は指定禁止 | preview 構文の有効化。parser が対応する language level のみ許可                                                                                                                                                                     |
-| `liftExcludePackages`     | string 配列 | 任意                                                                                    | 引き上げ除外 package (帰属型決定規則)。指定時は既定値 (`java` / `javax` / `jakarta`) を置き換える。segment 単位 prefix 一致                                                                                                         |
-| `allowIncompleteAnalysis` | string 配列 | 任意 (要素 1 の `true` / `false`、既定 `false`)                                         | `true` のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、解決済み graph (edge / 明示除外) と診断を公開する。完全性 gate 自体・診断の可視性・`silentOmission == 0` は変更しない (詳細は完全性 gate の節) |
-
-未知 key は protocol の規則どおり無視する。Core は本表を知らない (Analyzer 側のみが解釈する)。
-
-### 型解決
-
-JavaParser (AST 解析) + SymbolSolver (型解決) を用い、次の 3 つの `TypeSolver` を構成する。
-
-- `ReflectionTypeSolver` (JDK 標準型)
-- `JavaParserTypeSolver` (対象プロジェクトの source root)
-- `JarTypeSolver` (依存 jar)
-
-classpath は明示 `sourceRoots` 経路で `analysisRequest.metadata.classpath` key を **必須**とする (空配列可)。自動 discovery 経路では、custom tooling model が project ごとの compile classpath / classes output を提供する。request metadata に `classpath` があれば、共通 extra として全 context へ追加する。`javaLanguageLevel` / `javaPreview` の自動 discovery 時指定は不正とする。両 key とも要素数が 1 でない配列 (0 件・2 件以上) と非 string 要素は `JAVA_INVALID_REQUEST` として解析開始前に拒否する。
-
-`classpath` の各要素には依存 jar またはコンパイル済み classes directory を指定できる。自プロジェクトの bytecode を照会する場合は、解析対象プロジェクトの classes output directory (例: Gradle の `build/classes/java/main`) も既存の `classpath` 配列へ追加する。新しい metadata key は導入しない。SootUp は、source から得た binary name と一致する `.class` を classpath 上で照会し、自プロジェクトの class と依存 class を区別する。
-
-pre-flight 検査 (classpath key の有無 / 指定した jar または classes directory の存在・読み取り可否) は、解析開始前に一括で行う。明示された classpath entry の欠落・読み取り不能は `JAVA_MISSING_JAR` の fatal とし、`error` + 非ゼロ exit で即時停止する。明示された入力の欠落を部分解析へ降格すると、出力済みの `methodSymbol` / `callEdge` が「一見成功した出力」として観測されうるためである。
-
-`JAVA_SOOTUP_UNAVAILABLE` の継続可能 fallback は、pre-flight を通過した入力について次の 4 つに限定する。
-
-- SootUp が class file を解釈・索引化できない
-- 自動 discovery の model 由来 classes output が未作成
-- 明示経路で、自 project の classes output 自体が classpath に指定されていない
-- model 由来 compile classpath のうち、workspace 内の project 依存 build output が未 build で存在しないこの場合は対象と原因を diagnostic に出力し、JavaParser の結果だけで source-only 解析を継続する。workspace 内の未 build entry を除外しても、依存 project の source root が solver へ入るため、型解決は依存 context の source が補完する。(model 取得は task を実行しないため、fresh checkout ではこの欠落が通常状態である)。次の 2 つの欠落・読取不能は `JAVA_MISSING_JAR` の fatal とし、fallback しない。利用者が classpath entry として明示した classes directory / jar と、model が解決済み compile classpath として返した workspace 外の external artifact である。source-only で生成 member を救済できず primary call diagnostic が残れば、終端で `JAVA_INCOMPLETE_ANALYSIS` になる。fatal は先行 warning record を無効化する。そのため SootUp を利用できなかった context 数を `JAVA_INCOMPLETE_ANALYSIS` の error metadata (`sootUpUnavailableContexts`) へ自己完結に保持し、bytecode 救済の欠如が原因の未解決を fatal 後も診断できるようにする。
-
-SootUp 依存は `org.soot-oss:sootup.core:2.0.0`、`org.soot-oss:sootup.java.core:2.0.0`、`org.soot-oss:sootup.java.bytecode.frontend:2.0.0` に固定する。`sootup.callgraph` は本 doc「実装基盤」の責務境界に反するため追加しない。2.0.0 は実装前設計時点で Maven Central に公開されている安定版で、bytecode の `AnalysisInputLocation` / `View` に必要な最小 module を選んだ。
-
-### Source root discovery と解析 context
-
-`analysisRequest.sourceRoots` の有無で経路を排他的に選ぶ。
-
-| 経路           | 入力                                                                               | discovery / context                                                                                                             |
-| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 明示 override  | `sourceRoots` 1 件以上 + `classpath` + `javaLanguageLevel`、必要なら `javaPreview` | Gradle runtime を完全 bypass し、全 root と global classpath から単一 synthetic `SourceSetAnalysisContext` を構築する           |
-| 自動 discovery | `sourceRoots` 未指定                                                               | Gradle Tooling API で build model を取得し、各 Gradle project の `main` source set ごとに `SourceSetAnalysisContext` を構築する |
-
-自動 discovery は filesystem convention や root module の include 記述を独自解析しない。Gradle Tooling API `9.6.1` と、一時 init script から注入する bundled custom model provider を用いる。provider が返すのは次だけである。project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無。task 実行や source 生成は行わず、`test` と名前付き source set は明示 override で指定された場合を除き対象外とする。一時 provider / init script は workspace 外へ置く。
-
-provider は Gradle `7.6.5` API に対して build し Java 8 classfile とする。対象 Gradle は `7.6.5 <= version < 9.7.0`。Tooling API client と Analyzer build wrapper は `9.6.1` で、wrapper がない build には bundled の `9.6.1` を使う。Analyzer runtime は JDK 25 とする。Gradle daemon JVMは対象Gradleの互換条件に従って選び、project compile toolchainとsource language levelとは別軸にする。source language levelはcompile taskの`release`を優先し、なければ実効`sourceCompatibility`を用いる。`targetCompatibility`、Analyzer JVM、daemon JVM、project toolchainからparser levelを推測しない。固定CI anchorと安定failure reasonの詳細正本は [toolchain context](../../../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
-
-root は `/` separator の workspace 相対 path へ正規化する。明示root、またはworkspace内projectのsource setとして採用したroot / fileのrealpathがworkspace外へ出る場合はfatalとする。Tooling API が workspace 外の external composite / included build として識別した build の project は、root validation より先に解析 scope から除外する。除外は `JAVA_SOURCE_ROOT_EXCLUDED` warning へ件数を集約して報告する。root build の project 階層に含まれない composite / included build (workspace 内を含む) は v1 の model 対象外である。黙示の脱落を残さないため、provider が報告する build root ごとに 1 件の `JAVA_SOURCE_ROOT_EXCLUDED` warning と、`--source-root` による明示 override の案内を出す。modelが返す解決済みartifactは外部依存として利用できる。directory symlinkは再帰追跡しない。完全重複は先勝ちで除去し、一方が他方を包含するrootはrequest ambiguityとして拒否する。明示rootの欠落・非directory・読取不能はfatal、自動discoveryで存在しないrootは生成前sourceとみなし除外する。最終的なsource fileは絶対realpathで重複排除する。`include` / `exclude`と全locationは常に`workspaceRoot`座標で評価し、module / root IDはgraphに持ち込まない。
-
-各自動 context は model の project dependency で到達可能な context と自身の classpath だけを solver に接続する。明示経路は synthetic context の global classpath を用いる。source index を location の正本とし、solver origin と dependency reachability が一致するときだけ別 context の source へ対応付ける。
-
-### Parse・resolution・call 完全性
-
-全対象 Java file を workspace 相対 path の決定順で graph record 出力前に parse pre-flight する。1 件でも失敗した場合は最初の失敗 file の location、適用 language level、sanitize 済み parser messageを持つ `JAVA_PARSE_ERROR` を出力して非ゼロ終了し、v1 では部分 parse mode を提供しない。pre-flight の AST は file ごとに破棄し、成功後の通常解析で再 parse する。
-
-solver 前に resolution と独立した visitor で各 call expression / method reference / constructor invocation / initializer call を inventory 化する。`CallSiteId` は 2 つを canonical 順で連結した内部 identity であり、Protocol へは出力しない。1 つは workspace 相対 path・start / end line・column・AST call kind からなる lexical site key、もう 1 つは semantic caller method ID である。全 call は内部 outcome ledger で次のいずれか1つへ終端しなければならない。
-
-- `emitted`: valid edge を出力した。
-- `excluded`: `external-target` または `lift-excluded-package` の列挙済み理由に該当する。
-- `diagnostic`: allowlist された resolution failure として候補・理由を保持した。
-
-未知の `RuntimeException` / `LinkageError` を広く捕捉して diagnostic へ降格しない。allowlist 外の resolver failure は `JAVA_INTERNAL_ERROR` の request fatal とする。1 call の symbol / edge / ledger 更新は原子的に行い、中途半端な record を出さない。initializer の call は意味論上展開する。instance initializer / field initializer は各 constructor caller へ、static initializer は `<clinit>` caller へ展開する。展開後の各 call は独立した `CallSiteId` として数える。
-
-source にない生成 member は、call site から要求された member だけを project bytecode member index で検索する。index は generator 固有の annotation 名に依存せず、compile classes output の signature / owner / kind を扱う。source-only member は `sourceLocation` を持つ。bytecode-only member は `sourceLocation` を省略する。代わりに `methodSymbol.metadata` へ `declarationOrigin: "project-bytecode"`、`sourceAnchor: "owner-type"`、`ownerSourceLocation` を保持する。対応する edge は `calleeOrigin: "project-bytecode-member"` を持ち、Graph は nested metadata を deep copy する。owner source type がscope内にない生成type全体と、source call siteから直接参照されないJVM内部memberは索引対象外である。
-
-全救済後にも primary diagnostic outcome が残る場合、既定では成功 graph を返さず `JAVA_INCOMPLETE_ANALYSIS` の request fatal とする。未解決 call は内部 `CallSiteId` 順で並べるが、ID 自体は Protocol へ出力しない。各共通 `error.details` には、source location、元 diagnostic code / message、opaque metadata の reason / call kind / 判明済み target / candidate を自己完結形式で含める。内容は top-level metadata の total / reasonCounts と一致させる。`silentOmission` は常に 0 でなければならない。
-
-**完全性 gate の opt-in 緩和**: `metadata.allowIncompleteAnalysis` が `true` の場合、primary diagnostic が残っても request を fatal にせず、解決済み edge / 明示除外を含む graph を成功として公開する。残存する primary diagnostic は、検出時点で通常どおり `diagnostic` record (`JAVA_UNRESOLVED_SYMBOL` warning) として streaming 済みであり、graph が部分的であることは隠さない。stderr の call-site summary (`callSiteSummary`) には終端種別・理由別の集計 (`emitted` / `excluded[...]` / `diagnostic[...]`) が既定で出力され、`silentOmission == 0` の不変条件は緩和時も維持する。既定値は `false` (従来の fatal 挙動を維持、後方互換)。この flag は完全性 gate の判定タイミングだけを変える opt-in であり、outcome ledger の分類ロジック・帰属意味論・emit される edge の正しさ (推測による false edge の禁止) には影響しない。
-
-**救済・除外分類の適用範囲拡大**: bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。
-
-**receiver 型不明時の external-target 判定規則**: receiver 型が取得できない call は、次の順で分類を試みてから diagnostic 化する。いずれも classfile / 確定 AST のみを根拠とし、推測による型付けは行わない。
-
-1. **chain の前進解決**: receiver chain の各 link を project bytecode candidate の戻り値型 (descriptor / generic Signature 由来) で前進解決し、owner 型を復元できたら通常の救済 / external 分類を適用する。候補が一意でない link・primitive / 配列戻り値・project 外 classfile の link では前進しない。暗黙 this link は囲み型、型不明の単純名は確定 AST の initializer (囲み callable 内で同名宣言が一意の場合のみ) または囲み型の bytecode field 型で補完する。
-2. **起点遡及の external 判定**: 前進解決できない場合、chain・変数 initializer・`this.field` を遡って最初に静的型が取れる起点を探し、その型が scope 外 (source 宣言索引に無い) なら `external-target` 除外へ分類する。起点が scope 内型・暗黙 this、または起点の型も取れない場合は保守的に diagnostic に残す。
-3. **lambda parameter 規則**: receiver が lambda parameter の場合、その lambda の引数先 (受け手 method call の receiver、または代入先変数の宣言型) を同じ起点遡及で判定し、scope 外なら `external-target` へ分類する。受け手が暗黙 this / scope 内型なら diagnostic に残す。
-
-SAM arity を推論できない method reference は、参照名が owner classfile 上で一意の場合だけ候補採用する (一意でなければ不採用の保守側)。
-
-### Gradle runtime と安全境界
-
-自動 discovery は利用者が信頼する Gradle build logic を利用者権限で評価する。repository 認証、credential provider、network、Gradle cache、daemon JVM 選択は Gradle に委譲され、任意の build logic の副作用を depwalk が sandbox するとは保証しない。明示 `sourceRoots` はこの runtime を完全に bypass する安全経路である。
-
-CLI help はこの副作用境界と明示overrideを常時説明する。自動discoveryを開始する各runでは、build評価前にAnalyzer stderrへ安全通知の安定した定型文を出す。定型文が伝える内容 (build評価・repository / credential・network / cacheの委譲) と非漏洩境界の正本は [context/infrastructure.md](../../../context/infrastructure.md) であり、本docでは再掲しない。discovery開始・終了、使用Gradle version、project / root件数、安定failure categoryもstderrへ出すが、Gradle由来の自由文は出力しない。
-
-Gradle の stdout / stderr は Protocol / CLI 出力へ転送せず破棄する。例外は raw message、URL query、credential、絶対 path をそのまま返さず、分類済み code と sanitize 済み message / detail に変換する。非漏洩保証は depwalk が生成・転送する Protocol、CLI、log、test artifact に限定し、Gradle 自身や利用者 build logic の出力・副作用までは含めない。
-
 ### analysisMode の意味論
 
 `fullGraph` と `reachableFromEntrypoints` の両方を実装する。
@@ -181,119 +93,6 @@ Gradle の stdout / stderr は Protocol / CLI 出力へ転送せず破棄する�
 - `entrypoints` が未指定または空配列の場合は、`analysisMode` の値によらず scope 全体の call graph 生成要求として扱う。
 - node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は「帰属型の決定規則」節を正本とする。
 - caller 探索 (S1) の入力としては `reachableFromEntrypoints` は不完全であるため、caller 方向の問い合わせでは Core が `fullGraph` を選ぶ責務を持つ (本 doc は Java Analyzer 側の意味論の正本であり、Core の振る舞いは参照)。`reachableFromEntrypoints` は callee 方向の調査で出力量を削るための最適化と位置づける。
-
-### 正規化規則 (methodId / signature)
-
-型表記は erasure + JVM binary name とし、`methodId` は可読な文字列そのものとする (hash しない)。
-
-| 項目            | 規則                                                                                                                                | 例                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 型名            | JVM binary name (nested class は `$` 区切り)                                                                                        | `com.example.Outer$Inner`                                    |
-| generics        | erasure で消去する (型引数を保持しない)                                                                                             | `List<String>` → `java.util.List`                            |
-| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                                                                           | `String...` → `java.lang.String[]`                           |
-| `signature`     | `<帰属型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` (帰属型の決定規則は「帰属型の決定規則」節を正本とする) | `com.example.UserService#findById(java.lang.Long)`           |
-| `qualifiedName` | 表示・debug 用の完全修飾名                                                                                                          | `com.example.UserService.findById`                           |
-| constructor     | メソッド名 token は JVM 表記の `<init>` を用いる                                                                                    | `com.example.UserService#<init>(com.example.UserRepository)` |
-| `methodId`      | `java:` prefix + `signature`                                                                                                        | `java:com.example.UserService#findById(java.lang.Long)`      |
-
-Java の overload 解決は erasure ベースであり、erasure だけで overload の区別に十分であるため generics を保持する必要はない。`methodId` を hash しないのは、JSONL がデバッグ容易性のために選ばれた性質と一貫させるためであり、決定性は文字列生成規則が決定的であることで満たす。
-
-匿名クラスのメソッドは、宣言型に binary name を採番して扱う。採番は直近の enclosing class ごとに 1 始まりのソース出現順で行う (`com.example.Outer$1`、JVM binary name 互換)。`signature` / `methodId` は通常のメソッドと同じ規則で作る。ローカルクラスは `Outer$1Local` 形式 (n は同名ローカルクラスの enclosing class 内出現順)。lambda は独立 node にしないため専用の ID を持たない。
-
-### symbolKind の割り当て
-
-`method` + `constructor` + static initializer (`initializer`) を node 化する。lambda は独立 node にしない。protocol の `symbolKind` enum は変更しない。
-
-| Java の構文                                     | 扱い                                                                              |
-| ----------------------------------------------- | --------------------------------------------------------------------------------- |
-| インスタンス / static メソッド                  | `symbolKind: method`                                                              |
-| コンストラクタ                                  | `symbolKind: constructor`                                                         |
-| 匿名クラスのメソッド                            | `symbolKind: method` (宣言型が `Outer$1` になるだけで実体は通常のメソッド)        |
-| static 初期化ブロック                           | `symbolKind: initializer` (`signature` は `com.example.Foo#<clinit>`)             |
-| インスタンス初期化ブロック / フィールド初期化子 | 独立 node にせず、各 `constructor` に畳み込む (Java コンパイラの意味論に合わせる) |
-| lambda 本体                                     | 独立 node にせず、lambda を字句的に囲むメソッドに帰属させる                       |
-
-lambda 本体内の呼び出しは、囲みメソッドを caller とする `callEdge` として出力する。遅延実行される呼び出しであることは `callEdge.metadata` に `viaLambda: true` を立てて標識する (Core の graph 構築は `metadata` に依存しないため契約上は無害)。
-
-method reference (`this::toDto` / `Foo::bar` / `Foo::new`) も lambda と同じ原則で扱う。独立した node にはしない。method reference を字句的に囲むメソッドを caller とする `callEdge` を出力し、参照先メソッド (「帰属型の決定規則」節を適用) を callee とする。遅延実行であることは `callEdge.metadata` に `viaMethodReference: true` を立てて標識する (`viaLambda` とは独立した flag。method reference が lambda 本体の中に現れた場合は両方が立つ)。constructor reference (`Foo::new`) は「帰属型の決定規則」節の `new` 規則を適用し、callee を `Foo` の canonical constructor (`<init>`) とする。constructor は継承されないため引き上げは発生しない。`Foo` が scope 外なら出力しない。
-
-### dispatch 標識
-
-DI 解決を行わない経路では、interface / 抽象メソッド呼び出しの callee は「帰属型の決定規則」で決まる帰属型 (interface / 抽象クラスを含む) のメソッドになる。実装クラスのメソッドへの辺は Spring DI 解決 ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md)) が追加する。
-
-`callEdge.metadata.dispatch` に呼び出しの種別を持たせる。値は 4 つ。
-
-- `static`: static メソッド呼び出し
-- `virtual`: 具象クラスの instance メソッド
-- `interface`: interface 経由
-- `abstract`: 抽象クラスの抽象メソッド経由利用者は「この辺は宣言型止まりで実体ではない」と判別でき、実装候補の辺を足すときの土台にもなる。
-
-未解決 `diagnostic` に倒す案は採らない。Spring プロジェクトでは呼び出しの大半が interface 越しであり、辺を落とすと S1 / S2 (網羅性) が実用にならないため。
-
-成功条件 S4「Spring DI 経由の呼び出し先を実体まで解決できる」は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲で満たす。DI 解決を行わない経路では宣言型止まりになるのが仕様である。
-
-**dispatch 標識の拡張**: 複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。宣言型 edge の既存 metadata は変更しない。追加する実装候補 edge の metadata は次で固定する。本 doc を正本とする。
-
-| key              | 型       | 値 / 規則                                                                                                             |
-| ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `resolution`     | string   | `unique` または `ambiguous`。条件付き候補を含む場合は候補が 1 件でも `ambiguous`                                      |
-| `provenance`     | string[] | `sootup` / `spring-di` の重複なし・辞書順配列。両方から同じ candidate edge が得られた場合は `["sootup", "spring-di"]` |
-| `conditional`    | boolean  | 条件アノテーション付き候補なら `true`。条件なしでは key を省略                                                        |
-| `conditionTypes` | string[] | 検出した条件アノテーションの FQN を重複なし・辞書順で格納。`conditional: true` のとき必須                             |
-
-edge の重複判定は caller / callee / call site から生成する既存 `edgeId` 単位で行う。同一 edge を複数解析器が報告した場合は edge を 1 件に統合し、`provenance` を和集合にする。
-
-### Spring Bean 候補の選択規則
-
-Spring ApplicationContext は起動せず、次の静的規則だけを実装する。
-
-1. 注入型へ代入可能な Bean を型階層から列挙する。
-2. 注入点に直接の `@Qualifier("value")` がある場合は、Bean 側の qualifier value、Bean 名、alias のいずれかが `value` と一致する候補だけを残す。custom qualifier meta-annotation、generics qualifier、`@Resource` は対象外とする。
-3. 残った候補が 1 件なら `unique` とする。ただし条件アノテーション付き候補は `ambiguous` とする。
-4. 候補が複数件なら、条件アノテーションがない `@Primary` 候補がちょうど 1 件の場合だけその候補を `unique` とする。唯一の `@Primary` が条件付きの場合は、条件が偽のときに他候補が選ばれる可能性を残すため、全候補を保持して `ambiguous` とする。`@Primary` が 0 件または複数件の場合も全候補を保持して `ambiguous` とする。
-5. 候補が 0 件なら unresolved とする。既知の runtime-provided マーカーに該当する場合だけ理由を `runtime-provided` に置き換える。
-
-Bean 名は次の規則で導出する。
-
-- stereotype class は annotation の `value` が非空ならその値を使う。省略時は simple class name に `java.beans.Introspector.decapitalize` と同じ規則を適用する。
-- `@Bean` method は `name` / `value` に明示された名前を Bean 名・alias として保持する。省略時の Bean 名は method name とする。
-- Bean class または `@Bean` method に直接付与された `@Qualifier("value")` を qualifier value として保持する。
-
-### diagnostic / error code 体系
-
-`JAVA_` prefix + 大文字スネークケースとする。Core は `code` を不透明な文字列として扱うため契約変更は発生しない。
-
-`diagnostic` (解析継続):
-
-| code                        | severity  | 出る場面                                                                                                                                                                                  |
-| --------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JAVA_UNRESOLVED_SYMBOL`    | `warning` | 呼び出し先の型が解決できず `callEdge` を張れない。stream 中の warning は成功時のみ有効で、ledger の primary outcome として残れば終端で `JAVA_INCOMPLETE_ANALYSIS` の request fatal になる |
-| `JAVA_ENTRYPOINT_NOT_FOUND` | `warning` | `entrypoints` の method selector に一致する method が見つからない                                                                                                                         |
-| `JAVA_SOOTUP_UNAVAILABLE`   | `warning` | pre-flight 通過後に SootUp が class file を解釈・索引化できない、または自プロジェクト bytecode が classpath にない                                                                        |
-| `JAVA_RUNTIME_PROVIDED`     | `info`    | Spring Data / MyBatis が実行時に実装を提供するため意図的に解決しない                                                                                                                      |
-| `JAVA_AMBIGUOUS_CANDIDATE`  | `warning` | `@Qualifier` / `@Primary` 適用後も候補が複数残る                                                                                                                                          |
-| `JAVA_CONDITIONAL_BEAN`     | `info`    | 条件付き Bean を評価せず候補として保持する                                                                                                                                                |
-| `JAVA_SOURCE_ROOT_EXCLUDED` | `warning` | 未作成のdiscovery source directory、external included buildのproject、またはcomposite / included buildを除外した                                                                          |
-
-`error` (fatal / 非ゼロ exit):
-
-| code                        | 出る場面                                                                                                                |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `JAVA_MISSING_CLASSPATH`    | 明示 `sourceRoots` request の `metadata` に classpath key が無い (空配列は正当な入力)                                   |
-| `JAVA_MISSING_JAR`          | classpath に指定された jar または classes directory が存在しない / 読めない (fatal、既存 code を再利用)                 |
-| `JAVA_INVALID_REQUEST`      | `analysisRequest` が Java Analyzer として処理できない (未対応 `language` 等)                                            |
-| `JAVA_INTERNAL_ERROR`       | 上記以外の継続不能な内部エラー                                                                                          |
-| `JAVA_PARSE_ERROR`          | parse pre-flight で 1 件以上の file が失敗した                                                                          |
-| `JAVA_INCOMPLETE_ANALYSIS`  | 全救済後も primary diagnostic outcome が残り、完全な成功 graph を保証できない                                           |
-| `JAVA_INVALID_SOURCE_ROOTS` | 明示 / discovery rootの欠落・非directory・読取不能、root包含関係のambiguity、realpathのworkspace外脱出、binary name重複 |
-| `JAVA_NO_SOURCE_ROOTS`      | discoveryと除外後に有効なsource rootが0件                                                                               |
-| `JAVA_GRADLE_MODEL_ERROR`   | model非互換、必須field欠落、classpath解決、context対応、build評価に失敗した                                             |
-
-language level の欠落・invalid・曖昧・JavaParser 非対応 (preview を含む) は `JAVA_INVALID_REQUEST` として拒否する。専用の code は設けない。
-
-jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲の型解決が失敗し、継続すると「未解決だらけの、一見成功した結果」が出て利用者が不完全なグラフを正と誤認するリスクが高いため。`diagnostic.sourceLocation` と `relatedMethodId` を可能な範囲で埋め、未解決の発生箇所を追跡できるようにする。
-
-**未解決 call の診断 metadata**: `JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目 — `resolutionPhase` (失敗した解決段階) / `exceptionClass` (resolver 例外のクラス名のみ、message は含めない) / `receiverKind` (receiver 式種別、AST ノード種別名または実装で定義した固定表記) / `receiverTypeResolved` (receiver 型取得成否、真偽値) — を含める。診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` (後述) で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は成功時に streaming される `diagnostic` record へ同じ内容で含める (multi-agent review 指摘反映、2026-07-22 追加)。** metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
 
 ### 性能方針
 
@@ -326,54 +125,6 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 | multi-module discovery    | 3.11s     | 2.51s / 2.64s / 2.49s | 2.51s       | 399,687,680 bytes (約 381.2 MiB) | 4.0s 以下   | 512 MiB 以下 |
 
 この SLO は特定の fixture と計測環境に対する手動のリリース目標であり、**時間や RSS の機械的なテスト gate にはしない**。S1 から S3 の CLI E2E を required gate とする方針は維持する。fixture の規模、Analyzer runtime JDK、Gradle major が変わったら測り直す。
-
-### solver 層の bytecode member 合成
-
-scope 内 source 型を solver が解決するとき、同一 context の classes output にしか存在しない一意な callable member (Lombok 等の生成 member) を解決時に合成する。call-site 駆動の救済 (生成 member 索引) だけでは式の型伝播 (chained call / stream 連鎖) を辿れないための拡張で、source 宣言と source 優先の帰属規則は変更しない。合成 member の出力は bytecode-only member と同じ契約 (定義位置省略 + owner metadata) に従う。generic 戻り値は classes output の Signature 属性から実型引数を復元する。Signature が無い・読めない member と型変数は erasure (Object) へ degrade し、解析は失敗させない。
-
-合成・救済の選択境界: 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は、owner class の classfile が project 所有の classes output に存在する場合だけ採用する。対象は自 context と、**model の project 依存関係で到達可能な依存 project の output** である。
-
-external artifact だけに存在する同名 class の member は、project bytecode として救済しない (「solver 層の bytecode member 合成」節の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
-
-cross-module 救済: 依存 context の source 型が持つ生成 member (Lombok constructor / getter 等) の cross-module 呼び出しも救済の対象とする。採用境界は依存 project の output を含む。
-
-### 帰属型の決定規則
-
-帰属型 (メソッドが属する型) は「宣言型を優先し、宣言が scope 外のときだけレシーバの静的型へ引き上げる」。
-
-「宣言型」は SymbolSolver が override 解決まで済ませた後に返す、そのメソッド宣言の所在型を指す (本体を持つかどうかは問わない — interface / 抽象メソッドの宣言もここに含む)。override されていれば override 先の型、されていなければ継承元の型になる。
-
-| 条件                                                                                          | 帰属型                                                | 例                                                                                                                                                                                      |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 宣言サイトが scope 内                                                                         | 宣言型 (宣言の所在型)                                 | `UserService extends BaseService` で `save` を override していない → `userService.save` の callee は `com.example.BaseService#save`。override していれば `com.example.UserService#save` |
-| 宣言サイトが scope 外で、レシーバの静的型が scope 内、かつ宣言型が引き上げ除外 package でない | レシーバの静的型へ引き上げる                          | `UserRepository extends JpaRepository` → `userRepository.findById` の callee は `com.example.UserRepository#findById(java.lang.Long)`                                                   |
-| 宣言サイトが scope 外で、宣言型が引き上げ除外 package                                         | 出力しない                                            | `userService.toString` (`java.lang.Object#toString`) / `equals` / `hashCode`                                                                                                            |
-| 宣言サイトが scope 外で、レシーバの静的型も scope 外                                          | 出力しない (`methodSymbol` / `callEdge` とも出さない) | `String#equals` / `List#add`                                                                                                                                                            |
-
-**引き上げ除外 package**: 既定で `java` / `javax` / `jakarta` 配下を引き上げ対象から除外する (`liftExcludePackages` に渡す正規値は wildcard を含まない package prefix)。`analysisRequest.metadata` の `liftExcludePackages` で除外 package を上書き (置き換え) 可能にする。除外判定は宣言型の binary name に対する `.` 区切り segment 単位の prefix 一致で行う (`java` は `java.lang` / `java.util` に一致し、`javafx` には一致しない)。
-
-**その他の呼び出し形**:
-
-- static メソッド: 「レシーバ」を参照した型とみなして同一規則を適用する。
-- `this.foo` / `super.foo`: 宣言サイトが scope 内なら宣言型に帰属するため揺れない。
-- `new Foo` (constructor): constructor は継承されないため引き上げは発生しない。`Foo` が scope 内なら `com.example.Foo#<init>(...)` を callee とし、scope 外 (`new ArrayList<>` 等) なら出力しない。
-
-**根拠**:
-
-- 宣言サイト基準の根拠: 「常にレシーバ型へ帰属」だと scope 内継承 (override なし) で実在しない node が合成され node 分裂を招く。「常に根の基底へ集約」だと override した node が dead node になり影響調査ができない。実際の宣言サイトを使えばどちらの病理も起きない。
-- 引き上げを scope 外に限る根拠: 引き上げは「宣言が jar の中にあって node にできない」問題を解くためだけに使う。継承元が scope 外であることは `methodSymbol.metadata` に保持する (例: `declaringType: "org.springframework.data.repository.CrudRepository"`, `inherited: true`)。
-- scope 外呼び出しを落とす根拠: JDK / library 内部メソッドをすべて node 化すると影響調査に無価値なノイズでグラフが埋まる。depwalk の用途は自分のコードへの影響調査であり、library 内部の呼び出し関係は対象外。
-- 未解決との区別: scope 外呼び出しの省略は「解析できなかった」ではなく「仕様として出力しない」ため、`JAVA_UNRESOLVED_SYMBOL` の `diagnostic` は出さない。型解決自体に失敗した場合のみ `diagnostic` とする。
-- protocol 整合: 出力する `callEdge` の caller / callee はいずれも出力済み `methodSymbol` を参照するため、「valid な `callEdge` は解決済み `methodSymbol` を参照する」という契約を満たす。
-
-**既知の制約 (override)**: 静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは委譲しない (。、2026-07-12)。本 doc を正本とする。
-
-**node 母集合 (列挙方法)**: `fullGraph` の `methodSymbol` は次の和集合とする。
-
-1. **宣言列挙**: scope 内で宣言された method / constructor / static initializer のすべて。呼ばれていないメソッドも node として出力する (caller が 0 件であることを示せる = S1 の用途に必要)。
-2. **call site 由来**: 引き上げで生じた node (scope 内型に帰属する、宣言が scope 外のメソッド)。これらは scope 内に宣言が存在しないため宣言列挙では出せず、実際に呼び出された箇所からのみ生成する。呼ばれていない継承 library メソッドは node 化しない。
-
-`reachableFromEntrypoints` は上記母集合のうち、entrypoints から callee 方向に推移的に到達するものに限る。
 
 ### 段階導入
 
