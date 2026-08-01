@@ -7,7 +7,7 @@ governs:
   - core/internal
   - analyzers/java/src/main
   - core/.golangci.yml
-verified_commit: unverified
+verified_commit: 9654928
 ---
 
 # Codebase Architecture
@@ -28,7 +28,7 @@ Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundat
 
 ### Core の package 構成と依存方向 (Go)
 
-`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)、決定経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
+`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md))。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
 | Package                         | 層 (概念)  | 責務                                                                                      |
 | ------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
