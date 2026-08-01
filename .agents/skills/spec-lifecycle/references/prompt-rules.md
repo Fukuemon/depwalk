@@ -28,8 +28,9 @@ phase: prompts (`phase-prompts.md`) で生成する prompt の粒度 / 責務境
 - 他 app / package の追加探索を要求しない
 - 検証コマンドは `context/project.yml` の `commands` にある標準 task を直接書く
 - 「既存コードを参考に」「既存実装を確認して」等の探索誘発表現を使わない
-- `## 実装コンテキスト` に列挙する path は、`context/impact-index.yaml` があれば該当 feature の
-  `read:` から採る (索引に無い path を手当たり次第に足さない。エントリが無ければ索引の整備を先に提案する)
+- `## 実装コンテキスト` に列挙する path は、読み取り索引があれば該当 feature の `read:` から採る
+  (索引に無い path を手当たり次第に足さない。エントリが無ければ索引の整備を先に提案する)。
+  索引の場所は `spec-contract.md` の「読み取り索引の解決」に従う
 
 ## 受け入れ基準の EARS 風書き換え
 

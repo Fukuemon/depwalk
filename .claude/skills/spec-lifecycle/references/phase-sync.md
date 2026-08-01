@@ -65,8 +65,9 @@ durable な設計成果を design 側へ反映したときは、正本を design
 - 新規 ADR を起こした場合は ADR ID を spec の `## 上位文書整合` テーブルに追記する
 - 関連 spec / ADR / context を更新した場合は `Spec Workflow Contract` の「文書メタ情報の同期」に従い、対象文書のメタ情報も更新する
 - handoff 後の spec の呼称は `Spec Workflow Contract` の正本境界「用語規約」に従い書き換える
-- `context/impact-index.yaml` (読み取り索引) がある場合、対象 feature のエントリを更新する
-  (反映先ファイルを `read:` に、spec を `source_refs:` に。新規 feature ならエントリを新設する)
+- 読み取り索引がある場合、対象 feature のエントリを更新する
+  (反映先ファイルを `read:` に、spec を `source_refs:` に。新規 feature ならエントリを新設する)。
+  索引の場所・更新手段 (手編集か再生成か) は `spec-contract.md` の「読み取り索引の解決」に従う
 
 ### 5. ユーザー報告
 

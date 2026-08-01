@@ -58,8 +58,9 @@ issue 固有の決定は spec に残す (本 skill の対象外。`Spec Workflow
 - 既存記述と重複・矛盾する場合は追記でなく該当箇所を更新する。
 - `Spec Workflow Contract` の「文書メタ情報の同期」に従い、対象文書のメタ情報も更新する。
 
-### 3-2. 読み取り索引 (`context/impact-index.yaml`) の更新
+### 3-2. 読み取り索引の更新
 
+索引の場所・更新手段 (手編集か再生成か) は `spec-lifecycle` の `references/spec-contract.md`「読み取り索引の解決」に従う。
 書き戻した知見が特定 feature に紐づく場合、索引の該当エントリを同時に更新する:
 
 - 該当エントリの `read:` に書き戻し先ファイルが含まれているか確認し、無ければ足す
