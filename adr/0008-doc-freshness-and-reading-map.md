@@ -82,9 +82,19 @@ verified_commit: <sha> | unverified
 ---
 ```
 
-`type` の値域に `index` を置かない。索引 (`context/reading-map.yaml` と各 README の一覧) は本 frontmatter を入力とする生成物であり、自身が frontmatter を持つ対象ではないためである。
+`type` の値域に `index` を置かない。索引の実体 (`context/reading-map.yaml`) は本 frontmatter を入力とする生成物であり、自身が frontmatter を持つ対象ではないためである。
+
+一方 `context/README.md` のように**生成区間を含む人手の文書**は、索引ではなくその文書が属する層の型で表す (`context/README.md` なら `type: context`)。生成されるのはファイル全体ではなくマーカー区間だけであり、文書そのものは人が書くものだからである。
 
 肥大した改訂注記は frontmatter へ持ち込まず、本文の履歴節へ移す。
+
+#### 先行適用 (2026-08-01) で確認したこと
+
+全 14 本へ展開する前に、性質の異なる 3 本 (`design/features/graph/`、`context/toolchain.md`、`context/README.md`) へ先行適用して schema を検証した。
+
+- **frontmatter は prettier で変化しない**。3 本とも prettier 3.6.2 適用後も frontmatter は 1 文字も変わらなかった (本文のテーブルは整形される)。したがって [issue #45](https://github.com/Fukuemon/depwalk/issues/45) の生成器は frontmatter をそのままパースしてよく、人手の文書を `.prettierignore` へ入れる必要はない
+- **`governs` を持たない文書が実在する** (`context/README.md`)。パーサは `governs` / `verified_commit` の欠落を許容し、その文書を鮮度検査の対象外として扱う必要がある
+- **`governs` は単一 package とは限らない**。`context/toolchain.md` は Gradle の `.gradle` / `.gradle.kts` 両方を含む 6 パスを持つ。存在しないパスを列挙してもよい (ビルドスクリプトの記法は project により異なるため) 前提で、パーサは実在チェックを行わない
 
 #### `verified_commit` の初期値
 
