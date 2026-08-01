@@ -59,6 +59,18 @@ def _parse_frontmatter(text: str) -> dict | None:
             empty_keys.discard(current_list_key)
             continue
 
+        # 折り返されたインライン配列。prettier は長い `keys: [a, b, c]` を
+        # `keys:` + 次行の `[a, b, c]` へ整形するため、この形も受ける。
+        stripped = line.strip()
+        if current_list_key and stripped.startswith("[") and stripped.endswith("]"):
+            inner = stripped[1:-1].strip()
+            data[current_list_key] = [
+                _strip_quotes(v.strip()) for v in inner.split(",") if v.strip()
+            ]
+            empty_keys.discard(current_list_key)
+            current_list_key = None
+            continue
+
         if ":" not in line:
             raise DocMetaError(f"解釈できない行: {raw!r}")
 
