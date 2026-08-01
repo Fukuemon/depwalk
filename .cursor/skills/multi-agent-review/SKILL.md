@@ -2,7 +2,6 @@
 name: multi-agent-review
 description: 現在の branch diff / PR / spec を複数の登録 CLI エージェント (実セットは context/ai-agents.md) に並列レビューさせ、指摘を dedup・重大度順に統合した 1 本のレポートを返す。PR 対象時は統合レポートを PR コメントとして投稿できる。"複数エージェントでレビュー" / "Rv を並列で" / "マージ前にクロスチェック" / "PR にレビューコメント" / "multi-agent-review" で起動する。
 ---
-
 # Multi-Agent Review
 
 レビュー対象 (現ブランチ diff / PR / spec) を複数の CLI エージェントへ並列に投げ、各エージェントの指摘を 1 つのレポートに統合・重大度付けする skill。実行エンジンは `agent-orchestrate`、上限/失敗時の挙動 (1 回リトライ後スキップ・部分成功許容) もそれに従う。

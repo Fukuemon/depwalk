@@ -101,6 +101,10 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:zenn.dev)"
     ],
-    "deny": ["Shell(rm -rf /*)", "Shell(rm -rf /:*)", "Shell(rm -rf ~:*)"]
+    "deny": [
+      "Shell(rm -rf /*)",
+      "Shell(rm -rf /:*)",
+      "Shell(rm -rf ~:*)"
+    ]
   }
 }

@@ -6,7 +6,6 @@ description: >-
   spec-review とユーザー承認を待つ orchestrator。"通しで設計" / "spec-lifecycle" / "spec-full" /
   "spec を最後まで" で起動する。
 ---
-
 # Spec Lifecycle
 
 spec を 1 phase ずつ進める **半自律 orchestrator**。設計プロセス全体 (scaffold 〜 prompts 生成) を

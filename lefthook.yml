@@ -6,6 +6,28 @@ pre-commit:
       run: hooks/format/run_prettier.sh
     repo-analysis:
       run: hooks/quality/validate_repo_analysis.sh
+    # rulesync 生成物の drift 検査。生成物を触った commit のときだけ走らせる。
+    #
+    # .rulesync/ は sdd-template への symlink かつ .gitignore 対象なので、
+    # glob に .rulesync/** を書いても staged file としては決して一致しない。
+    # 「正本を編集して生成を忘れた」commit は生成物が staged にならないため
+    # 本 hook では捕まらない (検出は check-generated の手動実行が担う)。
+    # ここで捕まえるのは「生成物を手編集した」「再生成の結果が中途半端」の 2 つ。
+    #
+    # 正本が link されていない環境では exit 2 (検査不能) を返すので、
+    # 合格扱いにせずスキップとして通す。
+    rulesync-generated-drift:
+      glob:
+        - "AGENTS.md"
+        - "CLAUDE.md"
+        - ".agents/**"
+        - ".claude/**"
+        - ".codex/**"
+        - ".cursor/**"
+        - ".mcp.json"
+        - "scripts/generate.sh"
+        - "scripts/check-generated.sh"
+      run: scripts/check-generated.sh --staged || [ $? -eq 2 ]
     # Go の依存方向 gate。import かルール自体を
     # 触ったときだけ走らせる (毎 commit で linter を起動しない)。
     #
