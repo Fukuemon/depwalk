@@ -1,6 +1,15 @@
-# Infrastructure & Operations
+---
+type: context
+title: "Infrastructure & Operations"
+description: 公開基盤・環境・運用・セキュリティの契約
+keywords: [infrastructure, CI, secret, 運用, Gradle daemon]
+governs:
+  - .github/workflows
+  - analyzers/java/build.gradle.kts
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-18
+# Infrastructure & Operations
 
 公開基盤・環境戦略・運用・セキュリティの契約。本書は **app 側が依存する contract** を定義する。infra 実体を別 repo で管理する場合はその境界も記す ([context/project.yml](project.yml) のリポジトリマップ)。
 

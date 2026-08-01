@@ -1,6 +1,16 @@
-# Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
+---
+type: feature-design
+title: "CLI Interface"
+description: analyze コマンドの flag 体系と、Core への配線・入力検証の契約
+status: 完了
+keywords: [CLI, Cobra, flag, analyze, exit code]
+governs:
+  - core/internal/cli
+  - core/cmd/depwalk
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) の設計で新設。実装も [issue #22](https://github.com/Fukuemon/depwalk/issues/22) が担う。#34 でグラフレベル E2E の入口が protocol.Runner へ移動し、Analyzer 起動コマンドの解決が cli へ移設)
+# Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
 
 depwalk CLI の durable な feature 設計正本。`depwalk analyze` の **コマンド構造 / flag 体系 / method selector 書式 / 責務配置 (CLI 層と analyze use case) / exit code 体系 / 出力先規約 / CLI プロセス E2E の検証方針** を定義する。決定経緯は [issue #22](https://github.com/Fukuemon/depwalk/issues/22) と関連 PR を参照する。
 
@@ -87,3 +97,9 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 | feature doc | 追記                              | graph / output への Metadata 透過 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22)) はそれぞれ [graph](../graph/DesignDoc_graph.md) / [output](../output/DesignDoc_output.md) feature doc が正本 |
 | context     | 追記                              | `context/project.yml` Quick Commands に探索クエリの起動例、`context/testing.md` に E2E 具体引数の確定を反映                                                                                                 |
 | ADR         | 継承                              | ADR-0003 は無改訂 (規約 path 前段の導入見送り判断は [issue #22](https://github.com/Fukuemon/depwalk/issues/22) に記録)                                                                                      |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+- 2026-07-26: [issue #22](https://github.com/Fukuemon/depwalk/issues/22) の設計で新設。実装も [issue #22](https://github.com/Fukuemon/depwalk/issues/22) が担う。#34 でグラフレベル E2E の入口が protocol.Runner へ移動し、Analyzer 起動コマンドの解決が cli へ移設

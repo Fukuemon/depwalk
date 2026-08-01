@@ -1,6 +1,16 @@
-# Testing Conventions
+---
+type: context
+title: "Testing Conventions"
+description: test の責務分担と test runtime contract
+keywords: [testing, unit test, E2E, golden, fixture]
+governs:
+  - core/e2e
+  - testdata
+  - analyzers/java/src/test
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26
+# Testing Conventions
 
 テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.yml](project.yml)。
 

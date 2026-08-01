@@ -1,6 +1,15 @@
-# Feature 設計: Traversal (Caller / Callee 探索)
+---
+type: feature-design
+title: "Traversal (Caller / Callee 探索)"
+description: 呼び出しグラフの探索意味論と、深さ・訪問順・結果構造の契約
+status: 完了
+keywords: [traversal, caller, callee, depth, minDepth]
+governs:
+  - core/internal/traversal
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 (2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加)
+# Feature 設計: Traversal (Caller / Callee 探索)
 
 Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
 
@@ -151,3 +160,9 @@ sequenceDiagram
 | DesignDoc | 追記                              | Open Questions Q4 を解決済みへ更新 (本 doc を正本として参照)。成功条件 S1/S2 の測定方法に Traversal 層照合の補足を追加 |
 | context   | 追記                              | `context/testing.md` E2E (照合) 行に、S1/S2 が Traversal 層照合 (本 doc 正本) と CLI 出力照合の 2 層からなる旨を追記   |
 | ADR       | 継承                              | ADR-0001 (Protocol/Model 境界) / ADR-0002 (Core package 境界) の範囲内。新規 ADR 不要                                  |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+- 2026-07-26: 2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加
