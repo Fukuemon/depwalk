@@ -59,6 +59,17 @@ pre-push:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-push
+    # 生成物 drift の全体検査。pre-commit 側は staged file に対する glob で
+    # 発火するため「テンプレが先に進み、こちらが再生成していない」ケースを
+    # 捕まえられない (生成物が staged にならないので何も起きない)。
+    #
+    # そのケースこそ実際に踏んだ失敗 (84 ファイルの遅れに気づけなかった) なので、
+    # staged の内容に依存しない検査を push の直前に 1 回だけ走らせる。
+    # commit ごとに回すには再生成が重い (約 1.4 秒) が、push 単位なら許容できる。
+    #
+    # 正本が link されていない環境では exit 2 (検査不能) を返すのでスキップする。
+    rulesync-generated-drift:
+      run: scripts/check-generated.sh || [ $? -eq 2 ]
 
 commit-msg:
   commands:
