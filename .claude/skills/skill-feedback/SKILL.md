@@ -4,7 +4,6 @@ description: >-
   利用中に見つけた skill / rule / subagent の不具合・改善点を正本 (.rulesync/) に書き戻し、rulesync-sync
   で再生成して直す。"skill がおかしい" / "skill 直して" / "この手順ずれてる" / "skill-feedback" で起動する。
 ---
-
 # Skill Feedback
 
 skill / rule / subagent を **使っている最中に見つけた** 不具合 (手順のズレ / 古い前提 / 誤誘導 / 抜け) や改善点を、その場の回避で終わらせず正本 `.rulesync/` に書き戻す skill。

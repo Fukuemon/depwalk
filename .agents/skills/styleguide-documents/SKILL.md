@@ -6,7 +6,6 @@ description: >-
   (references/prose-rhythm.md) を定める。文書を書く skill から参照されるほか、"docs の書き方" / "文書レビュー"
   / "認知リズム" / "緩急" / "平坦でおもしろくない" で起動する。
 ---
-
 # Styleguide: Documents
 
 技術的な docs を書くときの再利用可能な原則層。

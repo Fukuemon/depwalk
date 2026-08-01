@@ -2,7 +2,6 @@
 name: agent-orchestrate
 description: 単一プロンプトを複数の非対話 CLI エージェント (実セットは context/ai-agents.md) に並列ファンアウトし、エージェント別出力を収集する。token / rate-limit 失敗は retry-then-skip で許容する。複数 AI エージェントへレビューや実装を同時委譲するときの基盤として、"agent-orchestrate" / "並列でエージェント" で起動する。
 ---
-
 # Agent Orchestrate
 
 複数の CLI エージェントを **非対話・並列** に呼び出すための基盤 skill。1 つのプロンプトを各エージェントへ投げ、出力を収集し、token / rate 上限の失敗を「1 回リトライ後スキップ・部分成功許容」で扱う。Rv (`multi-agent-review`) や実装委譲など、上位 skill / ワークフローの実行エンジンとして使う。

@@ -2,7 +2,6 @@
 name: context-harvest
 description: 実装・レビュー・障害対応で得た横断的な知見 (ハマりどころ / 暗黙の仕様 / 規約の欠落) を context/*.md や feature doc / ADR に書き戻す。作業の締めくくり、"これ context に書いといて" / "知見を残して" / "context-harvest" で起動する。
 ---
-
 # Context Harvest
 
 作業中に得た知見のうち、**今回の issue が閉じても価値が残るもの** を durable な文書 (context / feature doc / ADR) に書き戻す skill。
