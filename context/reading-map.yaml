@@ -7,10 +7,24 @@
 # エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。
 
 paths:
+  .claude/agents:
+    docs:
+      - context/ai-agents.md
+    keywords: [AI agent, Claude, Codex, Cursor, orchestrate]
+  .github/workflows:
+    docs:
+      - context/engineering.md
+      - context/infrastructure.md
+    keywords: [CI, Gradle daemon, infrastructure, lefthook, quality gate, secret, shared config, コメント規約, 運用]
+  analyzers/java:
+    docs:
+      - design/features/java-analyzer/DesignDoc_java-analyzer.md
+    keywords: [Gradle Tooling API, Java, JavaParser, SootUp, Spring, discovery]
   analyzers/java/build.gradle.kts:
     docs:
+      - context/infrastructure.md
       - context/toolchain.md
-    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+    keywords: [CI, Go, Gradle, Gradle daemon, JDK, build, infrastructure, mise, scaffold, secret, toolchain, 運用]
   analyzers/java/gradle/wrapper/gradle-wrapper.properties:
     docs:
       - context/toolchain.md
@@ -23,26 +37,89 @@ paths:
     docs:
       - context/toolchain.md
     keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  analyzers/java/src/main:
+    docs:
+      - context/architecture.md
+    keywords: [ArchUnit, architecture, depguard, package boundary, 依存方向]
+  analyzers/java/src/test:
+    docs:
+      - context/testing.md
+    keywords: [E2E, fixture, golden, testing, unit test]
+  core/.golangci.yml:
+    docs:
+      - context/architecture.md
+    keywords: [ArchUnit, architecture, depguard, package boundary, 依存方向]
+  core/cmd/depwalk:
+    docs:
+      - design/features/cli/DesignDoc_cli.md
+    keywords: [CLI, Cobra, analyze, exit code, flag]
+  core/e2e:
+    docs:
+      - context/testing.md
+    keywords: [E2E, fixture, golden, testing, unit test]
   core/go.mod:
     docs:
       - context/toolchain.md
     keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  core/internal:
+    docs:
+      - context/architecture.md
+    keywords: [ArchUnit, architecture, depguard, package boundary, 依存方向]
   core/internal/analyze:
     docs:
+      - design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md
       - design/features/graph/DesignDoc_graph.md
-    keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+    keywords: [CallEdge, CallSite, Edge, JSONL, MethodSymbol, Node, SPI, SourceLocation, Symbol, graph, protocol, schemaVersion]
+  core/internal/analyzer:
+    docs:
+      - design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md
+    keywords: [CallEdge, JSONL, MethodSymbol, SPI, protocol, schemaVersion]
+  core/internal/cli:
+    docs:
+      - design/features/cli/DesignDoc_cli.md
+    keywords: [CLI, Cobra, analyze, exit code, flag]
   core/internal/graph:
     docs:
       - design/features/graph/DesignDoc_graph.md
     keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+  core/internal/output:
+    docs:
+      - design/features/output/DesignDoc_output.md
+    keywords: [Console, DOT, EdgeView, JSON, Mermaid, NodeView, output]
   core/internal/protocol:
     docs:
+      - design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md
       - design/features/graph/DesignDoc_graph.md
-    keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+    keywords: [CallEdge, CallSite, Edge, JSONL, MethodSymbol, Node, SPI, SourceLocation, Symbol, graph, protocol, schemaVersion]
+  core/internal/traversal:
+    docs:
+      - design/features/traversal/DesignDoc_traversal.md
+    keywords: [callee, caller, depth, minDepth, traversal]
+  design/features:
+    docs:
+      - design/DesignDoc.md
+    keywords: [Phase, landscape, モジュール責務, 設計原則]
+  hooks:
+    docs:
+      - context/engineering.md
+    keywords: [CI, lefthook, quality gate, shared config, コメント規約]
+  lefthook.yml:
+    docs:
+      - context/engineering.md
+    keywords: [CI, lefthook, quality gate, shared config, コメント規約]
   mise.toml:
     docs:
       - context/toolchain.md
     keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  scripts:
+    docs:
+      - context/engineering.md
+    keywords: [CI, lefthook, quality gate, shared config, コメント規約]
+  testdata:
+    docs:
+      - context/testing.md
+      - design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md
+    keywords: [CallEdge, E2E, JSONL, MethodSymbol, SPI, fixture, golden, protocol, schemaVersion, testing, unit test]
 
 # governs を持たない文書 (鮮度検査の対象外。索引としてのみ載せる)
 unscoped:

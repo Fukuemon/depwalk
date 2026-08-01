@@ -1,6 +1,18 @@
-# Feature 設計: Analyzer Protocol / SPI
+---
+type: feature-design
+title: "Analyzer Protocol / SPI"
+description: Core と Analyzer をつなぐ JSONL wire schema・SPI・失敗時の契約
+status: 完了
+keywords: [protocol, JSONL, SPI, MethodSymbol, CallEdge, schemaVersion]
+governs:
+  - core/internal/protocol
+  - core/internal/analyze
+  - core/internal/analyzer
+  - testdata
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) で metadata の JSON 透過表出 (正本: output feature doc) を現状化。2026-07-18 [issue #24](https://github.com/Fukuemon/depwalk/issues/24) で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新)
+# Feature 設計: Analyzer Protocol / SPI
 
 Analyzer SPI、JSONL Communication Protocol、Model schema の durable な feature 設計正本。本 doc は Protocol / SPI / Model の正本であり、決定経緯は [issue #8](https://github.com/Fukuemon/depwalk/issues/8) と関連 PR を参照する。
 
@@ -246,3 +258,9 @@ Handshake / capability negotiation は Phase1 では採用しない。
 | [issue #21](https://github.com/Fukuemon/depwalk/issues/21) | 追記                              | 実装レビューで判明した Core 内 metadata 消失の訂正: #21 が利用する `callEdge.metadata` は #22 が opaque passthrough として保持する。gap の発見経緯は [issue #21](https://github.com/Fukuemon/depwalk/issues/21)                                              |
 | [issue #24](https://github.com/Fukuemon/depwalk/issues/24) | 追記                              | optional `sourceRoots`、request fatal の原子性、共通 `error.details`、optional symbol location、`methodSymbol.metadata` の Graph への opaque passthrough を反映。決定経緯は [issue #24](https://github.com/Fukuemon/depwalk/issues/24)                       |
 | [issue #22](https://github.com/Fukuemon/depwalk/issues/22) | 追記                              | `methodSymbol.metadata` 境界節の「既存 Output schema は表出しない」を現状 (Output は JSON へ意味解釈なしに透過表出、正本: [Output feature doc](../output/DesignDoc_output.md)) へ更新。決定経緯は [issue #22](https://github.com/Fukuemon/depwalk/issues/22) |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+- 2026-07-26: [issue #22](https://github.com/Fukuemon/depwalk/issues/22) で metadata の JSON 透過表出 (正本: output feature doc) を現状化。2026-07-18 [issue #24](https://github.com/Fukuemon/depwalk/issues/24) で source roots、request 原子性、共通 failure detail、symbol metadata 契約を更新

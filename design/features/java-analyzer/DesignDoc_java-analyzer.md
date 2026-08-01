@@ -1,6 +1,15 @@
-# Feature 設計: Java Analyzer
+---
+type: feature-design
+title: "Java Analyzer"
+description: Java/Spring 解析の内部構成と、SootUp / Gradle Tooling API / JavaParser の隔離境界
+status: 完了
+keywords: [Java, Spring, SootUp, JavaParser, Gradle Tooling API, discovery]
+governs:
+  - analyzers/java
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 (issue #32 の内部 package 構成・外部ライブラリ隔離境界を反映)
+# Feature 設計: Java Analyzer
 
 Java/Spring ソースの AST 解析・型解決・CallGraph 生成を担う言語別 Analyzer の durable な feature 設計正本。本 doc が Java Analyzer 設計の正本。決定経緯と issue 単位の作業記録は [#9](https://github.com/Fukuemon/depwalk/issues/9)、[#21](https://github.com/Fukuemon/depwalk/issues/21)、[#22](https://github.com/Fukuemon/depwalk/issues/22)、[#24](https://github.com/Fukuemon/depwalk/issues/24)、[#27](https://github.com/Fukuemon/depwalk/issues/27) を参照する。共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本であり、本 doc は Java 固有の discovery、metadata、解析完全性を定める。
 
@@ -497,3 +506,9 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 | issue #27 | 追記                              | sync phase (2026-07-21) で診断 metadata 4項目の `error.details.metadata` 契約を diagnostic / error code 体系へ、bytecode 救済・external-target 分類の method reference / explicit constructor invocation への適用拡大と receiver 型不明時の除外判定を Parse・resolution・call 完全性へ、cross-module 生成 member 救済の欠陥修正注記を solver 層の bytecode member 合成へ、未解決 call パターン fixture をテスト観点へ反映。決定経緯は [issue #27](https://github.com/Fukuemon/depwalk/issues/27) |
 | issue #27 | 追記                              | 実装 (2026-07-21) で external-target 判定規則の実体 (chain 前進解決 / 起点遡及 / lambda parameter 規則) を Parse・resolution・call 完全性へ、採用境界の機構記述精緻化を solver 層の bytecode member 合成へ、`metadata.allowIncompleteAnalysis` による完全性 gate の opt-in 緩和を Parse・resolution・call 完全性・metadata 契約・テスト観点へ追記。決定経緯は [issue #27](https://github.com/Fukuemon/depwalk/issues/27)                                                                         |
 | issue #32 | 追記                              | sync phase (2026-07-24) で「内部 package 構成と依存境界」節を追加 (pipeline 新設・段階実行順・外部ライブラリ隔離 3 段階・ArchUnit 検査)。決定経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32)                                                                                                                                                                                                                                                                                   |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+- 2026-07-26: issue #32 の内部 package 構成・外部ライブラリ隔離境界を反映

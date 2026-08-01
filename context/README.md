@@ -30,6 +30,11 @@ frontmatter を持たない文書 (`project.yml` / 移行前の `*.md`) はま�
 
 <!-- BEGIN GENERATED: context-index (scripts/reading-map.sh が更新する。手編集しない) -->
 
+- [ai-agents.md](ai-agents.md) — 非対話 CLI エージェントの invocation / routing / timeout 契約
+- [architecture.md](architecture.md) — package / runtime / state boundary と依存方向の規約
+- [engineering.md](engineering.md) — shared config / root task / repository quality gate の境界規約
+- [infrastructure.md](infrastructure.md) — 公開基盤・環境・運用・セキュリティの契約
+- [testing.md](testing.md) — test の責務分担と test runtime contract
 - [toolchain.md](toolchain.md) — 標準 toolchain と build 構成、Gradle discovery の互換 matrix
 
 <!-- END GENERATED: context-index -->

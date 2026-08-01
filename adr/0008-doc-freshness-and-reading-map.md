@@ -72,7 +72,7 @@
 
 ```yaml
 ---
-type: feature-design # design-doc | feature-design | context
+type: feature-design # design-doc | feature-design | context | prd
 title: Graph Engine
 description: 呼び出しグラフの node / edge が持つ属性と wire → 値型の変換契約 # 索引の 1 行説明
 status: 完了 # design 系のみ
@@ -88,6 +88,8 @@ verified_commit: <sha> | unverified
 `type` の値域に `index` を置かない。索引の実体 (`context/reading-map.yaml`) は本 frontmatter を入力とする生成物であり、自身が frontmatter を持つ対象ではないためである。
 
 一方 `context/README.md` のように**生成区間を含む人手の文書**は、索引ではなくその文書が属する層の型で表す (`context/README.md` なら `type: context`)。生成されるのはファイル全体ではなくマーカー区間だけであり、文書そのものは人が書くものだからである。
+
+`prd` は `templates/prd/template.md` のための値である (2026-08-01 追加)。本プロジェクトは統合モード (Why/What を Design Doc に内包) のため PRD の実体を持たないが、テンプレートは配布物として残るため型を用意する。PRD を作る場合の置き場は repo 直下であり、鮮度検査の対象 (`design/` / `context/`) には含まれない。
 
 肥大した改訂注記は frontmatter へ持ち込まず、本文の履歴節へ移す。
 

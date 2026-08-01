@@ -1,6 +1,16 @@
-# Codebase Architecture
+---
+type: context
+title: "Codebase Architecture"
+description: package / runtime / state boundary と依存方向の規約
+keywords: [architecture, package boundary, 依存方向, depguard, ArchUnit]
+governs:
+  - core/internal
+  - analyzers/java/src/main
+  - core/.golangci.yml
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-28
+# Codebase Architecture
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。

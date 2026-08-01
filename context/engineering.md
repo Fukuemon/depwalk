@@ -1,6 +1,17 @@
-# Engineering Conventions
+---
+type: context
+title: "Engineering Conventions"
+description: shared config / root task / repository quality gate の境界規約
+keywords: [quality gate, lefthook, CI, コメント規約, shared config]
+governs:
+  - lefthook.yml
+  - .github/workflows
+  - scripts
+  - hooks
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26
+# Engineering Conventions
 
 shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.yml](project.yml)。
 
