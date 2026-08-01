@@ -14,5 +14,8 @@ CLAUDE.md
 .cursor/
 .mcp.json
 
+# 読み取りマップ (正本は各文書の frontmatter。scripts/reading-map.sh が生成する)
+context/reading-map.yaml
+
 # Gradle wrapper / fixture の build 生成物
 testdata/fixtures/java/**/build/

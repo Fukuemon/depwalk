@@ -54,6 +54,22 @@ pre-commit:
         - "scripts/depgraph.sh"
         - "context/architecture.md"
       run: scripts/depgraph.sh && git diff --exit-code context/architecture.md
+    # 読み取りマップの drift 検査。frontmatter を変えたのに生成し直していない
+    # 状態を検出する。生成側 (スクリプト) と生成先の手編集も同じ検査で拾う。
+    #
+    # 入力が全対象文書の frontmatter なので depgraph のように狭い glob へは
+    # 絞れない (ADR-0008 決定 3)。frontmatter の先頭ブロックを読むだけで
+    # lint 起動を伴わないためコストは小さい。
+    #
+    # lefthook の run は sh -c で実行され set -e が効かないので && で連結する。
+    reading-map-drift:
+      glob:
+        - "design/**/*.md"
+        - "context/**/*.md"
+        - "context/reading-map.yaml"
+        - "scripts/reading-map.sh"
+        - "scripts/docmeta.py"
+      run: scripts/reading-map.sh && git diff --exit-code context/reading-map.yaml context/README.md
 
 pre-push:
   commands:

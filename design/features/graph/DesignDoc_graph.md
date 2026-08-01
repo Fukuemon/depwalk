@@ -1,6 +1,7 @@
 ---
 type: feature-design
 title: "Graph (呼び出しグラフのデータモデル)"
+description: node / edge が持つ属性と、wire record → graph 値型の変換契約・公開の原子性
 status: 完了
 keywords: [graph, Node, Edge, Symbol, CallSite, SourceLocation]
 governs:

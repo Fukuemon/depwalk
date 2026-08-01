@@ -1,0 +1,49 @@
+# 読み取りマップ — 「何を読めば足りるか」のルーティング表
+#
+# scripts/reading-map.sh が各文書の frontmatter から生成する。手編集しない。
+# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
+#
+# 使い方: 触るコードパスで前方一致するエントリを引き、docs のファイルだけを読む。
+# エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。
+
+paths:
+  analyzers/java/build.gradle.kts:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  analyzers/java/gradle/wrapper/gradle-wrapper.properties:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  analyzers/java/model-provider/build.gradle.kts:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  analyzers/java/settings.gradle.kts:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  core/go.mod:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+  core/internal/analyze:
+    docs:
+      - design/features/graph/DesignDoc_graph.md
+    keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+  core/internal/graph:
+    docs:
+      - design/features/graph/DesignDoc_graph.md
+    keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+  core/internal/protocol:
+    docs:
+      - design/features/graph/DesignDoc_graph.md
+    keywords: [CallSite, Edge, Node, SourceLocation, Symbol, graph]
+  mise.toml:
+    docs:
+      - context/toolchain.md
+    keywords: [Go, Gradle, JDK, build, mise, scaffold, toolchain]
+
+# governs を持たない文書 (鮮度検査の対象外。索引としてのみ載せる)
+unscoped:
+  - context/README.md

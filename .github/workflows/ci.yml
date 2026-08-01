@@ -146,3 +146,27 @@ jobs:
           # silently turn this job into a no-op green check (see
           # skipOrFail in core/e2e/java_fixture_test.go).
           DEPWALK_E2E_REQUIRED: "1"
+
+  docs:
+    name: "Docs (読み取りマップ drift / 鮮度)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # doc-freshness は verified_commit..HEAD を git log で辿るため全履歴が要る。
+        # shallow clone だと古い verified_commit が解決できず「参照不能」になる。
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 読み取りマップは各文書の frontmatter だけを入力にするため、rulesync 生成物と
+      # 違い .rulesync/ (sdd-template への symlink) を必要としない。したがってこの
+      # 検査は CI で成立する (生成物 drift 検査を CI に置けない理由は issue #46)。
+      - name: Reading map drift check
+        run: |
+          scripts/reading-map.sh
+          git diff --exit-code context/reading-map.yaml context/README.md
+
+      # 鮮度は常に exit 0。stale を理由に CI を落とさない (ADR-0008 業務ルール 2)。
+      # 結果は job summary に出して PR から読めるようにする。
+      - name: Doc freshness report
+        run: scripts/doc-freshness.sh
