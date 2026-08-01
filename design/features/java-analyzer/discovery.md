@@ -7,7 +7,7 @@ keywords:
   [discovery, Gradle, Tooling API, source root, classpath, composite build]
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
-verified_commit: 906d77a
+verified_commit: 2d82ed3
 ---
 
 # Java Analyzer: Source root discovery
@@ -23,6 +23,8 @@ Java Analyzer が **解析対象のソースと classpath をどう決めるか*
 - 利用者が `--source-root` を書かなかったとき、解析対象のソースをどう見つけるか
 - 型解決に必要な classpath をどこから得るか
 - Gradle を呼ぶことで生じる副作用 (build logic の評価) をどう扱うか
+
+問い合わせには [Gradle Tooling API](https://docs.gradle.org/current/userguide/tooling_api.html) を使う。外部プログラムから Gradle の build を評価させ、project 階層・依存関係・source directory を取得できる仕組みである。**build を評価する**という点が安全境界の話につながる。
 
 ## Source root discovery と解析 context
 
