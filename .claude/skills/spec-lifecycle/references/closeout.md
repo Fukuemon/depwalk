@@ -24,8 +24,9 @@ durable な情報は sync で design / ADR / context に救出済みであるこ
      削除前に ADR に起こす** (spec 削除後、「なぜこうしたか」を再現できる場所は ADR だけになる)
    - 横断的な知見 (ハマりどころ / 暗黙の仕様) が残っていれば `context-harvest` で書き戻す
 2. **参照の後始末**:
-   - `context/impact-index.yaml` の `source_refs:` から当該 spec のパスを除去し、
-     ADR / feature doc に差し替える (`read:` は design 側を指しているはずなので通常変更不要)
+   - 読み取り索引が spec への参照を持つ場合、`source_refs:` から当該 spec のパスを除去し
+     ADR / feature doc に差し替える (`read:` は design 側を指しているはずなので通常変更不要)。
+     索引の場所・更新手段は `spec-contract.md` の「読み取り索引の解決」に従う
    - feature doc / ADR に spec への決定経緯リンクがあれば、issue へのリンクに差し替える
 3. **削除の承認**: 削除対象・刈り取り結果・参照差し替えを提示し、承認を取る (contract の「承認の取り方」)
 4. **削除と commit**: `git rm -r specs/<issue-id>-<slug>/` し、削除 commit のメッセージに
