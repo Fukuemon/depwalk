@@ -22,20 +22,18 @@ Output Engine の設計正本。
 | **DOT**     | Graphviz というグラフ描画ツールが読むテキスト形式。`dot -Tpng` 等で画像に変換する          | 描画ツール経由で人    |
 | **Mermaid** | Markdown 内に埋め込めるグラフ記法。GitHub や多くの Markdown ビューアがそのまま図として描く | ドキュメント経由で人  |
 
-DOT と Mermaid は**それ自体が図ではなくテキスト**であり、外部のレンダラに渡して初めて図になる。depwalk はテキストの生成までを担い、描画は行わない。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現 (Design Doc Open Question Q3 の解)、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
+DOT と Mermaid は**それ自体が図ではなくテキスト**であり、外部のレンダラに渡して初めて図になる。depwalk はテキストの生成までを担い、描画は行わない。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
 
 ## 背景・要件解釈
 
 調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON / DOT / Mermaid で出力できる」)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
-
-Design Doc の Open Question Q3「Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)」は本 doc の「Console ツリー表現」節が解であり、以後本 doc を正本とする。
 
 ## スコープ
 
 ### やること
 
 - Output package の公開 entry point と Formatter / View の構造。
-- Console のツリー表現 (tree 構築規則・標識・行の書式) — Q3 の正本。
+- Console のツリー表現 (tree 構築規則・標識・行の書式)。
 - JSON 出力の schema と版管理・後方互換方針・要素順序の決定性。
 - DOT / Mermaid が表現すべき意味の要件 (G-1〜G-7)。
 - 該当なし / 到達なし / 未対応 format のエラー境界。
@@ -177,7 +175,7 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 - 該当なし / 到達なしの分岐は各 Formatter の内部で行う (`View.Status` / `Edges` / `Cutoffs` の 3 つを見る)。見せ方が形式ごとに異なるため、`Write` は status で分岐しない。
 - exit code とエラー表示先は CLI の責務。
 
-### Console ツリー表現 (Q3 の正本)
+### Console ツリー表現
 
 Traversal result は tree ではなく集合であるため、tree 化の規則を Output 側の仕様として定義する。
 

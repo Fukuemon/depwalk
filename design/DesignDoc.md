@@ -6,7 +6,7 @@ status: Draft
 keywords: [landscape, モジュール責務, 設計原則, Phase]
 governs:
   - design/features
-verified_commit: unverified
+verified_commit: dcb2a35
 ---
 
 # depwalk Design Doc
@@ -20,7 +20,7 @@ verified_commit: unverified
 
 ## 概要 (Summary)
 
-depwalk は、ソースコードの静的解析でメソッド間の呼び出し関係を抽出し、変更影響調査を支援する CLI ツールである。「あるメソッドを直したいが、どこから呼ばれ・どこを呼んでいるか」を手作業で追う負荷を自動化し、CI 上でも実行できる形で提供する。Phase1 は Java/Spring Boot を対象とするが、呼び出しグラフの構築・探索を担う **Core を言語非依存**に保ち、言語ごとの解析差異を独立プロセスの **Analyzer** に閉じ込めることで、将来の Kotlin / TypeScript / Vue / Go 対応を Core 変更なしに追加できるアーキテクチャを採る。
+depwalk は、ソースコードの静的解析でメソッド間の呼び出し関係を抽出し、変更影響調査を支援する CLI ツールである。「あるメソッドを直したいが、どこから呼ばれ・どこを呼んでいるか」を手作業で追う負荷を自動化し、CI 上でも実行できる形で提供する。対象言語は Java/Spring Boot から始める。ただし言語ごとの解析差異は独立プロセスの **Analyzer** に閉じ込め、呼び出しグラフの構築・探索を担う **Core は言語非依存**に保つ。この分離により、将来の Kotlin / TypeScript / Vue / Go 対応を Core の変更なしに追加できる。
 
 ## Why / What
 
@@ -148,7 +148,9 @@ flowchart TD
 | Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領                                         | Protocol (JSONL)   | Model                                                                                                                     |
 | Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成。source root 未指定時は Gradle build model から解析 context を discovery する | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp。自動 discovery 時のみ Gradle Tooling API / Gradle daemon / 一時 custom model provider |
 
-Gradle runtime は Java Analyzer の **条件付き依存**である。`analysisRequest.sourceRoots` が指定された明示 override では Tooling API、Gradle daemon、一時 provider を起動せず完全に bypass する。自動 discovery の build 評価・互換性・安全境界は [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure context](../context/infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) を正本とし、Core / Analyzer Protocol の言語非依存境界と成功条件は変更しない。
+Gradle runtime は Java Analyzer の **条件付き依存**である。`analysisRequest.sourceRoots` が指定された明示 override では Tooling API、Gradle daemon、一時 provider を起動せず完全に bypass する。自動 discovery の build 評価・互換性・安全境界は [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure context](../context/infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) を正本とする。
+
+この機能は Core / Analyzer Protocol の言語非依存境界と成功条件を変えない。
 
 ```mermaid
 flowchart LR
@@ -252,9 +254,11 @@ Phase は段階的に提供範囲を広げる。各 Phase の完了条件は spe
 
 ### Open Questions (未決事項)
 
-| #   | 論点                                                                  | 決定者   | 期限          | 状態                                                                                                                                                                                                                                      |
-| --- | --------------------------------------------------------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | `MethodSymbol` / `CallEdge` / `SourceLocation` の JSONL スキーマ定義  | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md))                                                                                              |
-| Q2  | SootUp 統合範囲 (どこまで Interface Dispatch / Override を解決するか) | Fukuemon | #21 の設計時  | 決定 (2026-07-12): 型階層・override・interface 実装候補の索引のみ (call graph 生成は委譲しない)。決定経緯は [issue #21](https://github.com/Fukuemon/depwalk/issues/21) / [feature doc](features/java-analyzer/DesignDoc_java-analyzer.md) |
-| Q3  | Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)       | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/output/DesignDoc_output.md) / [issue #7](https://github.com/Fukuemon/depwalk/issues/7))                                                                                                                  |
-| Q4  | 循環呼び出し・再帰の探索打ち切り条件 (深さ上限 / 訪問済み管理)        | Fukuemon | Phase1 設計時 | 解決済み ([feature doc](features/traversal/DesignDoc_traversal.md) / [issue #6](https://github.com/Fukuemon/depwalk/issues/6))                                                                                                            |
+現時点で未決の論点はない。かつての論点 (JSONL スキーマ定義 / SootUp 統合範囲 / Console ツリー表現 / 循環と深さ上限の打ち切り) はいずれも決着し、それぞれの正本へ移った。
+
+| 決着した論点             | 現在の正本                                                                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JSONL スキーマ定義       | [analyzer-protocol feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) |
+| SootUp 統合範囲          | [java-analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md) / [ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md)   |
+| Console ツリー表現       | [output feature doc](features/output/DesignDoc_output.md)                                                                                           |
+| 循環・深さ上限の打ち切り | [traversal feature doc](features/traversal/DesignDoc_traversal.md)                                                                                  |
