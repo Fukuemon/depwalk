@@ -6,7 +6,7 @@ status: Draft
 keywords: [landscape, モジュール責務, 設計原則, Phase]
 governs:
   - design/features
-verified_commit: 9654928
+verified_commit: 906d77a
 ---
 
 # depwalk Design Doc
@@ -209,14 +209,14 @@ landscape より下の詳細は以下を正本とする。本 doc には重複�
 
 feature 単位の設計 (データ構造・主要シナリオ / フロー) は [design/features/](features/) を正本とする。
 
-| Feature                              | 文書                                                                                        | 状態              |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------- |
-| Caller / Callee 探索                 | [DesignDoc_traversal.md](features/traversal/DesignDoc_traversal.md)                         | 完了              |
-| 呼び出しグラフのデータモデル (Graph) | [DesignDoc_graph.md](features/graph/DesignDoc_graph.md)                                     | 完了              |
-| 出力形式 (Console / JSON)            | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                  | 完了              |
-| Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) | 完了              |
-| Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md)             | 完了              |
-| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                           | 完了 (実装は #22) |
+| Feature                              | 文書                                                                                                                                                                                                                                                       | 状態 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| Caller / Callee 探索                 | [DesignDoc_traversal.md](features/traversal/DesignDoc_traversal.md)                                                                                                                                                                                        | 完了 |
+| 呼び出しグラフのデータモデル (Graph) | [DesignDoc_graph.md](features/graph/DesignDoc_graph.md)                                                                                                                                                                                                    | 完了 |
+| 出力形式 (Console / JSON)            | [DesignDoc_output.md](features/output/DesignDoc_output.md)                                                                                                                                                                                                 | 完了 |
+| Analyzer Protocol / SPI              | [DesignDoc_analyzer-protocol.md](features/analyzer-protocol/DesignDoc_analyzer-protocol.md)                                                                                                                                                                | 完了 |
+| Java Analyzer                        | [DesignDoc_java-analyzer.md](features/java-analyzer/DesignDoc_java-analyzer.md) (下位: [discovery](features/java-analyzer/discovery.md) / [analysis](features/java-analyzer/analysis.md) / [protocol-mapping](features/java-analyzer/protocol-mapping.md)) | 完了 |
+| CLI Interface (analyze コマンド)     | [DesignDoc_cli.md](features/cli/DesignDoc_cli.md)                                                                                                                                                                                                          | 完了 |
 
 ### Engineering Context (How: 横断規約)
 

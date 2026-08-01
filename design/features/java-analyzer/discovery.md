@@ -7,7 +7,7 @@ keywords:
   [discovery, Gradle, Tooling API, source root, classpath, composite build]
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
-verified_commit: a515089
+verified_commit: 906d77a
 ---
 
 # Java Analyzer: Source root discovery
@@ -16,7 +16,13 @@ Java Analyzer が **解析対象のソースと classpath をどう決めるか*
 
 利用者が `--source-root` を明示しない場合、Gradle の build model へ問い合わせて source root・compile classpath・classes output を取得する。この経路は対象プロジェクトの build logic を評価するため、network や credential provider に触れうる。その安全境界も本 doc が定める。
 
-判断の正本は [ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md)。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。
+判断の正本は [ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md)。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。用語 (classpath / classes directory / source root) は親 doc の「前提」節を参照する。
+
+## この doc が答えること
+
+- 利用者が `--source-root` を書かなかったとき、解析対象のソースをどう見つけるか
+- 型解決に必要な classpath をどこから得るか
+- Gradle を呼ぶことで生じる副作用 (build logic の評価) をどう扱うか
 
 ## Source root discovery と解析 context
 
