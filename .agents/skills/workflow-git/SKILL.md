@@ -4,7 +4,6 @@ description: >-
   本リポジトリの Git / GitHub 運用 workflow。ブランチ作成、コミット、Issue (ラベル含む)、PR の順序と停止条件を扱う。固有値は
   context/project.yml を読む。"branch 切って" / "コミットして" / "PR 作って" / "issue 起票" で起動する。
 ---
-
 # Workflow Git
 
 本リポジトリの Git / GitHub 操作を進めるときの入口スキル。プロジェクト固有値 (tracker / domains / labels) は [context/project.yml](../../../context/project.yml) を読む。

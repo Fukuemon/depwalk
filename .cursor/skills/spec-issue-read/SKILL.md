@@ -2,7 +2,6 @@
 name: spec-issue-read
 description: リポジトリのトラッカーから issue を取得し、構造化された要約を返す。issue 番号 / URL の言及、"issue 確認" / "issue 読んで" / "read issue" で起動する。
 ---
-
 # Spec Issue Read
 
 Issue tracker から指定 issue を取得し、要約と推奨次アクションを返す。

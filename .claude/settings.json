@@ -1,10 +1,5 @@
 {
   "permissions": {
-    "deny": [
-      "Bash(rm -rf /*)",
-      "Bash(rm -rf /:*)",
-      "Bash(rm -rf ~:*)"
-    ],
     "allow": [
       "Bash(cat:*)",
       "Bash(codex exec:*)",
@@ -123,6 +118,11 @@
       "Bash(git push:*)",
       "Bash(git reset --hard:*)",
       "Bash(rm:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf ~:*)"
     ]
   },
   "hooks": {

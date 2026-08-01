@@ -5,7 +5,6 @@ description: >-
   NEEDS_WORK と具体指摘を集約して返す。spec-lifecycle の phase gate として、またはユーザーが "spec-review"
   / "spec のレビュー" / "PASS か見て" を求めたときに起動する。
 ---
-
 # Spec Review
 
 cwc-long-running-agents の "Fresh-Context Evaluator" パターンに沿った skill。

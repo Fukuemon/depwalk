@@ -14,9 +14,6 @@ args = [ "chrome-devtools-mcp@latest" ]
 [mcp_servers.deepwiki]
 url = "https://mcp.deepwiki.com/mcp"
 
-[features]
-hooks = true
-
 [permissions.rulesync]
 extends = ":workspace"
 

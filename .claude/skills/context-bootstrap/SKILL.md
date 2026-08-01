@@ -5,7 +5,6 @@ description: >-
   (context/*.md) を生成する。新規プロダクトでテンプレートを使い始めるとき、context/
   が空またはプレースホルダのままのとき、"context-bootstrap" / "context 初期化" で起動する。
 ---
-
 # Context Bootstrap
 
 初期 `design/DesignDoc.md` と短い対話を入力に、**プロジェクト profile (`context/project.yml`) と context library (`context/*.md`)** を template から生成する。新規プロダクトで本テンプレートを使い始めるときの初期化 skill。
