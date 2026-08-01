@@ -36,6 +36,19 @@ except DocMetaError as e:
 
 def changed_since(commit: str, paths: list[str]) -> list[str]:
     """commit..HEAD で paths 配下に変更があった commit の短縮 SHA を返す。"""
+    # rebase / squash 後、commit が解決はできるが HEAD の祖先ではない状態が起きる。
+    # このとき git log commit..HEAD は成功し、多くの場合 0 件を返すため、実際には
+    # 一度も突き合わせていない文書が「一致」と報告されてしまう。範囲クエリの前に
+    # 祖先であることを確かめ、そうでなければ参照不能として扱う。
+    anc = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
+        cwd=root, capture_output=True, text=True,
+    )
+    if anc.returncode != 0:
+        raise RuntimeError(
+            f"HEAD の祖先ではありません (rebase / squash で履歴から外れた可能性): {commit}"
+        )
+
     r = subprocess.run(
         ["git", "log", "--format=%h", f"{commit}..HEAD", "--", *paths],
         cwd=root, capture_output=True, text=True,
@@ -70,7 +83,15 @@ for d in docs:
 out: list[str] = []
 out.append("## 文書の鮮度")
 out.append("")
-out.append(f"対象 {len(docs)} 文書 / 一致 {fresh} / 要確認 {len(stale)} / 未検証 {len(unverified)} / 参照不能 {len(broken)}")
+# 分母は governs を持つ文書だけにする。対象外の文書を足すと内訳の合計と
+# 食い違い、全件一致のときに「検査していない文書まで一致した」と読めてしまう。
+checked = fresh + len(stale) + len(unverified) + len(broken)
+exempt_count = len(docs) - checked
+out.append(
+    f"検査対象 {checked} 文書 / 一致 {fresh} / 要確認 {len(stale)} / "
+    f"未検証 {len(unverified)} / 参照不能 {len(broken)}"
+    + (f" (ほかに governs を持たない対象外が {exempt_count} 文書)" if exempt_count else "")
+)
 
 if stale:
     out.append("")
