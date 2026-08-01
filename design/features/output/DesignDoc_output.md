@@ -6,27 +6,16 @@ status: 完了
 keywords: [output, Console, JSON, DOT, Mermaid, NodeView, EdgeView]
 governs:
   - core/internal/output
-verified_commit: unverified
+verified_commit: 9b9d79d
 ---
 
 # Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
-Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
-
-## メタ
-
-| 項目           | 値                                                                                                                                                                                                                                |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                            |
-| 関連 DesignDoc | [成功条件 S3](../../DesignDoc.md#提供価値--成功条件-what)、[Goal G3](../../DesignDoc.md#goal)、[モジュール責務 Output Engine](../../DesignDoc.md#モジュール責務)、[Open Questions Q3](../../DesignDoc.md#open-questions-未決事項) |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                                              |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                     |
-| 関連 issue     | [#7](https://github.com/Fukuemon/depwalk/issues/7)、[#22](https://github.com/Fukuemon/depwalk/issues/22) (実 OSS 検証で検出した Console ラベル重複の修正)                                                                         |
-| 対象モジュール | `output` (`core/internal/output`)                                                                                                                                                                                                 |
+Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc が正本とするのは次の 6 つである。公開 entry point、Formatter・View 構造、Console ツリー表現 (Design Doc Open Question Q3 の解)、JSON schema と版管理、DOT・Mermaid の I/F 要件、エラー境界。
 
 ## 背景・要件解釈
 
-調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる (成功条件 S3 / Goal G3)。Phase1 は Console / JSON を実装し、DOT / Mermaid は実装こそ Phase4 だが **I/F は本 feature で確定**し、Phase4 で Output Engine の構造を作り直さないことを設計目標とする。
+調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理・可視化用途 (JSON / DOT / Mermaid) の双方で使われる (成功条件 S3 / Goal G3)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
 
 Design Doc の Open Question Q3「Console 出力のツリー表現フォーマット (深さ表示・循環参照の扱い)」は本 doc の「Console ツリー表現」節が解であり、以後本 doc を正本とする。
 
@@ -43,7 +32,7 @@ Design Doc の Open Question Q3「Console 出力のツリー表現フォーマ�
 ### やらないこと
 
 - グラフのビューワ提供 (DOT / Mermaid は構文生成まで — Non Goals)。
-- DOT / Mermaid の具体構文 (ノード形状 / 色 / 線種) — Phase4 spec で確定する。
+- DOT / Mermaid の具体構文 (ノード形状 / 色 / 線種) — 実装時に確定する。
 - 探索の意味論 (正本は [traversal feature doc](../traversal/DesignDoc_traversal.md))。
 - graph が保持する属性の定義 (正本は [graph feature doc](../graph/DesignDoc_graph.md))。
 - CLI の引数名 / exit code / エラー表示先 (正本は [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
@@ -52,7 +41,7 @@ Design Doc の Open Question Q3「Console 出力のツリー表現フォーマ�
 
 ### 公開 entry point と Formatter / View
 
-`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → formatter 選択 → 描画を担う。呼び出し側 (コンポジションルートである CLI 層) は formatter / `View` を知らず、`Write` と `RegisteredFormats` だけを使う。formatter interface は package 内に閉じており公開しない (新形式の追加は package 内の変更で完結する)。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する。[issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定)。
+`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → formatter 選択 → 描画を担う。呼び出し側 (コンポジションルートである CLI 層) は formatter / `View` を知らず、`Write` と `RegisteredFormats` だけを使う。formatter interface は package 内に閉じており公開しない (新形式の追加は package 内の変更で完結する)。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する)。
 
 ```go
 // core/internal/output
@@ -62,8 +51,8 @@ type Format string
 const (
     FormatConsole Format = "console"
     FormatJSON    Format = "json"
-    FormatDOT     Format = "dot"     // Phase4
-    FormatMermaid Format = "mermaid" // Phase4
+    FormatDOT     Format = "dot"     // 未実装 (定数のみ)
+    FormatMermaid Format = "mermaid" // 未実装 (定数のみ)
 )
 
 type Input struct {
@@ -108,7 +97,7 @@ type EdgeView struct {
     CalleeID string
     Cycle    bool
     CallSite *graph.SourceLocation // nil なら位置情報なし
-    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22))
+    Metadata map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出
 }
 
 // CutoffView は 1 depthLimit cutoff edge の Formatter 向け表現。
@@ -188,7 +177,7 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力の決定性を担保)。
 4. **展開順序** = 上記順序の pre-order DFS。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む)。これにより self-loop も規則 6 の `(cycle)` になり、root の self-loop で root が再展開されることもない。
 5. **初出のみ展開** = 部分木を展開するのは tree 中で最初に出現したときの 1 回のみ。出力行数は O(到達 edge 数) に収まり、**停止性はこの規則だけで保証される**。
-6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行い、**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない** (この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られ node が tree から消える):
+6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない。** この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られて node が tree から消えるためである:
    - **`(cycle)`** = 現在の経路上の祖先に戻る edge (back edge) の先。
    - **`(既出)`** = 祖先ではないが、別の枝で展開済みの node (合流)。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の到達側 endpoint の子として、**子の最後に** 1 行出す。N はその node からの cutoff edge 数。cutoff 先 (`targetMethodId`) は到達集合外のため名前を出さない。
@@ -264,7 +253,7 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
-- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持の正本) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味の正本は Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。[issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持の正本) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味の正本は Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。 で決定。
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
@@ -273,9 +262,9 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `schemaVersion` は **Analyzer Protocol と独立の採番** (Protocol は Analyzer ↔ Core、本 schema は Core ↔ 利用者の契約で、変更理由が独立)。
 - field の追加は後方互換 (additive、minor)。削除 / 意味変更 / 型変更は破壊的変更 (major)。利用者は未知 field を無視できることを前提にする。
 
-### DOT / Mermaid の I/F 要件 (Phase4 実装)
+### DOT / Mermaid の I/F 要件 (未実装)
 
-具体構文は Phase4 spec に委譲する。Phase4 実装は次を満たすこと (I/F の手直しを不要にするための意味要件)。
+具体構文は実装時に決める。実装は次を満たすこと (I/F の手直しを不要にするための意味要件)。
 
 | #   | 要件                                                                                                    |
 | --- | ------------------------------------------------------------------------------------------------------- |
@@ -299,7 +288,7 @@ flowchart TD
     Write --> View["View<br/>(symbol 解決済み / sort 済み)"]
     View --> Console["Console Formatter<br/>(tree 構築)"]
     View --> JSON["JSON Formatter"]
-    View --> DOT["DOT / Mermaid Formatter<br/>(Phase4)"]
+    View --> DOT["DOT / Mermaid Formatter<br/>(未実装)"]
     Write -->|"symbol / callSite を解決"| Graph["Graph Engine"]
 ```
 
@@ -321,7 +310,7 @@ flowchart TD
     F --> G["format に対応する Formatter を選ぶ"]
     G --> H["Console: View から tree を構築して描画<br/>(「Console ツリー表現」節。下図)"]
     G --> I["JSON: フラットな graph を描画<br/>(nodes/edges/depthCutoffs。「JSON 出力」節)"]
-    G --> J["DOT / Mermaid: 到達 graph を描画<br/>(Phase4。tree 化しない。「DOT / Mermaid の I/F 要件」節)"]
+    G --> J["DOT / Mermaid: 到達 graph を描画<br/>(未実装。tree 化しない。「DOT / Mermaid の I/F 要件」節)"]
     H --> K["各 Formatter は View.Status / Edges / Cutoffs を見て<br/>startNotFound (該当なし) と 到達なし を形式ごとに表現する<br/>(到達なし = Edges 空 かつ Cutoffs 空。<br/>Edges 空でも Cutoffs 非空なら cutoff ケース。「エラー境界」節 / 「Console ツリー表現」節の規則 8)"]
     I --> K
     J --> K
@@ -404,7 +393,7 @@ sequenceDiagram
 - 呼び出し側 (CLI 層) は use case が返した Traversal result と出力形式を指定して `output.Write` を呼ぶ。未対応 format は出力を書き出す前にエラーになる。
 - 開発者 / 保守担当は Console のツリーで呼び出し関係を読む。合流は `(既出)`、循環は `(cycle)`、深さ上限は `… (depth limit: N edges cut)` で読み取れる。
 - CI パイプラインは JSON を保存・後処理する。`minDepth == 1` で直接の呼び出し元だけを抽出する、といった後処理が JSON 単体で完結する。
-- ドキュメント作成者は DOT / Mermaid (Phase4) の出力を外部レンダラに渡して図を得る。
+- ドキュメント作成者は DOT / Mermaid の出力を外部レンダラに渡して図を得る (未実装)。
 
 ## テスト観点
 

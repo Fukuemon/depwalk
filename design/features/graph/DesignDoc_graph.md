@@ -10,29 +10,20 @@ governs:
   # staging / 公開の原子性も定義する。その実装は下の 2 package にある。
   - core/internal/protocol
   - core/internal/analyze
-verified_commit: unverified
+verified_commit: 9b9d79d
 ---
 
 # Feature 設計: Graph (呼び出しグラフのデータモデル)
 
-Graph Engine の durable な feature 設計正本。Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフの **node / edge が保持する属性**と、wire record → graph 値型の変換契約を定義する。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
+Graph Engine の durable な feature 設計正本。
 
-## メタ
-
-| 項目           | 値                                                                                                                                                                                                                                                                                      |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                                                                  |
-| 関連 DesignDoc | [モジュール責務 Graph Engine / Model](../../DesignDoc.md#モジュール責務)、[成功条件 S3](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                                                                     |
-| 関連 context   | [architecture](../../../context/architecture.md) (Package Boundary)                                                                                                                                                                                                                     |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                                                                                                           |
-| 関連 issue     | [#7](https://github.com/Fukuemon/depwalk/issues/7)、[#6](https://github.com/Fukuemon/depwalk/issues/6) (読み取り API の consumer)、[#24](https://github.com/Fukuemon/depwalk/issues/24)、[#32](https://github.com/Fukuemon/depwalk/issues/32) (SourceLocation 自前型化・変換所在の改訂) |
-| 対象モジュール | `core` (`core/internal/graph`。層構造の正本は [architecture.md](../../../context/architecture.md))                                                                                                                                                                                      |
+定義するのは 2 つある。1 つは Analyzer Protocol の wire record (`methodSymbol` / `callEdge`) から構築される in-memory 呼び出しグラフで、**node / edge が保持する属性**。もう 1 つは wire record から graph 値型への変換契約である。本 doc は graph データモデル (`Node.Symbol` / `Edge.CallSite`) の正本である。
 
 ## 背景・要件解釈
 
 Analyzer Protocol の `methodSymbol` は `methodId` に加えて `qualifiedName` / `signature` / `sourceLocation` を持ち、`callEdge` は `callSite` を持つ ([analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) が正本)。一方、`methodId` は **Analyzer が決定的に生成する不透明な stable ID** であり、人間可読な名前である保証はない。
 
-Output Engine (Console / JSON / DOT / Mermaid) がメソッド名・宣言位置・呼び出し箇所を表示するには、これらの属性を graph 側が保持している必要がある。graph model は Output 専用ではなく Traversal も読む**横断データモデル**であるため、その属性契約を本 doc が正本として定義する (置き場所の判断経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7))。
+Output Engine (Console / JSON / DOT / Mermaid) がメソッド名・宣言位置・呼び出し箇所を表示するには、これらの属性を graph 側が保持している必要がある。graph model は Output 専用ではなく Traversal も読む**横断データモデル**であるため、その属性契約は本 doc を正本とする。
 
 ## スコープ
 
@@ -76,17 +67,17 @@ type Edge struct {
 }
 ```
 
-- **変換は 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しは ACL (`protocol`。app が定義する port の実装側) が担い、以後 Core 内で wire record を持ち回らない (変換の所在は [issue #32](https://github.com/Fukuemon/depwalk/issues/32) で Analyze Use Case 層から platform 層へ改訂)。
+- **変換は 1 回だけ**行う。`protocol.MethodSymbol` / `protocol.CallEdge` (wire record) → 上記値型への写しは ACL (`protocol`。app が定義する port の実装側) が担い、以後 Core 内で wire record を持ち回らない。
 - **wire 専用フィールド (`schemaVersion` / `recordType`) は graph model に持ち込まない**。graph が wire 表現に結合すると、Protocol の版更新が Core 内部モデルへ波及するため。
-- `SourceLocation` は graph package が自前の値型として定義し、`protocol` package の型を再利用しない (2026-07-24 改訂。旧決定は protocol 型の再利用だったが、domain 層から wire 表現への import をゼロにする層規約 [ADR-0007](../../../adr/0007-layered-architecture-refactor.md) に伴い改訂。wire 型との重複定義は境界隔離のコストとして許容する。決定経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))。
+- `SourceLocation` は graph package が自前の値型として定義し、`protocol` package の型を再利用しない。domain 層から wire 表現への import をゼロにするためであり、wire 型との重複定義は境界隔離のコストとして受け入れる (判断の正本は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md))。
 - `sourceLocation` / `callSite` は Protocol 上 optional であり、graph でも nil を許容する。表示時の省略規則は consumer (output feature doc) が定める。
-- `methodSymbol.metadata` / `callEdge.metadata` は Graph が所有する opaque 属性として nested map / array を含め deep copy する (`Symbol.Metadata` / `Edge.Metadata`)。Graph / Traversal は値の意味を解釈しない。JSON 出力へは opaque なまま透過表出する (表出の正本は [output feature doc](../output/DesignDoc_output.md)。[issue #22](https://github.com/Fukuemon/depwalk/issues/22) で決定)。console 等それ以外の既存出力表現には自動では表出しない。bytecode-only symbol のように `sourceLocation` がない node も有効であり、owner の source anchor は metadata と sourceLocation を混同しない。
+- `methodSymbol.metadata` / `callEdge.metadata` は Graph が所有する opaque 属性として nested map / array を含め deep copy する (`Symbol.Metadata` / `Edge.Metadata`)。Graph / Traversal は値の意味を解釈しない。**metadata を持たない record は nil、明示的に空オブジェクトを持つ record は空 map** として区別して保持する (この差は JSON 出力に現れる)。JSON 出力へは opaque なまま透過表出する (表出の正本は [output feature doc](../output/DesignDoc_output.md))。console 等それ以外の既存出力表現には自動では表出しない。bytecode-only symbol のように `sourceLocation` がない node も有効であり、owner の source anchor は metadata と sourceLocation を混同しない。
 
 ### 構築と公開の原子性
 
 Analyze Use Case は valid な `methodSymbol` / `callEdge` を受領順に (ACL が graph 値型へ変換したものを) request 専用の **非公開 staging Graph** へ登録する。wire DTO 全件や Analyzer 側の全 graph を別途 buffer しない。Analyzer が exit `0` で終了し、fatal record がなく、stream 全体で全 edge の caller / callee 参照が揃った場合だけ staging Graph と diagnostic を公開する。
 
-検査と公開判断の担当は分かれる: stream の **参照完全性検査は ACL (`protocol`)** が行い (wire record を見る責務であり、結果は port の outcome として返す)、その結果と process 状態から **公開するかどうかを決めるのは Analyze Use Case** である (判断の正本は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md)、経緯は [issue #32](https://github.com/Fukuemon/depwalk/issues/32))。
+検査と公開判断の担当は分かれる。stream の **参照完全性検査は ACL (`protocol`)** が行う。wire record を見る責務であり、結果は port の outcome として返す。その結果と process 状態から **公開するかどうかを決めるのは Analyze Use Case** である (判断の正本は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md))。
 
 valid `error`、非ゼロ exit、stdout の parse / schema error の場合は参照完全性の成立を要求せず、staging Graph と先行 diagnostic をすべて破棄する。Graph Engine の公開 API から request の部分結果は観測できない。
 
