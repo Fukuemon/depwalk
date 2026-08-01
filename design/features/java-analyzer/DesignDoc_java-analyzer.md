@@ -8,7 +8,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: 906d77a
+verified_commit: 2d82ed3
 ---
 
 # Feature 設計: Java Analyzer
@@ -25,22 +25,24 @@ Java の静的解析に固有の語が多いため、先に整理する。
 
 Java のソースから「どのメソッドがどのメソッドを呼んでいるか」を出すには、3 段階を踏む。
 
-| 段                | やること                                                                               | 使うもの                       |
-| ----------------- | -------------------------------------------------------------------------------------- | ------------------------------ |
-| 1. 構文を読む     | ソースを構文木 (AST) にする。「ここにメソッド呼び出しがある」まで分かる                | **JavaParser**                 |
-| 2. 型を決める     | その呼び出しが**どの型の**どのメソッドか決める。`user.save()` の `user` が何型かを解く | **SymbolSolver**               |
-| 3. 実装候補を絞る | interface 越しの呼び出しについて、実装クラスの候補を挙げる                             | **SootUp** / Spring の DI 情報 |
+| 段                | やること                                                                               | 使うもの                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1. 構文を読む     | ソースを構文木 (AST) にする。「ここにメソッド呼び出しがある」まで分かる                | **[JavaParser](https://javaparser.org/)**                                   |
+| 2. 型を決める     | その呼び出しが**どの型の**どのメソッドか決める。`user.save()` の `user` が何型かを解く | **SymbolSolver** (JavaParser の `javaparser-symbol-solver-core`)            |
+| 3. 実装候補を絞る | interface 越しの呼び出しについて、実装クラスの候補を挙げる                             | **[SootUp](https://soot-oss.github.io/SootUp/latest/)** / Spring の DI 情報 |
 
 2 が解けないと呼び出し先が特定できず、edge を出せない。**この doc の大半は「2 と 3 をどこまで、どう解くか」の規則**である。
 
+SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的解析基盤だが、depwalk は**型階層と override / interface 実装候補の索引としてのみ使う**。call graph の生成は委譲しない (判断の正本は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。
+
 ### 型解決に必要な入力
 
-| 語                    | 意味                                                                                                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **classpath**         | 型を解決するために参照する場所の一覧。依存ライブラリの jar と、コンパイル済みクラスの置き場からなる                                                                        |
-| **classes directory** | コンパイル済みの `.class` ファイルが置かれるディレクトリ (Gradle なら `build/classes/java/main`)。**classes output** も同じものを指す                                      |
-| **bytecode member**   | ソースには現れないが `.class` には存在するメソッドやコンストラクタ。Lombok が生成する getter / コンストラクタが典型。ソースだけ見ても分からないため、`.class` を読んで補う |
-| **source root**       | 解析対象のソースが置かれたディレクトリ (`src/main/java` 等)                                                                                                                |
+| 語                    | 意味                                                                                                                                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **classpath**         | 型を解決するために参照する場所の一覧。依存ライブラリの jar と、コンパイル済みクラスの置き場からなる ([JDK の `--class-path`](https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html))                            |
+| **classes directory** | コンパイル済みの `.class` ファイルが置かれるディレクトリ (Gradle なら `build/classes/java/main`)。**classes output** も同じものを指す                                                                                        |
+| **bytecode member**   | ソースには現れないが `.class` には存在するメソッドやコンストラクタ。[Lombok が生成する](https://projectlombok.org/features/constructor) getter / コンストラクタが典型。ソースだけ見ても分からないため、`.class` を読んで補う |
+| **source root**       | 解析対象のソースが置かれたディレクトリ (`src/main/java` 等)                                                                                                                                                                  |
 
 依存ライブラリのソースは手元にないため、型解決は `.class` を読んで行う。classpath が欠けると「型が分からない」呼び出しが増え、edge が落ちる。
 
