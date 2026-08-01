@@ -5,7 +5,6 @@ description: >-
   を context/project.yml のコマンド契約から解決し、単一 module へのスコープ要否を判定する。"どう動かす" / "テストの回し方"
   / "コマンド一覧" で起動する。
 ---
-
 # Dev Commands
 
 本リポジトリで **タスクを正しいコマンドで実行する** ための入口。新しいコマンドを発明せず、[context/project.yml](../../../context/project.yml) の `commands` 契約に沿って実行する。

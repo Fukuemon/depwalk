@@ -2,7 +2,6 @@
 name: rulesync-sync
 description: AI 設定の正本 `.rulesync/` を編集し、AGENTS.md / CLAUDE.md / .codex / .claude / .cursor を全 provider 向けに再生成する。AI rule / skill / subagent の追加・変更、"AGENTS.md 更新" / "CLAUDE.md 変えて" / "rulesync" で起動する。
 ---
-
 # Rulesync Sync
 
 本リポジトリの AI 設定 (`AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/` 等) は `.rulesync/` から生成される。本 skill は **編集対象を `.rulesync/` に正しく寄せ、生成結果を検証する** ための workflow。
