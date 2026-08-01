@@ -6,12 +6,14 @@ status: 完了
 keywords: [traversal, caller, callee, depth, minDepth]
 governs:
   - core/internal/traversal
-verified_commit: unverified
+verified_commit: 9b9d79d
 ---
 
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本であり、決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
+Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
+
+本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本である。決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
 
 ## メタ
 
@@ -26,7 +28,9 @@ Traversal Engine の durable な feature 設計正本。Graph Engine が保持�
 
 ## 背景・要件解釈
 
-depwalk の Phase1 は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件 (S1 / S2) にしている。Analyzer Protocol / SPI (analyzer-protocol feature) が Core 側に `methodSymbol` / `callEdge` を渡せる境界を提供した後、Graph Engine が構築した呼び出しグラフを入力に、Traversal Engine が caller / callee 方向へ到達集合を計算する。
+depwalk の Phase1 は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件 (S1 / S2) にしている。
+
+この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI (analyzer-protocol feature) が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
 
 本 feature は Design Doc の Open Question Q4「循環呼び出し・再帰の探索打ち切り条件」を解き、探索 API、探索結果モデル、循環 / 深さ上限の意味論を確定する。
 
@@ -35,7 +39,7 @@ depwalk の Phase1 は、指定メソッドの caller / callee を探索し、�
 ### やること
 
 - caller 方向 / callee 方向の探索 API を提供する。
-- 探索方向、起点メソッド、深さ上限、探索順序 (BFS / DFS) を受け取る。
+- 探索方向、起点メソッド、深さ上限、探索順序 (BFS / DFS) を受け取る。探索順序は受け付けて検証するだけで、結果にも探索の実行にも影響しない (下記「探索順序の位置づけ」)。
 - 循環呼び出し / 再帰を検出し、無限ループせず観測可能な形で結果に含める。
 - 深さ上限到達を検出し、打ち切り情報を結果に含める。
 - Graph Engine が公開する読み取り API 経由で探索する (Graph の内部構造に依存しない)。
@@ -73,6 +77,14 @@ Traversal は起点 method ID、方向 (`caller` / `callee`)、深さ上限 (任
 呼び出しグラフでは、共有メソッドが複数箇所から呼ばれる合流構造が一般的である。探索木 edge 方式 (実際に辿った edge のみを結果に含める) では、この合流構造において BFS / DFS の選択によってどの edge が結果に残るかが変わってしまい、かつ循環していない合流 edge を誤って循環と標識してしまう。誘導部分グラフ + SCC 判定による定義は、この両方の問題を構造的に解消する。
 
 訪問済み node 管理 (再展開の抑止) は無限ループ防止のための内部実装機構であり、結果契約には現れない。
+
+#### 探索順序の位置づけ
+
+探索順序 (`bfs` / `dfs`) は request が受け取るが、**探索の実行にも結果にも影響しない**。到達集合はグラフの性質として定義されており、その計算には最短距離の走査 1 本があれば足りるためである。順序の指定は値として妥当かどうかだけ検証し、不正なら error にする。
+
+BFS / DFS の走査そのものは実装に存在するが、現時点ではどの本番経路からも呼ばれていない。将来 Console の tree 出力のように順序付き展開を要する consumer が現れたときのために残してある。
+
+したがって「順序を変えても結果が同じ」は、2 通りの走査を比べた結果ではなく、**そもそも走査が 1 本しかないこと**から従う。
 
 ### 画面・デザイン
 
@@ -142,7 +154,8 @@ sequenceDiagram
 横断規約は [context/testing.md](../../../context/testing.md)。本 feature 固有の観点を記す。
 
 - caller / callee 方向で既知の呼び出し元 / 呼び出し先集合を返せること。
-- 探索順序未指定時に内部訪問順序が BFS になること (到達集合自体の順序は検証しない。white-box test で検証)。
+- 探索順序の走査そのものが、未指定時に BFS、`dfs` 指定時に DFS の訪問順を返すこと (本番経路からは呼ばれないため white-box test で検証する)。
+- 不正な request (未知の探索方向、負の深さ上限、未知の探索順序) が探索を実行せず error になること。
 - 自己再帰 / 相互再帰 (SCC) を含む graph で、閉路を構成する edge が `cycle` 注釈を持ちつつ到達 edge 集合にも含まれること。
 - 合流 (ダイヤモンド型) graph で、同一 node への複数経路の edge がすべて到達 edge 集合に含まれ、`cycle` と誤標識されないこと。
 - BFS / DFS のどちらを指定しても、到達 node / edge 集合・`cycle` 注釈・`depthLimit` cutoff の内容が同一であること (順序非依存性)。
