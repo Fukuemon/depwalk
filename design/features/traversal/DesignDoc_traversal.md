@@ -13,26 +13,15 @@ verified_commit: 9b9d79d
 
 Traversal Engine の durable な feature 設計正本。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
 
-本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本である。決定経緯は [issue #6](https://github.com/Fukuemon/depwalk/issues/6) と関連 PR を参照する。
-
-## メタ
-
-| 項目           | 値                                                                                                                                                                                                  |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 関連 PRD 要求  | 統合モードのため [DesignDoc の Why / What](../../DesignDoc.md#提供価値--成功条件-what)                                                                                                              |
-| 関連 DesignDoc | [成功条件 S1/S2](../../DesignDoc.md#提供価値--成功条件-what)、[モジュール責務 Traversal Engine](../../DesignDoc.md#モジュール責務)、[Open Questions Q4](../../DesignDoc.md#open-questions-未決事項) |
-| 関連 context   | [architecture](../../../context/architecture.md)、[testing](../../../context/testing.md)、[toolchain](../../../context/toolchain.md)、[engineering](../../../context/engineering.md)                |
-| 関連 ADR       | [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md)、[ADR-0002](../../../adr/0002-core-implementation-foundation.md)                                                                       |
-| 関連 issue     | [#6](https://github.com/Fukuemon/depwalk/issues/6)                                                                                                                                                  |
-| 対象モジュール | `traversal` (`core` から呼び出される)                                                                                                                                                               |
+本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本である。全体像は [DesignDoc](../../DesignDoc.md)、Core の package 境界は [architecture](../../../context/architecture.md) を参照する。
 
 ## 背景・要件解釈
 
-depwalk の Phase1 は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件 (S1 / S2) にしている。
+depwalk は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件 (S1 / S2) にしている。
 
 この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI (analyzer-protocol feature) が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
 
-本 feature は Design Doc の Open Question Q4「循環呼び出し・再帰の探索打ち切り条件」を解き、探索 API、探索結果モデル、循環 / 深さ上限の意味論を確定する。
+循環呼び出し・再帰の打ち切り条件は本 doc が定める。探索 API、探索結果モデル、循環 / 深さ上限の意味論はいずれも本 doc を正本とする。
 
 ## スコープ
 
@@ -58,18 +47,18 @@ depwalk の Phase1 は、指定メソッドの caller / callee を探索し、�
 
 Traversal は起点 method ID、方向 (`caller` / `callee`)、深さ上限 (任意)、探索順序 (`bfs` / `dfs`、未指定時 `bfs`) を受け取り、到達 node 集合、到達 edge 集合、status、`cycle` 注釈、`depthLimit` cutoff を返す。
 
-| 概念              | 主な field / 値                                                                                                                        | 備考                                                                                                                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Traversal request | 起点 method ID、方向、深さ上限 (任意、未指定時は無制限)、探索順序 (未指定時は `bfs`)                                                   | CLI 引数名は [CLI feature doc](../cli/DesignDoc_cli.md) が定める                                                                                                                         |
-| Traversal result  | 到達 node 集合 (**node ごとの `minDepth` を保持**)、到達 edge 集合、status (`ok` / `startNotFound`)、`cycle` 注釈、`depthLimit` cutoff | Output Engine が consumer。tree は保持しない。到達 node / edge 集合は順序を保証しない。`minDepth` の公開は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) による additive 拡張 |
-| Cycle 注釈        | 対象 edge の集合                                                                                                                       | 到達部分グラフ内で閉路を構成する edge (self-loop、または同一 SCC 内の edge)。**到達 edge 集合にも含まれる** (呼び出し関係として実在するため除外しない)                                   |
-| DepthLimit cutoff | 対象 edge の集合、接続先 node の minDepth                                                                                              | 到達 node から `minDepth > maxDepth` の node への edge。**到達 edge 集合には含まれない**。対象は edge のみで node 自体は cutoff 対象にしない                                             |
+| 概念              | 主な field / 値                                                                                                                        | 備考                                                                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Traversal request | 起点 method ID、方向、深さ上限 (任意、未指定時は無制限)、探索順序 (未指定時は `bfs`)                                                   | CLI 引数名は [CLI feature doc](../cli/DesignDoc_cli.md) が定める                                                                                       |
+| Traversal result  | 到達 node 集合 (**node ごとの `minDepth` を保持**)、到達 edge 集合、status (`ok` / `startNotFound`)、`cycle` 注釈、`depthLimit` cutoff | Output Engine が consumer。tree は保持しない。到達 node / edge 集合は順序を保証しない                                                                  |
+| Cycle 注釈        | 対象 edge の集合                                                                                                                       | 到達部分グラフ内で閉路を構成する edge (self-loop、または同一 SCC 内の edge)。**到達 edge 集合にも含まれる** (呼び出し関係として実在するため除外しない) |
+| DepthLimit cutoff | 対象 edge の集合、接続先 node の minDepth                                                                                              | 到達 node から `minDepth > maxDepth` の node への edge。**到達 edge 集合には含まれない**。対象は edge のみで node 自体は cutoff 対象にしない           |
 
 #### 到達集合の定義
 
 結果は探索の副産物 (どの edge を辿ったか) ではなく、グラフの性質として定義する。これにより結果は探索順序 (BFS / DFS) に一切依存せず決定的になる。
 
-- **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 (複数経路で同一 node へ到達するダイヤモンド型構造) がある場合、最短の距離を採る。**Traversal result は到達 node ごとの minDepth を公開する** (consumer の JSON 出力が利用する。到達判定の内部値と同一であり、到達集合 / `cycle` / `depthLimit` の意味論は変えない — [issue #7](https://github.com/Fukuemon/depwalk/issues/7) の additive 拡張)。
+- **minDepth**: 起点から探索方向に沿った最短距離。起点自身は 0。合流 (複数経路で同一 node へ到達するダイヤモンド型構造) がある場合、最短の距離を採る。**Traversal result は到達 node ごとの minDepth を公開する**。consumer の JSON 出力が利用する。公開する値は到達判定に使う内部値と同一であり、到達集合 / `cycle` / `depthLimit` の意味論には影響しない。
 - **到達 node 集合**: `minDepth <= maxDepth` を満たす node (maxDepth 未指定時は全到達可能 node)。起点を含む。
 - **到達 edge 集合**: 両端が到達 node 集合に属する、探索方向に沿った全 edge (誘導部分グラフ)。合流 edge も `cycle` 注釈付き edge も含む。
 - **`maxDepth=0`**: 起点 node のみを到達集合に含み、起点の隣接 edge は `depthLimit` cutoff になる。ただし起点自身への self-loop は両端が到達 node のため、誘導 edge (+ `cycle` 注釈) として到達 edge 集合に残る (誘導部分グラフ定義からの帰結)。
@@ -164,18 +153,3 @@ sequenceDiagram
 - 到達 node ごとに公開される `minDepth` が起点からの最短距離に一致すること (合流 graph で最短経路側の値を採ること)。
 - 起点メソッドが存在しない場合、および Graph が空の場合に panic せず空結果 + `startNotFound` status を返すこと。
 - Traversal が Analyzer 実装や Output format に依存しないこと。
-
-## 上位資料からの変更点
-
-| 対象資料  | 変更種別 (継承 / 追記 / 変更提案) | 内容                                                                                                                   |
-| --------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| PRD       | 継承                              | 統合モードのため DesignDoc の Why / What を参照                                                                        |
-| DesignDoc | 追記                              | Open Questions Q4 を解決済みへ更新 (本 doc を正本として参照)。成功条件 S1/S2 の測定方法に Traversal 層照合の補足を追加 |
-| context   | 追記                              | `context/testing.md` E2E (照合) 行に、S1/S2 が Traversal 層照合 (本 doc 正本) と CLI 出力照合の 2 層からなる旨を追記   |
-| ADR       | 継承                              | ADR-0001 (Protocol/Model 境界) / ADR-0002 (Core package 境界) の範囲内。新規 ADR 不要                                  |
-
-## 変更履歴
-
-frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
-
-- 2026-07-26: 2026-07-11: [issue #7](https://github.com/Fukuemon/depwalk/issues/7) により Traversal result へ node ごとの `minDepth` 公開を additive 追加
