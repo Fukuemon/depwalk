@@ -1,6 +1,7 @@
 ---
 type: context
 title: Toolchain
+description: 標準 toolchain と build 構成、Gradle discovery の互換 matrix
 keywords: [toolchain, mise, Go, Gradle, JDK, build, scaffold]
 governs:
   - mise.toml
