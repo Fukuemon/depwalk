@@ -1,6 +1,20 @@
-# Toolchain
+---
+type: context
+title: Toolchain
+keywords: [toolchain, mise, Go, Gradle, JDK, build, scaffold]
+governs:
+  - mise.toml
+  - core/go.mod
+  - analyzers/java/build.gradle.kts
+  - analyzers/java/settings.gradle.kts
+  # 本書が正本として記録する値の出所。provider の Gradle API baseline /
+  # Java release は model-provider 側、同梱 Gradle の版は wrapper が持つ。
+  - analyzers/java/model-provider/build.gradle.kts
+  - analyzers/java/gradle/wrapper/gradle-wrapper.properties
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26
+# Toolchain
 
 採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
 
