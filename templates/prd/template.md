@@ -1,6 +1,18 @@
-# <プロダクト / 機能名> PRD
+---
+type: prd
+title: <文書名>
+description: <索引に出す 1 行説明。何が書いてあるかを具体的に>
+status: ドラフト | レビュー中 | 確定
+keywords: [<検索の手掛かり>, <API 名>, <用語>]
+governs:
+  # この文書が語る契約の実装場所。コードだけでなく設定ファイルでもよい。
+  # 鮮度検査の対象外にするなら governs と verified_commit の両方を消す。
+  - <path/to/impl>
+# 最後に実装と突き合わせた commit。未確認なら unverified のままにする。
+verified_commit: unverified
+---
 
-> 最終更新: YYYY-MM-DD / Status: ドラフト | レビュー中 | 確定
+# <プロダクト / 機能名> PRD
 
 PRD は **Why / What** を扱う。「誰のどの課題を、なぜ・何で解決するか」を確定し、How (実現方法) は [Design Doc](../design/DesignDoc.md) と [context/](../context/) へ委譲する。
 

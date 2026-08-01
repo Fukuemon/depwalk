@@ -1,6 +1,15 @@
-# Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
+---
+type: feature-design
+title: "Output (Console / JSON / DOT / Mermaid)"
+description: 出力形式ごとの表示規則と、graph / traversal から View への変換契約
+status: 完了
+keywords: [output, Console, JSON, DOT, Mermaid, NodeView, EdgeView]
+governs:
+  - core/internal/output
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-26 / Status: 完了 ([issue #22](https://github.com/Fukuemon/depwalk/issues/22) の設計で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲。#34 の実装追随で View の位置情報型を `graph.SourceLocation` へ更新し、`Write` の呼び出し元を CLI 層へ、formatter interface を package 内へ移した — JSON 出力のフィールド名は output 側の serialization view で不変)
+# Feature 設計: Output (Console / JSON / DOT / Mermaid 出力)
 
 Output Engine の durable な feature 設計正本。Traversal result (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を入力に、Console / JSON / DOT / Mermaid の各形式へ変換する出力契約を定義する。本 doc は **公開 entry point / Formatter・View 構造 / Console ツリー表現 (Design Doc Open Question Q3 の解) / JSON schema と版管理 / DOT・Mermaid の I/F 要件 / エラー境界** の正本であり、決定経緯は [issue #7](https://github.com/Fukuemon/depwalk/issues/7) と関連 PR を参照する。
 
@@ -418,3 +427,9 @@ sequenceDiagram
 | context                                                    | 追記                              | `context/architecture.md` に Output → Traversal 依存を追加。`context/testing.md` に S3 の 2 層照合と package-local `testdata/` を補足                              |
 | ADR                                                        | 継承                              | ADR-0001 / ADR-0002 の範囲内。新規 ADR 不要 (出力 schema の版管理は本 doc が正本を持つ)                                                                            |
 | [issue #22](https://github.com/Fukuemon/depwalk/issues/22) | 追記                              | `NodeView`/`EdgeView` への opaque `Metadata` 追加と JSON の `nodes[].metadata`/`edges[].metadata` (additive、omitempty)、`RegisteredFormats()` の公開 API 化を反映 |
+
+## 変更履歴
+
+frontmatter は現在の状態のみを持つ。改訂の経緯は本節に残す。
+
+- 2026-07-26: [issue #22](https://github.com/Fukuemon/depwalk/issues/22) の設計で NodeView/EdgeView の Metadata 透過と `RegisteredFormats()` 公開を追加。実 OSS 検証で Console ラベルと実 Protocol signature の不整合を検出し、Issue #22 の対応として修正。DOT / Mermaid の具体構文のみ Phase4 spec へ委譲。#34 の実装追随で View の位置情報型を `graph.SourceLocation` へ更新し、`Write` の呼び出し元を CLI 層へ、formatter interface を package 内へ移した — JSON 出力のフィールド名は output 側の serialization view で不変

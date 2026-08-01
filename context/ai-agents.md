@@ -1,6 +1,14 @@
-# AI Agents Registry
+---
+type: context
+title: "AI Agents Registry"
+description: 非対話 CLI エージェントの invocation / routing / timeout 契約
+keywords: [AI agent, Codex, Claude, Cursor, orchestrate]
+governs:
+  - .claude/agents
+verified_commit: unverified
+---
 
-> 最終更新: 2026-07-01
+# AI Agents Registry
 
 非対話で呼び出せる CLI エージェント (Codex / Claude / Cursor 等) の **唯一の正本**。`agent-orchestrate` / `multi-agent-review` skill は、CLI 名・モデル・flag をハードコードせず本ファイルを読む。スキーマの説明は `agent-orchestrate/references/agent-registry-schema.md` を参照する。
 

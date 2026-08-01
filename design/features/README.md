@@ -11,7 +11,12 @@ frontmatter を持たない feature doc はまだ載らない ([issue #40](https
 
 <!-- BEGIN GENERATED: features-index (scripts/reading-map.sh が更新する。手編集しない) -->
 
+- [analyzer-protocol/DesignDoc_analyzer-protocol.md](analyzer-protocol/DesignDoc_analyzer-protocol.md) — Core と Analyzer をつなぐ JSONL wire schema・SPI・失敗時の契約
+- [cli/DesignDoc_cli.md](cli/DesignDoc_cli.md) — analyze コマンドの flag 体系と、Core への配線・入力検証の契約
 - [graph/DesignDoc_graph.md](graph/DesignDoc_graph.md) — node / edge が持つ属性と、wire record → graph 値型の変換契約・公開の原子性
+- [java-analyzer/DesignDoc_java-analyzer.md](java-analyzer/DesignDoc_java-analyzer.md) — Java/Spring 解析の内部構成と、SootUp / Gradle Tooling API / JavaParser の隔離境界
+- [output/DesignDoc_output.md](output/DesignDoc_output.md) — 出力形式ごとの表示規則と、graph / traversal から View への変換契約
+- [traversal/DesignDoc_traversal.md](traversal/DesignDoc_traversal.md) — 呼び出しグラフの探索意味論と、深さ・訪問順・結果構造の契約
 
 <!-- END GENERATED: features-index -->
 
