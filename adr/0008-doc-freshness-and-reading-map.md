@@ -289,7 +289,7 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 
 - [ADR-0007](0007-layered-architecture-refactor.md): 生成 + drift 検査パターンの初出 (`scripts/depgraph.sh`)
 - [context/README.md](../context/README.md): 改訂対象の Freshness 契約
-- [context/impact-index.yaml](../context/impact-index.yaml): 生成物化と `context/reading-map.yaml` への改名の対象
+- [context/reading-map.yaml](../context/reading-map.yaml): 生成物化と改名の結果 (旧 `context/impact-index.yaml`)
 - [design/DesignDoc.md](../design/DesignDoc.md)
 - issue / PR:
   - [#40](https://github.com/Fukuemon/depwalk/issues/40): 文書再編成。frontmatter 化と `reading-map.yaml` への改名を取り込む

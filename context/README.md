@@ -13,15 +13,15 @@ keywords: [context, 規約, 索引]
 
 ## 位置づけ
 
-| 層              | 文書                                          | 役割                                               |
-| --------------- | --------------------------------------------- | -------------------------------------------------- |
-| Why / What      | [PRD.md](../PRD.md) (統合時は DesignDoc)      | 誰のどの課題を、なぜ・何で解決するか               |
-| How (全体像)    | [design/DesignDoc.md](../design/DesignDoc.md) | system landscape / モジュール責務 / 横断方針       |
-| How (feature)   | [design/features/](../design/features/)       | feature 単位の設計 (データ構造・画面・フロー)      |
-| How (規約/契約) | **context/** (本ライブラリ)                   | 技術スタック規約・codebase architecture・運用契約  |
-| 固有値          | [project.yml](project.yml)                    | repo / 命名 / コマンド / 対象ドメイン / トラッカー |
-| 意思決定        | [adr/](../adr/)                               | 長期参照する技術選定・境界の確定                   |
-| 作業文書        | [specs/](../specs/)                           | issue / 機能単位の要求・設計・テスト観点           |
+| 層              | 文書                                                           | 役割                                               |
+| --------------- | -------------------------------------------------------------- | -------------------------------------------------- |
+| Why / What      | [design/DesignDoc.md](../design/DesignDoc.md) の Why / What 節 | 誰のどの課題を、なぜ・何で解決するか               |
+| How (全体像)    | [design/DesignDoc.md](../design/DesignDoc.md)                  | system landscape / モジュール責務 / 横断方針       |
+| How (feature)   | [design/features/](../design/features/)                        | feature 単位の設計 (データ構造・画面・フロー)      |
+| How (規約/契約) | **context/** (本ライブラリ)                                    | 技術スタック規約・codebase architecture・運用契約  |
+| 固有値          | [project.yml](project.yml)                                     | repo / 命名 / コマンド / 対象ドメイン / トラッカー |
+| 意思決定        | [adr/](../adr/)                                                | 長期参照する技術選定・境界の確定                   |
+| 作業文書        | [specs/](../specs/)                                            | issue / 機能単位の要求・設計・テスト観点           |
 
 ## ファイル一覧
 
