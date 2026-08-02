@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Normalize .codex/config.toml so Codex can read the checked-out workspace.
+# Codex が checkout 済み workspace を読めるよう .codex/config.toml を正規化する。
 #
-# Why: `rulesync generate` currently emits `default_permissions = "rulesync"`
-# and a generated `[permissions.rulesync.filesystem]` profile with only
-# `":minimal" = "read"`. In Codex Desktop this can make the repository path
-# visible as the cwd while blocking reads for normal project files such as
-# specs/, context/, design/, and .rulesync/.
+# `rulesync generate` は現状 `default_permissions = "rulesync"` と、
+# `":minimal" = "read"` だけを持つ `[permissions.rulesync.filesystem]` profile を
+# 出力する。Codex Desktop ではこの組み合わせにより、repository path は cwd として
+# 見えているのに specs/ / context/ / design/ / .rulesync/ といった通常の
+# プロジェクトファイルの読み取りが塞がれることがある。
 #
-# Run this AFTER `npx rulesync@latest generate`. Idempotent.
+# `npx rulesync@latest generate` の**後**に実行する。冪等。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
