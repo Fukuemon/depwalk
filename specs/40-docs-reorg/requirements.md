@@ -142,7 +142,7 @@
 | 5   | 削除された close 済み spec           | 必須 | 10 ディレクトリ                             |
 | 6   | 文書リンクの機械検査                 | 任意 | 導入コストが見合う場合のみ quality gate へ  |
 | 7   | frontmatter を持つ文書 14 本         | 必須 | `> 最終更新` ヘッダは廃止 (ADR-0008)        |
-| 8   | frontmatter を持つ `templates/` 9 本 | 必須 | 新規文書が最初から規約に乗るようにする      |
+| 8   | frontmatter を持つ `templates/` 8 本 | 必須 | 新規文書が最初から規約に乗るようにする      |
 | 9   | `context/reading-map.yaml`           | 必須 | 改名のみ。中身は後続 issue の生成器が埋める |
 
 ## 例外シナリオ
@@ -213,7 +213,7 @@
 8. THE SYSTEM SHALL 文書の本文に 140 文字を超える一文を持たない (表・コードブロック・引用を除く)。
 9. WHERE 硬い専門語 (「正本」等) を用いる場合、THE SYSTEM SHALL その語の定義を用語集または初出箇所で示す。
 10. IF 推敲によって記述している判断・制約・契約の意味が変わった場合、THEN THE SYSTEM SHALL その変更を推敲とは別の変更として切り出し、レビューで判別できる状態にする。
-11. THE SYSTEM SHALL 鮮度検査の対象文書 14 本と `templates/` 9 本に、ADR-0008 が定める frontmatter を持たせ、手書きの `> 最終更新: YYYY-MM-DD` ヘッダを 1 件も残さない。
+11. THE SYSTEM SHALL 鮮度検査の対象文書 17 本と `templates/` 8 本に、ADR-0008 が定める frontmatter を持たせ、手書きの `> 最終更新: YYYY-MM-DD` ヘッダを 1 件も残さない。
 12. WHERE 文書がまだ実装との突き合わせを経ていない場合、THE SYSTEM SHALL `verified_commit: unverified` を設定し、実装と突き合わせた文書と区別できる状態にする。
 13. THE SYSTEM SHALL `context/impact-index.yaml` を `context/reading-map.yaml` へ改名し、旧名への参照をリポジトリ内に残さない。
 

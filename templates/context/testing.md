@@ -13,7 +13,7 @@ verified_commit: unverified
 
 # Testing Conventions
 
-テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.md](project.md)。
+テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.yml](project.yml)。
 
 ## テスト責務の分担
 

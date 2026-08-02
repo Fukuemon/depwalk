@@ -13,14 +13,14 @@ globs: **/*
 
 | 情報                                  | 正本                                                                       |
 | ------------------------------------- | -------------------------------------------------------------------------- |
-| プロダクト要求 (Why / What)           | [PRD.md](PRD.md) — 統合モードでは Design Doc の Why/What 節                |
+| プロダクト要求 (Why / What)           | `PRD.md` — 統合モードでは Design Doc の Why/What 節 (この場合 `PRD.md` は作らない) |
 | 全体像 / モジュール責務 (How)         | [design/DesignDoc.md](design/DesignDoc.md)                                 |
 | feature 単位の設計                    | [design/features/](design/features/)                                       |
 | 技術規約 / architecture / 運用契約    | [context/](context/) — 固有値は [context/project.yml](context/project.yml) |
 | 意思決定                              | [adr/](adr/)                                                               |
 | issue 単位の作業文書 (close 時に削除) | [specs/](specs/)                                                           |
-| 開発プロセス (skill 連鎖) の俯瞰図    | [architecture.md](architecture.md)                                         |
-| skill / rule 著作の判断記録           | [decisions.md](decisions.md)                                               |
+| 開発プロセス (skill 連鎖) の俯瞰図    | `architecture.md` (sdd-template repo 側にのみ存在)                         |
+| skill / rule 著作の判断記録           | `decisions.md` (sdd-template repo 側にのみ存在)                            |
 
 迷ったら **PRD (or 統合 DesignDoc の Why/What) → Design Doc → feature doc / context → ADR → spec** の順に読む。本 contract と内容が衝突したら **Design Doc が正**。
 
