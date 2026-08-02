@@ -9,50 +9,45 @@ import (
 	"os/exec"
 )
 
-// Command describes the Analyzer process invocation.
+// Command は Analyzer process の起動方法を表す。
 type Command struct {
-	// Path is the executable path.
 	Path string
-	// Args are command-line arguments passed to Path.
 	Args []string
-	// Dir is the optional working directory.
-	Dir string
-	// Stderr optionally receives the Analyzer stderr stream as it arrives,
-	// without interpretation. Core never parses Analyzer stderr as protocol
-	// data. When nil, stderr is only captured into [Result.Stderr].
+	Dir  string
+	// Stderr は Analyzer の stderr を届いた順にそのまま渡す先 (optional)。
+	// Core は stderr を protocol データとして解釈しない。
+	// nil のときは [Result.Stderr] に溜めるだけになる。
 	Stderr io.Writer
 }
 
-// Runner starts one Analyzer process for one analysis request.
+// Runner は解析要求 1 件につき Analyzer process を 1 つ起動する。
 type Runner struct {
 	command Command
 }
 
-// New returns a Runner for command.
 func New(command Command) Runner {
 	return Runner{command: command}
 }
 
-// Result contains process status returned by an Analyzer process. Stdout
-// content is not buffered here; it is handed to the onLine callback of
-// [Runner.Run] one line at a time, as it arrives.
+// Result は Analyzer process の終了状態。
+//
+// stdout の内容はここに溜めない。[Runner.Run] の onLine へ 1 行ずつ届いた順に
+// 渡す。全部読み終えてから返すと、大きな graph で待ち時間とメモリが膨らむため。
 type Result struct {
-	// ExitCode is the Analyzer process exit code.
 	ExitCode int
-	// Stderr is the raw Analyzer stderr output.
-	Stderr string
-	// ReadError is the first stdout read failure, if any. Lines received
-	// before the failure were already handed to onLine; reading stops at
-	// the failure.
+	Stderr   string
+	// ReadError は stdout の最初の読み取り失敗 (あれば)。
+	// 失敗前に届いた行は既に onLine へ渡してある。読み取りはそこで止まる。
 	ReadError error
 }
 
-// Run starts an Analyzer process, writes input to its stdin, and streams
-// stdout to onLine one line at a time (delimiter included; a trailing
-// unterminated line is delivered as-is) until EOF. onLine may be nil when
-// the caller does not consume stdout. The payload is opaque to this
-// package: composing the request line and interpreting stdout lines are
-// the protocol package's responsibility.
+// Run は Analyzer process を起動し、stdin へ input を書き、stdout を EOF まで
+// 1 行ずつ onLine へ流す (区切り文字を含む。終端のない最後の行はそのまま渡す)。
+// stdout を使わない呼び出し側は onLine に nil を渡してよい。
+//
+// 中身は本 package にとって opaque である。要求行の組み立ても stdout の解釈も
+// protocol package の責務であり、ここに持ち込むと process 制御と wire 表現が
+// 混ざる。
 func (r Runner) Run(input []byte, onLine func(line []byte)) (Result, error) {
 	var result Result
 	if r.command.Path == "" {
@@ -87,17 +82,15 @@ func (r Runner) Run(input []byte, onLine func(line []byte)) (Result, error) {
 			source = io.TeeReader(stderr, r.command.Stderr)
 		}
 		if _, err := buf.ReadFrom(source); err != nil {
-			// Stopping the drain on a forwarding failure would fill the pipe
-			// and keep the Analyzer from exiting, so read on to EOF without
-			// forwarding.
+			// 転送に失敗しても読み捨てを続ける。ここで読むのをやめると pipe が
+			// 詰まり、Analyzer が終了できなくなる。
 			_, _ = buf.ReadFrom(stderr)
 		}
 		stderrDone <- buf.Bytes()
 	}()
 
-	// finish drains stderr to EOF before calling Wait so the pipe is fully
-	// read when the process handle is released (os/exec requires reads to
-	// complete before Wait) and no trailing stderr output is lost.
+	// finish は Wait の前に stderr を EOF まで読み切る。os/exec が Wait 前の
+	// 読み切りを要求しており、怠ると末尾の stderr が失われる。
 	finish := func() error {
 		result.Stderr = string(<-stderrDone)
 		waitErr := cmd.Wait()
@@ -126,8 +119,8 @@ func (r Runner) Run(input []byte, onLine func(line []byte)) (Result, error) {
 	return result, nil
 }
 
-// readStdout streams stdout to onLine one line at a time and returns the
-// first non-EOF read failure, at which point reading stops.
+// readStdout は stdout を 1 行ずつ onLine へ流し、最初の読み取り失敗を返す。
+// 失敗した時点で読み取りを止める。
 func readStdout(stdout io.Reader, onLine func(line []byte)) error {
 	reader := bufio.NewReader(stdout)
 	for {

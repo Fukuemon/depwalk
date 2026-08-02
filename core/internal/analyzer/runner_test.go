@@ -11,9 +11,10 @@ import (
 	"testing"
 )
 
-// runScenario runs the helper Analyzer process for one fixture scenario and
-// returns the streamed stdout lines with the process result. The payload is
-// opaque to analyzer, so tests assert on raw lines, not records.
+// runScenario は fixture のシナリオ 1 件について helper Analyzer プロセスを動かし、
+// 流れた stdout の行とプロセスの結果を返す。
+//
+// 中身は analyzer にとって opaque なので、テストは record ではなく生の行を検証する。
 func runScenario(t *testing.T, scenario string, stderr io.Writer) ([]string, Result) {
 	t.Helper()
 
@@ -82,8 +83,8 @@ func (w *failingWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("stderr forwarding failed")
 }
 
-// A failing forward writer must not truncate the capture: stderr is still
-// drained to EOF.
+// 転送先の writer が失敗しても capture は途切れないこと。stderr は EOF まで
+// 読み切られる。
 func TestRunnerDrainsStderrWhenForwardWriterFails(t *testing.T) {
 	t.Parallel()
 

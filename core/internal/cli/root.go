@@ -17,21 +17,19 @@ func newRootCommand() *cobra.Command {
 	return root
 }
 
-// Execute runs the depwalk root command against the process arguments.
-// The returned error is already rendered to stderr by Cobra; callers map it
-// to a process exit status with [ExitCode].
+// Execute はプロセス引数に対して depwalk の root command を実行する。
+// 返る error は Cobra が既に stderr へ描画済み。呼び出し側は [ExitCode] で
+// プロセスの終了状態へ写す。
 func Execute() error {
 	return newRootCommand().Execute()
 }
 
-// ExitCode maps command results to the process exit code contract: 0 on
-// success, 2 when the failure was caused by what the user supplied, and 1 for
-// every runtime failure.
+// ExitCode はコマンドの結果を exit code の契約へ写す。成功は 0、利用者が渡した
+// 値が原因の失敗は 2、それ以外の実行時失敗は 1。
 //
-// Bad input is reported by two types — one for flag values rejected here, one
-// for values the analyze use case rejects (an unknown or ambiguous method
-// selector, an invalid request). Deciding that both mean exit 2 is this
-// function's job; neither package needs to know about exit codes.
+// 入力の誤りは 2 つの型で報告される。ここで弾いた flag 値と、analyze use case が
+// 弾いた値 (未知・曖昧な method selector、不正な要求) である。両方を 2 と決める
+// のは本関数の仕事であり、どちらの package も exit code を知る必要はない。
 func ExitCode(err error) int {
 	if err == nil {
 		return 0

@@ -53,7 +53,7 @@ class RecordWriterTest {
 
         writer.write(ErrorRecord.of("JAVA_INTERNAL_ERROR", "boom"));
 
-        // flush happens inside write(); no close() call needed for the content to be observable.
+        // flush は write() の中で行われるため、内容を観測するのに close() は要らない。
         assertTrue(out.toString(StandardCharsets.UTF_8).contains("JAVA_INTERNAL_ERROR"));
     }
 

@@ -166,9 +166,9 @@ func TestParseRecordPreservesSourceRootOrder(t *testing.T) {
 	}
 }
 
-// An explicit JSON null means the same as omitting the field: it decodes
-// to a nil slice and defers to automatic discovery. Only an empty array is
-// invalid; this pins that boundary as a deliberate contract.
+// 明示的な JSON null は field を省いたのと同じ意味になる。nil slice へ復元され、
+// 自動 discovery に委ねられる。無効なのは空配列だけであり、この境界が意図した
+// 契約であることを固定する。
 func TestParseRecordTreatsNullSourceRootsAsOmitted(t *testing.T) {
 	t.Parallel()
 
@@ -266,8 +266,8 @@ func TestParseRecordRoundTripsOpaqueMetadata(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("round trip = %v, want %v", got, want)
 			}
-			// map-level comparison is blind to float64 rounding, so pin the
-			// exact decimal text of an integer beyond float64 precision.
+			// map 単位の比較は float64 の丸めを見逃す。そのため float64 の精度を
+			// 超える整数について、十進表記そのものを固定する。
 			if strings.Contains(tt.line, "9007199254740993") && !strings.Contains(string(marshaled), "9007199254740993") {
 				t.Fatalf("round trip lost integer precision: %s", marshaled)
 			}

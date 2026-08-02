@@ -7,15 +7,15 @@ import (
 )
 
 // analyzerCmdEnv is the environment variable fallback for the Analyzer
-// launch command. It lives under the DEPWALK_ namespace (ADR-0003).
+// 起動コマンドを指定する環境変数。DEPWALK_ 名前空間に置く
+// (adr/0003-analyzer-command-resolution.md)。
 const analyzerCmdEnv = "DEPWALK_ANALYZER_CMD"
 
-// resolveAnalyzerCommand resolves the Analyzer launch command string.
+// resolveAnalyzerCommand は Analyzer の起動コマンド文字列を解決する。
 //
-// Resolution order (ADR-0003): the flag value takes precedence, then the
-// DEPWALK_ANALYZER_CMD environment variable (read through getenv), and if
-// neither is set, resolution fails so the caller can reject the request
-// before starting an Analyzer process.
+// 優先順位は flag 値、次に DEPWALK_ANALYZER_CMD 環境変数 (getenv 経由)
+// (adr/0003-analyzer-command-resolution.md)。どちらも無ければ失敗させる。
+// Analyzer process を起動する前に要求を弾けるようにするためである。
 func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
@@ -28,12 +28,11 @@ func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (strin
 	return "", fmt.Errorf("analyzer command is required: set --analyzer-cmd or %s", analyzerCmdEnv)
 }
 
-// isEscapableRune reports whether r is one of the characters that a
-// backslash outside quotes may escape (space, tab, newline, single quote,
-// double quote, or another backslash). A backslash immediately followed by
-// any other rune (or by nothing, i.e. at end of input) is kept as a
-// literal backslash instead, so Windows-style paths such as
-// `C:\jdk\bin\java.exe` survive splitting unmangled.
+// isEscapableRune は r が「引用符の外で backslash が escape できる文字」かを返す
+// (空白・tab・改行・単引用符・二重引用符・backslash)。
+//
+// それ以外の文字が続く場合 (および入力末尾) の backslash はリテラルとして残す。
+// `C:\jdk\bin\java.exe` のような Windows 形式のパスを壊さずに分割するため。
 func isEscapableRune(r rune) bool {
 	switch r {
 	case ' ', '\t', '\n', '\'', '"', '\\':
@@ -43,19 +42,16 @@ func isEscapableRune(r rune) bool {
 	}
 }
 
-// splitAnalyzerCommand splits a resolved command string into argv without invoking
-// a shell (ADR-0003 rejects shell injection risk). It supports single and
-// double quoting, matching common shell-word splitting semantics for the
-// subset depwalk needs.
+// splitAnalyzerCommand は解決済みのコマンド文字列を argv へ分解する。shell は
+// 起動しない (adr/0003-analyzer-command-resolution.md が injection リスクを退けている)。
+// 単引用符と二重引用符に対応し、depwalk が要る範囲で一般的な shell の語分割に合わせる。
 //
-// Outside quotes, a backslash escapes the next character only when that
-// character is itself special (space, tab, newline, a quote, or another
-// backslash); in every other case, including at the end of the string, the
-// backslash is kept as a literal character. This lets unquoted Windows
-// absolute paths (e.g. `C:\jdk\bin\java.exe`) pass through unchanged while
-// still supporting `\ ` to escape a space and `\"` / `\'` to escape a quote.
-// Inside quotes, backslashes are always literal; only the matching quote
-// character closes the quoted word.
+// 引用符の外では、backslash は次の文字が特殊 (空白・tab・改行・引用符・backslash) な
+// ときだけ escape として働く。それ以外は文字列末尾を含めてリテラルとして残す。
+// 引用符なしの Windows 絶対パス (`C:\jdk\bin\java.exe` など) をそのまま通しつつ、
+// `\ ` での空白 escape と `\"` / `\'` での引用符 escape も効かせるためである。
+//
+// 引用符の中では backslash は常にリテラルで、対応する引用符だけが語を閉じる。
 func splitAnalyzerCommand(command string) ([]string, error) {
 	runes := []rune(command)
 
@@ -91,8 +87,8 @@ func splitAnalyzerCommand(command string) ([]string, error) {
 				i++
 				continue
 			}
-			// No escapable character follows (or backslash is the last
-			// rune): keep it literal, e.g. for Windows paths.
+			// escape 対象が続かない (または backslash が最後) ときはリテラルとして
+			// 残す。Windows のパスをそのまま通すため。
 			current.WriteRune(r)
 			hasCurrent = true
 		case r == '\'' || r == '"':

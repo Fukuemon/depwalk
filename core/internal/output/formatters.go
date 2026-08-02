@@ -4,11 +4,11 @@ import "slices"
 
 // formatters returns the formatter for every [Format] the package renders.
 //
-// The set is built on each call rather than held in a package variable
-// populated from init: state ownership stays explicit, and tests never have
-// to mutate (and restore) a shared registry. Adding a format means adding
-// its implementation plus one entry here; [RegisteredFormats] and the CLI's
-// --format validation pick it up automatically.
+// init で package 変数に持たせず、呼ばれるたびに組み立てる。状態の持ち主が
+// 明示され、テストが共有 registry を書き換えて戻す必要もなくなる。
+//
+// 形式を足すときは実装とここの 1 行だけでよい。[RegisteredFormats] と CLI の
+// --format 検証が自動で拾う。
 func formatters() map[Format]formatter {
 	return map[Format]formatter{
 		FormatConsole: consoleFormatter{},
@@ -16,8 +16,8 @@ func formatters() map[Format]formatter {
 	}
 }
 
-// RegisteredFormats returns the registered output format names in sorted
-// order. The returned slice is independent from the formatter set.
+// RegisteredFormats は登録済みの出力形式名を辞書順で返す。
+// 返す slice は formatter の集合とは独立している。
 func RegisteredFormats() []string {
 	registered := formatters()
 	formats := make([]string, 0, len(registered))

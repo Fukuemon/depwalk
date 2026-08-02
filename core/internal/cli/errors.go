@@ -2,14 +2,12 @@ package cli
 
 import "fmt"
 
-// inputError marks a failure caused by what the user supplied on the command
-// line: an unknown flag value, a missing required flag, or a value outside the
-// accepted range. [ExitCode] maps it to exit status 2.
+// inputError は利用者がコマンドラインで渡した値が原因の失敗を表す。未知の flag 値、
+// 必須 flag の欠落、許容範囲外の値など。[ExitCode] が exit status 2 へ写す。
 //
-// It is separate from analyze.InputError on purpose. These failures are
-// rejected here, before the use case runs, so tagging them with the use case's
-// error type would claim a relationship that does not exist. Both types map to
-// the same exit status; [ExitCode] is where that decision lives.
+// analyze.InputError とは意図的に分けている。これらは use case が走る前にここで
+// 弾く失敗であり、use case の error 型で標識すると実際には無い関係を主張することに
+// なる。両者が同じ exit status になる判断は [ExitCode] だけが持つ。
 type inputError struct {
 	err error
 }
@@ -18,7 +16,6 @@ func (e *inputError) Error() string { return e.err.Error() }
 
 func (e *inputError) Unwrap() error { return e.err }
 
-// invalidInput builds an [inputError] with a formatted message.
 func invalidInput(format string, args ...any) error {
 	return &inputError{err: fmt.Errorf(format, args...)}
 }

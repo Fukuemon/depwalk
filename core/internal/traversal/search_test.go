@@ -8,8 +8,8 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph/graphtest"
 )
 
-// branchGraph is shaped so that BFS and DFS visit orders differ:
-// a -> b, a -> c, b -> d. BFS visits [a b c d], DFS visits [a b d c].
+// branchGraph は BFS と DFS で訪問順が変わる形にしてある。
+// a -> b, a -> c, b -> d。BFS は [a b c d]、DFS は [a b d c] の順で訪れる。
 func branchGraph() *graph.Graph {
 	return graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
@@ -56,7 +56,7 @@ func TestVisitOrderDoesNotRevisitOnCycle(t *testing.T) {
 }
 
 func TestMinDepthsComputesShortestDistances(t *testing.T) {
-	// o -> a -> a2 -> m and o -> b -> m: minDepth(m) must be 2.
+	// o -> a -> a2 -> m と o -> b -> m: minDepth(m) は 2 になること。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").

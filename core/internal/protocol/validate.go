@@ -6,13 +6,12 @@ import (
 	"strings"
 )
 
-// ValidationError describes a protocol schema validation failure.
+// ValidationError は protocol schema の検証失敗を表す。
 type ValidationError struct {
 	Field  string
 	Reason string
 }
 
-// Error returns the validation error message.
 func (e ValidationError) Error() string {
 	if e.Field == "" {
 		return e.Reason
@@ -20,7 +19,7 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Reason)
 }
 
-// Validate validates an [AnalysisRequest] record.
+// Validate は [AnalysisRequest] record を検証する。
 func (r AnalysisRequest) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeAnalysisRequest); err != nil {
 		return err
@@ -70,7 +69,7 @@ func (s MethodSelector) validate(field string) error {
 	return nil
 }
 
-// Validate validates a [MethodSymbol] record.
+// Validate は [MethodSymbol] record を検証する。
 func (r MethodSymbol) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeMethodSymbol); err != nil {
 		return err
@@ -100,7 +99,7 @@ func (r MethodSymbol) Validate() error {
 	return nil
 }
 
-// Validate validates a [CallEdge] record.
+// Validate は [CallEdge] record を検証する。
 func (r CallEdge) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeCallEdge); err != nil {
 		return err
@@ -122,7 +121,7 @@ func (r CallEdge) Validate() error {
 	return nil
 }
 
-// Validate validates a [Diagnostic] record.
+// Validate は [Diagnostic] record を検証する。
 func (r Diagnostic) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeDiagnostic); err != nil {
 		return err
@@ -146,7 +145,7 @@ func (r Diagnostic) Validate() error {
 	return nil
 }
 
-// Validate validates an [AnalyzerError] record.
+// Validate は [AnalyzerError] record を検証する。
 func (r AnalyzerError) Validate() error {
 	if err := validateRecordHeader(r.SchemaVersion, r.RecordType, RecordTypeError); err != nil {
 		return err
@@ -217,8 +216,8 @@ func validateRecordHeader(schemaVersion string, recordType, want RecordType) err
 	return nil
 }
 
-// rejectExplicitEmptyArray rejects a present-but-empty optional array while
-// allowing an omitted (nil) one.
+// rejectExplicitEmptyArray は「存在するが空」の optional 配列を拒否し、
+// 省略 (nil) は許す。空配列は「対象なし」を意図した指定と解釈できず曖昧なため。
 func rejectExplicitEmptyArray[T any](field string, values []T) error {
 	if values != nil && len(values) == 0 {
 		return invalid(field, "must not be an explicit empty array")

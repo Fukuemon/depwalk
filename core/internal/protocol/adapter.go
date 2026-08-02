@@ -10,21 +10,19 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Adapter is the Adapter half of the ACL: it implements the
-// analyze.Source port by composing the wire analysisRequest,
-// running the Analyzer process through [Runner], and translating wire
-// records into domain values with the Translator (translate.go). The
-// wiring of Adapter into the analyze use case happens in cli (manual DI).
+// Adapter は ACL の Adapter 側。wire の analysisRequest を組み立て、[Runner] で
+// Analyzer process を動かし、Translator (translate.go) で wire record を domain 値へ
+// 変換することで analyze.Source port を実装する。
+//
+// analyze の use case への配線は cli が手で行う。
 type Adapter struct {
 	command analyzer.Command
 }
 
-// NewAdapter returns an [Adapter] that launches the Analyzer with command.
 func NewAdapter(command analyzer.Command) *Adapter {
 	return &Adapter{command: command}
 }
 
-// Run implements the analyze.Source port.
 func (a *Adapter) Run(
 	request analyze.Request,
 	onNode func(graph.Node),
@@ -53,11 +51,10 @@ func (a *Adapter) Run(
 	if len(request.Exclude) > 0 {
 		wireRequest.Exclude = request.Exclude
 	}
-	// [Runner.Run] validates the request again (it is also used directly,
-	// e.g. by record-level E2E tests). The Adapter validates here first so
-	// that a bad request coming through the port is classified as an input
-	// error — exit code 2 — before any process is launched, instead of
-	// surfacing as an untyped runtime failure.
+	// [Runner.Run] 側でも要求を検証する (record レベルの E2E などが直接使うため)。
+	// Adapter が先に検証するのは、port 経由の不正な要求を process 起動前に入力
+	// エラー (exit code 2) として分類するためである。後段に任せると型のない
+	// 実行時失敗として表に出る。
 	if err := wireRequest.Validate(); err != nil {
 		return analyze.Outcome{}, &analyze.InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
 	}

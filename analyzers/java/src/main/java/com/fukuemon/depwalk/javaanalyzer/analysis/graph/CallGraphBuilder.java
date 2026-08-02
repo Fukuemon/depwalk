@@ -291,7 +291,7 @@ public final class CallGraphBuilder {
     }
 
     // ------------------------------------------------------------------
-    // method call processing
+    // メソッド呼び出しの処理
     // ------------------------------------------------------------------
 
     private void processMethodCall(MethodCallExpr mce, WalkContext ctx) {
@@ -678,7 +678,7 @@ public final class CallGraphBuilder {
     }
 
     // ------------------------------------------------------------------
-    // call-site outcome ledger
+    // 呼び出し箇所ごとの結果台帳 (ledger)
     // ------------------------------------------------------------------
 
     /** ledger 用の実効 caller (caller 不在の site は <clinit> / placeholder へ帰着)。 */
