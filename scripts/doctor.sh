@@ -20,8 +20,9 @@ EXPECTED=(
 )
 
 linked=0
-broken=()
-missing=()
+broken=()   # symlink だが参照先が無い
+solid=()    # symlink でない実体がある
+absent=()   # 何も無い
 for rel in "${EXPECTED[@]}"; do
   if [ -L "$rel" ]; then
     if [ -e "$rel" ]; then
@@ -29,30 +30,39 @@ for rel in "${EXPECTED[@]}"; do
     else
       broken+=("$rel")
     fi
+  elif [ -e "$rel" ]; then
+    solid+=("$rel")
   else
-    missing+=("$rel")
+    absent+=("$rel")
   fi
 done
 
-if [ "$linked" -eq 0 ]; then
+if [ "$linked" -eq 0 ] && [ "${#broken[@]}" -eq 0 ]; then
   echo "doctor: 未接続 — 共有プロセス層が 1 つも繋がっていません。" >&2
   echo "  AI 設定 / skill / hook はこの環境に存在しません。" >&2
   echo "  接続: sdd-template 側で bash scripts/link.sh $ROOT" >&2
   exit 2
 fi
 
+status=0
 if [ "${#broken[@]}" -gt 0 ]; then
   echo "doctor: symlink が切れています (${#broken[@]} 件):" >&2
   printf '  %s\n' "${broken[@]}" >&2
   echo "  復旧: sdd-template 側で make sync、または bash scripts/link.sh $ROOT" >&2
-  exit 1
+  status=1
 fi
-
-if [ "${#missing[@]}" -gt 0 ]; then
-  echo "doctor: symlink でない実体があります (${#missing[@]} 件):" >&2
-  printf '  %s\n' "${missing[@]}" >&2
+if [ "${#absent[@]}" -gt 0 ]; then
+  echo "doctor: 接続されていない項目があります (${#absent[@]} 件):" >&2
+  printf '  %s\n' "${absent[@]}" >&2
+  echo "  接続: sdd-template 側で bash scripts/link.sh $ROOT" >&2
+  status=1
+fi
+if [ "${#solid[@]}" -gt 0 ]; then
+  echo "doctor: symlink でない実体があります (${#solid[@]} 件):" >&2
+  printf '  %s\n' "${solid[@]}" >&2
   echo "  消費 repo 固有の実体なら問題ありません。テンプレ由来なら link.sh を再実行してください。" >&2
-  exit 1
+  status=1
 fi
+[ "$status" -eq 0 ] || exit "$status"
 
 echo "doctor: OK (${linked} entries)"
