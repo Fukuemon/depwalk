@@ -5,7 +5,7 @@
 #   context/README.md          ファイル一覧 (生成マーカー区間だけ置換)
 #
 # 手書きの索引は育たない (impact-index.yaml が実例) ため生成物にする。
-# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
+# 判断を定めるのは adr/0008-doc-freshness-and-reading-map.md。
 #
 # 冪等: frontmatter が変わっていなければ再実行しても差分は出ない。
 # その性質を使って pre-commit / CI が drift を検査する。
@@ -66,7 +66,7 @@ lines = [
     "# 読み取りマップ — 「何を読めば足りるか」のルーティング表",
     "#",
     "# scripts/reading-map.sh が各文書の frontmatter から生成する。手編集しない。",
-    "# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。",
+    "# 判断を定めるのは adr/0008-doc-freshness-and-reading-map.md。",
     "#",
     "# 使い方: 触るコードパスで前方一致するエントリを引き、docs のファイルだけを読む。",
     "# エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。",

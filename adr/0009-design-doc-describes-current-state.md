@@ -24,9 +24,9 @@ design doc (`design/DesignDoc.md` / `design/features/`) と context に、**現�
 
 ### 規約は既にあり、実態が追随していない
 
-これは新しい方針ではない。`spec-contract.md` の正本境界は既にこう定めている。
+これは新しい方針ではない。`spec-contract.md` の役割境界は既にこう定めている。
 
-> 判定の目安: 「issue が閉じても残り続ける設計情報」は design 正本、「この issue の意思決定の記録」は spec
+> 判定の目安: 「issue が閉じても残り続ける設計情報」は design が持ち、「この issue の意思決定の記録」は spec
 
 `closeout.md` はさらに踏み込む。
 
@@ -53,7 +53,7 @@ design doc / feature doc / context は「いま system がどう設計されて�
 | 作業単位の議論                       | issue / PR                         |
 | 現在の設計・契約・制約               | design doc / feature doc / context |
 
-**「なぜこうしたか」を design doc に書きたくなったら、それは ADR にすべき判断である。** design doc からは `(判断の正本は ADR-XXXX)` の形で 1 行参照する。
+**「なぜこうしたか」を design doc に書きたくなったら、それは ADR にすべき判断である。** design doc からは `(判断を定めるのは ADR-XXXX)` の形で 1 行参照する。
 
 ### 3. 廃止する節
 
@@ -75,7 +75,7 @@ ADR への参照は節にまとめず、**その判断を説明している箇�
 
 ### 5. Phase 参照は DesignDoc に集約する
 
-「Phase N で実装する」はロードマップであり、feature doc が持つと更新漏れで腐る。ロードマップの正本は `design/DesignDoc.md` とする。
+「Phase N で実装する」はロードマップであり、feature doc が持つと更新漏れで腐る。ロードマップを定めるのは `design/DesignDoc.md` とする。
 
 ただし**実装状況そのものは現在の事実**なので feature doc に書いてよい。「DOT / Mermaid は未実装」は書く。「Phase4 で実装」は書かない。
 
@@ -83,7 +83,7 @@ ADR への参照は節にまとめず、**その判断を説明している箇�
 
 ### 却下: 規約化せず推敲の中で黙って直す
 
-文書は減るが、後から「経緯を書き戻したい」提案が来たときに根拠が残らない。99 件の削除は一度きりの作業ではなく、今後も同じ判断を繰り返すため、判断の正本が要る。
+文書は減るが、後から「経緯を書き戻したい」提案が来たときに根拠が残らない。99 件の削除は一度きりの作業ではなく、今後も同じ判断を繰り返すため、判断を置く場所が要る。
 
 ### 却下: 経緯を design doc に残したまま、節を整理するだけ
 
@@ -115,11 +115,11 @@ ADR への参照は節にまとめず、**その判断を説明している箇�
 
 - spec 更新要否: 要。[issue #40](https://github.com/Fukuemon/depwalk/issues/40) の推敲スコープへ「経緯の除去と ADR 化」を追加する
 - 適用の順序: `templates/features/template.md` から 3 節を外し、既存 6 本は `verified_commit` 消し込みのバッチ作業と同時に処理する (どちらも文書を 1 本ずつ精読する作業であり、分けると二度読みになる)
-- context / AI 向け設定更新要否: 否。規約自体は `spec-contract.md` の正本境界に既にあり、本 ADR はその適用を定めるもの
+- context / AI 向け設定更新要否: 否。規約自体は `spec-contract.md` の役割境界に既にあり、本 ADR はその適用を定めるもの
 
 ## 関連ドキュメント / チケット
 
 - [ADR-0008](0008-doc-freshness-and-reading-map.md): frontmatter と `verified_commit`。改訂履歴を doc が持つ必要をなくした前提
-- `spec-lifecycle` skill の `references/spec-contract.md`: 正本境界 (本 ADR が適用する規約)
+- `spec-lifecycle` skill の `references/spec-contract.md`: 役割境界 (本 ADR が適用する規約)
 - `spec-lifecycle` skill の `references/closeout.md`: 「ADR 未起票の判断は削除前に ADR へ起こす」
 - issue / PR: [#40](https://github.com/Fukuemon/depwalk/issues/40)

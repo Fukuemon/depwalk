@@ -11,7 +11,7 @@ verified_commit: 9b9d79d
 
 # Feature 設計: Traversal (Caller / Callee 探索)
 
-Traversal Engine の設計正本。
+Traversal Engine の設計を定める。
 
 ## 探索とは
 
@@ -22,7 +22,7 @@ Traversal Engine の設計正本。
 
 いずれも 1 段で止まらず再帰的に辿るため、「A を変えると最終的に誰が影響を受けるか」が分かる。ただし呼び出しは循環しうる (A が B を呼び B が A を呼ぶ) ので、無限に辿らない打ち切りが要る。その打ち切りをどう定義するかが本 doc の中心である。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
 
-本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) の正本である。全体像は [DesignDoc](../../DesignDoc.md)、Core の package 境界は [architecture](../../../context/architecture.md) を参照する。
+本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を定める。全体像は [DesignDoc](../../DesignDoc.md)、Core の package 境界は [architecture](../../../context/architecture.md) を参照する。
 
 ## 背景・要件解釈
 
@@ -30,7 +30,7 @@ depwalk は、指定メソッドの caller / callee を探索し、既知の呼�
 
 この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI (analyzer-protocol feature) が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
 
-循環呼び出し・再帰の打ち切り条件は本 doc が定める。探索 API、探索結果モデル、循環 / 深さ上限の意味論はいずれも本 doc を正本とする。
+循環呼び出し・再帰の打ち切り条件は本 doc が定める。探索 API、探索結果モデル、循環 / 深さ上限の意味論はいずれも本 doc が定める。
 
 ## スコープ
 
@@ -45,8 +45,8 @@ depwalk は、指定メソッドの caller / callee を探索し、既知の呼�
 ### やらないこと
 
 - Java ソースの解析、型解決、DI 解決は行わない (`java-analyzer` の責務)。
-- Analyzer Protocol / SPI / Model schema は再定義しない (正本は analyzer-protocol feature doc と ADR-0001)。
-- Output Engine の表現形式は決めない (正本は [output feature doc](../output/DesignDoc_output.md))。
+- Analyzer Protocol / SPI / Model schema は再定義しない (定めるのは analyzer-protocol feature doc と ADR-0001)。
+- Output Engine の表現形式は決めない (定めるのは [output feature doc](../output/DesignDoc_output.md))。
 - CLI `depwalk analyze` の引数、exit code、エラー表示は決めない ([CLI feature doc](../cli/DesignDoc_cli.md) の対象)。
 - 永続ストア、キャッシュ、並列探索、分散処理は扱わない。
 

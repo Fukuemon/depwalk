@@ -1,7 +1,7 @@
 # 読み取りマップ — 「何を読めば足りるか」のルーティング表
 #
 # scripts/reading-map.sh が各文書の frontmatter から生成する。手編集しない。
-# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
+# 判断を定めるのは adr/0008-doc-freshness-and-reading-map.md。
 #
 # 使い方: 触るコードパスで前方一致するエントリを引き、docs のファイルだけを読む。
 # エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。

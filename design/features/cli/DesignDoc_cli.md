@@ -12,7 +12,7 @@ verified_commit: 9b9d79d
 
 # Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
 
-depwalk CLI の設計正本。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層と analyze use case)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
+depwalk CLI の設計を定める。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層と analyze use case)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
 
 ## 背景・要件解釈
 
@@ -41,9 +41,9 @@ flag は 2 群に分かれ、互いに独立している。
 
 - **解析対象を指定する群**: `--analyzer-cmd` / `--language` / `--analyzer-meta` / `--source-root`
 - **探索を指定する群**: `--method` / `--direction` / `--max-depth` / `--format`
-  Analyzer 起動契約の正本は [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
+  Analyzer 起動契約を定めるのは [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
 
-`sourceRoots` / `include` / `exclude` の意味論の正本は [Analyzer Protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の `analysisRequest` 節。CLI は glob・path の意味解釈を行わず透過のみを担う。
+`sourceRoots` / `include` / `exclude` の意味論を定めるのは [Analyzer Protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の `analysisRequest` 節。CLI は glob・path の意味解釈を行わず透過のみを担う。
 
 **拡張余地**: 新出力形式は formatter 実装 + registry 登録だけで CLI に自動露出する。新しいクエリ種別 (例: パス探索) はサブコマンド新設でも flag 追加でも拡張できる (本節冒頭の方針宣言による)。
 
@@ -77,6 +77,6 @@ flag は 2 群に分かれ、互いに独立している。
 ## テスト (CLI プロセス E2E)
 
 - `os/exec` で build 済み depwalk バイナリを実プロセス起動し、stdout / stderr / exit code を検証する (harness の `buildCoreCLI` / `runCLI` を再利用する)。
-- console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (成功条件 S3 の CLI レベルでの担保)。
+- console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (成功条件 S3 を CLI レベルで確かめる)。
 - 既存のグラフレベル E2E (`protocol.Runner` を直接呼び出し、record 単位で照合する層) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
 - method selector は完全 signature、signature 省略の一意一致 / overload 曖昧性に加え、nested class の binary name (`Outer$Inner#method`) を回帰検証する。

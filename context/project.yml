@@ -1,4 +1,4 @@
-# Project Profile — depwalk 固有値の唯一の正本 (機械可読)
+# Project Profile — depwalk 固有値をここだけで定める (機械可読)
 #
 # `.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` / `workflow-git` 等の skill は、
 # 固有名をハードコードせず本ファイルを読む。値を変えたら meta.updated を更新し、
@@ -11,7 +11,7 @@ product:
   name: depwalk
   slug: depwalk
 
-# Repository Map。Core 実装基盤の正本は adr/0002-core-implementation-foundation.md、
+# Repository Map。Core 実装基盤を定めるのは adr/0002-core-implementation-foundation.md、
 # 詳細な package boundary は context/architecture.md。
 repos:
   convention: ghq 規約。$(ghq root)/github.com/Fukuemon/depwalk
@@ -35,7 +35,7 @@ naming:
   package: Go package は小文字・短い単語・責務名 (core/internal/core のような重複名は使わない)
   core_module: github.com/Fukuemon/depwalk/core
   # フラットな責務名構成。層ディレクトリは作らない (層は概念として architecture.md の対応表で示す)。
-  # 正本は adr/0007-layered-architecture-refactor.md / context/architecture.md の Package Boundary
+  # 定めるのは adr/0007-layered-architecture-refactor.md / context/architecture.md の Package Boundary
   core_packages: core/internal/{graph,traversal,analyze,protocol,analyzer,output,cli}
   analyzer_dir: analyzers/<language>/
   branch: feature/<issue-id>
@@ -44,12 +44,12 @@ naming:
   # リリース先。v1 リリースまでは中身を持たせず、初期 commit のまま据え置く。
   release_branch: main
 
-# Quick Commands。Core の標準 command は adr/0002 を正本とする。
+# Quick Commands。Core の標準 command は adr/0002 が定める。
 # repository-level の make-like wrapper は初期導入しない。
 commands:
   dev: depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" # 自動 discovery (Gradle build model)
   dev-override: depwalk analyze <workspace-root> --language java --source-root <relative-root> --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --analyzer-meta classpath= --analyzer-meta javaLanguageLevel=21 # 明示 override (--source-root 繰り返し可。preview は --analyzer-meta javaPreview=true)
-  query: depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --method "com.example.UserService#findById(java.lang.Long)" --direction caller --format json # 探索クエリ。正本は design/features/cli/DesignDoc_cli.md (設計確定済み・実装は #22)
+  query: depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --method "com.example.UserService#findById(java.lang.Long)" --direction caller --format json # 探索クエリ。定めるのは design/features/cli/DesignDoc_cli.md (設計確定済み・実装は #22)
   build: cd core && go build ./...
   lint: cd core && go vet ./...
   format: cd core && go fmt ./... # 確認は cd core && test -z "$(gofmt -l .)"
@@ -68,7 +68,7 @@ tracker:
   cli: gh
   project: Fukuemon/depwalk
 
-# 対象ドメイン (spec「実装対象」テーブルと domain:* ラベルの正本)
+# 対象ドメイン (spec「実装対象」テーブルと domain:* ラベルをここで定める)
 domains:
   - core # CLI entrypoint、Analyzer process orchestration、graph/traversal/output/protocol を束ねる Go Core
   - traversal # Caller / Callee 探索 (Traversal Engine)
@@ -76,7 +76,7 @@ domains:
   - analyzer-protocol # Analyzer SPI + Communication Protocol (JSONL) + Model (言語非依存の共通契約)
   - java-analyzer # Java/Spring 解析の言語別実装 (analyzer-protocol を実装)
 
-# Label Policy — Issue / PR のラベル体系の唯一の正本 (workflow-git skill が読む)
+# Label Policy — Issue / PR のラベル体系をここだけで定める (workflow-git skill が読む)
 labels:
   axes:
     - axis: "type:*"
@@ -115,7 +115,7 @@ spec:
 design:
   prd: integrated # PRD は design/DesignDoc.md の Why/What 節に統合
 
-# Source of Truth — 正本ドキュメントのパス契約
+# Source of Truth — 決まりを置くドキュメントの path 契約
 paths:
   prd: design/DesignDoc.md # 統合モード (Why/What 節)
   design_doc: design/DesignDoc.md
@@ -130,7 +130,7 @@ paths:
   spec_review: specs/<issue-id>-<slug>/review.md # 任意
 
 # 読み取りマップ (「何を読めば足りるか」のルーティング表)。
-# 各文書の frontmatter から生成する。判断の正本は
+# 各文書の frontmatter から生成する。判断を定めるのは
 # adr/0008-doc-freshness-and-reading-map.md。
 reading_index:
   path: context/reading-map.yaml
