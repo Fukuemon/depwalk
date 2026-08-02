@@ -7,13 +7,12 @@ import (
 	"syscall"
 )
 
-// maxRSS returns the process's maximum resident set size as reported by the
-// OS (getrusage(2) RUSAGE_CHILDREN, via os.ProcessState.SysUsage()), or
-// false if unavailable.
+// maxRSS は OS が報告するプロセスの最大 RSS を返す
+// (getrusage(2) RUSAGE_CHILDREN を os.ProcessState.SysUsage() 経由で取得)。
+// 取得できなければ false。
 //
-// The unit is platform-dependent: Linux reports kilobytes, Darwin reports
-// bytes. Callers must not compare raw values across platforms without
-// normalizing first.
+// **単位は platform 依存である。** Linux は kilobyte、Darwin は byte を返す。
+// 正規化せずに platform をまたいで生の値を比較してはならない。
 func maxRSS(state *os.ProcessState) (int64, bool) {
 	if state == nil {
 		return 0, false

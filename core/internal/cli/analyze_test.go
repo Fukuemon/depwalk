@@ -33,7 +33,7 @@ func TestAnalyzeCommandBuildsGraphThroughFakeAnalyzer(t *testing.T) {
 	if got := stdout.String(); !strings.Contains(got, "analyzed 2 method(s), 1 call edge(s)") {
 		t.Fatalf("stdout = %q, want a summary of 2 methods and 1 call edge", got)
 	}
-	// Without --method only the summary is written, never traversal output.
+	// --method が無ければサマリだけを書き、探索結果は出さない。
 	if got := stdout.String(); strings.Contains(got, `"schemaVersion"`) || strings.Contains(got, `"nodes"`) {
 		t.Fatalf("stdout = %q, want no query output without --method", got)
 	}
@@ -526,18 +526,18 @@ func TestAnalyzeCommandFailsOnFatalAnalyzerError(t *testing.T) {
 	}
 }
 
-// fakeAnalyzerCommand returns an --analyzer-cmd string that re-invokes the
-// current test binary as a fake Analyzer process (TestFakeAnalyzerHelperProcess
-// below), keeping cli package tests independent of a JVM.
+// fakeAnalyzerCommand は、現在のテストバイナリを fake Analyzer プロセスとして
+// 再実行する --analyzer-cmd 文字列を返す (下の TestFakeAnalyzerHelperProcess)。
+// cli package のテストを JVM に依存させないため。
 func fakeAnalyzerCommand(t *testing.T, scenario string) string {
 	t.Helper()
 
 	return fmt.Sprintf(`"%s" -test.run=TestFakeAnalyzerHelperProcess -- --fake-analyzer %s`, os.Args[0], scenario)
 }
 
-// TestFakeAnalyzerHelperProcess is not a real test. It is re-executed as a
-// subprocess by fakeAnalyzerCommand and acts as a minimal Analyzer Protocol
-// implementation for tests in this package.
+// TestFakeAnalyzerHelperProcess はテストではない。fakeAnalyzerCommand から
+// subprocess として再実行され、本 package のテスト向けに Analyzer Protocol の
+// 最小実装として振る舞う。
 func TestFakeAnalyzerHelperProcess(t *testing.T) {
 	scenario := helperScenario()
 	if scenario == "" {
@@ -599,8 +599,8 @@ func TestFakeAnalyzerHelperProcess(t *testing.T) {
 	}
 }
 
-// requestSourceRootsForHelper reports the analysisRequest.sourceRoots values
-// exactly as received on stdin, or "(absent)" when the field was omitted.
+// requestSourceRootsForHelper は stdin で受け取った analysisRequest.sourceRoots を
+// そのまま返す。field が省かれていれば "(absent)"。
 func requestSourceRootsForHelper(stdin []byte) string {
 	return requestStringArrayForHelper(stdin, "sourceRoots")
 }

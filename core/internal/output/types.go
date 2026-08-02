@@ -5,28 +5,31 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
-// Format identifies an output representation.
+// Format は出力表現を識別する。
 type Format string
 
 const (
-	// FormatConsole selects human-readable console output.
+	// FormatConsole は人が読む console 出力。
 	FormatConsole Format = "console"
-	// FormatJSON selects machine-readable JSON output.
+	// FormatJSON は機械処理向けの JSON 出力。
 	FormatJSON Format = "json"
-	// FormatDOT reserves Graphviz DOT output for Phase 4.
+	// FormatDOT は Graphviz DOT 出力。formatter は未登録で、指定すると許容値
+	// エラーになる。可視化はスコープ外 (adr/0010-defer-graph-visualization.md)。
 	FormatDOT Format = "dot"
-	// FormatMermaid reserves Mermaid output for Phase 4.
+	// FormatMermaid は Mermaid 出力。FormatDOT と同じく未登録。
 	FormatMermaid Format = "mermaid"
 )
 
-// Input contains the graph, traversal result, and request needed to build a View.
+// Input は View を組み立てるのに要る graph・探索結果・要求をまとめたもの。
 type Input struct {
 	Graph   *graph.Graph
 	Result  traversal.Result
 	Request traversal.Request
 }
 
-// View is the symbol-resolved, deterministically ordered input shared by formatters.
+// View は symbol を解決し順序を確定させた、formatter 共通の入力。
+//
+// 各 formatter が個別に解決すると、形式ごとに順序や欠損の扱いがずれる。
 type View struct {
 	Status    traversal.Status
 	Direction graph.Direction
@@ -36,7 +39,7 @@ type View struct {
 	Cutoffs   []CutoffView
 }
 
-// NodeView describes one reached method. Symbol fields may be empty when unavailable.
+// NodeView は到達した 1 メソッド。symbol が取れない場合、各 field は空になる。
 type NodeView struct {
 	ID            string
 	QualifiedName string
@@ -46,7 +49,7 @@ type NodeView struct {
 	Metadata      map[string]any
 }
 
-// EdgeView describes one reached call edge.
+// EdgeView は到達した 1 本の呼び出し edge。
 type EdgeView struct {
 	ID       string
 	CallerID string
@@ -56,7 +59,7 @@ type EdgeView struct {
 	Metadata map[string]any
 }
 
-// CutoffView describes one call edge excluded by the traversal depth limit.
+// CutoffView は深さ上限で除外された 1 本の呼び出し edge。
 type CutoffView struct {
 	EdgeID         string
 	CallerID       string

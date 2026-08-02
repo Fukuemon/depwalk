@@ -140,7 +140,7 @@ public final class Main {
             try {
                 writer.close();
             } catch (IOException ignored) {
-                // best-effort close; exit code is already decided above.
+                // exit code は上で確定済みのため、close 失敗は握りつぶす。
             }
         }
     }
@@ -181,7 +181,7 @@ public final class Main {
         try {
             writer.write(ErrorRecord.of(JavaErrorCode.JAVA_INTERNAL_ERROR.code(), "internal error during analysis: " + detail));
         } catch (IOException ignored) {
-            // stdout may already be unusable; stderr already has the exception detail.
+            // stdout は既に使えない可能性があり、例外の詳細は stderr に出ている。
         }
         return 1;
     }

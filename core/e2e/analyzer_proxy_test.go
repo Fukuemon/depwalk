@@ -11,18 +11,17 @@ import (
 	"testing"
 )
 
-// TestAnalyzerRecordingProxyHelperProcess is not a real test. It is re-executed
-// as a subprocess and acts as the test-only transparent recording proxy:
-// it forwards Core's stdin bytes to the real Analyzer, relays
-// the Analyzer's stdout / stderr / exit status without transformation, and
-// only records verification copies into the given capture directory. It never
-// synthesizes, reorders, re-serializes, or filters records.
+// TestAnalyzerRecordingProxyHelperProcess はテストではない。subprocess として
+// 再実行され、テスト専用の透過記録プロキシとして働く。
+//
+// Core の stdin をそのまま実 Analyzer へ渡し、Analyzer の stdout / stderr /
+// exit status を無変換で中継し、検証用の複製を capture directory へ記録するだけ。
+// record の合成・並べ替え・再直列化・除外は一切しない。
 func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
 	captureDir, command, malformed := proxyHelperArgs(os.Args)
 	if malformed {
-		// Returning silently on missing arguments would look like an Analyzer
-		// that produced no output and exited 0, turning an empty graph into a
-		// false success. Fail loudly instead.
+		// 引数不足で黙って返すと「出力せず 0 で終了した Analyzer」に見え、空の
+		// graph が成功として通ってしまう。声高に失敗させる。
 		fmt.Fprintln(os.Stderr, "recording proxy: --proxy-capture requires <dir> <command...>")
 		os.Exit(97)
 	}
@@ -32,9 +31,10 @@ func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
 	os.Exit(runRecordingProxy(os.Stdin, os.Stdout, os.Stderr, captureDir, command))
 }
 
-// proxyHelperArgs extracts "--proxy-capture <dir> <command...>" after the
-// test-binary "--" separator; returns ("", nil, false) when not invoked as a
-// helper and malformed=true when the flag is present without <dir> <command>.
+// proxyHelperArgs はテストバイナリの "--" 区切りより後ろから
+// "--proxy-capture <dir> <command...>" を取り出す。helper として起動されていない
+// ときは ("", nil, false)、flag はあるが <dir> <command> が無いときは
+// malformed=true を返す。
 func proxyHelperArgs(args []string) (string, []string, bool) {
 	for i, arg := range args {
 		if arg == "--proxy-capture" {
@@ -47,10 +47,9 @@ func proxyHelperArgs(args []string) (string, []string, bool) {
 	return "", nil, false
 }
 
-// runRecordingProxy launches the real Analyzer command and relays all four
-// channels byte-transparently while teeing copies into captureDir. A proxy or
-// Analyzer startup / capture failure exits non-zero and is never downgraded
-// to success.
+// runRecordingProxy は実 Analyzer コマンドを起動し、4 つの channel すべてを
+// byte 透過で中継しつつ captureDir へ複製する。プロキシまたは
+// Analyzer の起動失敗・capture 失敗は非ゼロ exit にし、成功へ格下げしない。
 func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir string, command []string) int {
 	if len(command) == 0 {
 		fmt.Fprintln(stderr, "recording proxy: analyzer command is required")
@@ -76,9 +75,8 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 	defer stderrFile.Close()
 
 	cmd := exec.Command(command[0], command[1:]...)
-	// The capture holds the bytes the Analyzer actually read. The current
-	// Protocol always reads the single analysisRequest line to completion,
-	// so the whole request is captured.
+	// capture には Analyzer が実際に読んだ byte が入る。現行 Protocol は
+	// analysisRequest の 1 行を必ず最後まで読むため、要求全体が記録される。
 	cmd.Stdin = io.TeeReader(stdin, requestFile)
 	cmd.Stdout = io.MultiWriter(stdout, stdoutFile)
 	cmd.Stderr = io.MultiWriter(stderr, stderrFile)
@@ -102,12 +100,11 @@ func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir str
 	return exit
 }
 
-// TestProxyEchoChildHelperProcess is a fixed child used by the transparency
-// unit test: echoes stdin to stdout with a prefix line, writes one stderr
-// line, and exits 3.
+// TestProxyEchoChildHelperProcess は透過性の unit test が使う固定の子プロセス。
+// stdin を接頭辞付きで stdout へ返し、stderr へ 1 行書き、3 で終了する。
 func TestProxyEchoChildHelperProcess(t *testing.T) {
-	// Select the scenario through launch arguments rather than t.Setenv,
-	// which would pollute the environment of the whole process.
+	// シナリオの選択は t.Setenv ではなく起動引数で行う。t.Setenv はプロセス
+	// 全体の環境を汚すため。
 	if !hasArg(os.Args, "--proxy-echo-child") {
 		return
 	}

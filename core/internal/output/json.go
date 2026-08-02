@@ -53,8 +53,8 @@ type jsonCutoff struct {
 	CallSite       *jsonSourceLocation `json:"callSite,omitempty"`
 }
 
-// jsonSourceLocation serializes a graph-owned source location with the JSON
-// output schema's field names (the same names the Analyzer Protocol uses).
+// jsonSourceLocation は graph 所有の source location を、JSON 出力 schema の
+// field 名で直列化する (Analyzer Protocol と同じ名前)。
 type jsonSourceLocation struct {
 	Path        string `json:"path"`
 	StartLine   int    `json:"startLine"`

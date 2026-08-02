@@ -17,19 +17,19 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// requiredEnvVar is the environment variable that, when set to "1", turns a
-// missing E2E prerequisite (JDK 25, the analyzer jar) from a skip into a
-// hard failure. CI's e2e job sets it so that a prerequisite silently going
-// missing (e.g. JDK version detection breaking, or the jar upload/download
-// step failing) fails the job loudly instead of the job going green having
-// run zero assertions.
+// requiredEnvVar は "1" のとき、E2E の前提 (JDK 25、analyzer jar) の欠落を skip
+// ではなく失敗に変える環境変数。
+//
+// CI の e2e job がこれを立てる。前提が黙って欠ける (JDK 検出が壊れる、jar の
+// upload / download が失敗する等) と、**アサーションを 1 つも実行しないまま job が
+// 緑になる**ためである。
 const requiredEnvVar = "DEPWALK_E2E_REQUIRED"
 
-// skipOrFail skips the test with the given message, unless requiredEnvVar
-// is set to "1", in which case it fails the test instead. This is the
-// single chokepoint E2E prerequisite checks go through so CI can opt into
-// "missing prerequisite is a failure" without duplicating the env check at
-// every call site.
+// skipOrFail はメッセージを添えてテストを skip する。ただし requiredEnvVar が "1"
+// なら失敗させる。
+//
+// E2E の前提検査はすべてここを通す。各呼び出し箇所で環境変数を見なくても、CI が
+// 「前提の欠落は失敗」を選べるようにするためである。
 func skipOrFail(t *testing.T, format string, args ...any) {
 	t.Helper()
 	msg := fmt.Sprintf(format, args...)
@@ -39,17 +39,18 @@ func skipOrFail(t *testing.T, format string, args ...any) {
 	t.Skip(msg)
 }
 
-// e2eRequired reports whether requiredEnvVar's value means "prerequisite
-// gaps must fail the test rather than skip it". Split out from skipOrFail
-// so the branch condition (as opposed to the t.Skip/t.Fatal side effect,
-// which testing.T does not allow observing directly) can be unit tested.
+// e2eRequired は requiredEnvVar の値が「前提の欠落を skip でなく失敗にする」を
+// 意味するかを返す。
+//
+// skipOrFail から分けてある。t.Skip / t.Fatal の副作用は testing.T から直接観測
+// できないため、分岐条件だけを unit test で検証できるようにした。
 func e2eRequired(envValue string) bool {
 	return envValue == "1"
 }
 
-// fixtureRoot returns testdata/fixtures/java as an absolute path. Tests run
-// with the package directory as the working directory, so the relative
-// climb is stable regardless of how `go test` is invoked.
+// fixtureRoot は testdata/fixtures/java を絶対パスで返す。テストは package の
+// ディレクトリを作業ディレクトリとして走るため、相対の遡りは `go test` の
+// 呼び方によらず安定する。
 func fixtureRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", "testdata", "fixtures", "java"))
@@ -64,7 +65,7 @@ func fixtureRoot(t *testing.T) string {
 // analyzers/java's Gradle build auto-provisions JDK 25 even though the
 // system java may be older), then on PATH. It skips the test when none is
 // found so a plain `go test ./...` does not fail in environments without
-// JDK 25 (e.g. the Go-only CI job).
+// JDK 25 が無い環境 (Go だけの CI job など)。
 func findJava25(t *testing.T) string {
 	t.Helper()
 
@@ -94,10 +95,9 @@ func findJava25(t *testing.T) string {
 
 // javaVersionPattern extracts the major version number from `java -version`
 // output, e.g. `openjdk version "25"` or `openjdk version "25.0.1" 2025-...`.
-// Matching on the leading digits before a "." or closing quote tolerates
-// vendor/format variation better than a literal `version "25` substring
-// check would (which breaks on any prefix change and can't distinguish 25
-// from 250).
+// "." または閉じ引用符の手前の数字に一致させる。`version "25` の部分文字列
+// 一致より、ベンダーや書式の違いに強い。部分文字列だと接頭辞が変わるだけで
+// 壊れ、25 と 250 も区別できない。
 var javaVersionPattern = regexp.MustCompile(`version "(\d+)`)
 
 func isJava25(path string) bool {
@@ -108,8 +108,8 @@ func isJava25(path string) bool {
 	return javaMajorVersion(string(out)) == 25
 }
 
-// javaMajorVersion parses the major version number out of `java -version`
-// combined output, or returns 0 if no version string is found.
+// javaMajorVersion は `java -version` の出力からメジャーバージョンを取り出す。
+// バージョン文字列が見つからなければ 0 を返す。
 func javaMajorVersion(out string) int {
 	match := javaVersionPattern.FindStringSubmatch(out)
 	if match == nil {
@@ -125,7 +125,7 @@ func javaMajorVersion(out string) int {
 // findAnalyzerJar locates the Java Analyzer fat jar built by `cd
 // analyzers/java && ./gradlew shadowJar`. It skips the test when the jar is
 // missing rather than building it itself: producing the jar is an explicit
-// Gradle build prerequisite and must not be an implicit side effect of a Go test.
+// Gradle build の前提であり、Go のテストの暗黙の副作用にしてはならない。
 func findAnalyzerJar(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "analyzers", "java", "build", "libs", "java-analyzer.jar"))
@@ -138,7 +138,7 @@ func findAnalyzerJar(t *testing.T) string {
 	return path
 }
 
-// expectedCallEdge is one entry of testdata/fixtures/java/expected/call-edges.json.
+// expectedCallEdge は testdata/fixtures/java/expected/call-edges.json の 1 件。
 type expectedCallEdge struct {
 	Description string `json:"description"`
 	Caller      string `json:"caller"`
@@ -147,7 +147,7 @@ type expectedCallEdge struct {
 	ViaLambda   bool   `json:"viaLambda,omitempty"`
 }
 
-// expectedDiagnostic is one entry of testdata/fixtures/java/expected/diagnostics.json.
+// expectedDiagnostic は testdata/fixtures/java/expected/diagnostics.json の 1 件。
 type expectedDiagnostic struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
@@ -222,22 +222,19 @@ func assertDiagnosticCode(t *testing.T, diagnostics []protocol.Diagnostic, code 
 	t.Errorf("diagnostic code %q not found among %d diagnostics: %+v", code, len(diagnostics), diagnostics)
 }
 
-// TestJavaAnalyzerFixtureE2E runs the real analyzers/java fat jar against
-// testdata/fixtures/java/project through the same request-building and
-// Analyzer-launch path as `depwalk analyze` (core/internal/analyze), and
-// checks the result against the fixture's known caller/callee/diagnostic
-// expectations.
+// TestJavaAnalyzerFixtureE2E は実 analyzers/java fat jar を
+// testdata/fixtures/java/project に対して動かし、既知の caller / callee /
+// diagnostic の期待値と突き合わせる。要求の組み立てと Analyzer 起動の経路は
+// `depwalk analyze` (core/internal/analyze) と同じものを通る。
 //
-// This test goes one layer below the analyze use case (driving
-// protocol.Runner directly) instead of asserting against its Result:
-// Result.Graph does not carry callEdge.metadata (graph.Edge has no Metadata
-// field, since the current Traversal Engine graph model does not need it),
-// but this test needs to see callEdge.metadata.dispatch and .viaLambda.
-// Going one layer down keeps the assertions at the protocol record level
-// without reimplementing any analyze/protocol logic — it reuses
-// analyze.BuildMetadata for the metadata composition rule and
-// protocol.AnalysisRequest.Validate for request validation, exactly as the
-// ACL adapter (protocol.Adapter) does internally.
+// analyze の Result ではなく、1 層下の protocol.Runner を直接叩いている。
+// Result.Graph は callEdge.metadata を運ばないためである (現行の Traversal が
+// 必要としないので graph.Edge に Metadata field が無い)。本テストは
+// callEdge.metadata の dispatch と viaLambda を見る必要がある。
+//
+// 1 層下げても analyze / protocol のロジックは書き直さない。metadata の組み立ては
+// analyze.BuildMetadata、要求の検証は protocol.AnalysisRequest.Validate を、
+// ACL adapter (protocol.Adapter) と同じように再利用する。
 func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -353,11 +350,11 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	})
 }
 
-// runForMaxRSS runs the analyzer process a second time, independent of
-// analyzer.Runner, purely to read the process's maximum resident set size
-// from os.ProcessState.SysUsage(): analyzer.Runner does not expose
-// os.ProcessState, so this is the smallest addition that gets a max-RSS
-// reading without changing Core's production Runner API.
+// runForMaxRSS は analyzer.Runner とは別に analyzer プロセスをもう一度動かし、
+// os.ProcessState.SysUsage() から最大 RSS を読む。
+//
+// analyzer.Runner は os.ProcessState を公開しない。本番の Runner API を変えずに
+// 最大 RSS を得るための最小の追加としてこの形にした。
 func runForMaxRSS(javaPath, jarPath string, request protocol.AnalysisRequest) (int64, bool) {
 	payload, err := json.Marshal(request)
 	if err != nil {

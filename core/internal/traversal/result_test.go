@@ -27,7 +27,7 @@ func edgeIDs(res traversal.Result) map[string]bool {
 }
 
 func TestResultEdgesFormInducedSubgraph(t *testing.T) {
-	// a -> b -> c: every edge between reached nodes is included.
+	// a -> b -> c: 到達 node 間の edge がすべて含まれること。
 	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	want := []string{"edge:ab", "edge:bc"}
@@ -71,7 +71,7 @@ func TestResultDepthsExcludeNodesBeyondMaxDepth(t *testing.T) {
 }
 
 func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
-	// o -> a -> a2 -> m and o -> b -> m: the second route is shorter.
+	// o -> a -> a2 -> m と o -> b -> m: 後者の経路が短い。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
@@ -88,8 +88,8 @@ func TestResultDepthsUseShortestPathAtConvergence(t *testing.T) {
 }
 
 func TestResultDiamondKeepsAllConvergentEdges(t *testing.T) {
-	// o -> a -> m and o -> b -> m: all four edges are call relations and
-	// must survive regardless of which arm a walk expands first.
+	// o -> a -> m と o -> b -> m: 4 本すべてが実在の呼び出し関係であり、
+	// どちらの腕を先に展開しても残ること。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:ob", "method:o", "method:b").
@@ -127,7 +127,7 @@ func TestResultSelfLoopAnnotatedAsCycle(t *testing.T) {
 }
 
 func TestResultMutualRecursionAnnotatedAsCycle(t *testing.T) {
-	// o -> a <-> b (mutual recursion), b -> c (escape edge).
+	// o -> a <-> b (相互再帰)、b -> c (抜け出す edge)。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:ab", "method:a", "method:b").
@@ -151,7 +151,7 @@ func TestResultMutualRecursionAnnotatedAsCycle(t *testing.T) {
 }
 
 func TestResultDepthCutoffRecordsBeyondLimitEdges(t *testing.T) {
-	// a -> b -> c -> d with maxDepth 2: edge c->d leads to minDepth 3.
+	// a -> b -> c -> d を maxDepth 2 で: edge c->d の先は minDepth 3 になる。
 	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
@@ -192,9 +192,8 @@ func TestResultMaxDepthZeroCutsAllAdjacentEdges(t *testing.T) {
 }
 
 func TestResultMaxDepthZeroKeepsStartSelfLoopAsCycleEdge(t *testing.T) {
-	// A self-loop on the start node has both endpoints reached even at
-	// maxDepth 0, so it stays in the induced edge set with a cycle
-	// annotation instead of becoming a depth cutoff.
+	// 起点への self-loop は maxDepth 0 でも両端が到達 node になる。そのため
+	// 深さ打ち切りにならず、cycle 注釈付きで誘導 edge 集合に残る。
 	g := graphtest.NewBuilder().
 		Edge("edge:aa", "method:a", "method:a").
 		Edge("edge:ab", "method:a", "method:b").
@@ -222,7 +221,7 @@ func TestResultNoDepthCutoffsWhenUnlimited(t *testing.T) {
 }
 
 func TestResultCallerDirectionBuildsInducedSubgraph(t *testing.T) {
-	// a -> c, b -> c: caller traversal from c reaches both callers.
+	// a -> c, b -> c: c からの caller 探索が両方の caller に到達すること。
 	g := graphtest.NewBuilder().
 		Edge("edge:ac", "method:a", "method:c").
 		Edge("edge:bc", "method:b", "method:c").
@@ -247,8 +246,8 @@ func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
 }
 
 func TestResultIdenticalForBFSAndDFS(t *testing.T) {
-	// Uneven diamond + cycle + depth limit: the full result contract
-	// (nodes, edges, cycles, cutoffs) must not depend on the visit order.
+	// 非対称な合流 + 閉路 + 深さ上限。結果の契約 (nodes / edges / cycles /
+	// cutoffs) がすべて訪問順に依存しないこと。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").

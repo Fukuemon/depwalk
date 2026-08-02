@@ -71,10 +71,10 @@ jobs:
 
       - name: Dependency boundary gate (core must not depend on analyzers/)
         run: |
-          # Scope the grep to this repo's own analyzers/<language> import
-          # path prefix (not a bare "analyzers/" substring) so a
-          # third-party dependency whose import path happens to contain
-          # "analyzers/" isn't misreported as a boundary violation.
+          # grep の対象を本 repo 自身の analyzers/<language> import に絞る。
+          # "analyzers/" の部分一致ではなく path prefix で照合する。import path に
+          # たまたま "analyzers/" を含むだけの third-party 依存を、境界違反として
+          # 誤検出しないため。
           if go list -deps ./... | grep -E "^github.com/Fukuemon/depwalk/analyzers/"; then
             echo "core must not depend on analyzers/<language>/ packages"
             exit 1
@@ -141,10 +141,9 @@ jobs:
         run: go test ./e2e/... -v
         working-directory: core
         env:
-          # Fail (not skip) when a prerequisite (JDK 25, the analyzer jar)
-          # is missing, so a broken JDK detection or jar download doesn't
-          # silently turn this job into a no-op green check (see
-          # skipOrFail in core/e2e/java_fixture_test.go).
+          # 前提 (JDK 25、analyzer jar) が欠けたら skip ではなく fail させる。
+          # JDK 検出や jar の取得が壊れたとき、この job が黙って no-op の
+          # 緑になるのを防ぐ (core/e2e/java_fixture_test.go の skipOrFail)。
           DEPWALK_E2E_REQUIRED: "1"
 
   docs:

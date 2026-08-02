@@ -183,9 +183,9 @@ class MainTest {
     @Test
     void ioExceptionDuringAnalysisSetupProducesInternalErrorRecordAndNonZeroExit(
             @TempDir Path workspace, @TempDir Path classpathDir) throws IOException {
-        // pre-flight only checks existence / readability (not zip validity), so a garbage-bytes file
-        // named *.jar passes pre-flight but fails when JarTypeSolver's constructor tries to open it as
-        // a zip during AnalysisRunner's setup (TypeSolverFactory.create).
+        // pre-flight は存在と読み取り可否しか見ない (zip として妥当かは見ない)。
+        // そのため *.jar という名前のゴミバイト列は pre-flight を通り、AnalysisRunner の
+        // setup (TypeSolverFactory.create) で JarTypeSolver が zip として開こうとして失敗する。
         Path corruptJar = classpathDir.resolve("corrupt.jar");
         Files.write(corruptJar, new byte[] {0x00, 0x01, 0x02, 0x03});
         Files.writeString(workspace.resolve("Ok.java"), "package com.example; class Ok { }");

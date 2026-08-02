@@ -10,78 +10,64 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
-// Options configures one depwalk analyze run.
+// Options は depwalk analyze 1 回の設定。
 type Options struct {
-	// WorkspaceRoot is the absolute path to the workspace being analyzed.
 	WorkspaceRoot string
-	// SourceRoots holds the raw --source-root flag values in the order they
-	// were given. Core passes them through to analysisRequest.sourceRoots
-	// without interpreting build systems or package hierarchies; an
-	// empty slice means the flag was not given and the field is omitted.
+	// SourceRoots は --source-root の値を指定順のまま持つ。Core は build system も
+	// package 階層も解釈せず analysisRequest.sourceRoots へ素通しする。
+	// 空なら flag 未指定で、request の field 自体を省く。
 	SourceRoots []string
-	// Language is passed through to analysisRequest.language without
-	// interpretation.
+	// Language は解釈せず analysisRequest.language へ素通しする。
 	Language string
-	// AnalyzerMeta holds the raw --analyzer-meta key=value flag values, in
-	// the order they were given.
+	// AnalyzerMeta は --analyzer-meta の key=value を指定順のまま持つ。
 	AnalyzerMeta []string
-	// Include and Exclude hold the raw workspace-relative glob values in the
-	// order they were given. Empty slices omit the corresponding request fields.
+	// Include / Exclude は workspace 相対の glob を指定順のまま持つ。
+	// 空なら request の該当 field を省く。
 	Include []string
 	Exclude []string
-	// Method selects the graph node to traverse. An empty value keeps the
-	// legacy summary-only behavior and ignores the remaining query fields.
-	Method string
-	// Direction and MaxDepth configure traversal for a method query.
+	// Method は探索の起点 node を選ぶ。空なら件数サマリだけを返す動作になり、
+	// 以降の query field は無視する。
+	Method    string
 	Direction graph.Direction
 	MaxDepth  *int
 }
 
-// Result is the outcome of a successful depwalk analyze run.
+// Result は depwalk analyze が成功したときの結果。
 type Result struct {
-	// Graph is the call graph built from the Analyzer's methodSymbol and
+	// Graph は Analyzer の methodSymbol と
 	// callEdge records.
-	Graph *graph.Graph
-	// Diagnostics contains non-fatal diagnostic records reported by the
-	// Analyzer.
-	Diagnostics []Diagnostic
-	// MethodCount is the number of methodSymbol records folded into Graph.
-	MethodCount int
-	// CallEdgeCount is the number of callEdge records folded into Graph.
+	Graph         *graph.Graph
+	Diagnostics   []Diagnostic
+	MethodCount   int
 	CallEdgeCount int
-	// MethodQuery holds the traversal outcome of a method query; nil when
-	// Options.Method was empty.
+	// MethodQuery は method query の探索結果。Options.Method が空なら nil。
 	MethodQuery *MethodQuery
 }
 
-// MethodQuery is the traversal request and result of a method query, kept
-// together so the caller can render them (the output formatter consumes
-// both).
+// MethodQuery は method query の探索要求と結果。
+// output の formatter が両方を使うため、組にして渡す。
 type MethodQuery struct {
 	Request traversal.Request
 	Result  traversal.Result
 }
 
-// Runner runs the analyze use case against an injected [Source]. It is
-// published as a struct, not an interface: callers that need an abstraction
-// define one on their side.
+// Runner は注入された [Source] に対して analyze の use case を実行する。
+//
+// interface ではなく struct として公開する。抽象が要る呼び出し側が自分で
+// interface を定義すればよく、提供側が先回りして抽象を作ると使われない抽象が残る。
 type Runner struct {
 	source Source
 }
 
-// New returns a [Runner] backed by source.
 func New(source Source) Runner {
 	return Runner{source: source}
 }
 
-// Run executes the Analyzer through the port and builds a call graph from
-// its records.
+// Run は port 経由で Analyzer を実行し、その record から呼び出しグラフを構築する。
 //
-// A non-nil error is returned when the request cannot be built or
-// validated, when the Analyzer stdout fails protocol validation, or when
-// the Analyzer reports a fatal error (an "error" record or a non-zero
-// exit code); these are all fatal failures the caller should propagate as
-// a non-zero process exit.
+// error を返すのは、要求を組めない / 検証に通らない、Analyzer の stdout が
+// protocol 検証に失敗する、Analyzer が致命的な失敗 ("error" record または非ゼロ
+// exit) を報告した場合。いずれも呼び出し側が非ゼロ exit として伝播すべき失敗である。
 func (r Runner) Run(opts Options) (Result, error) {
 	if r.source == nil {
 		return Result{}, errors.New("analyze: a Source is required")
@@ -101,10 +87,9 @@ func (r Runner) Run(opts Options) (Result, error) {
 		Metadata:      metadata,
 	}
 
-	// stagingGraph receives domain values one at a time as the port streams
-	// them; it stays private request state until the run is confirmed
-	// successful and is discarded (never published) on any fatal outcome,
-	// keeping the request atomic.
+	// stagingGraph は port が流す domain 値を 1 件ずつ受け取る。run の成功が
+	// 確定するまで request 内の非公開状態として保ち、fatal なら公開せず破棄する。
+	// 要求を原子的に扱うためである。
 	stagingGraph := graph.New()
 	methodCount, callEdgeCount := 0, 0
 	outcome, err := r.source.Run(request,

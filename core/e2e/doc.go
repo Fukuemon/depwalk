@@ -1,18 +1,15 @@
-// Package e2e runs the real analyzers/java fat jar through the
-// core/internal/analyze use case against the fixture project under
-// testdata/fixtures/java, and checks the result against the fixture's known
-// caller/callee expectations (see testdata/fixtures/java/README.md).
+// Package e2e は実 analyzers/java fat jar を core/internal/analyze の use case 経由で
+// testdata/fixtures/java の fixture project に対して動かし、既知の caller / callee の
+// 期待値と突き合わせる (testdata/fixtures/java/README.md)。
 //
-// Unlike the JUnit tests in analyzers/java (which exercise the analysis
-// logic in-process) and the Go process-contract tests in
-// core/internal/analyzer (which exercise the Analyzer Protocol against a
-// fake analyzer), this package is the only place that verifies Core and the
-// real Java Analyzer process actually agree with each other end to end.
+// analyzers/java の JUnit テストは解析ロジックをプロセス内で、
+// core/internal/analyzer の Go テストは Analyzer Protocol を fake analyzer に対して
+// 検証する。本 package は **Core と実 Java Analyzer プロセスが端から端まで実際に
+// 噛み合うことを検証する唯一の場所**である。
 //
-// Requirements and skip rule: these tests need a JDK 25 java executable and
-// a built analyzers/java/build/libs/java-analyzer.jar (produced by `cd
-// analyzers/java && ./gradlew shadowJar`). Both are discovered at runtime
-// (see findJava25 and findAnalyzerJar in java_fixture_test.go); when either
-// is missing, the tests call t.Skip so a plain `go test ./...` (e.g. the Go
-// CI job, which does not build the Java Analyzer) is not broken.
+// 前提と skip 規則: JDK 25 の java 実行ファイルと、build 済みの
+// analyzers/java/build/libs/java-analyzer.jar (`cd analyzers/java && ./gradlew
+// shadowJar` で作る) が要る。どちらも実行時に探す (java_fixture_test.go の
+// findJava25 / findAnalyzerJar)。欠けていれば t.Skip する。素の
+// `go test ./...` (Java Analyzer を build しない Go の CI job など) を壊さないため。
 package e2e

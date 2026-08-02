@@ -48,12 +48,12 @@ class DiagnosticsTest {
                         "JAVA_UNRESOLVED_SYMBOL".equals(d.get("code")) && "warning".equals(d.get("severity"))),
                 "expected JAVA_UNRESOLVED_SYMBOL/warning diagnostic: " + diagnostics);
 
-        // No callEdge should be produced for the unresolved call.
+        // 未解決の呼び出しに対して callEdge を作らないこと。
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertTrue(edges.stream().noneMatch(e -> "java:com.example.Ok#run()".equals(e.get("callerMethodId"))),
                 "unresolved call must not produce a callEdge: " + edges);
 
-        // Ok#run() itself is still enumerated as a declared method (declaration-site enumeration is unaffected).
+        // Ok#run() 自体は宣言済み method として列挙され続けること (宣言側の列挙は影響を受けない)。
         List<Map<String, Object>> nodes = ran.byType("methodSymbol");
         assertTrue(nodes.stream().anyMatch(n -> "java:com.example.Ok#run()".equals(n.get("methodId"))));
     }

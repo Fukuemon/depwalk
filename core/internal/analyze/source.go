@@ -6,7 +6,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Request describes one analysis run handed to the [Source] port. Every
+// Request は [Source] port へ渡す 1 回の解析を表す。すべて
 // field is passed through to the Analyzer request without interpretation;
 // the port implementation owns the wire form (request id, schema version,
 // validation).
@@ -19,27 +19,22 @@ type Request struct {
 	Metadata      map[string]any
 }
 
-// Outcome is the process-level result the [Source] port reports after the
+// Outcome は stream の終了後に [Source] port が報告する process 単位の結果。以下は
 // record stream ends.
 type Outcome struct {
-	// Diagnostics contains non-fatal diagnostic records reported by the
-	// Analyzer, translated to domain values.
-	Diagnostics []Diagnostic
-	// Failure is the fatal Analyzer error record, if one was emitted.
-	Failure *AnalyzerFailure
-	// ValidationError is the first Core-side stdout validation error.
+	// Diagnostics は Analyzer が報告した致命的でない診断 (domain 値へ変換済み)。
+	Diagnostics     []Diagnostic
+	Failure         *AnalyzerFailure
 	ValidationError error
-	// ExitCode is the Analyzer process exit code.
-	ExitCode int
+	ExitCode        int
 }
 
-// Err reports the failure the run ended with, or nil when the Analyzer
-// finished cleanly.
+// Err は run が終わった原因の失敗を返す。正常終了なら nil。
 //
-// The order matters. A fatal Analyzer result — an error record, or a non-zero
-// exit — keeps its own reason, because the stream's reference-completeness
-// check must not mask why the Analyzer actually gave up. Callers get that
-// precedence by using this method instead of reading the fields directly.
+// **判定順に意味がある。** Analyzer 側の致命的な結果 (error record または非ゼロ
+// exit) を先に見るのは、stream の参照完全性検査が「Analyzer が実際になぜ諦めたか」
+// を覆い隠さないようにするためである。呼び出し側は field を直接読まず本メソッドを
+// 使うことで、この優先順位を得る。
 func (o Outcome) Err() error {
 	if o.Failure != nil {
 		return o.Failure
@@ -53,18 +48,18 @@ func (o Outcome) Err() error {
 	return nil
 }
 
-// Source is the port through which the use case receives domain-typed
-// analysis results: nodes and edges are streamed to the callbacks as they
-// arrive, and the process-level outcome is returned once the stream ends.
-// The interface is defined consumer-side; the protocol
-// package's ACL adapter implements it, and cli injects that adapter into
-// [New].
+// Source は use case が domain 型の解析結果を受け取る port。node と edge は届いた
+// 順に callback へ流し、process 単位の結果は stream の終了時に返す。
+//
+// interface は利用側 (本 package) で定義する。実装は protocol package の ACL
+// adapter で、cli が [New] へ注入する。提供側で定義すると use case が wire 表現を
+// 知ることになり、依存が逆向きになる。
 type Source interface {
 	Run(request Request, onNode func(graph.Node), onEdge func(graph.Edge)) (Outcome, error)
 }
 
-// Diagnostic is a non-fatal Analyzer diagnostic translated to domain
-// values. Metadata is opaque and never interpreted by Core.
+// Diagnostic は致命的でない Analyzer の診断を domain 値へ写したもの。
+// Metadata は opaque で、Core は解釈しない。
 type Diagnostic struct {
 	Severity        string
 	Code            string

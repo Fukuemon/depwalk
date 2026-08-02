@@ -9,11 +9,11 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// fakeSource is an in-package Source fake: it streams the
-// configured nodes / edges to the callbacks and returns the configured
-// outcome, recording the request it received. Process-level behavior
-// (fake Analyzer subprocesses) is tested against the ACL adapter in the
-// protocol package.
+// fakeSource は package 内の Source の fake。設定した node / edge を callback へ
+// 流し、設定した outcome を返し、受け取った request を記録する。
+//
+// プロセス単位の挙動 (fake Analyzer subprocess) は protocol package の ACL adapter
+// に対して検証する。
 type fakeSource struct {
 	nodes   []graph.Node
 	edges   []graph.Edge
@@ -189,8 +189,8 @@ func TestRunPropagatesAnalyzerFailure(t *testing.T) {
 func TestRunKeepsFatalReasonOverValidationErrorAndPublishesNothing(t *testing.T) {
 	t.Parallel()
 
-	// A fatal record and a validation error on the same stream: the fatal
-	// reason must win, and no partial result may be published.
+	// 同じ stream に fatal record と検証エラーが並ぶ場合。fatal 側の理由が勝ち、
+	// 部分結果は公開してはならない。
 	source := &fakeSource{
 		nodes: []graph.Node{{ID: "method:caller"}},
 		edges: []graph.Edge{{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:missing"}},
@@ -230,9 +230,8 @@ func TestRunPropagatesNonZeroExit(t *testing.T) {
 	}
 }
 
-// Outcome.Err folds the three result fields into one failure. Pin the
-// precedence: getting it wrong would replace the Analyzer's own fatal reason
-// with a reference-completeness error.
+// Outcome.Err は 3 つの結果 field を 1 つの失敗へ畳む。優先順位を固定する。
+// 誤ると Analyzer 自身の fatal 理由が参照完全性エラーで置き換わる。
 func TestOutcomeErrPrefersTheFatalReason(t *testing.T) {
 	t.Parallel()
 
@@ -277,8 +276,7 @@ func TestOutcomeErrPrefersTheFatalReason(t *testing.T) {
 	}
 }
 
-// The original validation error is wrapped with %w so callers can still
-// reach it with errors.Is.
+// 元の検証エラーは %w で包む。呼び出し側が errors.Is で辿れるようにするため。
 func TestOutcomeErrWrapsTheValidationError(t *testing.T) {
 	t.Parallel()
 
@@ -330,7 +328,7 @@ func TestRunQueryMatchesUniqueSelectorWithoutSignature(t *testing.T) {
 	if result.MethodQuery.Request.StartID != "opaque-target" {
 		t.Fatalf("StartID = %q, want opaque-target", result.MethodQuery.Request.StartID)
 	}
-	// A selector without a signature must traverse the same as the full one.
+	// signature を省いた selector は、完全な selector と同じ探索結果になること。
 	if _, reached := result.MethodQuery.Result.Nodes["opaque-caller"]; !reached {
 		t.Fatalf("traversal nodes = %#v, want opaque-caller reached", result.MethodQuery.Result.Nodes)
 	}

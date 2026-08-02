@@ -98,7 +98,7 @@ func TestTraverseCallerDirectionReachesCallers(t *testing.T) {
 }
 
 func TestTraverseDoesNotLoopOnCircularGraph(t *testing.T) {
-	// a -> b -> a and self loop c -> c reachable from a via b -> c.
+	// a -> b -> a と、b -> c 経由で a から到達できる self loop c -> c。
 	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").
@@ -116,7 +116,7 @@ func TestTraverseDoesNotLoopOnCircularGraph(t *testing.T) {
 }
 
 func TestTraverseUnlimitedDepthWhenMaxDepthUnset(t *testing.T) {
-	// Deep chain a -> b -> c -> d -> e.
+	// 深い連鎖 a -> b -> c -> d -> e。
 	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:bc", "method:b", "method:c").
@@ -169,7 +169,7 @@ func TestTraverseMaxDepthZeroKeepsOnlyStart(t *testing.T) {
 }
 
 func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
-	// Diamond with uneven arms: o -> a -> a2 -> m (depth 3) and o -> b -> m (depth 2).
+	// 腕の長さが違う合流: o -> a -> a2 -> m (深さ 3) と o -> b -> m (深さ 2)。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
@@ -188,8 +188,8 @@ func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
 }
 
 func TestTraverseNodesIdenticalForBFSAndDFS(t *testing.T) {
-	// Uneven diamond where a DFS arm reaches m at depth 3 before the
-	// shorter depth-2 arm: the node set must not depend on the order.
+	// DFS 側の腕が深さ 3 で m に着き、短い深さ 2 の腕より先に到達する合流。
+	// node 集合が順序に依存しないこと。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").

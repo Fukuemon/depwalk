@@ -110,7 +110,7 @@ public final class AnalysisRunner {
      * @param request preflight 検証済みの解析要求 (未検証の要求を渡してはならない)
      * @param allowIncompleteAnalysis true のとき、全救済後も残る primary diagnostic があっても
      *     request を fatal にせず、解決済み graph と診断を公開する
-     *     ({@code metadata.allowIncompleteAnalysis})
+     *     ({@code metadata.allowIncompleteAnalysis} に対応する)
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
      * @throws IncompleteAnalysisException {@code allowIncompleteAnalysis} が false のまま、
