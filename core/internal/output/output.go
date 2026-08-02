@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Write renders in using the formatter registered for format.
-// Unsupported formats fail before the writer is touched.
+// Write は format に登録された formatter で in を描画する。
+// 未対応の format は writer に触れる前に失敗させる (書きかけを残さないため)。
 func Write(w io.Writer, format Format, in Input) error {
 	formatter, ok := formatters()[format]
 	if !ok {
