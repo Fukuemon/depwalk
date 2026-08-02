@@ -6,10 +6,12 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// AnalyzerFailure is returned by [Runner.Run] when the Analyzer reports a
-// fatal error record. It preserves the full structured failure —
-// top-level code, message, source location, opaque metadata, and ordered
-// details — without interpreting Analyzer-specific codes or metadata keys.
+// AnalyzerFailure は Analyzer が致命的な error record を報告したときに
+// [Runner.Run] が返す。
+//
+// 構造化された失敗をそのまま保つ (top-level の code / message / source location /
+// opaque metadata / 順序付きの details)。Analyzer 固有の code や metadata の key は
+// 解釈しない。解釈すると Core が言語固有の知識を持つことになる。
 type AnalyzerFailure struct {
 	Code     string
 	Message  string
@@ -18,8 +20,7 @@ type AnalyzerFailure struct {
 	Details  []FailureDetail
 }
 
-// FailureDetail is one language-agnostic structured detail of a fatal
-// Analyzer failure.
+// FailureDetail は致命的な Analyzer 失敗の、言語に依存しない構造化された明細 1 件。
 type FailureDetail struct {
 	Code     string
 	Message  string
@@ -27,20 +28,17 @@ type FailureDetail struct {
 	Metadata map[string]any
 }
 
-// Error returns the top-level failure summary.
 func (e *AnalyzerFailure) Error() string {
 	return fmt.Sprintf("analyzer reported a fatal error: %s: %s", e.Code, e.Message)
 }
 
-// InputError marks an error caused by values supplied for an analysis request
-// or method query. CLI callers use it to distinguish exit code 2 failures from
-// runtime failures without interpreting error text.
+// InputError は解析要求や method query に渡された値が原因の error を標識する。
+// CLI 側が exit code 2 の失敗を実行時失敗と区別するために使う。
+// error 文字列を読んで分類しなくて済むようにするためである。
 type InputError struct {
 	Err error
 }
 
-// Error returns the wrapped error's message.
 func (e *InputError) Error() string { return e.Err.Error() }
 
-// Unwrap returns the wrapped error so callers can inspect its cause.
 func (e *InputError) Unwrap() error { return e.Err }
