@@ -1,9 +1,10 @@
 package traversal
 
-// sccComponents assigns a strongly connected component ID to every node
-// using an iterative Tarjan algorithm in O(V + E). The iteration is
-// explicit (no recursion) so deep call chains cannot overflow the stack.
-// Component IDs are arbitrary; only membership equality is meaningful.
+// sccComponents は各 node に強連結成分の ID を割り当てる。Tarjan 法で O(V + E)。
+//
+// 再帰ではなく明示的な反復で書いてある。呼び出し連鎖が深い graph で
+// stack overflow を起こさせないため。
+// ID の値自体に意味はなく、同じ ID かどうかだけが意味を持つ。
 func sccComponents(nodes map[string]bool, adjacency map[string][]string) map[string]int {
 	index := map[string]int{}
 	lowlink := map[string]int{}

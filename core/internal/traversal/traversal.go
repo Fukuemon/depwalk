@@ -6,85 +6,77 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Order selects the internal visit order of the walk. It has no effect
-// on the observable [Result].
+// Order は走査の訪問順を選ぶ。[Result] には影響しない。
 type Order string
 
 const (
-	// OrderBFS expands nodes breadth-first. It is the default.
+	// OrderBFS は幅優先で展開する。既定値。
 	OrderBFS Order = "bfs"
-	// OrderDFS expands nodes depth-first.
+	// OrderDFS は深さ優先で展開する。
 	OrderDFS Order = "dfs"
 )
 
-// Status reports whether a traversal found its start node.
+// Status は探索が起点 node を見つけられたかを表す。
 type Status string
 
 const (
-	// StatusOK means the start node existed and the result is populated.
+	// StatusOK は起点が存在し、結果が埋まっていることを表す。
 	StatusOK Status = "ok"
-	// StatusStartNotFound means the start node was absent (including an
-	// empty graph). It is a normal "no match" result, not an error.
+	// StatusStartNotFound は起点が無かったことを表す (graph が空の場合を含む)。
+	// error ではなく正常な「該当なし」として扱う。
 	StatusStartNotFound Status = "startNotFound"
 )
 
-// Request describes one traversal run.
+// Request は 1 回の探索を表す。
 type Request struct {
-	// StartID is the methodId of the start node.
+	// StartID は起点 node の methodId。
 	StartID string
-	// Direction selects caller or callee reachability.
+	// Direction は caller / callee のどちらの到達可能性を見るかを選ぶ。
 	Direction graph.Direction
-	// MaxDepth limits the reached set to nodes with minDepth <= MaxDepth.
-	// nil means unlimited. Zero keeps only the start node.
+	// MaxDepth は到達集合を minDepth <= MaxDepth の node に限る。
+	// nil は無制限。0 なら起点だけが残る。
 	MaxDepth *int
-	// Order selects the internal visit order. Empty defaults to [OrderBFS].
+	// Order は訪問順を選ぶ。空なら [OrderBFS]。
 	Order Order
 }
 
-// Result is the outcome of a traversal. Nodes and Edges carry the
-// reached induced subgraph as sets keyed by ID: no order is guaranteed.
+// Result は探索の結果。Nodes と Edges は到達した誘導部分グラフを ID をキーとする
+// 集合として持ち、順序は保証しない。
 type Result struct {
 	Status Status
-	// Nodes is the reached node ID set (minDepth <= maxDepth), including
-	// the start node.
+	// Nodes は到達 node の ID 集合 (minDepth <= maxDepth)。起点を含む。
 	Nodes map[string]bool
-	// Depths maps each reached node ID to its shortest distance from the
-	// start node. It has the same keys as Nodes.
+	// Depths は到達 node ごとの起点からの最短距離。キーは Nodes と同じ。
 	Depths map[string]int
-	// Edges is the induced subgraph: every edge in the traversal
-	// direction whose both endpoints are reached, including convergent
-	// and cycle edges.
+	// Edges は誘導部分グラフ。両端が到達 node である探索方向の edge をすべて含む。
+	// 合流 edge も閉路の edge も除外しない。
 	Edges map[string]graph.Edge
-	// Cycles annotates the Edges entries that lie on a cycle of the
-	// reached subgraph (self-loop or same SCC). Annotated edges stay in
-	// Edges because they are real call relations.
+	// Cycles は Edges のうち到達部分グラフ内で閉路を構成するものに注釈を付ける
+	// (self-loop または同一 SCC)。注釈しても Edges から外さない。実在する
+	// 呼び出し関係であり、落とすと網羅性が崩れるため。
 	Cycles map[string]bool
-	// DepthCutoffs records edges from a reached node to a node beyond
-	// the depth limit, keyed by edge ID. These edges are not in Edges.
+	// DepthCutoffs は到達 node から深さ上限の外の node へ向かう edge を
+	// edge ID をキーに記録する。これらは Edges には含めない。
 	DepthCutoffs map[string]DepthCutoff
 }
 
-// DepthCutoff is an edge cut by the depth limit together with the
-// minDepth of the node it leads to.
+// DepthCutoff は深さ上限で切られた edge と、その接続先 node の minDepth。
 type DepthCutoff struct {
 	Edge graph.Edge
-	// TargetMinDepth is the minDepth of the beyond-limit node the edge
-	// leads to in the traversal direction (always > maxDepth).
+	// TargetMinDepth は探索方向の接続先 node の minDepth (常に maxDepth より大きい)。
 	TargetMinDepth int
 }
 
-// Traverse runs one traversal over g and returns the reached induced
-// subgraph. Invalid request options fail before any walk with the
-// zero-value [Result], which must not be used; a missing start node
-// yields an empty [Result] with [StatusStartNotFound] instead of an
-// error.
+// Traverse は g を 1 回探索し、到達した誘導部分グラフを返す。
 //
-// The reached set is derived from a single shortest-distance walk
-// ([minDepths]) because the contract defines it order-independently:
-// deriving it from any other walk could only agree or silently diverge.
-// The Order option is therefore validated but does not alter the walk;
-// its BFS / DFS semantics live in [visitOrder] for consumers that need
-// an ordered expansion (kept for future tree-style output).
+// 不正な request は走査前に error にし、[Result] はゼロ値を返す (使ってはならない)。
+// 起点が見つからない場合は error にせず、空の [Result] と
+// [StatusStartNotFound] を返す。解析結果として「該当なし」は正常だからである。
+//
+// 到達集合は最短距離の走査 ([minDepths]) 1 本から導く。契約が順序に依存しない
+// 以上、別の走査から導いても一致するか、静かに食い違うかのどちらかにしかならない。
+// このため Order は検証するだけで走査を変えない。BFS / DFS の走査自体は
+// [visitOrder] にあるが、本関数からは呼ばない。
 func Traverse(g *graph.Graph, req Request) (Result, error) {
 	if err := validate(req); err != nil {
 		return Result{}, err
