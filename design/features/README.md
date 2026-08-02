@@ -27,4 +27,4 @@ frontmatter を持たない feature doc はまだ載らない ([issue #40](https
 
 ## 新規追加
 
-[templates/features/template.md](../../templates/features/template.md) を `design/features/<feature>/DesignDoc_<feature>.md` にコピーして起票する。
+`templates/features/template.md` を `design/features/<feature>/DesignDoc_<feature>.md` にコピーして起票する。`templates/` は sdd-template から symlink で繋がっており本 repo では追跡しない (未接続なら `bash scripts/doctor.sh`)。
