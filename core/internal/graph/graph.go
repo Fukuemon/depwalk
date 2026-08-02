@@ -69,9 +69,9 @@ type Edge struct {
 type Graph struct {
 	nodes map[string]Node
 	edges map[string]Edge
-	// outgoing maps a caller node ID to the edges it calls (callee direction).
+	// outgoing は caller の node ID から、その node が呼ぶ edge への対応 (callee 方向)。
 	outgoing map[string][]Edge
-	// incoming maps a callee node ID to the edges that call it (caller direction).
+	// incoming は callee の node ID から、その node を呼ぶ edge への対応 (caller 方向)。
 	incoming map[string][]Edge
 }
 

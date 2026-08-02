@@ -99,9 +99,8 @@ func patternsFixtureRoot(t *testing.T) string {
 	return filepath.Join(multiModuleFixtureRoot(t), "patterns")
 }
 
-// ensurePatternsClasses builds the patterns fixture classes output (Lombok
-// generated members) so bytecode rescue has real candidates; a build failure
-// fails the test.
+// ensurePatternsClasses は patterns fixture の classes output (Lombok 生成 member)
+// を build する。bytecode 救済に実在の候補を与えるため。build 失敗はテストの失敗とする。
 func ensurePatternsClasses(t *testing.T, fixture string) {
 	t.Helper()
 	marker := filepath.Join(fixture, "lib", "build", "classes", "java", "main",

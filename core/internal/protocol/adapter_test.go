@@ -24,7 +24,7 @@ func fakeAnalyzerAdapter(scenario string) *Adapter {
 	})
 }
 
-// runAdapter collects the streamed domain values alongside the outcome.
+// runAdapter は流れてくる domain 値を outcome とあわせて集める。
 func runAdapter(adapter *Adapter, request analyze.Request) ([]graph.Node, []graph.Edge, analyze.Outcome, error) {
 	var nodes []graph.Node
 	var edges []graph.Edge
@@ -174,10 +174,11 @@ func TestAdapterReportsNonZeroExit(t *testing.T) {
 	}
 }
 
-// assertRequestScenarioPassed fails the test when the fake Analyzer
-// rejected the wire request. The fake reports assertion failures by
-// exiting non-zero, and a non-zero exit is carried in the outcome rather
-// than returned as an error, so the exit code must be checked explicitly.
+// assertRequestScenarioPassed は fake Analyzer が wire 要求を拒否したときに
+// テストを失敗させる。
+//
+// fake は検証失敗を非ゼロ exit で報告し、非ゼロ exit は error ではなく outcome に
+// 載る。そのため exit code を明示的に確かめる必要がある。
 func assertRequestScenarioPassed(t *testing.T, outcome analyze.Outcome, err error) {
 	t.Helper()
 
@@ -296,9 +297,9 @@ func TestAdapterFakeAnalyzerProcess(t *testing.T) {
 	}
 }
 
-// assertAdapterRequest verifies the wire request the adapter composed:
-// schema fields, generated request id, fullGraph mode, and the presence /
-// omission of the optional filter fields.
+// assertAdapterRequest は adapter が組み立てた wire 要求を検証する。schema の
+// field、生成した request id、fullGraph モード、optional な filter field の
+// 有無を見る。
 func assertAdapterRequest(requestBytes []byte, withFilters bool) {
 	var request AnalysisRequest
 	if err := json.Unmarshal(requestBytes, &request); err != nil {

@@ -265,9 +265,9 @@ func writeJSONDocument(t *testing.T, in Input) jsonDocument {
 
 func intPointer(value int) *int { return &value }
 
-// jsonLocation maps the fields by hand, so this pins that every one of
-// them (path / startLine plus the three optional fields) marshals under
-// its wire-compatible name and none are swapped.
+// jsonLocation は field を手で対応付けている。そのため各 field
+// (path / startLine と optional 3 つ) が wire 互換の名前で直列化され、
+// 取り違えが起きないことをここで固定する。
 func TestJSONSourceLocationMarshalsAllOptionalFields(t *testing.T) {
 	t.Parallel()
 

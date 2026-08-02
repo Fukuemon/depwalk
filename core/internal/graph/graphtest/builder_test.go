@@ -103,7 +103,7 @@ func TestBuilderBuildsDiamondGraph(t *testing.T) {
 }
 
 func TestBuilderBuildsCircularGraph(t *testing.T) {
-	// a -> b -> a (mutual recursion) and c -> c (self loop)
+	// a -> b -> a (相互再帰) と c -> c (self loop)
 	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").

@@ -17,19 +17,19 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// requiredEnvVar is the environment variable that, when set to "1", turns a
-// missing E2E prerequisite (JDK 25, the analyzer jar) from a skip into a
-// hard failure. CI's e2e job sets it so that a prerequisite silently going
-// missing (e.g. JDK version detection breaking, or the jar upload/download
-// step failing) fails the job loudly instead of the job going green having
-// run zero assertions.
+// requiredEnvVar は "1" のとき、E2E の前提 (JDK 25、analyzer jar) の欠落を skip
+// ではなく失敗に変える環境変数。
+//
+// CI の e2e job がこれを立てる。前提が黙って欠ける (JDK 検出が壊れる、jar の
+// upload / download が失敗する等) と、**アサーションを 1 つも実行しないまま job が
+// 緑になる**ためである。
 const requiredEnvVar = "DEPWALK_E2E_REQUIRED"
 
-// skipOrFail skips the test with the given message, unless requiredEnvVar
-// is set to "1", in which case it fails the test instead. This is the
-// single chokepoint E2E prerequisite checks go through so CI can opt into
-// "missing prerequisite is a failure" without duplicating the env check at
-// every call site.
+// skipOrFail はメッセージを添えてテストを skip する。ただし requiredEnvVar が "1"
+// なら失敗させる。
+//
+// E2E の前提検査はすべてここを通す。各呼び出し箇所で環境変数を見なくても、CI が
+// 「前提の欠落は失敗」を選べるようにするためである。
 func skipOrFail(t *testing.T, format string, args ...any) {
 	t.Helper()
 	msg := fmt.Sprintf(format, args...)
@@ -39,17 +39,18 @@ func skipOrFail(t *testing.T, format string, args ...any) {
 	t.Skip(msg)
 }
 
-// e2eRequired reports whether requiredEnvVar's value means "prerequisite
-// gaps must fail the test rather than skip it". Split out from skipOrFail
-// so the branch condition (as opposed to the t.Skip/t.Fatal side effect,
-// which testing.T does not allow observing directly) can be unit tested.
+// e2eRequired は requiredEnvVar の値が「前提の欠落を skip でなく失敗にする」を
+// 意味するかを返す。
+//
+// skipOrFail から分けてある。t.Skip / t.Fatal の副作用は testing.T から直接観測
+// できないため、分岐条件だけを unit test で検証できるようにした。
 func e2eRequired(envValue string) bool {
 	return envValue == "1"
 }
 
-// fixtureRoot returns testdata/fixtures/java as an absolute path. Tests run
-// with the package directory as the working directory, so the relative
-// climb is stable regardless of how `go test` is invoked.
+// fixtureRoot は testdata/fixtures/java を絶対パスで返す。テストは package の
+// ディレクトリを作業ディレクトリとして走るため、相対の遡りは `go test` の
+// 呼び方によらず安定する。
 func fixtureRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", "testdata", "fixtures", "java"))
@@ -107,8 +108,8 @@ func isJava25(path string) bool {
 	return javaMajorVersion(string(out)) == 25
 }
 
-// javaMajorVersion parses the major version number out of `java -version`
-// combined output, or returns 0 if no version string is found.
+// javaMajorVersion は `java -version` の出力からメジャーバージョンを取り出す。
+// バージョン文字列が見つからなければ 0 を返す。
 func javaMajorVersion(out string) int {
 	match := javaVersionPattern.FindStringSubmatch(out)
 	if match == nil {
@@ -137,7 +138,7 @@ func findAnalyzerJar(t *testing.T) string {
 	return path
 }
 
-// expectedCallEdge is one entry of testdata/fixtures/java/expected/call-edges.json.
+// expectedCallEdge は testdata/fixtures/java/expected/call-edges.json の 1 件。
 type expectedCallEdge struct {
 	Description string `json:"description"`
 	Caller      string `json:"caller"`
@@ -146,7 +147,7 @@ type expectedCallEdge struct {
 	ViaLambda   bool   `json:"viaLambda,omitempty"`
 }
 
-// expectedDiagnostic is one entry of testdata/fixtures/java/expected/diagnostics.json.
+// expectedDiagnostic は testdata/fixtures/java/expected/diagnostics.json の 1 件。
 type expectedDiagnostic struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
@@ -349,11 +350,11 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 	})
 }
 
-// runForMaxRSS runs the analyzer process a second time, independent of
-// analyzer.Runner, purely to read the process's maximum resident set size
-// from os.ProcessState.SysUsage(): analyzer.Runner does not expose
-// os.ProcessState, so this is the smallest addition that gets a max-RSS
-// reading without changing Core's production Runner API.
+// runForMaxRSS は analyzer.Runner とは別に analyzer プロセスをもう一度動かし、
+// os.ProcessState.SysUsage() から最大 RSS を読む。
+//
+// analyzer.Runner は os.ProcessState を公開しない。本番の Runner API を変えずに
+// 最大 RSS を得るための最小の追加としてこの形にした。
 func runForMaxRSS(javaPath, jarPath string, request protocol.AnalysisRequest) (int64, bool) {
 	payload, err := json.Marshal(request)
 	if err != nil {

@@ -2,15 +2,16 @@ package protocol
 
 import "github.com/Fukuemon/depwalk/core/internal/graph"
 
-// This file is the Translator half of the ACL: it maps wire
-// DTOs to graph-owned domain values, deep copying nested data so later
-// mutation of a protocol DTO can never change the graph. Wire-only fields
-// (schemaVersion / recordType) are dropped here and never reach the
-// domain model.
+// 本ファイルは ACL の Translator 側。wire DTO を graph が所有する domain 値へ
+// 写す。
+//
+// 入れ子のデータは deep copy する。あとから protocol の DTO を書き換えても
+// graph が変わらないようにするためである。wire 専用の field
+// (schemaVersion / recordType) はここで落とし、domain model へは渡さない。
+// 渡すと domain が wire の版に結合する。
 
-// NodeFromMethodSymbol converts an Analyzer Protocol method symbol to a
-// [graph.Node]. The record's source location and opaque metadata are deep
-// copied into graph-owned values.
+// NodeFromMethodSymbol は Analyzer Protocol の method symbol を [graph.Node] へ
+// 変換する。source location と opaque な metadata は graph 所有の値へ deep copy する。
 func NodeFromMethodSymbol(record MethodSymbol) graph.Node {
 	return graph.Node{
 		ID: record.MethodID,
@@ -23,9 +24,8 @@ func NodeFromMethodSymbol(record MethodSymbol) graph.Node {
 	}
 }
 
-// EdgeFromCallEdge converts an Analyzer Protocol call edge to a
-// [graph.Edge]. The call site and opaque metadata are deep copied into
-// graph-owned values like the node conversion.
+// EdgeFromCallEdge は Analyzer Protocol の call edge を [graph.Edge] へ変換する。
+// call site と opaque な metadata は node の変換と同じく deep copy する。
 func EdgeFromCallEdge(record CallEdge) graph.Edge {
 	return graph.Edge{
 		ID:       record.EdgeID,
@@ -68,9 +68,9 @@ func copyMetadataObject(object map[string]any) map[string]any {
 	return copied
 }
 
-// copyMetadataValue deep copies one opaque JSON value. Scalars (string,
-// bool, nil, and the number representations json.Number / float64) are
-// immutable and returned as is.
+// copyMetadataValue は opaque な JSON 値 1 つを deep copy する。
+// スカラー (string / bool / nil、数値表現の json.Number / float64) は不変なので
+// そのまま返す。
 func copyMetadataValue(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:

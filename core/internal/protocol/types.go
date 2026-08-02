@@ -1,21 +1,21 @@
 package protocol
 
-// SchemaVersion is the Phase 1 Analyzer Protocol version.
+// SchemaVersion は現行の Analyzer Protocol の版。
 const SchemaVersion = "1"
 
-// RecordType identifies the kind of protocol record.
+// RecordType は protocol record の種別を識別する。
 type RecordType string
 
 const (
-	// RecordTypeAnalysisRequest is the Core-to-Analyzer analysis request.
+	// RecordTypeAnalysisRequest は Core から Analyzer への解析要求。
 	RecordTypeAnalysisRequest RecordType = "analysisRequest"
-	// RecordTypeMethodSymbol is an Analyzer-to-Core method symbol record.
+	// RecordTypeMethodSymbol は Analyzer から Core への method symbol record。
 	RecordTypeMethodSymbol RecordType = "methodSymbol"
-	// RecordTypeCallEdge is an Analyzer-to-Core call edge record.
+	// RecordTypeCallEdge は Analyzer から Core への call edge record。
 	RecordTypeCallEdge RecordType = "callEdge"
-	// RecordTypeDiagnostic is an Analyzer-to-Core non-fatal diagnostic record.
+	// RecordTypeDiagnostic は Analyzer から Core への、致命的でない診断 record。
 	RecordTypeDiagnostic RecordType = "diagnostic"
-	// RecordTypeError is an Analyzer-to-Core fatal error record.
+	// RecordTypeError は Analyzer から Core への致命的な error record。
 	RecordTypeError RecordType = "error"
 )
 
@@ -23,31 +23,27 @@ const (
 type Language string
 
 const (
-	// LanguageJava is the Phase 1 Analyzer language.
+	// LanguageJava は現行で唯一対応する言語。
 	LanguageJava Language = "java"
 )
 
-// AnalysisMode controls the requested call graph scope.
+// AnalysisMode は要求する呼び出しグラフの範囲を指定する。
 type AnalysisMode string
 
 const (
-	// AnalysisModeFullGraph requests a graph for the whole analysis scope.
+	// AnalysisModeFullGraph は解析 scope 全体の graph を要求する。
 	AnalysisModeFullGraph AnalysisMode = "fullGraph"
-	// AnalysisModeReachableFromEntrypoints requests a graph reachable from entrypoints.
+	// AnalysisModeReachableFromEntrypoints は entrypoints から到達可能な graph を要求する。
 	AnalysisModeReachableFromEntrypoints AnalysisMode = "reachableFromEntrypoints"
 )
 
-// SymbolKind identifies the kind of callable symbol.
+// SymbolKind は呼び出せる symbol の種別を識別する。
 type SymbolKind string
 
 const (
-	// SymbolKindMethod identifies a method.
-	SymbolKindMethod SymbolKind = "method"
-	// SymbolKindConstructor identifies a constructor.
+	SymbolKindMethod      SymbolKind = "method"
 	SymbolKindConstructor SymbolKind = "constructor"
-	// SymbolKindFunction identifies a function.
-	SymbolKindFunction SymbolKind = "function"
-	// SymbolKindInitializer identifies an initializer.
+	SymbolKindFunction    SymbolKind = "function"
 	SymbolKindInitializer SymbolKind = "initializer"
 )
 
@@ -55,11 +51,9 @@ const (
 type Severity string
 
 const (
-	// SeverityInfo is informational.
-	SeverityInfo Severity = "info"
-	// SeverityWarning is a warning.
+	SeverityInfo    Severity = "info"
 	SeverityWarning Severity = "warning"
-	// SeverityPartialFailure indicates a non-fatal partial analysis failure.
+	// SeverityPartialFailure は致命的でない部分的な解析失敗を表す。
 	SeverityPartialFailure Severity = "partialFailure"
 )
 
@@ -72,7 +66,7 @@ type Record interface {
 	record()
 }
 
-// AnalysisRequest is the Core-to-Analyzer request record.
+// AnalysisRequest は Core から Analyzer への要求 record。
 type AnalysisRequest struct {
 	SchemaVersion string           `json:"schemaVersion"`
 	RecordType    RecordType       `json:"recordType"`
@@ -97,13 +91,13 @@ func (r AnalysisRequest) Mode() AnalysisMode {
 	return r.AnalysisMode
 }
 
-// MethodSelector identifies an entrypoint method.
+// MethodSelector は entrypoint のメソッドを指定する。
 type MethodSelector struct {
 	QualifiedName string `json:"qualifiedName"`
 	Signature     string `json:"signature,omitempty"`
 }
 
-// MethodSymbol is an Analyzer-to-Core graph node record.
+// MethodSymbol は Analyzer から Core への graph node record。
 type MethodSymbol struct {
 	SchemaVersion string          `json:"schemaVersion"`
 	RecordType    RecordType      `json:"recordType"`
@@ -118,7 +112,7 @@ type MethodSymbol struct {
 
 func (MethodSymbol) record() {}
 
-// CallEdge is an Analyzer-to-Core graph edge record.
+// CallEdge は Analyzer から Core への graph edge record。
 type CallEdge struct {
 	SchemaVersion  string          `json:"schemaVersion"`
 	RecordType     RecordType      `json:"recordType"`
@@ -131,7 +125,7 @@ type CallEdge struct {
 
 func (CallEdge) record() {}
 
-// SourceLocation identifies a source range relative to workspaceRoot.
+// SourceLocation は workspaceRoot からの相対でソース範囲を表す。
 type SourceLocation struct {
 	Path        string `json:"path"`
 	StartLine   int    `json:"startLine"`
@@ -154,7 +148,7 @@ type Diagnostic struct {
 
 func (Diagnostic) record() {}
 
-// AnalyzerError is an Analyzer-to-Core fatal error record.
+// AnalyzerError は Analyzer から Core への致命的な error record。
 type AnalyzerError struct {
 	SchemaVersion string          `json:"schemaVersion"`
 	RecordType    RecordType      `json:"recordType"`
@@ -165,8 +159,8 @@ type AnalyzerError struct {
 	Details       []FailureDetail `json:"details,omitempty"`
 }
 
-// FailureDetail is one language-agnostic structured detail of a fatal error.
-// Core consumers validate only the common fields and treat metadata as opaque.
+// FailureDetail は致命的な失敗の、言語に依存しない構造化された明細 1 件。
+// Core は共通 field だけを検証し、metadata は opaque として扱う。
 type FailureDetail struct {
 	Code     string          `json:"code"`
 	Message  string          `json:"message"`

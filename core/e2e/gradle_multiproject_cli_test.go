@@ -208,12 +208,12 @@ type cliResult struct {
 	stderr   string
 }
 
-// runCLI runs the real Core CLI with --analyzer-cmd pointing at the recording
-// proxy, which launches the real Analyzer jar.
+// runCLI は --analyzer-cmd に記録プロキシを指した実 Core CLI を動かす。
+// プロキシが実 Analyzer jar を起動する。
 func runCLI(t *testing.T, cliPath, captureDir, javaPath, jarPath string, args ...string) cliResult {
 	t.Helper()
-	// proxyCmd is quoted by hand, so a path containing a double quote would
-	// corrupt the command. Fail explicitly rather than silently.
+	// proxyCmd は手で引用符を付けているため、二重引用符を含むパスがあると
+	// コマンドが壊れる。黙って進めず明示的に失敗させる。
 	for _, part := range []string{os.Args[0], captureDir, javaPath, jarPath} {
 		if strings.Contains(part, `"`) {
 			t.Fatalf("path containing a double quote is not supported by the proxy command quoting: %q", part)
@@ -244,8 +244,8 @@ func multiModuleFixtureRoot(t *testing.T) string {
 	return root
 }
 
-// ensureMultiModuleManifest builds the fixture (classes output + explicit
-// classpath manifest) when missing; a build failure fails the test.
+// ensureMultiModuleManifest は fixture (classes output と明示 classpath manifest) が
+// 無ければ build する。build 失敗はテストの失敗とする。
 func ensureMultiModuleManifest(t *testing.T, fixture string) []string {
 	t.Helper()
 	manifestPath := filepath.Join(fixture, "build", "depwalk-classpath.txt")
@@ -275,7 +275,7 @@ func ensureMultiModuleManifest(t *testing.T, fixture string) []string {
 	return entries
 }
 
-// buildCoreCLI builds the real depwalk CLI binary; a build failure fails the test.
+// buildCoreCLI は実 depwalk CLI バイナリを build する。build 失敗はテストの失敗とする。
 func buildCoreCLI(t *testing.T) string {
 	t.Helper()
 	binary := filepath.Join(t.TempDir(), "depwalk")
@@ -346,8 +346,8 @@ func capturedRecords(t *testing.T, captureDir string) []protocol.Record {
 	return records
 }
 
-// capturedGraph returns deterministic comparable views of the raw Analyzer
-// graph (method locations by id, edge keys with metadata, edgeId excluded).
+// capturedGraph は Analyzer の生 graph を、比較可能で決定的な view にして返す
+// (id ごとの method 位置、metadata 付きの edge key。edgeId は除く)。
 func capturedGraph(t *testing.T, captureDir string) (map[string]string, []string) {
 	t.Helper()
 	methods := map[string]string{}
@@ -375,9 +375,8 @@ func capturedGraph(t *testing.T, captureDir string) (map[string]string, []string
 func assertCapturedGraphMatches(t *testing.T, captureDir string, expected expectedMultiModuleGraph) {
 	t.Helper()
 	methods, edges := capturedGraph(t, captureDir)
-	// expected/graph.json is the fixture's complete set. Matching the counts
-	// turns the containment check into a set equality check, so extra methods
-	// or edges are detected too.
+	// expected/graph.json は fixture の全体集合である。件数も一致させることで
+	// 包含の検査が集合一致の検査になり、余分な method や edge も検出できる。
 	if len(methods) != len(expected.Methods) {
 		t.Errorf("method count = %d, want exactly %d: %v", len(methods), len(expected.Methods), methods)
 	}
@@ -417,8 +416,8 @@ func assertCapturedGraphMatches(t *testing.T, captureDir string, expected expect
 	}
 }
 
-// assertNoGradleFreeText verifies the analyzer stderr carries only
-// depwalk-generated fixed lines and metrics (no Gradle free text).
+// assertNoGradleFreeText は analyzer の stderr が depwalk 由来の定型行と metrics
+// だけを載せていること (Gradle の自由文が混ざらないこと) を検証する。
 func assertNoGradleFreeText(t *testing.T, stderrText string) {
 	t.Helper()
 	for _, line := range strings.Split(stderrText, "\n") {
@@ -434,9 +433,9 @@ func assertNoGradleFreeText(t *testing.T, stderrText string) {
 	}
 }
 
-// writeFatalWorkspace creates a workspace whose real analysis streams graph
-// records first and then fails with JAVA_INCOMPLETE_ANALYSIS (two unresolved
-// in-scope calls in a second file).
+// writeFatalWorkspace は、実解析が graph record を流したあとに
+// JAVA_INCOMPLETE_ANALYSIS で失敗する workspace を作る
+// (2 つ目のファイルに scope 内の未解決 call を 2 件置く)。
 func writeFatalWorkspace(t *testing.T, workspace string) {
 	t.Helper()
 	dir := filepath.Join(workspace, "com", "example", "fatal")

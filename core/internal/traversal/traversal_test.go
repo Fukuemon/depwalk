@@ -98,7 +98,7 @@ func TestTraverseCallerDirectionReachesCallers(t *testing.T) {
 }
 
 func TestTraverseDoesNotLoopOnCircularGraph(t *testing.T) {
-	// a -> b -> a and self loop c -> c reachable from a via b -> c.
+	// a -> b -> a と、b -> c 経由で a から到達できる self loop c -> c。
 	g := graphtest.NewBuilder().
 		Edge("edge:ab", "method:a", "method:b").
 		Edge("edge:ba", "method:b", "method:a").

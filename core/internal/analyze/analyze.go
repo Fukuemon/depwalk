@@ -87,10 +87,9 @@ func (r Runner) Run(opts Options) (Result, error) {
 		Metadata:      metadata,
 	}
 
-	// stagingGraph receives domain values one at a time as the port streams
-	// them; it stays private request state until the run is confirmed
-	// successful and is discarded (never published) on any fatal outcome,
-	// keeping the request atomic.
+	// stagingGraph は port が流す domain 値を 1 件ずつ受け取る。run の成功が
+	// 確定するまで request 内の非公開状態として保ち、fatal なら公開せず破棄する。
+	// 要求を原子的に扱うためである。
 	stagingGraph := graph.New()
 	methodCount, callEdgeCount := 0, 0
 	outcome, err := r.source.Run(request,

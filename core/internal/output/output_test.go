@@ -228,8 +228,8 @@ func (f *recordingFormatter) Format(w io.Writer, view View) error {
 	return err
 }
 
-// writerFunc adapts a function to io.Writer so a test can force a write
-// failure.
+// writerFunc は関数を io.Writer へ適合させる。テストが書き込み失敗を起こせる
+// ようにするため。
 type writerFunc func([]byte) (int, error)
 
 func (f writerFunc) Write(p []byte) (int, error) { return f(p) }

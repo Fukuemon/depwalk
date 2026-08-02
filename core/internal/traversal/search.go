@@ -2,10 +2,11 @@ package traversal
 
 import "github.com/Fukuemon/depwalk/core/internal/graph"
 
-// minDepths returns the shortest distance from start to every reachable
-// node in the given direction (start = 0), computed breadth-first so the
-// distances are exact regardless of the requested visit order. Visited
-// nodes are never re-expanded, which also terminates cyclic graphs.
+// minDepths は起点から到達可能な各 node への最短距離を返す (起点は 0)。
+//
+// 幅優先で走査する。[Request] の Order は結果に影響しない契約なので、距離は
+// 指定された訪問順に関係なく正確でなければならない。
+// 訪問済み node を再展開しないため、循環があっても停止する。
 func minDepths(g *graph.Graph, startID string, dir graph.Direction) map[string]int {
 	depths := map[string]int{startID: 0}
 	queue := []string{startID}
@@ -23,13 +24,12 @@ func minDepths(g *graph.Graph, startID string, dir graph.Direction) map[string]i
 	return depths
 }
 
-// visitOrder walks the graph from start and returns the node IDs in the
-// order they were expanded: FIFO for [OrderBFS] (the default) and LIFO
-// matching recursive depth-first order for [OrderDFS]. It implements the
-// [Order] semantics of [Request] for consumers that need an ordered
-// expansion; [Traverse] itself derives the reached set from
-// [minDepths] because the result contract is order-independent. Visited
-// nodes are never re-expanded.
+// visitOrder は起点から graph を辿り、展開した順に node ID を返す。
+// [OrderBFS] (既定) は FIFO、[OrderDFS] は再帰的な深さ優先と同じ順になる。
+//
+// [Traverse] からは呼ばれない。到達集合の契約が訪問順に依存しないため、
+// [Traverse] は [minDepths] だけで結果を導く。本関数は順序付きの展開を要する
+// consumer (将来の tree 出力など) のために残してある。
 func visitOrder(g *graph.Graph, startID string, dir graph.Direction, order Order) []string {
 	visited := map[string]bool{startID: true}
 	frontier := []string{startID}
@@ -71,9 +71,7 @@ func visitOrder(g *graph.Graph, startID string, dir graph.Direction, order Order
 	return out
 }
 
-// nextNode returns the node an edge leads to when walking in dir: the
-// callee for [graph.DirectionCallee] and the caller for
-// [graph.DirectionCaller].
+// nextNode は dir 方向に辿ったときの接続先 node を返す。
 func nextNode(e graph.Edge, dir graph.Direction) string {
 	if dir == graph.DirectionCaller {
 		return e.CallerID
