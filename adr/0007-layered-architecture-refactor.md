@@ -38,9 +38,9 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + JSONL Protocol 
 | #   | ルール                                                                              | 理由                                                       |
 | --- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | 1   | 依存方向は内向き単方向 (platform → app → domain)。domain は他層に依存しない         | クリーンアーキテクチャの基本原則。DesignDoc P2 / P3 と整合 |
-| 2   | wire 表現 (Protocol DTO) は境界の変換層でドメインモデルへ写像し、内層に持ち込まない | architecture.md の既存規約を実装レベルで担保               |
+| 2   | wire 表現 (Protocol DTO) は境界の変換層でドメインモデルへ写像し、内層に持ち込まない | architecture.md の既存規約を実装レベルで保証               |
 | 3   | 外部ライブラリ (Cobra / SootUp / Gradle Tooling API) への依存は境界側に隔離する     | 将来のライブラリ差し替え・テスト容易性                     |
-| 4   | 再編は外部挙動を変えない (E2E / golden test が無変更で PASS する)                   | リファクタリングの安全性担保                               |
+| 4   | 再編は外部挙動を変えない (E2E / golden test が無変更で PASS する)                   | リファクタリングの安全性の確認                             |
 | 5   | 層をまたぐ禁止 import は機械検査で検出し、quality gate に組み込む                   | 人力レビュー頼みでは regression する                       |
 
 ### 受け入れ基準 (EARS)
@@ -63,7 +63,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + JSONL Protocol 
 
 問題の本質は「package 間の実際の依存エッジが見えない・強制されないこと」であり、層ディレクトリはこれに対して粗すぎる答えだった (層は 3 分類の順序しか示さず、`graph` と `traversal` の関係のような実エッジは依然不可視)。代わりに次の 3 点で可視性と強制を実現する:
 
-- **依存方向の規定と機械検査**: package 単位の依存規則 (正本は `context/architecture.md` の Package Boundary) を depguard の deny ルールで宣言し、CI / pre-commit で強制する。層 glob より解像度が高い
+- **依存方向の規定と機械検査**: package 単位の依存規則 (定めるのは `context/architecture.md` の Package Boundary) を depguard の deny ルールで宣言し、CI / pre-commit で強制する。層 glob より解像度が高い
 - **生成された依存図**: `go list` から package 依存図 (mermaid) を生成するスクリプトを置き、`context/architecture.md` の生成マーカー区間を更新する。手描きの図と違い腐らず、再生成 diff を検査すれば実態との drift も検出できる
 - **コンポジションルート**: 配線 (手動 DI + `var _` 検証) を `cli` に集約し、実際の依存グラフが 1 箇所で読めるようにする
 

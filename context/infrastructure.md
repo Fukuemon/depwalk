@@ -13,7 +13,7 @@ verified_commit: 9654928
 
 公開基盤・環境戦略・運用・セキュリティの契約。本書は **app 側が依存する contract** を定義する。infra 実体を別 repo で管理する場合はその境界も記す ([context/project.yml](project.yml) のリポジトリマップ)。
 
-> depwalk は **CLI ツール**であり、サーバ / Web UI を持たない (Non Goals)。一般的な Web app 向けの環境戦略の多くは非該当。Core 実装基盤は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
+> depwalk は **CLI ツール**であり、サーバ / Web UI を持たない (Non Goals)。一般的な Web app 向けの環境戦略の多くは非該当。Core 実装基盤は [ADR-0002](../adr/0002-core-implementation-foundation.md) が定める。
 
 ## Infrastructure / Deployment
 

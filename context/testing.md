@@ -19,25 +19,25 @@ Core の test framework は Go 標準の `testing` とする。
 
 ## テスト責務の分担
 
-| 種別              | 配置                                                              | 主担当範囲                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)。Java Analyzer 側は `analyzers/java/` で JUnit を用いる (三層構成は下記「Java Analyzer 三層」参照)                                                                                                                                                                                                                                                                                                                                   |
-| Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠                                                                                                                                                                                                                                                                                                                                                                         |
-| E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3)。S1/S2 は Traversal Engine 層の到達集合照合 ([feature doc](../design/features/traversal/DesignDoc_traversal.md) が正本) と CLI 出力照合の 2 層からなり、CLI 出力照合の設計は確定済み ([CLI feature doc](../design/features/cli/DesignDoc_cli.md) が正本)・完成は CLI 層が担う。S3 も同様に Output Engine 層の照合 ([feature doc](../design/features/output/DesignDoc_output.md) が正本。unit / golden) と CLI 出力照合の 2 層からなる |
+| 種別              | 配置                                                              | 主担当範囲                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL parse / validate、探索打ち切り (Q4)。Java Analyzer 側は `analyzers/java/` で JUnit を用いる (三層構成は下記「Java Analyzer 三層」参照)                                                                                                                                                                                                                                                                                                                                         |
+| Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠                                                                                                                                                                                                                                                                                                                                                                               |
+| E2E (照合)        | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller/callee 集合と CLI 出力の一致 (S1/S2)、各出力形式のパース可否 (S3)。S1/S2 は Traversal Engine 層の到達集合照合 ([feature doc](../design/features/traversal/DesignDoc_traversal.md) が定める) と CLI 出力照合の 2 層からなり、CLI 出力照合の設計は確定済み ([CLI feature doc](../design/features/cli/DesignDoc_cli.md) が定める)・完成は CLI 層が担う。S3 も同様に Output Engine 層の照合 ([feature doc](../design/features/output/DesignDoc_output.md) が定める。unit / golden) と CLI 出力照合の 2 層からなる |
 
 ## テスト runtime contract
 
-- E2E は 2 層からなる: Traversal 層は `testdata/fixtures/traversal/` の graph 入力 + 期待集合 JSON fixture で到達 node / edge 集合を照合し (実装済み)、CLI 層は **サンプル Java/Spring プロジェクト**を fixture として既知の呼び出し関係集合と CLI 出力を照合する (DesignDoc 成功条件の測定方法。設計は確定済みで [CLI feature doc](../design/features/cli/DesignDoc_cli.md) が正本、完成は #22 実装フェーズが担う)。
-- Core ↔ Analyzer は別プロセスのため、JSONL 入出力を境界とした **contract test** を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)。横断的な contract test 観点は本書を正本とする。
+- E2E は 2 層からなる: Traversal 層は `testdata/fixtures/traversal/` の graph 入力 + 期待集合 JSON fixture で到達 node / edge 集合を照合し (実装済み)、CLI 層は **サンプル Java/Spring プロジェクト**を fixture として既知の呼び出し関係集合と CLI 出力を照合する (DesignDoc 成功条件の測定方法。設計は確定済みで [CLI feature doc](../design/features/cli/DesignDoc_cli.md) が定め、完成は #22 実装フェーズが担う)。
+- Core ↔ Analyzer は別プロセスのため、JSONL 入出力を境界とした **contract test** を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。Protocol / SPI / Model schema を定めるのは [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)。横断的な contract test 観点は本書が定める。
 - Core の unit test / contract test は `cd core && go test ./...` で実行できる状態を保つ。
 - Mock は手書き fake / interface stub で開始する。
 - Golden fixture は `testdata/` 配下に置く。repo root の `testdata/` に加え、Go 慣習の **package-local `testdata/`** (例: `core/internal/output/testdata/golden/`) も可とする (単一 package に閉じる golden は package-local を優先する)。
 - `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
-- E2E の具体 CLI 引数・対象選択は確定済み (flag 体系・exit code の正本は [CLI feature doc](../design/features/cli/DesignDoc_cli.md))。CLI 出力照合 (S1-S3) の完成は #22 の実装フェーズが担う。
+- E2E の具体 CLI 引数・対象選択は確定済み (flag 体系・exit code を定めるのは [CLI feature doc](../design/features/cli/DesignDoc_cli.md))。CLI 出力照合 (S1-S3) の完成は #22 の実装フェーズが担う。
 
 ### Java Analyzer 三層
 
-Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実 jar E2E の三層でテストする。判断根拠と feature 固有観点の正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
+Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実 jar E2E の三層でテストする。判断根拠と feature 固有観点を定めるのは [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
 
 | 層                     | 配置                                                          | JVM 要否               |
 | ---------------------- | ------------------------------------------------------------- | ---------------------- |
@@ -67,7 +67,7 @@ macOS では `/tmp` と `/var/folders` が `/private` 配下への symlink で�
 
 ## Protocol contract test
 
-Analyzer Protocol / SPI の contract test は、実装スタック確定前でも以下の観点を正本とする。
+Analyzer Protocol / SPI の contract test は、実装スタック確定前でも以下の観点が定める。
 
 - valid `analysisRequest` record を Analyzer が受け取れること。
 - `analysisRequest.include` / `analysisRequest.exclude` が `workspaceRoot` からの相対 path glob 配列として扱われ、絶対 path、空文字、`..` を含む path が schema 不準拠として拒否されること。
@@ -96,7 +96,7 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 - valid `error`、非ゼロ exit、parse / schema error が先行 graph record と diagnostic をすべて無効化し、staging Graph を公開しないこと。正常 stream だけが参照完全性を満たすこと。
 - 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと。
 - valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること。
-- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal は表出せず、Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出すること (表出の正本は [output feature doc](../design/features/output/DesignDoc_output.md))。
+- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal は表出せず、Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出すること (表出を定めるのは [output feature doc](../design/features/output/DesignDoc_output.md))。
 - `error.details` の共通 fieldを決定順で保持し、Analyzer 固有 code に分岐せず CLI が汎用表示できること。
 
 ## Gradle multi-project / 完全性の横断テスト
@@ -111,4 +111,4 @@ Analyzer Protocol / SPI の contract test は、実装スタック確定前で�
 ## 横断テスト方針
 
 - リリース判定には最低限 S1 (caller) / S2 (callee) / S3 (各出力形式) の E2E 照合を含める。
-- **2 つ目以降**の Analyzer 追加時は Protocol contract test の通過を必須とする (S5: Core 無変更の担保。初号機導入時の言語非依存な初回配線は対象外)。
+- **2 つ目以降**の Analyzer 追加時は Protocol contract test の通過を必須とする (S5: Core を変えずに済むことの確認。初号機導入時の言語非依存な初回配線は対象外)。

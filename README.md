@@ -27,7 +27,7 @@ depwalk はこの調査を静的解析で自動化し、CLI として CI に組�
 
 Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / 実行時 Proxy の動的解析、IDE Plugin / Web UI の提供。本ツールは CLI に限定する。
 
-グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](adr/0010-defer-graph-visualization.md))。
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断を定めるのは [ADR-0010](adr/0010-defer-graph-visualization.md))。
 
 ## 使い方
 
@@ -46,7 +46,7 @@ depwalk analyze <workspace-root> \
   --format json
 ```
 
-`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。コマンドの正本は [context/project.yml](context/project.yml) の `commands`。
+`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。コマンドを定めるのは [context/project.yml](context/project.yml) の `commands`。
 
 ## アーキテクチャ
 
@@ -63,7 +63,7 @@ depwalk analyze <workspace-root> \
 
 ## ドキュメント構成
 
-本リポジトリは Spec Driven Development (SDD) テンプレートを土台に運用する。正本は層ごとに分かれる。
+本リポジトリは Spec Driven Development (SDD) テンプレートを土台に運用する。決まりは層ごとに分かれる。
 
 | 層                | 文書                                       | 役割                                             |
 | ----------------- | ------------------------------------------ | ------------------------------------------------ |
@@ -76,10 +76,10 @@ depwalk analyze <workspace-root> \
 
 **どこから読むか**が分からないときは [context/reading-map.yaml](context/reading-map.yaml) を引く。触るコードパスから「読むべき文書」を逆引きできる索引で、各文書の frontmatter から生成している。
 
-各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する (正本は [ADR-0008](adr/0008-doc-freshness-and-reading-map.md))。
+各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する (定めるのは [ADR-0008](adr/0008-doc-freshness-and-reading-map.md))。
 
-> 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節を正本とする。
-> AI エージェントの操作契約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) (正本は sdd-template リポジトリ、`rulesync` で各 provider へ生成)。
+> 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節が定める。
+> AI エージェントの操作契約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) (定義は sdd-template リポジトリにあり、`rulesync` で各 provider へ生成)。
 
 ## ディレクトリ
 

@@ -1,4 +1,4 @@
-# ADR-0008: 文書の鮮度を git 証拠で担保し、読み取りマップを生成物にする
+# ADR-0008: 文書の鮮度を git の証拠で保証し、読み取りマップを生成物にする
 
 ## 状態
 
@@ -12,11 +12,11 @@
 
 ## 背景
 
-本プロジェクトの文書は「docs が正本、コードが導出物」という SDD の前提で運用しており、この方向は維持する。一方で **正本であること自体は、正本が実装と一致していることを保証しない**。実測 (2026-07-28) で次の 2 つの構造的な穴が確認された。
+本プロジェクトの文書は「docs が決まりで、コードはそこから導く」という SDD の前提で運用しており、この方向は維持する。一方で **決まりを置いた文書であること自体は、その内容が実装と一致していることを保証しない**。実測 (2026-07-28) で次の 2 つの構造的な穴が確認された。
 
 ### 穴 1: 鮮度が人の手書きに依存している
 
-`context/README.md` の Freshness 契約は「各ファイル先頭に `> 最終更新: YYYY-MM-DD` を置き、内容変更時に更新する」と定めている。この日付は人が手で書くため、**更新を忘れても・実態と食い違っても、機械的には検出できない**。実際 14 ファイル (`design/` 7 本 + `context/` 7 本) がこのヘッダを持つが、日付の正しさを担保する仕組みは存在しない。
+`context/README.md` の Freshness 契約は「各ファイル先頭に `> 最終更新: YYYY-MM-DD` を置き、内容変更時に更新する」と定めている。この日付は人が手で書くため、**更新を忘れても・実態と食い違っても、機械的には検出できない**。実際 14 ファイル (`design/` 7 本 + `context/` 7 本) がこのヘッダを持つが、日付の正しさを保証する仕組みは存在しない。
 
 加えてヘッダ行は `> 最終更新: 2026-07-26 / Status: 完了 (300 字を超える改訂注記...)` のような散文へ肥大しており、機械可読でも人間可読でもなくなっている。
 
@@ -28,9 +28,9 @@
 
 ### 既に成功しているパターン
 
-一方で本リポジトリには、同じ「文書が腐る」問題を解いた実例が 1 つある。Core の package 依存図は `scripts/depgraph.sh` が `go list` の実 import から生成し、`context/architecture.md` の生成マーカー区間を冪等に置換する。再生成して diff が出れば drift とみなし、lefthook pre-commit と CI が FAIL させる (判断の正本は [ADR-0007](0007-layered-architecture-refactor.md))。
+一方で本リポジトリには、同じ「文書が腐る」問題を解いた実例が 1 つある。Core の package 依存図は `scripts/depgraph.sh` が `go list` の実 import から生成し、`context/architecture.md` の生成マーカー区間を冪等に置換する。再生成して diff が出れば drift とみなし、lefthook pre-commit と CI が FAIL させる (判断を定めるのは [ADR-0007](0007-layered-architecture-refactor.md))。
 
-本 ADR は、**depgraph で実証済みのパターンを文書運用全体へ一般化する**ものである。外部ツール (OpenWiki 等) の調査も行ったが、それらは「コードが正本・docs が導出物」を前提としており本プロジェクトとは向きが逆のため、ツール自体は導入せず設計思想のみを取り込む。
+本 ADR は、**depgraph で実証済みのパターンを文書運用全体へ一般化する**ものである。外部ツール (OpenWiki 等) の調査も行ったが、それらは「コードが決まりで、docs はそこから導く」を前提としており本プロジェクトとは向きが逆のため、ツール自体は導入せず設計思想のみを取り込む。
 
 ## 要求
 
@@ -99,7 +99,7 @@ verified_commit: <sha> | unverified
 
 - **frontmatter 自体は prettier で変化しない**。3 本とも prettier 3.6.2 適用後も frontmatter は 1 文字も変わらなかった。したがって [issue #45](https://github.com/Fukuemon/depwalk/issues/45) の生成器は frontmatter をそのままパースしてよい。**ただしこれは「人手の文書を `.prettierignore` へ入れなくてよい」ことを意味しない** — 下記「生成区間を含む文書の整形」を参照
 - **`governs` を持たない文書が実在する** (`context/README.md`)。パーサは `governs` と `verified_commit` の**両方が欠けている場合だけ**鮮度検査の対象外として扱う。片方だけ欠けている状態は設定ミス (キー名の typo / 移行時の書き漏れ) として **error にする**。片欠けを黙って対象外にすると、governed な文書が stale 一覧から静かに消え、未確認の棚卸しという目的が崩れる
-- **`governs` は単一 package とは限らない**。`context/toolchain.md` は 6 パスを持ち、そこには `analyzers/java/model-provider/build.gradle.kts` や `gradle-wrapper.properties` のように「本文が正本として記録している値の出所」も含める。**その文書が語っている契約の実装場所をすべて挙げる**のが基準であり、文書が置かれた package だけではない (`design/features/graph/` が変換契約と公開の原子性も定義するため `protocol` / `analyze` を含むのが例)
+- **`governs` は単一 package とは限らない**。`context/toolchain.md` は 6 パスを持ち、そこには `analyzers/java/model-provider/build.gradle.kts` や `gradle-wrapper.properties` のように「本文が決まりとして記録している値の出所」も含める。**その文書が語っている契約の実装場所をすべて挙げる**のが基準であり、文書が置かれた package だけではない (`design/features/graph/` が変換契約と公開の原子性も定義するため `protocol` / `analyze` を含むのが例)
 - パーサは `governs` のパスが実在するかを検査しない。ビルドスクリプトの記法差 (`.gradle` / `.gradle.kts`) など project 側の事情を吸収するため。ただし文書の著者は実在するパスを書く
 
 #### 生成区間を含む文書の整形
@@ -162,7 +162,7 @@ verified_commit: <sha> | unverified
 | `context/ai-agents.md`               | `.claude/agents/` (下記の注意を参照)                                                                                                                                                     |
 | `context/README.md`                  | なし (索引部分は生成物。決定 4 を参照)                                                                                                                                                   |
 
-`context/ai-agents.md` の `governs` には制約がある。この文書が語る subagent 定義の**正本は sdd-template リポジトリ**にあり、本リポジトリの `.rulesync/` は symlink で commit しない。したがって検出できるのは「再生成された生成物 (`.claude/agents/`) が変わったこと」までであり、正本側の変更そのものは追えない。この限界を承知のうえで生成物を監視対象にする。
+`context/ai-agents.md` の `governs` には制約がある。この文書が語る subagent 定義を**持つのは sdd-template リポジトリ**にあり、本リポジトリの `.rulesync/` は symlink で commit しない。したがって検出できるのは「再生成された生成物 (`.claude/agents/`) が変わったこと」までであり、決まりを置いた側の変更そのものは追えない。この限界を承知のうえで生成物を監視対象にする。
 
 `context/project.yml` は YAML のため frontmatter を持てず、既存の `meta.updated` を継続する。
 
@@ -222,11 +222,11 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
 
 コードから AI が wiki を生成・追従させるツール群 (OpenWiki / DeepWiki 等) を検討した。却下理由は 3 点。
 
-1. これらは「コードが正本、docs は導出物」を前提とし、本プロジェクトの SDD (「衝突したら Design Doc が正」) と向きが逆である。導入すると正本が二重化する
+1. これらは「コードが決まりで、docs はそこから導く」を前提とし、本プロジェクトの SDD (「衝突したら Design Doc が正」) と向きが逆である。導入すると決まりの置き場が二重になる
 2. 生成物が root の `AGENTS.md` / `CLAUDE.md` へ書き込むが、本リポジトリではこの 2 つは `.rulesync/` からの生成物で直接編集が禁止されており、正面衝突する
-3. 生成される文書の品質は設計品質を担保する水準に届かない (公開されている利用報告でも「アーキテクチャの構造化は有用だが、内容は概略レベル」と評価されている)
+3. 生成される文書の品質は、設計の品質を保証できる水準に届かない (公開されている利用報告でも「アーキテクチャの構造化は有用だが、内容は概略レベル」と評価されている)
 
-思想 (git 証拠による鮮度担保 / progressive disclosure / 読み取りマップの生成物化) のみを取り込む。
+思想 (git の証拠による鮮度の保証 / progressive disclosure / 読み取りマップの生成物化) のみを取り込む。
 
 ### 却下: 鮮度検査も CI FAIL にする
 
@@ -282,7 +282,7 @@ drift 検査 (生成物側) の入力は**全対象文書の frontmatter**であ
   - `context/README.md` の Freshness 契約を frontmatter ベースへ改訂する
   - `context/reading-map.yaml` (改名後) の冒頭コメント (育て方) を生成物である旨へ改訂する
   - `context/README.md` のファイル一覧と、`impact-index` を参照している既存記述をすべて新名へ追随させる
-  - **`verified_commit` を誰が進めるかは skill 側の契約である**。`spec-lifecycle` の sync phase と `context-harvest` が更新責務を負うが、これらの skill の正本は sdd-template リポジトリにあり、本リポジトリの `.rulesync/` は symlink で commit しない。skill 側の変更は `skill-feedback` 経由で正本へ書き戻す
+  - **`verified_commit` を誰が進めるかは skill 側の契約である**。`spec-lifecycle` の sync phase と `context-harvest` が更新責務を負うが、これらの skill を定めるのは sdd-template リポジトリにあり、本リポジトリの `.rulesync/` は symlink で commit しない。skill 側の変更は `skill-feedback` 経由で元の定義へ書き戻す
 - 実装上の注意: lefthook の `run` は `sh -c` で実行され `set -e` が効かない。生成と `git diff --exit-code` は `&&` で連結する (既存の `go-depgraph-drift` と同じ形)
 
 ## 関連ドキュメント / チケット
