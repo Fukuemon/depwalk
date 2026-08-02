@@ -53,7 +53,7 @@ depwalk は Core (Go) と Analyzer (言語別) をプロセス + JSONL Protocol 
 
 ### スコープ外
 
-CLI インターフェース・JSONL Protocol schema・exit code 等の外部挙動の変更、新機能追加、既存ロジックのアルゴリズム変更、Core / Analyzer 間のプロセス境界の変更、`analyzers/java` の Gradle build 構成の変更 (package 移動に伴う機械的追随を除く)。
+外部挙動の変更 (CLI インターフェース・JSONL Protocol schema・exit code 等)、新機能追加、既存ロジックのアルゴリズム変更。Core / Analyzer 間のプロセス境界の変更も含む。`analyzers/java` の Gradle build 構成の変更も対象とする (package 移動に伴う機械的追随は除く)。
 
 ## 決定
 
