@@ -17,4 +17,4 @@
 - 将来拡張 (新 app / API / 認証など) の採否を決めた。
 - 代替案比較を経て、採用方針を明示的に残す必要がある。
 
-テンプレートは [templates/adr/template.md](../templates/adr/template.md) を `adr/NNNN-<title>.md` にコピーして使う。
+テンプレートは `templates/adr/template.md` を `adr/NNNN-<title>.md` にコピーして使う。`templates/` は sdd-template から symlink で繋がっており本 repo では追跡しない (未接続なら `bash scripts/doctor.sh`)。
