@@ -39,7 +39,7 @@ Core 実装基盤を定めるのは [ADR-0002](../adr/0002-core-implementation-f
 | `core/internal/analyze`         | `app`      | `depwalk analyze` の use case orchestration + port interface 定義 (利用側・小さく)        |
 | `core/internal/protocol`        | `platform` | JSONL wire DTO / parse / validate + ACL (wire → domain 変換 Translator と port 実装)      |
 | `core/internal/analyzer`        | `platform` | 外部 Analyzer process の起動、stdin / stdout / stderr、exit code handling                 |
-| `core/internal/output`          | `platform` | text / JSON / DOT / Mermaid formatter (依存先は graph / traversal のみ)                   |
+| `core/internal/output`          | `platform` | Console / JSON formatter (依存先は graph / traversal のみ)                                |
 | `core/internal/cli`             | `platform` | CLI command / flags / 入力 validation + 手動 DI 配線 (コンポジションルート、`var _` 集約) |
 
 依存規則 (package 単位。depguard で機械検査する):
