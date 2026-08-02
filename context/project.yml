@@ -72,7 +72,7 @@ tracker:
 domains:
   - core # CLI entrypoint、Analyzer process orchestration、graph/traversal/output/protocol を束ねる Go Core
   - traversal # Caller / Callee 探索 (Traversal Engine)
-  - output # 出力形式 (Console / JSON / DOT / Mermaid; Output Engine)
+  - output # 出力形式 (Console / JSON; Output Engine)
   - analyzer-protocol # Analyzer SPI + Communication Protocol (JSONL) + Model (言語非依存の共通契約)
   - java-analyzer # Java/Spring 解析の言語別実装 (analyzer-protocol を実装)
 
