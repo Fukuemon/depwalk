@@ -99,7 +99,7 @@ source にない生成 member は、call site から要求された member だ�
 
 ### 救済と除外分類が効く範囲
 
-bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけでなく method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用し、救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。
+bytecode 救済 (project bytecode member index) と `external-target` 除外分類は、method call だけに適用するのではない。method reference (constructor reference 含む) と explicit constructor invocation (`super(...)` / `this(...)`) の resolve 失敗にも適用する。救済・分類を試みてから diagnostic 化する。outcome ledger の 3 終端と帰属意味論は変更しない。
 
 ### 呼び出し元の型が分からないとき
 
