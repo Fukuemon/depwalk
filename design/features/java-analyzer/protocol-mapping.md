@@ -16,11 +16,11 @@ verified_commit: 2d82ed3
 
 # Java Analyzer: Protocol への写像
 
-**解析結果を Analyzer Protocol の record へどう写すか**の正本。
+**解析結果を Analyzer Protocol の record へどう写すか**を定める。
 
 同じメソッドが常に同じ `methodId` になること (正規化)、呼び出しをどの型に帰属させるか、どの metadata を載せるか、失敗をどの code で報告するかを定める。
 
-wire schema そのものは [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) が正本であり、本 doc は Java 固有の写像規則だけを扱う。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。用語 (adjacency / provenance / dispatch) は親 doc の「前提」節を参照する。
+wire schema そのものは [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) が定めるものであり、本 doc は Java 固有の写像規則だけを扱う。親 doc は [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md)。用語 (adjacency / provenance / dispatch) は親 doc の「前提」節を参照する。
 
 ## この doc が答えること
 
@@ -33,15 +33,15 @@ wire schema そのものは [analyzer-protocol feature doc](../analyzer-protocol
 
 型表記は erasure + JVM binary name とし、`methodId` は可読な文字列そのものとする (hash しない)。
 
-| 項目            | 規則                                                                                                                                | 例                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 型名            | JVM binary name (nested class は `$` 区切り)                                                                                        | `com.example.Outer$Inner`                                    |
-| generics        | erasure で消去する (型引数を保持しない)                                                                                             | `List<String>` → `java.util.List`                            |
-| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                                                                           | `String...` → `java.lang.String[]`                           |
-| `signature`     | `<帰属型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` (帰属型の決定規則は「帰属型の決定規則」節を正本とする) | `com.example.UserService#findById(java.lang.Long)`           |
-| `qualifiedName` | 表示・debug 用の完全修飾名                                                                                                          | `com.example.UserService.findById`                           |
-| constructor     | メソッド名 token は JVM 表記の `<init>` を用いる                                                                                    | `com.example.UserService#<init>(com.example.UserRepository)` |
-| `methodId`      | `java:` prefix + `signature`                                                                                                        | `java:com.example.UserService#findById(java.lang.Long)`      |
+| 項目            | 規則                                                                                                                            | 例                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 型名            | JVM binary name (nested class は `$` 区切り)                                                                                    | `com.example.Outer$Inner`                                    |
+| generics        | erasure で消去する (型引数を保持しない)                                                                                         | `List<String>` → `java.util.List`                            |
+| 配列 / varargs  | erasure の配列表記に正規化する (varargs は配列として扱う)                                                                       | `String...` → `java.lang.String[]`                           |
+| `signature`     | `<帰属型の binary name>#<メソッド名>(<引数型の binary name をカンマ区切り>)` (帰属型の決定規則は「帰属型の決定規則」節が定める) | `com.example.UserService#findById(java.lang.Long)`           |
+| `qualifiedName` | 表示・debug 用の完全修飾名                                                                                                      | `com.example.UserService.findById`                           |
+| constructor     | メソッド名 token は JVM 表記の `<init>` を用いる                                                                                | `com.example.UserService#<init>(com.example.UserRepository)` |
+| `methodId`      | `java:` prefix + `signature`                                                                                                    | `java:com.example.UserService#findById(java.lang.Long)`      |
 
 Java の overload 解決は erasure ベースであり、erasure だけで overload の区別に十分であるため generics を保持する必要はない。`methodId` を hash しないのは、JSONL がデバッグ容易性のために選ばれた性質と一貫させるためであり、決定性は文字列生成規則が決定的であることで満たす。
 
@@ -80,7 +80,7 @@ Java の overload 解決は erasure ベースであり、erasure だけで overl
 
 ### 既知の制約: override は追えない
 
-静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは委譲しない (。、2026-07-12)。本 doc を正本とする。
+静的解決のため、基底型の変数経由の呼び出しは基底型のメソッドに帰属し、実行時に呼ばれる override 先には辺が張られない。virtual dispatch の解決は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md) の範囲とする。SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成そのものは任せない (2026-07-12)。本 doc が定める。
 
 ### どのメソッドを node として出すか
 
@@ -125,7 +125,7 @@ DI 解決を行わない経路では、interface / 抽象メソッド呼び出�
 
 ### 実装候補が複数あるとき
 
-複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。宣言型 edge の既存 metadata は変更しない。追加する実装候補 edge の metadata は次で固定する。本 doc を正本とする。
+複数の dispatch 候補は call site ごとに caller → 各実装候補への複数 `CallEdge` として表現し、宣言型 (interface / 基底型) への既存 edge も保持する。宣言型 edge の既存 metadata は変更しない。追加する実装候補 edge の metadata は次で固定する。本 doc が定める。
 
 | key              | 型       | 値 / 規則                                                                                                             |
 | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -200,4 +200,4 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - `exceptionClass` — resolver 例外のクラス名のみ (message は含めない)
 - `receiverKind` — receiver 式種別 (AST ノード種別名、または実装で定義した固定表記)
 - `receiverTypeResolved` — receiver 型を取得できたか (真偽値)
-  診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は同じ内容で含める。** 出力先は成功時に逐次出力される `diagnostic` record になる。 metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
+  診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は同じ内容で含める。** 出力先は成功時に逐次出力される `diagnostic` record になる。 metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc が定める。

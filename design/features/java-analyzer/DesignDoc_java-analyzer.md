@@ -13,9 +13,9 @@ verified_commit: 2d82ed3
 
 # Feature 設計: Java Analyzer
 
-Java/Spring のソースを読み、メソッドの呼び出し関係を抽出する言語別 Analyzer の設計正本。
+Java/Spring のソースを読み、メソッドの呼び出し関係を抽出する言語別 Analyzer の設計を定める。
 
-共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が正本。本 doc は Java 固有の部分だけを扱う。
+共通契約 (SPI / JSONL Protocol / Model schema) は [Analyzer Protocol / SPI feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) と [ADR-0001](../../../adr/0001-analyzer-protocol-jsonl-spi.md) が定める。本 doc は Java 固有の部分だけを扱う。
 
 ## 前提: この doc を読むのに必要な語
 
@@ -33,7 +33,7 @@ Java のソースから「どのメソッドがどのメソッドを呼んでい
 
 2 が解けないと呼び出し先が特定できず、edge を出せない。**この doc の大半は「2 と 3 をどこまで、どう解くか」の規則**である。
 
-SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的解析基盤だが、depwalk は**型階層と override / interface 実装候補の索引としてのみ使う**。call graph の生成は委譲しない (判断の正本は [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。
+SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的解析基盤だが、depwalk は**型階層と override / interface 実装候補の索引としてのみ使う**。call graph の生成は任せない (判断を定めるのは [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。
 
 ### 型解決に必要な入力
 
@@ -91,9 +91,9 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 
 ### やらないこと
 
-- 共通契約 (SPI / Protocol / Model schema) の定義・変更 (→ analyzer-protocol feature doc が正本)
+- 共通契約 (SPI / Protocol / Model schema) の定義・変更 (→ analyzer-protocol feature doc が定める)
 - グラフ探索 (→ traversal)、出力整形 (→ output)
-- SootUp への call graph 生成委譲 (型階層・override・interface 実装候補の索引としてのみ使う)
+- SootUp への call graph 生成の委任 (型階層・override・interface 実装候補の索引としてのみ使う)
 - Reflection / AspectJ Runtime / 実行時 Proxy の動的解析 (Design Doc Non Goals)
 - CLI 引数の完全仕様の確定 (出力形式指定 / 探索方向 / 深さ上限などの全 flag 体系 → 後続の CLI interface spec)
 
@@ -101,7 +101,7 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 
 ### 詳細の所在
 
-本 doc は Java Analyzer 全体の骨格 (実装基盤・package 境界・起動契約・性能) を持つ。個別の規則は次へ委譲する。
+本 doc は Java Analyzer 全体の骨格 (実装基盤・package 境界・起動契約・性能) を持つ。個別の規則は次が持つ。
 
 - [discovery.md](discovery.md) — 解析対象のソースと classpath をどう決めるか (Gradle build model と安全境界)
 - [analysis.md](analysis.md) — ソースから呼び出し関係をどう解決するか (型解決 / Spring DI / 完全性)
@@ -116,7 +116,7 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 
 ### 内部 package 構成と依存境界
 
-`javaanalyzer` 配下の内部構成の正本 (判断の正本は [ADR-0007](../../../adr/0007-layered-architecture-refactor.md))。
+`javaanalyzer` 配下の内部構成を定める (判断を定めるのは [ADR-0007](../../../adr/0007-layered-architecture-refactor.md))。
 
 - 直下の `protocol` (wire DTO) / `io` (JSONL 入出力) / `preflight` (入力検証) / `discovery` (Gradle Tooling API 隔離) は入出力・起動系として維持する。
 - `analysis` 配下は解析パイプラインの段階別 package で構成し、**段階の実行順は `analysis/pipeline` (AnalysisRunner) だけが知る**。実行順: scope 列挙 → context 構築 (JavaParser + augment) → attribution 準備 → sootup 型階層 index → spring DI index → graph 構築 → completeness 検査 → io 出力。`normalize` は段階横断の naming util。
@@ -125,7 +125,7 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 
 ### 起動契約
 
-Core は `--analyzer-cmd` (CLI flag) → `DEPWALK_ANALYZER_CMD` (環境変数) の順で Analyzer 起動コマンド文字列を解決する。どちらも指定が無い場合は実行前に validation error で拒否する。Core は解決した文字列を **shell を介さず shell-word 分割して exec** する (shell injection を避ける)。Core は `java` / jar / JVM の存在を知らず、言語固有の分岐と path 解決規約を持ち込まない。正本判断は [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
+Core は `--analyzer-cmd` (CLI flag) → `DEPWALK_ANALYZER_CMD` (環境変数) の順で Analyzer 起動コマンド文字列を解決する。どちらも指定が無い場合は実行前に validation error で拒否する。Core は解決した文字列を **shell を介さず shell-word 分割して exec** する (shell injection を避ける)。Core は `java` / jar / JVM の存在を知らず、言語固有の分岐と path 解決規約を持ち込まない。判断は [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
 
 metadata passthrough も同様の言語非依存原則に従う。Core は `--analyzer-meta key=value` で `analysisRequest.metadata` へ素通しするだけで、key / value の意味を解釈しない。
 
@@ -139,8 +139,8 @@ metadata passthrough も同様の言語非依存原則に従う。Core は `--an
 | `reachableFromEntrypoints` | `entrypoints` から呼び出し先 (callee) 方向に推移的に到達する `methodSymbol` と、それらの間の `callEdge` のみ |
 
 - `entrypoints` が未指定または空配列の場合は、`analysisMode` の値によらず scope 全体の call graph 生成要求として扱う。
-- node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は「帰属型の決定規則」節を正本とする。
-- caller 探索 (S1) の入力としては `reachableFromEntrypoints` は不完全であるため、caller 方向の問い合わせでは Core が `fullGraph` を選ぶ責務を持つ (本 doc は Java Analyzer 側の意味論の正本であり、Core の振る舞いは参照)。`reachableFromEntrypoints` は callee 方向の調査で出力量を削るための最適化と位置づける。
+- node 母集合 (どのメソッドを `methodSymbol` として出すか) の列挙方法は「帰属型の決定規則」節が定める。
+- caller 探索 (S1) の入力としては `reachableFromEntrypoints` は不完全であるため、caller 方向の問い合わせでは Core が `fullGraph` を選ぶ責務を持つ (本 doc は Java Analyzer 側の意味論を定めるものであり、Core の振る舞いは参照)。`reachableFromEntrypoints` は callee 方向の調査で出力量を削るための最適化と位置づける。
 
 ### 性能方針
 
@@ -176,10 +176,10 @@ metadata passthrough も同様の言語非依存原則に従う。Core は `--an
 
 ### 段階導入
 
-| 段階                 | 範囲                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 静的呼び出し抽出     | JavaParser + SymbolSolver による静的呼び出し抽出 (実装済み)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| SootUp / Spring 解析 | SootUp による型階層 / Interface Dispatch / Override 候補の補完と、Spring Bean / DI 解決による候補絞り込み (S4 の達成)。実装は型階層補完 → Spring 候補絞り込み → 統合 E2E の順に分割する ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。**SootUp の統合範囲は決定済み (2026-07-12)**: 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は委譲しない。SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (性能方針節を参照)。**Lombok 生成コンストラクタの解決**: `@AllArgsConstructor` / `@RequiredArgsConstructor` 等 Lombok が生成する constructor は source (JavaParser) からは見えないため、SootUp の bytecode 型階層照会対象に自プロジェクトのコンパイル済み class を含めて解決する。これに伴い、解析対象プロジェクトは解析時点でコンパイル済み (`.class` 生成済み) であることを前提とする (未ビルド時は E3 の一般規則で degrade する)。この自プロジェクトのコンパイル済み class も、既存の解析対象ソース・依存 jar と同様に読み取り専用として扱う (書き込み・実行はしない)。 |
+| 段階                 | 範囲                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 静的呼び出し抽出     | JavaParser + SymbolSolver による静的呼び出し抽出 (実装済み)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| SootUp / Spring 解析 | SootUp による型階層 / Interface Dispatch / Override 候補の補完と、Spring Bean / DI 解決による候補絞り込み (S4 の達成)。実装は型階層補完 → Spring 候補絞り込み → 統合 E2E の順に分割する ([ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md))。**SootUp の統合範囲は決定済み (2026-07-12)**: 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は任せない。SootUp の view 構築は lazy に行い、型階層解決に必要なクラスのみ読み込む (性能方針節を参照)。**Lombok 生成コンストラクタの解決**: `@AllArgsConstructor` / `@RequiredArgsConstructor` 等 Lombok が生成する constructor は source (JavaParser) からは見えないため、SootUp の bytecode 型階層照会対象に自プロジェクトのコンパイル済み class を含めて解決する。これに伴い、解析対象プロジェクトは解析時点でコンパイル済み (`.class` 生成済み) であることを前提とする (未ビルド時は E3 の一般規則で degrade する)。この自プロジェクトのコンパイル済み class も、既存の解析対象ソース・依存 jar と同様に読み取り専用として扱う (書き込み・実行はしない)。 |
 
 Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて確定する呼び出しの完全追跡は初期スコープに含めない ([ADR-0004](../../../adr/0004-defer-runtime-call-tracing.md))。静的に候補を導ける場合は候補と根拠を出力し、確定できない場合は候補・未解決理由を観測可能にする。
 
@@ -190,7 +190,7 @@ Reflection / AspectJ Runtime / 実行時 Proxy 等、実行時状態で初めて
 
 ### 起動から結果を返すまで
 
-Core が Analyzer を 1 回呼ぶと何が起きるかの全体像。各段の詳細は子 doc へ委譲する。
+Core が Analyzer を 1 回呼ぶと何が起きるかの全体像。各段の詳細は子 doc が持つ。
 
 ```mermaid
 sequenceDiagram
@@ -270,9 +270,9 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 
 ## テスト観点
 
-横断規約は [context/testing.md](../../../context/testing.md)。本 feature は三層 (Java unit / Go fake analyzer / 実 jar E2E) で担保する。
+横断規約は [context/testing.md](../../../context/testing.md)。本 feature は三層 (Java unit / Go fake analyzer / 実 jar E2E) で保証する。
 
-**観測責務の境界**: 曖昧性・解決根拠の観測は Analyzer JSONL (`callEdge.metadata` / `diagnostic`) までを本 feature の責務とする。CLI 出力への edge 単位 metadata 表出は [CLI feature doc](../cli/DesignDoc_cli.md) が管轄する。本 doc を正本とする。
+**観測責務の境界**: 曖昧性・解決根拠の観測は Analyzer JSONL (`callEdge.metadata` / `diagnostic`) までを本 feature の責務とする。CLI 出力への edge 単位 metadata 表出は [CLI feature doc](../cli/DesignDoc_cli.md) が管轄する。本 doc が定める。
 
 **Java unit test (JUnit / `analyzers/java/`)**
 

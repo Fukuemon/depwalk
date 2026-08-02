@@ -26,7 +26,7 @@ Java Analyzerへ次の二つを一つの後続featureとして段階導入する
 責務境界は次のとおりとする。
 
 - JavaParser / SymbolSolver: ソースAST、呼び出し式、annotation、source symbolの抽出を担う。
-- SootUp: bytecodeと依存jarを含む型階層、override、interface実装候補の補完を担う。call graph生成まで委譲するかは後続specのclarify phaseで決定する。
+- SootUp: bytecodeと依存jarを含む型階層、override、interface実装候補の補完を担う。call graph 生成まで任せるかは後続 spec の clarify phaseで決定する。
 - Spring DI解析: stereotype、`@Bean`、constructor / field / setter injection、`@Qualifier`、`@Primary`、一意候補規則によるBean候補の絞り込みを担う。
 - Core: Spring / JVM / SootUpの意味を解釈せず、Analyzer Protocolで受け取ったgraphを処理する。
 
@@ -36,7 +36,7 @@ Java Analyzerへ次の二つを一つの後続featureとして段階導入する
 
 上記決定時点で未決だった 2 点が issue #21 の clarify phase で確定した。決定内容自体は変更しない、状態の追記として記録する。
 
-1. **call graph 生成の委譲範囲**: SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成までは委譲しない。
+1. **call graph 生成をどこまで任せるか**: SootUp は型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成までは任せない。
 
    理由は 4 つある。
    - **本 ADR の責務境界と整合する**。JavaParser が source AST・呼び出し式・symbol の抽出を担い、SootUp は型階層・override・実装候補の補完を担う、という分担を崩さない
@@ -47,7 +47,7 @@ Java Analyzerへ次の二つを一つの後続featureとして段階導入する
 2. **候補edge / 解決根拠 / 曖昧性のProtocol表現**: call siteごとにcaller→各実装候補への複数`CallEdge`を出力し、宣言型への既存edgeも保持する。各edgeの`metadata`に解決根拠 (`resolution` / `provenance` 等) を付与する (issue #21)。
 3. **project bytecode member index (issue #24、2026-07-18)**: source に現れない生成 member は、call site から要求された signature だけを自 project の compile classes output から索引化して解決する。index は Lombok 等の generator 固有 annotation に依存しない。SootUp は bytecode member / 型情報の取得を担い、call graph 生成と call inventory の完全性判定は引き続き Java Analyzer が担う。bytecode-only member は Protocol 上の `sourceLocation` を省略し、owner の source anchor を opaque metadata で保持する。
 
-上記の理由は issue #21 の spec で確定したものを本 ADR へ移した (2026-08-02)。spec は closeout で削除済みのため、判断の正本は本 ADR とする。
+上記の理由は issue #21 の spec で確定したものを本 ADR へ移した (2026-08-02)。spec は closeout で削除済みのため、判断を定めるのは本 ADR とする。
 
 Spring DIとInterface Dispatch / SootUpは別Issueに分けず、一つのfeature Issueで設計する。SpringのBean選択は型階層から得る実装候補に依存し、両者でsymbol正規化、edge重複排除、曖昧性表現、E2E fixtureを共有するためである。実装promptは型階層補完、Spring候補絞り込み、統合E2Eの順に分割する。
 

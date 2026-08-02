@@ -8,7 +8,7 @@ governs:
   - core/go.mod
   - analyzers/java/build.gradle.kts
   - analyzers/java/settings.gradle.kts
-  # 本書が正本として記録する値の出所。provider の Gradle API baseline /
+  # 本書が決まりとして記録する値の出所。provider の Gradle API baseline /
   # Java release は model-provider 側、同梱 Gradle の版は wrapper が持つ。
   - analyzers/java/model-provider/build.gradle.kts
   - analyzers/java/gradle/wrapper/gradle-wrapper.properties
@@ -17,9 +17,9 @@ verified_commit: 9b9d79d
 
 # Toolchain
 
-採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands を正本とする。
+採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の Quick Commands が定める。
 
-Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-foundation.md) を正本とする。
+Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-foundation.md) が定める。
 本書は、実装者が参照する標準 stack と導入境界だけを保持する。
 
 ## 標準スタック
@@ -35,16 +35,16 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 | Linter                    | `go vet` / `golangci-lint`                | `golangci-lint` は導入済み。depguard で依存方向を機械検査する ([engineering.md](engineering.md) の quality gate)                                         |
 | Formatter                 | `gofmt` / `go fmt`                        | Go 標準 formatter を正とする                                                                                                                             |
 | Unit test                 | Go 標準 `testing`                         | 手書き fake / golden fixture / contract test で開始する                                                                                                  |
-| E2E                       | Go 標準 `testing` から CLI fixture を実行 | 実装は `core/e2e`。CLI 引数の正本は [CLI feature doc](../design/features/cli/DesignDoc_cli.md)                                                           |
+| E2E                       | Go 標準 `testing` から CLI fixture を実行 | 実装は `core/e2e`。CLI 引数を定めるのは [CLI feature doc](../design/features/cli/DesignDoc_cli.md)                                                       |
 
 ## 採用方針
 
-- **Java Analyzer の解析ライブラリは先行固定**: JavaParser (AST) / SymbolSolver (型解決) / SootUp (Interface Dispatch・Override 解決)。SootUp の統合範囲は確定済み (2026-07-12): 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は委譲しない。正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) (決定経緯: [issue #21](https://github.com/Fukuemon/depwalk/issues/21))。
-- **Gradle discovery stack を固定**: Tooling API client `9.6.1`、対象 Gradle `7.6.5`〜`9.6.x`、custom model provider は Gradle `7.6.5` API / Java 8 classfile とする。判断は [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)、version matrix の詳細は本書の [Gradle discovery compatibility matrix](#gradle-discovery-compatibility-matrix) を唯一の正本とする。
+- **Java Analyzer の解析ライブラリは先行固定**: JavaParser (AST) / SymbolSolver (型解決) / SootUp (Interface Dispatch・Override 解決)。SootUp の統合範囲は確定済み (2026-07-12): 型階層・override・interface 実装候補の索引としてのみ使用し、call graph 生成は任せない。定めるのは [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) (決定経緯: [issue #21](https://github.com/Fukuemon/depwalk/issues/21))。
+- **Gradle discovery stack を固定**: Tooling API client `9.6.1`、対象 Gradle `7.6.5`〜`9.6.x`、custom model provider は Gradle `7.6.5` API / Java 8 classfile とする。判断は [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)、version matrix の詳細は本書の [Gradle discovery compatibility matrix](#gradle-discovery-compatibility-matrix) だけを見る。
 - **Java / Gradle の4軸を分離**: (1) Analyzer runtime JDK 25、(2) 対象 Gradle の互換条件で選ぶ daemon JVM、(3) 対象 project の compile toolchain、(4) parser に渡す source language level / preview を独立させる。source level は `release` 優先、なければ実効 `sourceCompatibility` とし、`targetCompatibility` は parser input に使わない。4軸間の推測・代用は禁止する。
-- **Java Analyzer の実装言語は Kotlin を不採用とし Java を維持**: JDK 25 の言語機能 (sealed interface + record + pattern matching) で Kotlin の主利点が Java 単体でも得られ、JavaParser interop では Kotlin の null 安全が platform type で効かないため。判断の正本は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
+- **Java Analyzer の実装言語は Kotlin を不採用とし Java を維持**: JDK 25 の言語機能 (sealed interface + record + pattern matching) で Kotlin の主利点が Java 単体でも得られ、JavaParser interop では Kotlin の null 安全が platform type で効かないため。判断を定めるのは [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md)。
 - **Core 実装言語**は Go に固定する。判断根拠は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
-- Analyzer との通信は **JSONL over STDIN/STDOUT** に固定 (言語非依存・実装/デバッグ容易)。判断根拠は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)、Protocol / SPI / Model schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。
+- Analyzer との通信は **JSONL over STDIN/STDOUT** に固定 (言語非依存・実装/デバッグ容易)。判断根拠は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md)、Protocol / SPI / Model schema は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) が定める。
 - Go 側 Core は標準ライブラリを優先する。JSONL、外部 process 実行、graph 表現、text / JSON / Mermaid 出力、test は標準ライブラリと内部 package で開始する。
 - JSONL parser / validator は安定版の `encoding/json` で開始する。ただし、`encoding/json` v1 の duplicate key 許容、invalid UTF-8 置換、struct field の case-insensitive matching を Protocol contract として採用しない。
 - `encoding/json/v2` と `encoding/json/jsontext` は初期採用しない。Go 1.25 時点では experimental であり、`GOEXPERIMENT=jsonv2` が不要になった時点で strict JSONL parser の実装候補として再評価する。
@@ -53,7 +53,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 
 ## Gradle discovery compatibility matrix
 
-本節を自動 discovery の version matrix の詳細正本とする。
+自動 discovery の version matrix の詳細は本節で定める。
 
 - bundled Tooling API client と Analyzer build wrapper: `9.6.1`
 - target Gradle: `7.6.5 <= version < 9.7.0`

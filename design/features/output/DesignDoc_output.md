@@ -11,7 +11,7 @@ verified_commit: dcb2a35
 
 # Feature 設計: Output (Console / JSON 出力)
 
-Output Engine の設計正本。
+Output Engine の設計を定める。
 
 ## 2 つの出力形式
 
@@ -20,7 +20,7 @@ Output Engine の設計正本。
 | **Console** | 端末にそのまま表示するツリー表現 | 人                    |
 | **JSON**    | 機械処理向けの構造化データ       | スクリプト / 他ツール |
 
-グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](../../../adr/0010-defer-graph-visualization.md))。
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す (判断を定めるのは [ADR-0010](../../../adr/0010-defer-graph-visualization.md))。
 
 ## 背景・要件解釈
 
@@ -38,9 +38,9 @@ Output Engine の設計正本。
 ### やらないこと
 
 - グラフのビューワ提供、および図として描く形式の生成 (Non Goals / ADR-0010)。
-- 探索の意味論 (正本は [traversal feature doc](../traversal/DesignDoc_traversal.md))。
-- graph が保持する属性の定義 (正本は [graph feature doc](../graph/DesignDoc_graph.md))。
-- CLI の引数名 / exit code / エラー表示先 (正本は [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
+- 探索の意味論 (定めるのは [traversal feature doc](../traversal/DesignDoc_traversal.md))。
+- graph が保持する属性の定義 (定めるのは [graph feature doc](../graph/DesignDoc_graph.md))。
+- CLI の引数名 / exit code / エラー表示先 (定めるのは [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
 
 ## 設計
 
@@ -119,9 +119,9 @@ type formatter interface {
 }
 ```
 
-- **Formatter は `View` 以外に依存しない**: Console / JSON いずれの出力項目も `View` / `NodeView` / `EdgeView` / `CutoffView` の field からのみ得られる (`traversal.Result` や `graph.Graph` へ直接アクセスしない)。全出力項目と対応 field の一覧は「View 境界の全数対応」節を正本とする。
+- **Formatter は `View` 以外に依存しない**: Console / JSON いずれの出力項目も `View` / `NodeView` / `EdgeView` / `CutoffView` の field からのみ得られる (`traversal.Result` や `graph.Graph` へ直接アクセスしない)。全出力項目と対応 field の一覧は「View 境界の全数対応」節が定める。
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 Result から常に同一のバイト列を出力する。
-- symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する ([graph feature doc](../graph/DesignDoc_graph.md) が属性の正本)。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
+- symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する ([graph feature doc](../graph/DesignDoc_graph.md) が属性を定める)。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
 - `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
 - **`View` は `Request` の `direction` / `start` を保持して Formatter へ運ぶ** (JSON の `direction` field と Console の子方向判定・文言分岐が必要とするため)。
 - **`NodeView.MinDepth` / `CutoffView.TargetMinDepth` は `traversal.Result` の `minDepth` 公開を View 構築時に引き継ぐ** (JSON の `nodes[].minDepth` / `depthCutoffs[].targetMinDepth` が Formatter 内で `traversal.Result` に触れずに済むようにするため)。
@@ -177,7 +177,7 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 
 1. **root** = 起点 node。
 2. **子** = 誘導 edge 集合 (`View.Edges`) を探索方向に辿った先の node。caller 方向なら子は「呼び出し元」、callee 方向なら「呼び出し先」。
-3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力の決定性を担保)。
+3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力を決定的にするため)。
 4. **展開順序** = 上記順序の pre-order DFS。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む)。これにより self-loop も規則 6 の `(cycle)` になり、root の self-loop で root が再展開されることもない。
 5. **初出のみ展開** = 部分木を展開するのは tree 中で最初に出現したときの 1 回のみ。出力行数は O(到達 edge 数) に収まり、**停止性はこの規則だけで保証される**。
 6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない。** この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られて node が tree から消えるためである:
@@ -256,7 +256,7 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
-- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持の正本) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味の正本は Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。 で決定。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持を定める) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味を定めるのは Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。 で決定。
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
@@ -385,7 +385,7 @@ sequenceDiagram
 
 横断規約は [context/testing.md](../../../context/testing.md)。本 feature 固有の観点を記す。
 
-- 各 formatter の出力を golden file と比較する unit test で担保する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result → 同一バイト列) を同時に検証する。
+- 各 formatter の出力を golden file と比較する unit test で保証する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result → 同一バイト列) を同時に検証する。
 - fixture ケース: 循環 (self-loop / 相互再帰 / 3 要素 SCC) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし (`Edges` も `Cutoffs` も空) / `maxDepth=0` (`Edges` 空 + `Cutoffs` 非空) / `maxDepth=0` + 起点 self-loop / `startNotFound`。
 - Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。実 Protocol と同じ完全な `signature` を入力しても `qualifiedName` と重複せず 1 回だけ表示され、`signature` 欠落時の fallback が機能すること。
 - JSON: `encoding/json` でパースできること (S3)。`targetMethodId` が `nodes[]` に存在しない (dangling) ことを caller / callee 両方向で検証すること。`cycle: false` が省略されないこと。

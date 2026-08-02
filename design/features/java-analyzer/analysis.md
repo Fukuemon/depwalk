@@ -15,7 +15,7 @@ verified_commit: 2d82ed3
 
 # Java Analyzer: 解析エンジン
 
-**ソースから呼び出し関係をどう解決するか**の正本。
+**ソースから呼び出し関係をどう解決するか**を定める。
 
 JavaParser と SymbolSolver で型を解決し、SootUp で型階層・override・interface 実装候補を索引し、Spring の DI で候補を絞り込む。解決できなかった call をどう扱うか (救済するか、未解決として完全性 gate に残すか) も本 doc が定める。
 

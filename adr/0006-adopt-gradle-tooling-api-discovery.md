@@ -24,10 +24,10 @@ Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling A
 - 各 project の `main` ごとに解析 context を作り、project dependency で到達可能な context と classpath だけを型解決へ接続する。
 - composite / included build のprojectはmodelの対象外 (root buildのproject階層だけを解析する)。workspace外のexternal included build projectと、providerが報告するincluded build rootは、いずれも`JAVA_SOURCE_ROOT_EXCLUDED` warningで除外を観測可能にし、黙示の脱落を残さない。解決済みartifactは外部依存として利用できる。一方、workspace内projectとして採用したsource root / fileのrealpathがworkspace外へ出る場合はfatalとする。
 - modelに宣言されたsource directoryが未作成なら生成前の空rootとして除外し、既存rootの非directory・読取不能はfatalにする。project classes outputが未作成、明示経路で自project classes output自体が指定されていない場合、またはmodel由来classpathのworkspace内project依存build outputが未buildの場合は`JAVA_SOOTUP_UNAVAILABLE` warningで該当bytecodeなしのsource解析を継続する (依存contextのsource rootがsolverへ入り型解決を補完する)。ただし、利用者が明示したclasspath entryまたはmodelが解決済みworkspace外external entryの欠落・読取不能はfatalとする。
-- provider は Gradle `7.6.5` API baseline に対してbuildしJava 8 classfileとする (compile 用の再配布 API artifact は `7.6.4` が最終のため `7.6.5` 相当として `7.6.4` を使用する。確定 2026-07-18)。対象Gradleは`7.6.5 <= version < 9.7.0`、wrapper不在時はbundled Tooling API `9.6.1`を使用する。固定CI anchorは`7.6.5 / daemon JDK 8`、`8.14.5 / daemon JDK 17`、`9.6.1 / daemon JDK 25`とし、詳細正本は [toolchain context](../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
+- provider は Gradle `7.6.5` API baseline に対してbuildしJava 8 classfileとする (compile 用の再配布 API artifact は `7.6.4` が最終のため `7.6.5` 相当として `7.6.4` を使用する。確定 2026-07-18)。対象Gradleは`7.6.5 <= version < 9.7.0`、wrapper不在時はbundled Tooling API `9.6.1`を使用する。固定CI anchorは`7.6.5 / daemon JDK 8`、`8.14.5 / daemon JDK 17`、`9.6.1 / daemon JDK 25`とし、詳細を定めるのは [toolchain context](../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
 - `sourceRoots` が 1 件以上指定された request は Gradle Tooling API、daemon、一時 provider を完全に bypass し、明示 classpath / language level から単一 synthetic context を構築する。
 
-自動 discovery は trusted build 前提である。build logic は利用者権限で評価され、repository credential、network、cache、daemon JVM 選択、任意の副作用は Gradle に委譲される。depwalk は credential を受領・保存せず、Gradle stdout / stderr を Protocol / CLIへ転送しない。raw exception は sanitize する。非漏洩保証は depwalk が生成・転送する artifact に限定し、任意 build logic の sandbox は提供しない。
+自動 discovery は trusted build 前提である。build logic は利用者権限で評価され、repository credential、network、cache、daemon JVM 選択、任意の副作用は Gradle に任せる。depwalk は credential を受領・保存せず、Gradle stdout / stderr を Protocol / CLIへ転送しない。raw exception は sanitize する。非漏洩保証は depwalk が生成・転送する artifact に限定し、任意 build logic の sandbox は提供しない。
 
 CLI help はこの副作用と明示 bypass を常時説明する。自動 discovery の各 run では、build 評価の前に Analyzer stderr へ通知を出す。通知は「build logic 評価、repository / credential resolution、network、cache を利用し得る」ことを安定した定型文で伝える。discoveryの開始・終了と安定categoryは観測可能にするが、Gradle由来の自由文は転送しない。
 
@@ -71,6 +71,6 @@ CLI help はこの副作用と明示 bypass を常時説明する。自動 disco
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): Java Analyzer の条件付き Gradle runtime
-- [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): discovery / analysis context / 完全性の正本
+- [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): discovery / analysis context / 完全性を定める
 - [context/infrastructure.md](../context/infrastructure.md): trusted build、credential、network、非漏洩境界
 - [issue #24](https://github.com/Fukuemon/depwalk/issues/24): 決定経緯と issue 単位の作業記録
