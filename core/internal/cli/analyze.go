@@ -201,8 +201,8 @@ func formatSourceLocation(location *graph.SourceLocation) string {
 	if location.StartColumn != nil {
 		text = fmt.Sprintf("%s:%d", text, *location.StartColumn)
 	}
-	// Records that carry an end position are rendered as a range: the
-	// Protocol keeps it, so dropping it here would hide it from the user.
+	// 終了位置を持つ record は範囲として描画する。Protocol が保持している情報を
+	// ここで落とすと、利用者から見えなくなるため。
 	if location.EndLine != nil {
 		end := fmt.Sprintf("%d", *location.EndLine)
 		if location.EndColumn != nil {
