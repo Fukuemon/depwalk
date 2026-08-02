@@ -24,7 +24,7 @@ Output Engine の設計を定める。
 
 ## 背景・要件解釈
 
-調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理用途 (JSON) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON で出力できる」)。現時点で実装済みなのは Console / JSON で、DOT / Mermaid は未実装である。ただし **I/F は本 doc で確定**しており、実装時に Output Engine の構造を作り直さないことを設計目標とする。
+調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理用途 (JSON) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON で出力できる」)。対応形式はこの 2 つで、図として描く形式は持たない ([ADR-0010](../../../adr/0010-defer-graph-visualization.md))。形式を足すときに Output Engine の構造を作り直さずに済むことを設計目標とする。
 
 ## スコープ
 
@@ -157,13 +157,13 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 
 `startNotFound` と「到達なし」は**正常系**として各形式で明示する。Output Engine が `error` を返すのは次の 2 つのみ。
 
-| ケース                                              | Console                                                                   | JSON                                         | DOT / Mermaid           | 戻り値                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------- | ----------------------- | --------------------------------------------- |
-| 起点不在 (`status=startNotFound`)                   | `該当なし: 起点メソッドが解析結果に存在しません (<start>)`                | `status: "startNotFound"` + 空配列           | 空グラフの有効構文      | `nil`                                         |
-| 到達なし (`Edges` も `Cutoffs` も空)                | root 行 + `└─ (呼び出し元なし)` (callee 方向は `(呼び出し先なし)`)        | 起点 1 件 + 空 `edges`                       | 起点 node のみ          | `nil`                                         |
-| `Edges` は空だが `Cutoffs` が非空 (`maxDepth=0` 等) | root 行 + `… (depth limit: N edges cut)`。`(呼び出し元なし)` とは出さない | 起点 1 件 + 空 `edges` + 非空 `depthCutoffs` | 起点 node + cutoff 表現 | `nil`                                         |
-| 未対応 format 指定                                  | —                                                                         | —                                            | —                       | `error` (出力前に validation。対応形式を案内) |
-| `io.Writer` への書き込み失敗                        | —                                                                         | —                                            | —                       | `error`                                       |
+| ケース                                              | Console                                                                   | JSON                                         | 戻り値                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------- |
+| 起点不在 (`status=startNotFound`)                   | `該当なし: 起点メソッドが解析結果に存在しません (<start>)`                | `status: "startNotFound"` + 空配列           | `nil`                                         |
+| 到達なし (`Edges` も `Cutoffs` も空)                | root 行 + `└─ (呼び出し元なし)` (callee 方向は `(呼び出し先なし)`)        | 起点 1 件 + 空 `edges`                       | `nil`                                         |
+| `Edges` は空だが `Cutoffs` が非空 (`maxDepth=0` 等) | root 行 + `… (depth limit: N edges cut)`。`(呼び出し元なし)` とは出さない | 起点 1 件 + 空 `edges` + 非空 `depthCutoffs` | `nil`                                         |
+| 未対応 format 指定                                  | —                                                                         | —                                            | `error` (出力前に validation。対応形式を案内) |
+| `io.Writer` への書き込み失敗                        | —                                                                         | —                                            | `error`                                       |
 
 - 「到達なし」の判定は **`Edges` が空 かつ `Cutoffs` も空**。`maxDepth=0` では起点の隣接 edge が cutoff になる (起点 self-loop は誘導 edge として残る — traversal feature doc の `maxDepth=0` 契約) ため、`Edges` 空だけで判定してはならない。
 - 該当なし / 到達なしの分岐は各 Formatter の内部で行う (`View.Status` / `Edges` / `Cutoffs` の 3 つを見る)。見せ方が形式ごとに異なるため、`Write` は status で分岐しない。
