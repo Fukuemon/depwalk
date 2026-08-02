@@ -165,9 +165,10 @@ func TestWriteReturnsFormatterError(t *testing.T) {
 	}
 }
 
-// Write must dispatch to the formatter registered for the requested
-// format. The seam tests above pass a formatter in directly, so they stay
-// green even if the registry maps a format to the wrong formatter.
+// Write が要求された format の registry 登録済み formatter へ振り分けること。
+//
+// 上の seam テストは formatter を直接渡すため、registry の対応付けが誤っていても
+// 緑のままになる。その穴を本テストが塞ぐ。
 func TestWriteDispatchesToTheFormatterOfTheRequestedFormat(t *testing.T) {
 	g := graphtest.NewBuilder().Node("method:a").Build()
 	in := Input{
@@ -203,9 +204,8 @@ func TestWriteDispatchesToTheFormatterOfTheRequestedFormat(t *testing.T) {
 	}
 }
 
-// Write returns the formatter's error unchanged instead of swallowing it.
-// This goes through the registry path, so it uses an input that always
-// fails rather than a stub formatter.
+// Write が formatter の error を握り潰さずそのまま返すこと。
+// registry 経由の経路を通すため、stub の formatter ではなく必ず失敗する入力を使う。
 func TestWritePropagatesFormatterErrorThroughTheRegistry(t *testing.T) {
 	want := errors.New("writer closed")
 	failing := writerFunc(func([]byte) (int, error) { return 0, want })

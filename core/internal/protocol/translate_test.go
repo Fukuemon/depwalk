@@ -43,7 +43,7 @@ func TestNodeFromMethodSymbolDeepCopiesSourceLocation(t *testing.T) {
 
 	got := protocol.NodeFromMethodSymbol(record)
 
-	// Mutating the protocol DTO must not change the graph-owned value.
+	// protocol の DTO を書き換えても、graph が所有する値は変わらないこと。
 	record.Source.Path = "mutated.go"
 	*record.Source.StartColumn = 99
 	wantColumn := 4
@@ -89,7 +89,7 @@ func TestEdgeFromCallEdgeDeepCopiesCallSite(t *testing.T) {
 
 	got := protocol.EdgeFromCallEdge(record)
 
-	// Mutating the protocol DTO must not change the graph-owned value.
+	// protocol の DTO を書き換えても、graph が所有する値は変わらないこと。
 	record.CallSite.Path = "mutated.go"
 	*record.CallSite.StartColumn = 99
 	wantColumn := 7
@@ -128,8 +128,8 @@ func TestNodeFromMethodSymbolDeepCopiesOpaqueMetadata(t *testing.T) {
 		t.Fatalf("Metadata = %#v, want %#v", got.Symbol.Metadata, want)
 	}
 
-	// Mutating the protocol DTO's nested values must not change the
-	// graph-owned copy.
+	// protocol の DTO の入れ子の値を書き換えても、graph が所有する複製は
+	// 変わらないこと。
 	record.Metadata["ownerSourceLocation"].(map[string]any)["path"] = "mutated"
 	record.Metadata["tags"].([]any)[1].(map[string]any)["nested"] = false
 	if !reflect.DeepEqual(got.Symbol.Metadata, want) {
@@ -178,8 +178,8 @@ func TestEdgeFromCallEdgeDeepCopiesOpaqueMetadata(t *testing.T) {
 		t.Fatalf("Metadata = %#v, want %#v", got.Metadata, want)
 	}
 
-	// Mutating the protocol DTO's nested values must not change the
-	// graph-owned copy.
+	// protocol の DTO の入れ子の値を書き換えても、graph が所有する複製は
+	// 変わらないこと。
 	record.Metadata["provenance"].(map[string]any)["source"] = "mutated"
 	record.Metadata["candidates"].([]any)[1].(map[string]any)["selected"] = false
 	if !reflect.DeepEqual(got.Metadata, want) {

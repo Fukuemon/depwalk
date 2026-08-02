@@ -2,10 +2,11 @@ package e2e
 
 import "testing"
 
-// TestE2ERequired verifies the branch condition skipOrFail uses to decide
-// between t.Skip and t.Fatal. skipOrFail's own t.Skip/t.Fatal call cannot be
-// observed directly from within a test (testing.T does not expose which one
-// ran), so the decision logic is tested here in isolation instead.
+// TestE2ERequired は skipOrFail が t.Skip と t.Fatal を選ぶ分岐条件を検証する。
+//
+// skipOrFail 自身の t.Skip / t.Fatal 呼び出しはテストから直接観測できない
+// (testing.T はどちらが走ったかを公開しない)。そのため判定ロジックだけを
+// ここで単独に検証する。
 func TestE2ERequired(t *testing.T) {
 	t.Parallel()
 
@@ -31,10 +32,11 @@ func TestE2ERequired(t *testing.T) {
 	}
 }
 
-// TestJavaMajorVersion verifies the regex-based java -version parser
-// against real-world `java -version` output variants, since the previous
-// literal `version "25` substring check was brittle against formatting
-// changes across JDK vendors and versions.
+// TestJavaMajorVersion は正規表現による java -version の解析を、実在する
+// 出力の変種に対して検証する。
+//
+// 以前の `version "25` という部分文字列一致は、JDK のベンダーやバージョンで
+// 書式が変わると壊れた。
 func TestJavaMajorVersion(t *testing.T) {
 	t.Parallel()
 

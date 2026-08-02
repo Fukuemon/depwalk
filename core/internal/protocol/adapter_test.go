@@ -14,9 +14,8 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Adapter tests moved from the analyze package: they drive a fake Analyzer
-// subprocess through the full ACL (wire request composition, record
-// parsing, wire → domain translation) via the analyze.Source port.
+// Adapter のテスト。analyze.Source port 経由で fake Analyzer の subprocess を
+// 動かし、ACL 全体 (wire 要求の組み立て、record parse、wire → domain 変換) を通す。
 
 func fakeAnalyzerAdapter(scenario string) *Adapter {
 	return NewAdapter(analyzer.Command{
@@ -127,9 +126,9 @@ func TestAdapterTranslatesStructuredFailureDetails(t *testing.T) {
 func TestAdapterKeepsFatalReasonOverReferenceIncompleteness(t *testing.T) {
 	t.Parallel()
 
-	// The fake analyzer streams a dangling call edge before its fatal error
-	// record; the fatal record must be reported and the reference-
-	// completeness failure suppressed (fatal streams discard prior records).
+	// fake analyzer は fatal な error record の前に、参照の宙に浮いた call edge を
+	// 流す。fatal 側が報告され、参照完全性の失敗は抑止されること
+	// (fatal な stream は先行 record ごと破棄するため)。
 	_, _, outcome, err := runAdapter(fakeAnalyzerAdapter("dangling-edge-then-error"), analyze.Request{
 		WorkspaceRoot: t.TempDir(),
 		Language:      "java",
@@ -213,9 +212,9 @@ func TestAdapterOmitsUnsetFiltersAndEntrypoints(t *testing.T) {
 	assertRequestScenarioPassed(t, outcome, err)
 }
 
-// The no-op guard for the two tests above: a deliberately wrong wire
-// request must make them fail. The fake analyzer's "request-options"
-// scenario expects filters, so sending none has to be rejected.
+// 上 2 つのテストが素通りしないことの保証。意図的に誤った wire 要求を送ると
+// 失敗するはずである。fake analyzer の "request-options" シナリオは filter を
+// 期待するため、何も送らなければ拒否される。
 func TestAdapterRequestAssertionsDetectAWrongRequest(t *testing.T) {
 	t.Parallel()
 
@@ -245,9 +244,9 @@ func TestAdapterMarksInvalidRequestValuesAsInputErrorBeforeAnalyzerLaunch(t *tes
 	}
 }
 
-// TestAdapterFakeAnalyzerProcess is not a real test. It is re-executed as a
-// subprocess by fakeAnalyzerAdapter and acts as a minimal Analyzer Protocol
-// implementation for the adapter tests, keeping them independent of a JVM.
+// TestAdapterFakeAnalyzerProcess はテストではない。fakeAnalyzerAdapter から
+// subprocess として再実行され、adapter のテスト向けに Analyzer Protocol の最小実装
+// として振る舞う。JVM に依存させないためである。
 func TestAdapterFakeAnalyzerProcess(t *testing.T) {
 	scenario := adapterHelperScenario()
 	if scenario == "" {

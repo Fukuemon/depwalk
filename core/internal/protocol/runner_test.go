@@ -14,9 +14,8 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 )
 
-// Record-level Runner tests moved from the analyzer package: the analyzer
-// package streams opaque lines, and record parsing / reference
-// completeness live here (ACL).
+// record 単位の Runner テスト。analyzer package は opaque な行を流すだけで、
+// record の parse と参照完全性は ACL である本 package が持つ。
 
 func TestRunnerScenarios(t *testing.T) {
 	t.Parallel()
@@ -195,8 +194,8 @@ func TestCollectorSkipsReferenceValidationOnFatalStream(t *testing.T) {
 func TestCollectorReportsReadErrorAsValidationError(t *testing.T) {
 	t.Parallel()
 
-	// A stdout read failure surfaces as a validation error unless a parse
-	// error was recorded first.
+	// stdout の読み取り失敗は検証エラーとして現れる。ただし先に parse エラーが
+	// 記録されていればそちらが優先される。
 	readErr := fmt.Errorf("read analyzer stdout: connection reset")
 	result := newRecordCollector(nil).finalize(readErr)
 	if result.ValidationError == nil || !strings.Contains(result.ValidationError.Error(), "read analyzer stdout") {
@@ -241,8 +240,8 @@ func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
 	)
 }
 
-// TestProtocolHelperAnalyzerProcess is not a real test. It replays one
-// fixture scenario as a fake Analyzer process for TestRunnerScenarios.
+// TestProtocolHelperAnalyzerProcess はテストではない。TestRunnerScenarios の
+// ために、fixture のシナリオを 1 つ fake Analyzer プロセスとして再生する。
 func TestProtocolHelperAnalyzerProcess(t *testing.T) {
 	args := os.Args
 	for i, arg := range args {
