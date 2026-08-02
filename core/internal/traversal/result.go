@@ -2,11 +2,12 @@ package traversal
 
 import "github.com/Fukuemon/depwalk/core/internal/graph"
 
-// buildResult classifies every edge adjacent to a reached node into the
-// induced edge set or a depth cutoff, then annotates cycle edges. The
-// classification depends only on the reached node set and minDepth, so
-// the result is identical for any visit order. depths must cover every
-// reachable node (as returned by [minDepths]).
+// buildResult は到達 node に隣接する edge を、誘導 edge 集合と深さ打ち切りに
+// 分類し、閉路を構成する edge に注釈を付ける。
+//
+// 分類は到達 node 集合と minDepth だけに依存するため、訪問順が変わっても
+// 結果は変わらない。depths は到達可能な全 node を含んでいる必要がある
+// ([minDepths] の戻り値)。
 func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, depths map[string]int) Result {
 	edges := make(map[string]graph.Edge, len(nodes))
 	cutoffs := map[string]DepthCutoff{}
@@ -33,11 +34,11 @@ func buildResult(g *graph.Graph, dir graph.Direction, nodes map[string]bool, dep
 	}
 }
 
-// cycleEdges returns the IDs of induced edges that lie on a cycle of the
-// reached subgraph. An edge lies on a cycle exactly when its endpoints
-// belong to the same strongly connected component (a self-loop trivially
-// does). Convergent (diamond) edges connect distinct components and are
-// never annotated.
+// cycleEdges は到達部分グラフ内で閉路を構成する誘導 edge の ID を返す。
+//
+// 判定は「両端が同じ強連結成分に属するか」で行う (self-loop は自明に該当)。
+// 合流 (ダイヤモンド型) の edge は異なる成分をつなぐため注釈されない。
+// 経路を辿って判定すると合流を閉路と誤判定するため、この方法を採る。
 func cycleEdges(nodes map[string]bool, edges map[string]graph.Edge) map[string]bool {
 	adjacency := make(map[string][]string, len(nodes))
 	for _, e := range edges {

@@ -47,8 +47,8 @@ func visitOrder(g *graph.Graph, startID string, dir graph.Direction, order Order
 
 		edges := g.Neighbors(id, dir)
 		if order == OrderDFS {
-			// Push in reverse so the first neighbor is expanded first,
-			// matching recursive depth-first order.
+			// 逆順に積む。そうしないと最初の隣接 node が最後に展開され、
+			// 再帰的な深さ優先の順序と食い違う。
 			for i := len(edges) - 1; i >= 0; i-- {
 				next := nextNode(edges[i], dir)
 				if visited[next] {
