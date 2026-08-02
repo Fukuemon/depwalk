@@ -15,7 +15,7 @@ cd "$ROOT"
 EXPECTED=(
   "CLAUDE.md" "AGENTS.md"
   ".claude/skills" ".claude/settings.json"
-  "hooks" "templates"
+  "hooks/protected-branch/git_hook.py" "templates/adr" "templates/features"
   ".rulesync"
 )
 
