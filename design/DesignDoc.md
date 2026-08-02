@@ -11,7 +11,7 @@ verified_commit: 2d82ed3
 
 # depwalk Design Doc
 
-本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
+本 Design Doc は depwalk の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) が持つ。
 
 <!--
 本 doc は統合モードで生成 (design-doc skill が判定)。独立 PRD は作らず、Why/What は本 doc の「## Why / What」節に統合する。
@@ -45,13 +45,13 @@ depwalk はこの調査を自動化することを目的とする。
 
 ### 提供価値 / 成功条件 (What)
 
-| #   | 成功条件                                                                         | 測定方法                                                                                                                                                                                                                                               |
-| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| S1  | 指定メソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる | サンプル Java/Spring プロジェクトで、既知の呼び出し元集合と CLI 出力が一致する (Traversal Engine 層の到達集合照合は [feature doc](features/traversal/DesignDoc_traversal.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する) |
-| S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                                                                                                                                                                                                     |
-| S3  | 呼び出しグラフを Console / JSON で出力できる                                     | 各形式でパース可能な出力が得られる (Output Engine 層の照合は [feature doc](features/output/DesignDoc_output.md) が正本。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する)                                                              |
-| S4  | Spring DI 経由の呼び出し先を実体まで解決できる                                   | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                           |
-| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | **2 つ目以降**の言語 Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)。初号機 (Java) 導入時の言語非依存な初回配線 (`depwalk analyze` command / Analyzer 起動コマンド解決) は対象外とする                                    |
+| #   | 成功条件                                                                         | 測定方法                                                                                                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | 指定メソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる | サンプル Java/Spring プロジェクトで、既知の呼び出し元集合と CLI 出力が一致する (Traversal Engine 層の到達集合照合は [feature doc](features/traversal/DesignDoc_traversal.md) が定める。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する) |
+| S2  | 指定メソッドの呼び出し先を探索し、列挙できる                                     | 同上 (callee 方向で既知集合と一致)                                                                                                                                                                                                                       |
+| S3  | 呼び出しグラフを Console / JSON で出力できる                                     | 各形式でパース可能な出力が得られる (Output Engine 層の照合は [feature doc](features/output/DesignDoc_output.md) が定める。CLI 出力レベルでの最終照合は CLI interface spec 完了後に完成する)                                                              |
+| S4  | Spring DI 経由の呼び出し先を実体まで解決できる                                   | interface 注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる                                                                                                                                                                             |
+| S5  | 新しい言語の Analyzer を追加するとき Core を変更せずに済む                       | **2 つ目以降**の言語 Analyzer 追加で Core モジュールに差分が発生しないこと (Protocol のみで結合)。初号機 (Java) 導入時の言語非依存な初回配線 (`depwalk analyze` command / Analyzer 起動コマンド解決) は対象外とする                                      |
 
 ### スコープ
 
@@ -85,7 +85,7 @@ depwalk はこの調査を自動化することを目的とする。
 - 動的解析系: Reflection 解析、AspectJ Runtime 解析、実行時 Proxy 解析
 - 提供形態: IDE Plugin、Web UI
 
-本ツールは **CLI に限定**する。グラフの可視化は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](../adr/0010-defer-graph-visualization.md))。
+本ツールは **CLI に限定**する。グラフの可視化は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断を定めるのは [ADR-0010](../adr/0010-defer-graph-visualization.md))。
 
 ## Background
 
@@ -102,7 +102,7 @@ depwalk はこの調査を自動化することを目的とする。
 
 ## アーキテクチャ概観 (Overview)
 
-システムの全体像を **C4 で 2 段** 示す。詳細コンポーネントは feature doc、内部シーケンスは spec へ委譲する。
+システムの全体像を **C4 で 2 段** 示す。詳細コンポーネントは feature doc、内部シーケンスは spec が持つ。
 
 ### System Context (C4 L1) — 誰が・何のために使うか
 
@@ -148,7 +148,7 @@ flowchart TD
 | Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol 経由で受領                                         | Protocol (JSONL)   | Model                                                                                                                     |
 | Java Analyzer    | Java/Spring の AST 解析・型解決・DI 解決・CallGraph 生成。source root 未指定時は Gradle build model から解析 context を discovery する | Analyzer SPI 実装  | JavaParser / SymbolSolver / SootUp。自動 discovery 時のみ Gradle Tooling API / Gradle daemon / 一時 custom model provider |
 
-Gradle runtime は Java Analyzer の **条件付き依存**である。`analysisRequest.sourceRoots` が指定された明示 override では Tooling API、Gradle daemon、一時 provider を起動せず完全に bypass する。自動 discovery の build 評価・互換性・安全境界は [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure context](../context/infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) を正本とする。
+Gradle runtime は Java Analyzer の **条件付き依存**である。`analysisRequest.sourceRoots` が指定された明示 override では Tooling API、Gradle daemon、一時 provider を起動せず完全に bypass する。自動 discovery の build 評価・互換性・安全境界は [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)、[infrastructure context](../context/infrastructure.md)、[ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md) が定める。
 
 この機能は Core / Analyzer Protocol の言語非依存境界と成功条件を変えない。
 
@@ -185,12 +185,12 @@ Analyzer との通信は **プロセス間通信**を用いる。
 - **形式**: STDIN / STDOUT 上の **JSONL** (1 行 1 レコード)。Core が解析要求を渡し、Analyzer が graph model (`MethodSymbol` / `CallEdge`) と diagnostics (`diagnostic` / `error`) を JSONL で返す。
 - **採用理由**: 言語非依存 (どの言語ランタイムからも実装可能) / 実装容易 / デバッグ容易 (テキストで観測可能) / 拡張容易 (新フィールド追加が容易)。
 
-`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマ、Analyzer SPI、versioning 方針は [Analyzer Protocol / SPI feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) を正本とする。JSONL over STDIN/STDOUT を process SPI とする判断は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) を正本とする。
+`MethodSymbol` / `CallEdge` / `SourceLocation` の具体スキーマ、Analyzer SPI、versioning 方針は [Analyzer Protocol / SPI feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) が定める。JSONL over STDIN/STDOUT を process SPI とする判断は [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) が定める。
 
 ## Alternatives Considered
 
 統合モードのため、landscape に影響する代替案を本 doc に保持する。
-確定した長期判断は [adr/](../adr/) を正本とする。
+確定した長期判断は [adr/](../adr/) が定める。
 
 | 案  | 内容                                | メリット                  | デメリット                                 | 判定   |
 | --- | ----------------------------------- | ------------------------- | ------------------------------------------ | ------ |
@@ -201,13 +201,13 @@ Analyzer との通信は **プロセス間通信**を用いる。
 いずれも「Core を言語非依存に保ち、Analyzer を独立プロセス + 共通 Protocol で結合する」(P1〜P4) という方針を優先して不採用とした。
 Core 実装基盤は [ADR-0002](../adr/0002-core-implementation-foundation.md) で Go / Go modules / Go 標準 command を採用済み。
 
-## 詳細の所在 (委譲先)
+## 詳細の所在
 
-landscape より下の詳細は以下を正本とする。本 doc には重複させず、抜けと意図的委譲を区別するためリンクのみ置く。
+landscape より下の詳細は以下が定める。本 doc には重複させず、抜けと意図的な委任を区別するためリンクのみ置く。
 
 ### Feature 設計 (How: feature)
 
-feature 単位の設計 (データ構造・主要シナリオ / フロー) は [design/features/](features/) を正本とする。
+feature 単位の設計 (データ構造・主要シナリオ / フロー) は [design/features/](features/) が定める。
 
 | Feature                              | 文書                                                                                                                                                                                                                                                       | 状態 |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
@@ -220,7 +220,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 ### Engineering Context (How: 横断規約)
 
-技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.yml](../context/project.yml)。
+技術スタック規約・codebase architecture・運用契約は [context/](../context/) ライブラリが定める。プロジェクト固有値は [context/project.yml](../context/project.yml)。
 
 | トピック                     | 文書                                                  |
 | ---------------------------- | ----------------------------------------------------- |
@@ -231,7 +231,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 ### Related ADRs / 代替案 (Why: 判断)
 
-確定した技術判断・却下した代替案は [adr/](../adr/) を正本とする。本 doc では一覧のみ持つ。
+確定した技術判断・却下した代替案は [adr/](../adr/) が定める。本 doc では一覧のみ持つ。
 
 | ADR                                                           | 決定                                                                                                                  | 関連ドキュメント                                                                                                                          |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -254,14 +254,14 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 **その先**
 
 - CLI の使い勝手 (解析中の進捗表示 / method selector が曖昧なときの候補選択 / 結果の絞り込み)
-- 可視化の再導入 — 形式は決めない。DOT / Mermaid は外部レンダラへの依存を利用者に負わせるため、自己完結した単一 HTML を含めて選び直す (判断の正本は [ADR-0010](../adr/0010-defer-graph-visualization.md))
+- 可視化の再導入 — 形式は決めない。DOT / Mermaid は外部レンダラへの依存を利用者に負わせるため、自己完結した単一 HTML を含めて選び直す (判断を定めるのは [ADR-0010](../adr/0010-defer-graph-visualization.md))
 - Multi Language (Kotlin / TypeScript / Vue / Go)
 
 ### Open Questions (未決事項)
 
-現時点で未決の論点はない。かつての論点 (JSONL スキーマ定義 / SootUp 統合範囲 / Console ツリー表現 / 循環と深さ上限の打ち切り) はいずれも決着し、それぞれの正本へ移った。
+現時点で未決の論点はない。かつての論点 (JSONL スキーマ定義 / SootUp 統合範囲 / Console ツリー表現 / 循環と深さ上限の打ち切り) はいずれも決着し、それぞれの置き場へ移った。
 
-| 決着した論点             | 現在の正本                                                                                                                                          |
+| 決着した論点             | 今どこにあるか                                                                                                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | JSONL スキーマ定義       | [analyzer-protocol feature doc](features/analyzer-protocol/DesignDoc_analyzer-protocol.md) / [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) |
 | SootUp 統合範囲          | [java-analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md) / [ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md)   |

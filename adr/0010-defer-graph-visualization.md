@@ -90,7 +90,7 @@ CLI 限定という前提はアーキテクチャ全体 (単一バイナリ配�
 ## 関連ドキュメント / チケット
 
 - [ADR-0002](0002-core-implementation-foundation.md): 「永続ストアは現時点で持たない」。決定 4 の 2 が変更を要する
-- [ADR-0009](0009-design-doc-describes-current-state.md): ロードマップの正本は DesignDoc とする決定
-- [design/DesignDoc.md](../design/DesignDoc.md): Goal / 成功条件 / スコープ / ロードマップの正本
-- [design/features/output/DesignDoc_output.md](../design/features/output/DesignDoc_output.md): 出力形式の正本
+- [ADR-0009](0009-design-doc-describes-current-state.md): ロードマップを定めるのは DesignDoc とする決定
+- [design/DesignDoc.md](../design/DesignDoc.md): Goal / 成功条件 / スコープ / ロードマップを定める
+- [design/features/output/DesignDoc_output.md](../design/features/output/DesignDoc_output.md): 出力形式を定める
 - issue / PR: [#40](https://github.com/Fukuemon/depwalk/issues/40)

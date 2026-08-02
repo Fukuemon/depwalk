@@ -10,7 +10,7 @@ verified_commit: 9654928
 
 # AI Agents Registry
 
-非対話で呼び出せる CLI エージェント (Codex / Claude / Cursor 等) の **唯一の正本**。`agent-orchestrate` / `multi-agent-review` skill は、CLI 名・モデル・flag をハードコードせず本ファイルを読む。スキーマの説明は `agent-orchestrate/references/agent-registry-schema.md` を参照する。
+非対話で呼び出せる CLI エージェント (Codex / Claude / Cursor 等) の **唯一の決まり**。`agent-orchestrate` / `multi-agent-review` skill は、CLI 名・モデル・flag をハードコードせず本ファイルを読む。スキーマの説明は `agent-orchestrate/references/agent-registry-schema.md` を参照する。
 
 <!--
 記入ガイド:
@@ -63,10 +63,10 @@ verified_commit: 9654928
 
 ## 用途別ルーティング
 
-| 用途        | 既定で使うエージェント  | 備考                       |
-| ----------- | ----------------------- | -------------------------- |
-| review (Rv) | claude, codex, cursor   | 並列レビュー → 指摘マージ  |
-| implement   | cursor (`composer-2.5`) | 実装委譲。完了後に検証する |
+| 用途        | 既定で使うエージェント  | 備考                           |
+| ----------- | ----------------------- | ------------------------------ |
+| review (Rv) | claude, codex, cursor   | 並列レビュー → 指摘マージ      |
+| implement   | cursor (`composer-2.5`) | 実装を任せる。完了後に検証する |
 
 - フォールバックは既定では行わず、上限/失敗エージェントはスキップして残りで続行する。
 - 用途ごとに使うエージェントを変える場合は skill 起動時に上書き指定する。

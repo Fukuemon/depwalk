@@ -68,7 +68,7 @@ depwalk/
     └── fixtures/
 ```
 
-Core と Analyzer が共有する正本は、Analyzer Protocol feature doc、ADR、JSONL fixture、contract test 観点に限定する。
+Core と Analyzer が共有する決まりは、Analyzer Protocol feature doc、ADR、JSONL fixture、contract test 観点に限定する。
 Go package や Java 実装 code を共有境界にしない。
 
 ## 代替案
@@ -95,12 +95,12 @@ Go package や Java 実装 code を共有境界にしない。
 - Core が Java Analyzer の JVM runtime や Java 解析 library に依存しない。
 - 初期 dependency を Cobra に限定し、restore 時間と supply chain risk を小さく保てる。
 - `go test`、`go vet`、`go fmt`、`go mod tidy` を local / CI の共通 command として使える。
-- `encoding/json/v2` を待たずに実装へ進める。Protocol の厳格性は contract test と `core/internal/protocol` の validation で担保する。
+- `encoding/json/v2` を待たずに実装へ進める。Protocol の厳格性は contract test と `core/internal/protocol` の validation で保証する。
 
 ### 悪い影響 / トレードオフ
 
 - Go と Java Analyzer の間で型定義を code として共有できない。
-- Protocol 互換性は JSONL fixture と contract test で担保する必要がある。
+- Protocol 互換性は JSONL fixture と contract test で保証する必要がある。
 - `encoding/json` v1 は duplicate key、invalid UTF-8、struct field の大小文字違いなどを permissive に扱う。Protocol parser は `json.Unmarshal` へ直接流すだけでは contract を満たせない。
 - `encoding/json/v2` を初期採用しないため、v2 の strict default を利用できない。v2 が安定化した時点で、strict validation の実装を置き換えるかを再評価する。
 - make-like wrapper を初期導入しないため、複数 module や CI matrix が増えた場合は root task の再設計が必要になる。
@@ -113,12 +113,12 @@ Go package や Java 実装 code を共有境界にしない。
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。issue #11 は本 ADR と context への handoff を記録し、durable な判断の正本を ADR / context に移す。
+- spec 更新要否: 要。issue #11 は本 ADR と context への handoff を記録し、長く残る判断を ADR / context へ移す。
 - context / AI 向け設定更新要否: 要。`context/project.yml`、`context/architecture.md`、`context/toolchain.md`、`context/testing.md`、`context/engineering.md` を本 ADR 参照として更新する。
 
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): Core 言語非依存、Analyzer 独立プロセス、Alternatives Considered
 - [adr/0001-analyzer-protocol-jsonl-spi.md](0001-analyzer-protocol-jsonl-spi.md): JSONL over STDIN/STDOUT の process SPI
-- [design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema の正本
+- [design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema を定める
 - [issue #11](https://github.com/Fukuemon/depwalk/issues/11): Core 実装基盤の決定経緯と issue 単位の作業記録

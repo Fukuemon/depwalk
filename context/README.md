@@ -44,8 +44,8 @@ frontmatter を持たない文書 (`project.yml` / 移行前の `*.md`) はま�
 ## Producer / Consumer 契約
 
 - **Producer (設計時)**: 設計判断が確定したら該当ファイルへ反映する。spec / ADR の決定が context を変える場合は本ライブラリを更新してから下流へ進む。
-- **Consumer (実装時)**: 実装は context を正本として参照する。新しいパターンを発見したら該当ファイルへ追記する。
-- **Freshness**: 各ファイル先頭の frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を置く。手書きの `> 最終更新: YYYY-MM-DD` は使わない (日付は嘘をつけるが git の差分は嘘をつけないため)。実装と突き合わせていない文書は `verified_commit: unverified` を明示する。正本は [ADR-0008](../adr/0008-doc-freshness-and-reading-map.md)。
+- **Consumer (実装時)**: 実装は context に従う。新しいパターンを発見したら該当ファイルへ追記する。
+- **Freshness**: 各ファイル先頭の frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を置く。手書きの `> 最終更新: YYYY-MM-DD` は使わない (日付は嘘をつけるが git の差分は嘘をつけないため)。実装と突き合わせていない文書は `verified_commit: unverified` を明示する。定めるのは [ADR-0008](../adr/0008-doc-freshness-and-reading-map.md)。
 
 ## 記載しないもの
 

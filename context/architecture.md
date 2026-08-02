@@ -12,23 +12,23 @@ verified_commit: 9654928
 
 # Codebase Architecture
 
-コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
-Core 実装基盤の正本は [ADR-0002](../adr/0002-core-implementation-foundation.md)。
+コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) が定め、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
+Core 実装基盤を定めるのは [ADR-0002](../adr/0002-core-implementation-foundation.md)。
 
 ## Package Boundary
 
 依存方向は **Core 内は単方向、Core → Analyzer は Protocol 経由のみ** とする (DesignDoc 設計原則 P1〜P4)。
 
 - CLI → Core のみに依存する。
-- Core 内: `Traversal Engine` → `Graph Engine`、`Output Engine` → `Graph Engine` / `Traversal Engine`。Output → Traversal は Traversal result / request 型の consumer としての依存であり (正本は [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
-- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録する。stream 全体の参照完全性の**検査自体は ACL** が行い (wire record を見る責務)、use case はその結果と process 成功を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。正本は [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
-- Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema の正本は [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
+- Core 内: `Traversal Engine` → `Graph Engine`、`Output Engine` → `Graph Engine` / `Traversal Engine`。Output → Traversal は Traversal result / request 型の consumer としての依存であり (定めるのは [Output feature doc](../design/features/output/DesignDoc_output.md))、逆方向 (Traversal → Output) の依存は禁止 (循環禁止)。
+- Graph Engine は node / edge の表示用属性 (`Symbol` = qualifiedName / signature / optional 宣言位置 / opaque metadata、`CallSite`) を **graph 固有の値型** (wire 非依存の自前 `SourceLocation` 型を含む) で保持する。wire record → domain 値型の変換は `platform` 層の ACL (`protocol`) が担い、Analyze Use Case は port 経由で受領した domain 値を非公開 staging Graph へ 1-pass 登録する。stream 全体の参照完全性の**検査自体は ACL** が行い (wire record を見る責務)、use case はその結果と process 成功を確認したときだけ公開する。fatal 時は Graph と先行 diagnostic を破棄し、wire DTO 全件や wire 専用フィールド (`schemaVersion` / `recordType`) を graph model に保持しない。定めるのは [Graph feature doc](../design/features/graph/DesignDoc_graph.md)。
+- Core → Analyzer は `Analyzer SPI` (Protocol 境界) のみを介する。Core は Analyzer の内部 (使用ライブラリ・言語ランタイム) を知らない。Protocol / SPI / Model schema を定めるのは [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md)。
 - Analyzer は `Model` (`MethodSymbol` / `CallEdge` / `SourceLocation`) のスキーマにのみ依存する。Core の内部実装には依存しない。
 - **禁止経路**: Core から特定言語ランタイム / Analyzer 実装への直接依存。**2 つ目以降**の言語 Analyzer 追加で Core に差分が出ないこと (S5。初号機導入時の言語非依存な初回配線は対象外)。
 
 ### Core の package 構成と依存方向 (Go)
 
-`core/internal` 配下は**フラットな責務名 package** で構成する (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md))。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
+`core/internal` 配下は**フラットな責務名 package** で構成する (判断を定めるのは [ADR-0007](../adr/0007-layered-architecture-refactor.md))。層 (domain / app / platform 相当) は概念としてのみ維持し、ディレクトリには焼き付けない。
 
 | Package                         | 層 (概念)  | 責務                                                                                      |
 | ------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ graph LR
 
 ### Java Analyzer の内部境界
 
-`analyzers/java` の `javaanalyzer` 配下は、解析パイプラインの段階別 package (`analysis/` 配下) と入出力・起動系 (`protocol` / `io` / `preflight` / `discovery`) で構成する。段階の実行順は `analysis/pipeline` (Runner) だけが知る。外部ライブラリの隔離は次の 3 段階とする (判断の正本は [ADR-0007](../adr/0007-layered-architecture-refactor.md)):
+`analyzers/java` の `javaanalyzer` 配下は、解析パイプラインの段階別 package (`analysis/` 配下) と入出力・起動系 (`protocol` / `io` / `preflight` / `discovery`) で構成する。段階の実行順は `analysis/pipeline` (Runner) だけが知る。外部ライブラリの隔離は次の 3 段階とする (判断を定めるのは [ADR-0007](../adr/0007-layered-architecture-refactor.md)):
 
 - **SootUp**: `analysis/sootup` (adapter) に完全に封じ込め、facade が自前型で公開する。他 package から `sootup.*` の import 禁止
 - **Gradle Tooling API**: `discovery` に完全隔離 (`org.gradle.*` は discovery のみ。jar が `org.gradle.api` / `util` / `internal` も同梱するため tooling 配下限定にしない)
