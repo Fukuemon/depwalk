@@ -10,18 +10,17 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// TestUnresolvedCallPatternsCLI analyses the hard-to-resolve call pattern
-// fixture (testdata/fixtures/java/multi-module-spring-project/patterns/) with
-// the real Core CLI and the real Analyzer jar through auto discovery.
+// TestUnresolvedCallPatternsCLI は解決が難しい呼び出しパターンの fixture
+// (testdata/fixtures/java/multi-module-spring-project/patterns/) を、実 Core CLI と
+// 実 Analyzer jar の自動 discovery で解析する。
 //
-// Five patterns used to be reported as unresolved: fluent chains, method
-// references, explicit super calls, var with generics, and cross-module Lombok
-// members. All of them are now rescued, so this test guards the success
-// expectation that every pattern becomes an edge under the bytecode-only
-// member contract.
+// かつて未解決として報告されていた 5 パターン (fluent chain、method reference、
+// 明示的な super 呼び出し、generics 付き var、cross-module の Lombok member) は
+// すべて救済済みである。bytecode-only member の契約下で各パターンが edge になる、
+// という成功の期待を本テストが守る。
 //
-// patterns/ is a standalone build that the root fixture's settings.gradle does
-// not include, so it does not affect TestGradleMultiProjectCLI's expectations.
+// patterns/ は root fixture の settings.gradle が含めない独立 build なので、
+// TestGradleMultiProjectCLI の期待値には影響しない。
 func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
@@ -51,15 +50,15 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 		}
 	}
 
-	// Rescue outcome: cross-module generated members become edges under the
-	// bytecode-only contract (calleeOrigin=project-bytecode-member).
+	// 救済の結果: cross-module の生成 member が bytecode-only の契約で edge になる
+	// (calleeOrigin=project-bytecode-member)。
 	itemCtor := "java:com.example.pat.lib.Item#<init>(java.lang.String,int)"
 	itemGetName := "java:com.example.pat.lib.Item#getName()"
 	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
 
-	// Four callers reach getName (cross-module constructor, var with generics,
-	// the head of a fluent chain, and a method reference); the constructor has
-	// two callers.
+	// getName には 4 つの caller が到達する (cross-module のコンストラクタ、
+	// generics 付き var、fluent chain の先頭、method reference)。
+	// コンストラクタ側の caller は 2 つ。
 	if got := len(edges[itemCtor]); got < 2 {
 		t.Errorf("Item ctor edges = %d, want >= 2 (cross-module, fluent chain head): %v", got, edges[itemCtor])
 	}
@@ -77,7 +76,7 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 		}
 	}
 
-	// A rescued method reference edge carries the viaMethodReference marker.
+	// 救済された method reference の edge は viaMethodReference の標識を持つ。
 	foundReference := false
 	for _, edge := range edges[itemGetName] {
 		if edge.Metadata["viaMethodReference"] == true {
@@ -88,7 +87,7 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 		t.Errorf("rescued method reference edge must carry viaMethodReference: %v", edges[itemGetName])
 	}
 
-	// Completeness gate: every call site is classified and none stay unresolved.
+	// 完全性 gate: すべての call site が分類され、未解決が残らない。
 	stderrText := capturedText(t, capture, "stderr.txt")
 	if !strings.Contains(stderrText, "silentOmission=0") {
 		t.Errorf("ledger summary must report silentOmission=0:\n%s", stderrText)

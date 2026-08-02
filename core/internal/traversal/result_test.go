@@ -192,9 +192,8 @@ func TestResultMaxDepthZeroCutsAllAdjacentEdges(t *testing.T) {
 }
 
 func TestResultMaxDepthZeroKeepsStartSelfLoopAsCycleEdge(t *testing.T) {
-	// A self-loop on the start node has both endpoints reached even at
-	// maxDepth 0, so it stays in the induced edge set with a cycle
-	// annotation instead of becoming a depth cutoff.
+	// 起点への self-loop は maxDepth 0 でも両端が到達 node になる。そのため
+	// 深さ打ち切りにならず、cycle 注釈付きで誘導 edge 集合に残る。
 	g := graphtest.NewBuilder().
 		Edge("edge:aa", "method:a", "method:a").
 		Edge("edge:ab", "method:a", "method:b").
@@ -247,8 +246,8 @@ func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
 }
 
 func TestResultIdenticalForBFSAndDFS(t *testing.T) {
-	// Uneven diamond + cycle + depth limit: the full result contract
-	// (nodes, edges, cycles, cutoffs) must not depend on the visit order.
+	// 非対称な合流 + 閉路 + 深さ上限。結果の契約 (nodes / edges / cycles /
+	// cutoffs) がすべて訪問順に依存しないこと。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
