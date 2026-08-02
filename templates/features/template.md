@@ -16,7 +16,7 @@ verified_commit: unverified
 
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・画面・フロー単位で記述する。責務・範囲・方針の層に留め、ファイル配置・directive・テスト手順などの実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** 「なぜそうしたか」「どう変えてきたか」は書かず、判断は ADR へ起こして `(判断の正本は ADR-NNNN)` の形でその場に 1 行参照する (正本は [ADR-0009](../../../adr/0009-design-doc-describes-current-state.md))。
+**現在の設計だけを書く。** 「なぜそうしたか」「どう変えてきたか」「どの issue で決めたか」は書かず、判断は ADR へ起こしてその場に 1 行参照する (`spec-lifecycle` の `references/spec-contract.md` の正本境界)。
 
 ## 背景・要件解釈
 

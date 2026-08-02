@@ -13,7 +13,7 @@ verified_commit: unverified
 
 # Toolchain
 
-採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.md](project.md) の Quick Commands を正本とする。
+採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の `commands` を正本とする。
 
 ## 標準スタック
 
@@ -26,6 +26,10 @@ verified_commit: unverified
 | Formatter       |        |      |
 | Unit test       |        |      |
 | E2E             |        |      |
+
+## エージェント補助 (任意)
+
+- bash 出力の token 削減に [RTK](https://github.com/rtk-ai/rtk) を推奨する。導入と注意は `dev-commands` skill の `references/rtk.md` (開発者ごとの global 設定。repo の hook には登録しない)。
 
 ## 採用方針
 

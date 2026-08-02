@@ -2,7 +2,7 @@
 
 > spec 本体テンプレート。
 > 機能固有の追加節 (API endpoint / ER 図 / 認可マトリクス / data-testid 等) は `templates/specs/appendices/<topic>.md` から該当 appendix を取り込む。
-> 必須節・必須サブ節は `hooks/spec/validate_document.sh` が検査し、レビュー観点は `.rulesync/skills/spec-review/references/review-rubric.md` が評価する。
+> 必須節・必須サブ節は `hooks/spec/validate_document.sh` が検査し、レビュー観点は subagent 定義 `.rulesync/subagents/spec-reviewer.md` が評価する。
 
 ## メタ情報
 
@@ -47,7 +47,7 @@
 | context       |               |                                   |
 | ADR (なら ID) |               |                                   |
 
-> 矛盾を検出した場合は `spec-sync` で PRD / Design Doc / feature doc / context / ADR への back-propagation を提案する。
+> 矛盾を検出した場合は `spec-lifecycle` の sync phase で PRD / Design Doc / feature doc / context / ADR への back-propagation を提案する。
 
 ## 関連資料
 
@@ -102,7 +102,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## 解決済みの論点
 
-(`spec-resolve` で確定したものをここに移動する)
+(`spec-lifecycle` の clarify phase で確定したものをここに移動する)
 
 -
 
@@ -114,7 +114,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## 実装対象
 
-正規 target は `context/project.md` の対象ドメイン一覧を正本とする。
+正規 target は `context/project.yml` の対象ドメイン一覧を正本とする。
 
 | モジュール   | 実装有無 | 主な責務 |
 | ------------ | :------: | -------- |
@@ -209,7 +209,7 @@ EARS 風で振る舞いを記述する (`<who>` `<trigger>` 時、システム�
 
 ## フロー / シーケンス
 
-(`spec-diagrams` で生成。spec の主要操作を Mermaid 図に落とす)
+(`spec-lifecycle` の diagram phase で生成。spec の主要操作を Mermaid 図に落とす)
 
 ### Flowchart (ユーザー操作起点)
 
@@ -233,12 +233,12 @@ sequenceDiagram
 
 ### prompts 生成方針
 
-- `context/project.md` の対象ドメインのどこで分けるか
+- `context/project.yml` の対象ドメインのどこで分けるか
 - 並列実装できる境界
 
 ## 上位資料からの変更点
 
-本 spec で PRD / Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。`spec-track` / `spec-sync` で更新する。
+本 spec で PRD / Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。`spec-lifecycle` の track / sync phase で更新する。
 
 ### PRD への影響
 
