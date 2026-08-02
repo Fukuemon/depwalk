@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Disable Claude Code attribution in generated project settings.
-# Run after `npx rulesync@latest generate`. Idempotent.
+# 生成された project settings で Claude Code の attribution を無効にする。
+# `npx rulesync@latest generate` の後に実行する。冪等。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

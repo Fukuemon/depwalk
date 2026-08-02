@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Normalize .cursor/cli.json so the cursor-agent CLI accepts it.
+# cursor-agent CLI が受け付ける形へ .cursor/cli.json を正規化する。
 #
-# Why: `rulesync generate` (>=8.x) always writes top-level `version` / `editor`
-# keys and only emits `permissions.deny` when at least one deny entry exists.
-# The current cursor-agent CLI rejects `version` / `editor` as unrecognized keys
-# and requires `permissions.deny` to be an array. rulesync has no option to
-# suppress those keys, so we normalize the generated file here.
+# `rulesync generate` (>=8.x) は top-level の `version` / `editor` を必ず書き、
+# `permissions.deny` は deny が 1 件以上あるときしか出さない。一方で現行の
+# cursor-agent CLI は `version` / `editor` を未知キーとして拒否し、
+# `permissions.deny` が配列であることを要求する。rulesync 側にこれらを抑止する
+# option が無いため、生成後にここで整える。
 #
-# Run this AFTER `npx rulesync@latest generate`. Idempotent.
+# `npx rulesync@latest generate` の**後**に実行する。冪等。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,8 +16,8 @@ CLI_JSON="$ROOT/.cursor/cli.json"
 [ -f "$CLI_JSON" ] || { echo "no $CLI_JSON; skip"; exit 0; }
 
 tmp="$(mktemp)"
-# - drop unrecognized top-level keys (version, editor)
-# - guarantee permissions.deny is an array (cursor-agent requires it)
+# - 未知の top-level キー (version、editor) を落とす
+# - permissions.deny を必ず配列にする (cursor-agent の要求)
 jq '
   del(.version, .editor)
   | .permissions = (.permissions // {})
