@@ -86,8 +86,8 @@ func TestRunnerRejectsInvalidRequest(t *testing.T) {
 	}
 }
 
-// collectStdout feeds stdout to the record collector one line at a time,
-// mirroring how [Runner.Run] receives lines from the analyzer package.
+// collectStdout は stdout を 1 行ずつ record collector へ渡す。[Runner.Run] が
+// analyzer package から行を受け取る流れをそのまま模す。
 func collectStdout(stdout string, onRecord func(Record)) RunResult {
 	collector := newRecordCollector(onRecord)
 	reader := bufio.NewReader(strings.NewReader(stdout))

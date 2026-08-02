@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// ParseRecord parses and validates one JSONL record line.
+// ParseRecord は JSONL の 1 行を parse して検証する。
 func ParseRecord(line []byte) (Record, error) {
 	line = bytes.TrimSuffix(line, []byte("\n"))
 	line = bytes.TrimSuffix(line, []byte("\r"))
@@ -100,8 +100,8 @@ func decodeExact(raw map[string]json.RawMessage, fields map[string]struct{}, out
 	if err != nil {
 		return invalid("jsonl", err.Error())
 	}
-	// UseNumber keeps opaque metadata numbers as their exact decimal text so
-	// integers beyond float64 precision survive a parse/serialize round trip.
+	// UseNumber で opaque な metadata の数値を十進表記のまま保つ。float64 の精度を
+	// 超える整数が parse と直列化の往復で壊れないようにするため。
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	if err := decoder.Decode(out); err != nil {

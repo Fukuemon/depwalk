@@ -51,11 +51,10 @@ func (a *Adapter) Run(
 	if len(request.Exclude) > 0 {
 		wireRequest.Exclude = request.Exclude
 	}
-	// [Runner.Run] validates the request again (it is also used directly,
-	// e.g. by record-level E2E tests). The Adapter validates here first so
-	// that a bad request coming through the port is classified as an input
-	// error — exit code 2 — before any process is launched, instead of
-	// surfacing as an untyped runtime failure.
+	// [Runner.Run] 側でも要求を検証する (record レベルの E2E などが直接使うため)。
+	// Adapter が先に検証するのは、port 経由の不正な要求を process 起動前に入力
+	// エラー (exit code 2) として分類するためである。後段に任せると型のない
+	// 実行時失敗として表に出る。
 	if err := wireRequest.Validate(); err != nil {
 		return analyze.Outcome{}, &analyze.InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
 	}

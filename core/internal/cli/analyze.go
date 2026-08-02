@@ -19,13 +19,13 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// As the composition root, cli injects the ACL adapter into the analyze
-// port by hand. The interface satisfaction check is kept here, next to the
-// wiring, rather than in the implementing package.
+// コンポジションルートとして、cli が ACL adapter を analyze の port へ手で注入する。
+// interface 充足の検査は実装側の package ではなく、配線のあるここに置く。
+// 配線と検査が離れると、配線を変えたときに検査が置き去りになる。
 var _ analyze.Source = (*protocol.Adapter)(nil)
 
-// analyzeFlags holds the complete flag surface for newAnalyzeCommand:
-// Analyzer launch inputs, source filters, and method query options.
+// analyzeFlags は newAnalyzeCommand が受ける flag 一式。Analyzer の起動入力、
+// ソースの絞り込み、method query の選択肢からなる。
 type analyzeFlags struct {
 	analyzerCmd  string
 	language     string
@@ -39,8 +39,8 @@ type analyzeFlags struct {
 	exclude      []string
 }
 
-// analyzeLongHelp stays language-agnostic: it describes Analyzer-side source
-// root discovery and its possible side effects without naming any build tool.
+// analyzeLongHelp は言語に依存しない書き方を保つ。Analyzer 側の source root
+// discovery とその副作用を、特定の build tool 名を出さずに説明する。
 const analyzeLongHelp = `Run an Analyzer process and build a call graph.
 
 When no --source-root is given, the selected Analyzer discovers source roots
@@ -60,9 +60,9 @@ func newAnalyzeCommand() *cobra.Command {
 		Long:  analyzeLongHelp,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Query output is the only content allowed on stdout. Suppress Cobra's
-			// usage block for all RunE failures; Cobra still renders ordinary error
-			// messages to stderr, while AnalyzerFailure keeps its custom renderer.
+			// stdout に出してよいのは query の出力だけ。RunE の失敗では Cobra の
+			// usage 表示を抑止する。通常の error は Cobra が stderr へ出し、
+			// AnalyzerFailure は独自の描画を保つ。
 			cmd.SilenceUsage = true
 			workspaceRoot, err := resolveWorkspaceRoot(args)
 			if err != nil {
@@ -124,9 +124,8 @@ func newAnalyzeCommand() *cobra.Command {
 				var failure *analyze.AnalyzerFailure
 				if errors.As(err, &failure) {
 					renderAnalyzerFailure(cmd.ErrOrStderr(), failure)
-					// The full failure, summary first, is already rendered;
-					// suppress cobra's trailing duplicate summary and the
-					// usage block that would follow it.
+					// サマリを先頭にした失敗の全文は描画済み。後続で cobra が
+					// 出す重複サマリと usage を抑止する。
 					cmd.SilenceErrors = true
 					cmd.SilenceUsage = true
 				}
@@ -153,8 +152,8 @@ func newAnalyzeCommand() *cobra.Command {
 		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		// Flag parsing happens before RunE, so classify parse/type failures here
-		// instead of relying on RunE's semantic validation.
+		// flag の parse は RunE より前に走る。そのため parse / 型の失敗はここで
+		// 分類する。RunE の意味検証には載らない。
 		cmd.SilenceUsage = true
 		return &inputError{err: err}
 	})
@@ -173,10 +172,11 @@ func newAnalyzeCommand() *cobra.Command {
 	return cmd
 }
 
-// renderAnalyzerFailure prints the structured Analyzer failure: the top-level
-// summary first, then each failure detail in array order. Only the common
-// protocol fields are rendered; Analyzer-specific codes and metadata keys are
-// shown verbatim, never interpreted.
+// renderAnalyzerFailure は構造化された Analyzer の失敗を出力する。top-level の
+// サマリを先に、続けて各明細を配列順に出す。
+//
+// 描画するのは protocol の共通 field だけ。Analyzer 固有の code や metadata の key は
+// そのまま出し、解釈しない。解釈すると Core が言語固有の知識を持つ。
 func renderAnalyzerFailure(w io.Writer, failure *analyze.AnalyzerFailure) {
 	fmt.Fprintf(w, "Error: %s\n", failure.Error())
 	if failure.Location != nil {
@@ -213,9 +213,8 @@ func formatSourceLocation(location *graph.SourceLocation) string {
 	return text
 }
 
-// canonicalJSON renders opaque metadata as compact JSON with object keys in
-// lexicographic order (encoding/json sorts map keys) and arrays in input
-// order.
+// canonicalJSON は opaque な metadata を、object の key を辞書順 (encoding/json が
+// map の key を整列する)、配列を入力順にした compact な JSON として描画する。
 func canonicalJSON(value any) string {
 	encoded, err := json.Marshal(value)
 	if err != nil {

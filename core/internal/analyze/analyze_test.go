@@ -9,11 +9,11 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// fakeSource is an in-package Source fake: it streams the
-// configured nodes / edges to the callbacks and returns the configured
-// outcome, recording the request it received. Process-level behavior
-// (fake Analyzer subprocesses) is tested against the ACL adapter in the
-// protocol package.
+// fakeSource は package 内の Source の fake。設定した node / edge を callback へ
+// 流し、設定した outcome を返し、受け取った request を記録する。
+//
+// プロセス単位の挙動 (fake Analyzer subprocess) は protocol package の ACL adapter
+// に対して検証する。
 type fakeSource struct {
 	nodes   []graph.Node
 	edges   []graph.Edge

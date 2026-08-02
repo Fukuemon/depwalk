@@ -28,12 +28,11 @@ func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (strin
 	return "", fmt.Errorf("analyzer command is required: set --analyzer-cmd or %s", analyzerCmdEnv)
 }
 
-// isEscapableRune reports whether r is one of the characters that a
-// backslash outside quotes may escape (space, tab, newline, single quote,
-// double quote, or another backslash). A backslash immediately followed by
-// any other rune (or by nothing, i.e. at end of input) is kept as a
-// literal backslash instead, so Windows-style paths such as
-// `C:\jdk\bin\java.exe` survive splitting unmangled.
+// isEscapableRune は r が「引用符の外で backslash が escape できる文字」かを返す
+// (空白・tab・改行・単引用符・二重引用符・backslash)。
+//
+// それ以外の文字が続く場合 (および入力末尾) の backslash はリテラルとして残す。
+// `C:\jdk\bin\java.exe` のような Windows 形式のパスを壊さずに分割するため。
 func isEscapableRune(r rune) bool {
 	switch r {
 	case ' ', '\t', '\n', '\'', '"', '\\':

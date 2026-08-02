@@ -189,7 +189,7 @@ final class BytecodeRescue {
      * <li>{@code Type::m} ({@code typeNameScope=true}): static なら arity=samArity、
      *     instance (unbound reference) なら arity=samArity-1 のみが有効。両方に
      *     候補があれば曖昧として不採用。</li>
-     * <li>{@code expr::m} ({@code typeNameScope=false}, bound reference): instance
+     * <li>{@code expr::m} ({@code typeNameScope=false}、bound reference): instance
      *     の arity=samArity のみが有効 (static、または samArity-1 は無効)。</li>
      * </ul>
      * SAM arity を推論できない場合は、上記の (arity, static/instance) 検証ができ

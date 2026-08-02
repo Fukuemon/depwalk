@@ -526,9 +526,9 @@ func TestAnalyzeCommandFailsOnFatalAnalyzerError(t *testing.T) {
 	}
 }
 
-// fakeAnalyzerCommand returns an --analyzer-cmd string that re-invokes the
-// current test binary as a fake Analyzer process (TestFakeAnalyzerHelperProcess
-// below), keeping cli package tests independent of a JVM.
+// fakeAnalyzerCommand は、現在のテストバイナリを fake Analyzer プロセスとして
+// 再実行する --analyzer-cmd 文字列を返す (下の TestFakeAnalyzerHelperProcess)。
+// cli package のテストを JVM に依存させないため。
 func fakeAnalyzerCommand(t *testing.T, scenario string) string {
 	t.Helper()
 
@@ -599,8 +599,8 @@ func TestFakeAnalyzerHelperProcess(t *testing.T) {
 	}
 }
 
-// requestSourceRootsForHelper reports the analysisRequest.sourceRoots values
-// exactly as received on stdin, or "(absent)" when the field was omitted.
+// requestSourceRootsForHelper は stdin で受け取った analysisRequest.sourceRoots を
+// そのまま返す。field が省かれていれば "(absent)"。
 func requestSourceRootsForHelper(stdin []byte) string {
 	return requestStringArrayForHelper(stdin, "sourceRoots")
 }

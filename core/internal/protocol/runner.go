@@ -16,23 +16,20 @@ type Runner struct {
 	command analyzer.Command
 }
 
-// NewRunner returns a Runner that launches the Analyzer with command.
 func NewRunner(command analyzer.Command) Runner {
 	return Runner{command: command}
 }
 
-// RunResult contains protocol-level results of an Analyzer run. Method
-// symbol and call edge records are not buffered here; they are handed to
-// the onRecord callback of [Runner.Run] as they arrive.
+// RunResult は Analyzer 実行の protocol 単位の結果。
+//
+// methodSymbol / callEdge の record はここに溜めない。[Runner.Run] の onRecord へ
+// 届いた順に渡す。
 type RunResult struct {
-	Diagnostics []Diagnostic
-	// AnalyzerError contains the fatal Analyzer error record, if one was emitted.
-	AnalyzerError *AnalyzerError
-	// ValidationError contains the first Core-side stdout validation error.
+	Diagnostics     []Diagnostic
+	AnalyzerError   *AnalyzerError
 	ValidationError error
-	// ExitCode is the Analyzer process exit code.
-	ExitCode int
-	Stderr   string
+	ExitCode        int
+	Stderr          string
 }
 
 // Run は Analyzer process を起動し、analysisRequest の JSONL record を 1 件送り、
@@ -61,10 +58,11 @@ func (r Runner) Run(request AnalysisRequest, onRecord func(Record)) (RunResult, 
 	return result, nil
 }
 
-// recordCollector consumes the Analyzer stdout stream one JSONL line at a
-// time. Graph records are converted downstream via onRecord instead of
-// being buffered; only method IDs and edge endpoints are retained for the
-// post-stream reference-completeness check.
+// recordCollector は Analyzer の stdout を JSONL 1 行ずつ消費する。
+//
+// graph の record は溜めずに onRecord へ流す。stream 終了後の参照完全性検査に
+// 要る method ID と edge の両端だけを保持する。全件を保持すると大きな graph で
+// メモリが膨らむ。
 type recordCollector struct {
 	onRecord   func(Record)
 	references *referenceChecker
@@ -106,16 +104,15 @@ func (c *recordCollector) addRecord(record Record) {
 	}
 }
 
-// finalize closes the stream: a stdout read failure is reported as a
-// validation error unless an earlier one was already recorded, and the
-// reference-completeness check runs last.
+// finalize は stream を閉じる。stdout の読み取り失敗は検証エラーとして報告する
+// (先に記録済みのものがあればそちらを優先)。参照完全性の検査は最後に走らせる。
 func (c *recordCollector) finalize(readErr error) RunResult {
 	if readErr != nil {
 		c.setValidationError(readErr)
 	}
-	// A fatal stream makes Core discard every preceding record, so dangling
-	// references are not reported as a separate validation failure (the
-	// fatal contract in design/features/graph/DesignDoc_graph.md).
+	// fatal な stream では Core が先行 record をすべて破棄する。そのため参照の
+	// 宙づりを別の検証失敗として報告しない
+	// (design/features/graph/DesignDoc_graph.md の fatal 契約)。
 	if c.result.AnalyzerError == nil {
 		if err := c.references.validate(); err != nil {
 			c.setValidationError(err)
@@ -130,8 +127,8 @@ func (c *recordCollector) setValidationError(err error) {
 	}
 }
 
-// referenceChecker retains only the identifiers needed to verify that every
-// call edge references an emitted method symbol once the stream ends.
+// referenceChecker は、stream 終了時に「全 call edge が出力済みの method symbol を
+// 参照している」ことを検証するのに要る識別子だけを保持する。
 type referenceChecker struct {
 	methodIDs map[string]struct{}
 	edges     []edgeReference

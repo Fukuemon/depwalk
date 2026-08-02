@@ -10,9 +10,9 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
 )
 
-// fixtureFile is the self-describing schema of a traversal E2E fixture:
-// a graph input (keys matching the Analyzer Protocol json tags) plus the
-// expected reached sets per traversal case (S1 = caller, S2 = callee).
+// fixtureFile は traversal の E2E fixture の schema。graph の入力
+// (key は Analyzer Protocol の json tag に合わせる) と、探索ケースごとの到達集合の
+// 期待値 (S1 = caller、S2 = callee) からなる。
 type fixtureFile struct {
 	Description string        `json:"description"`
 	Graph       fixtureGraph  `json:"graph"`

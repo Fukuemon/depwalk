@@ -31,9 +31,10 @@ func TestAnalyzerRecordingProxyHelperProcess(t *testing.T) {
 	os.Exit(runRecordingProxy(os.Stdin, os.Stdout, os.Stderr, captureDir, command))
 }
 
-// proxyHelperArgs extracts "--proxy-capture <dir> <command...>" after the
-// test-binary "--" separator; returns ("", nil, false) when not invoked as a
-// helper and malformed=true when the flag is present without <dir> <command>.
+// proxyHelperArgs はテストバイナリの "--" 区切りより後ろから
+// "--proxy-capture <dir> <command...>" を取り出す。helper として起動されていない
+// ときは ("", nil, false)、flag はあるが <dir> <command> が無いときは
+// malformed=true を返す。
 func proxyHelperArgs(args []string) (string, []string, bool) {
 	for i, arg := range args {
 		if arg == "--proxy-capture" {
@@ -46,8 +47,8 @@ func proxyHelperArgs(args []string) (string, []string, bool) {
 	return "", nil, false
 }
 
-// runRecordingProxy launches the real Analyzer command and relays all four
-// channels byte-transparently while teeing copies into captureDir. A proxy or
+// runRecordingProxy は実 Analyzer コマンドを起動し、4 つの channel すべてを
+// byte 透過で中継しつつ captureDir へ複製する。プロキシまたは
 // Analyzer の起動失敗・capture 失敗は非ゼロ exit にし、成功へ格下げしない。
 func runRecordingProxy(stdin io.Reader, stdout, stderr io.Writer, captureDir string, command []string) int {
 	if len(command) == 0 {

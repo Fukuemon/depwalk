@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ValidationError describes a protocol schema validation failure.
+// ValidationError は protocol schema の検証失敗を表す。
 type ValidationError struct {
 	Field  string
 	Reason string
@@ -216,8 +216,8 @@ func validateRecordHeader(schemaVersion string, recordType, want RecordType) err
 	return nil
 }
 
-// rejectExplicitEmptyArray rejects a present-but-empty optional array while
-// allowing an omitted (nil) one.
+// rejectExplicitEmptyArray は「存在するが空」の optional 配列を拒否し、
+// 省略 (nil) は許す。空配列は「対象なし」を意図した指定と解釈できず曖昧なため。
 func rejectExplicitEmptyArray[T any](field string, values []T) error {
 	if values != nil && len(values) == 0 {
 		return invalid(field, "must not be an explicit empty array")
