@@ -162,7 +162,7 @@ verified_commit: <sha> | unverified
 | `context/ai-agents.md`               | `.claude/agents/` (下記の注意を参照)                                                                                                                                                     |
 | `context/README.md`                  | なし (索引部分は生成物。決定 4 を参照)                                                                                                                                                   |
 
-`context/ai-agents.md` の `governs` には制約がある。この文書が語る subagent 定義を**持つのは sdd-template リポジトリ**にあり、本リポジトリの `.rulesync/` は symlink で commit しない。したがって検出できるのは「再生成された生成物 (`.claude/agents/`) が変わったこと」までであり、決まりを置いた側の変更そのものは追えない。この限界を承知のうえで生成物を監視対象にする。
+`context/ai-agents.md` の `governs` には制約がある。この文書が語る subagent 定義を**持つのは sdd-template リポジトリ**であり、本リポジトリは symlink で接続するだけで何も追跡しない (ADR-0011 / sdd-template decisions.md 2026-08-02)。したがって鮮度検査で追える実装が本リポジトリに存在しない。`governs` からは外し、この文書の鮮度は sdd-template 側の変更で判断する。
 
 `context/project.yml` は YAML のため frontmatter を持てず、既存の `meta.updated` を継続する。
 

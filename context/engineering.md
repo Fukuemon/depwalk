@@ -82,7 +82,7 @@ Core 実装基盤を定めるのは [ADR-0002](../adr/0002-core-implementation-f
 
 ## Repository Quality Gate
 
-- 現状の gate: Markdown / ドキュメント整合 (lefthook 経由)。AI 設定は `.rulesync/` が定め、生成物 (`AGENTS.md` / `CLAUDE.md` / `.codex/` / `.claude/` / `.cursor/`) の直接編集を禁止する。
+- 現状の gate: Markdown / ドキュメント整合 (lefthook 経由)。AI 設定は sdd-template が中央で生成し symlink で配る。本リポジトリでは追跡せず、手元での編集も反映されない (次の `make sync` で戻る)。
 - Core 実装後の最小 gate: `cd core && go test ./...`、`cd core && go vet ./...`、`cd core && test -z "$(gofmt -l .)"`、`cd core && go mod tidy` 後の差分確認。
 - 依存境界 gate: Core から `analyzers/<language>/` や特定 Analyzer runtime へ直接依存しないことを CI の Go job で検査する (`go list -deps ./...` に `analyzers/` が含まれないこと。`.github/workflows/ci.yml`)。
 - 依存方向 gate (Go): `core/internal` の package 単位の禁止 import (例: `graph` / `traversal` / `analyze` / `output` → `protocol` / `cli` 等) を golangci-lint + depguard で検査し、lefthook pre-commit / CI に組み込む。ルールは `files` (package の glob) + `deny` + `desc` (違反理由) の宣言形式で書く。違反時は `desc` の理由が表示されるので、開発者・AI エージェントはメッセージだけで是正できる。依存規則を定めるのは [architecture.md](architecture.md) の Package Boundary (導入判断は [ADR-0007](../adr/0007-layered-architecture-refactor.md))。あわせて依存図の生成 (`scripts/depgraph.sh` → architecture.md の生成マーカー区間) と再生成 drift 検査を同 gate に含める。
