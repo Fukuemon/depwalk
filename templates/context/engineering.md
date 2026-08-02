@@ -13,7 +13,7 @@ verified_commit: unverified
 
 # Engineering Conventions
 
-shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.md](project.md)。
+shared config / root task / repository quality gate の境界規約。toolchain 一覧は [toolchain.md](toolchain.md)、プロジェクト固有コマンドは [context/project.yml](project.yml)。
 
 ## Shared Config Boundary
 
