@@ -79,7 +79,7 @@ depwalk analyze <workspace-root> \
 各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する (定めるのは [ADR-0008](adr/0008-doc-freshness-and-reading-map.md))。
 
 > 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節が定める。
-> AI エージェントの操作契約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) (定義は sdd-template リポジトリにあり、`rulesync` で各 provider へ生成)。
+> AI エージェントの操作契約 (`CLAUDE.md` / `AGENTS.md` / `.claude/` など) は sdd-template リポジトリが定め、symlink で接続する。本リポジトリでは追跡しないため、clone しただけの状態では存在しない。接続は sdd-template 側で `bash scripts/link.sh <このリポジトリ>`、確認は `bash scripts/doctor.sh`。
 
 ## ディレクトリ
 

@@ -7,10 +7,6 @@
 # エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。
 
 paths:
-  .claude/agents:
-    docs:
-      - context/ai-agents.md
-    keywords: [AI agent, Claude, Codex, Cursor, orchestrate]
   .github/workflows:
     docs:
       - context/engineering.md
@@ -176,3 +172,4 @@ paths:
 # governs を持たない文書 (鮮度検査の対象外。索引としてのみ載せる)
 unscoped:
   - context/README.md
+  - context/ai-agents.md

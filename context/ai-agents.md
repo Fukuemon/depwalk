@@ -3,9 +3,6 @@ type: context
 title: "AI Agents Registry"
 description: 非対話 CLI エージェントの invocation / routing / timeout 契約
 keywords: [AI agent, Codex, Claude, Cursor, orchestrate]
-governs:
-  - .claude/agents
-verified_commit: 9654928
 ---
 
 # AI Agents Registry
@@ -73,4 +70,4 @@ verified_commit: 9654928
 
 ## 既知の問題
 
-- **cursor cli.json schema 非互換 (2026-06-15 解決)**: `rulesync generate` (>=8.x) は `.cursor/cli.json` に top-level `version`・`editor` を常時出力し、`permissions.deny` を deny エントリがある時だけ出力する。一方 cursor-agent CLI は `version`・`editor` を未知キーとして拒否し `permissions.deny` を必須配列として要求するため、生成直後は起動不可だった。`rulesync` 側に抑止設定が無いため、(1) `.rulesync/permissions.json` に deny エントリを追加し deny 配列を出力、(2) 生成後に `scripts/fix-cursor-cli.sh` (jq で `version`/`editor` 除去・deny 配列保証) を通す、の 2 段で解消。`rulesync-sync` skill の generate 手順に正規化を組込み済み。`rulesync` 更新で `version`/`editor` を出さなくなれば (2) は不要になる。
+- **cursor cli.json schema 非互換 (2026-06-15 解決)**: `rulesync generate` (>=8.x) は `.cursor/cli.json` に top-level `version`・`editor` を常時出力し、`permissions.deny` を deny エントリがある時だけ出力する。一方 cursor-agent CLI は `version`・`editor` を未知キーとして拒否し `permissions.deny` を必須配列として要求するため、生成直後は起動不可だった。`rulesync` 側に抑止設定が無いため、(1) `.rulesync/permissions.json` に deny エントリを追加し deny 配列を出力、(2) 生成後に sdd-template 側の `scripts/fix-cursor-cli.sh` (jq で `version`/`editor` 除去・deny 配列保証) を通す、の 2 段で解消。生成は中央 (sdd-template の `make dist`) で行うため、本 repo に正規化の手順は無い。`rulesync` 更新で `version`/`editor` を出さなくなれば (2) は不要になる。
