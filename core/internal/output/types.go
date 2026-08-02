@@ -13,11 +13,6 @@ const (
 	FormatConsole Format = "console"
 	// FormatJSON は機械処理向けの JSON 出力。
 	FormatJSON Format = "json"
-	// FormatDOT は Graphviz DOT 出力。formatter は未登録で、指定すると許容値
-	// エラーになる。可視化はスコープ外 (adr/0010-defer-graph-visualization.md)。
-	FormatDOT Format = "dot"
-	// FormatMermaid は Mermaid 出力。FormatDOT と同じく未登録。
-	FormatMermaid Format = "mermaid"
 )
 
 // Input は View を組み立てるのに要る graph・探索結果・要求をまとめたもの。
