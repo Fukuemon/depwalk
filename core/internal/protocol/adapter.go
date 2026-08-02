@@ -10,21 +10,19 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Adapter is the Adapter half of the ACL: it implements the
-// analyze.Source port by composing the wire analysisRequest,
-// running the Analyzer process through [Runner], and translating wire
-// records into domain values with the Translator (translate.go). The
-// wiring of Adapter into the analyze use case happens in cli (manual DI).
+// Adapter は ACL の Adapter 側。wire の analysisRequest を組み立て、[Runner] で
+// Analyzer process を動かし、Translator (translate.go) で wire record を domain 値へ
+// 変換することで analyze.Source port を実装する。
+//
+// analyze の use case への配線は cli が手で行う。
 type Adapter struct {
 	command analyzer.Command
 }
 
-// NewAdapter returns an [Adapter] that launches the Analyzer with command.
 func NewAdapter(command analyzer.Command) *Adapter {
 	return &Adapter{command: command}
 }
 
-// Run implements the analyze.Source port.
 func (a *Adapter) Run(
 	request analyze.Request,
 	onNode func(graph.Node),

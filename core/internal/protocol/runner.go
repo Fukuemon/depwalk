@@ -7,7 +7,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 )
 
-// Runner runs one Analyzer process for one analysis request and parses its
+// Runner は解析要求 1 件につき Analyzer process を 1 つ動かし、その
 // stdout as Analyzer Protocol records. Process control (spawn / stdio /
 // exit code) is delegated to the analyzer package, which treats the
 // payload as opaque lines; the protocol-aware half of the exchange lives
@@ -25,7 +25,6 @@ func NewRunner(command analyzer.Command) Runner {
 // symbol and call edge records are not buffered here; they are handed to
 // the onRecord callback of [Runner.Run] as they arrive.
 type RunResult struct {
-	// Diagnostics contains diagnostic records parsed from stdout.
 	Diagnostics []Diagnostic
 	// AnalyzerError contains the fatal Analyzer error record, if one was emitted.
 	AnalyzerError *AnalyzerError
@@ -33,11 +32,10 @@ type RunResult struct {
 	ValidationError error
 	// ExitCode is the Analyzer process exit code.
 	ExitCode int
-	// Stderr is the raw Analyzer stderr output.
-	Stderr string
+	Stderr   string
 }
 
-// Run starts an Analyzer process, sends one analysisRequest JSONL record,
+// Run は Analyzer process を起動し、analysisRequest の JSONL record を 1 件送り、
 // and parses stdout records until the process exits. Each valid
 // methodSymbol and callEdge record is passed to onRecord as it is
 // received; onRecord may be nil when the caller does not consume graph

@@ -19,7 +19,7 @@ const (
 	RecordTypeError RecordType = "error"
 )
 
-// Language identifies the source language handled by an Analyzer.
+// Language は Analyzer が扱うソース言語を識別する。
 type Language string
 
 const (
@@ -51,7 +51,7 @@ const (
 	SymbolKindInitializer SymbolKind = "initializer"
 )
 
-// Severity identifies the severity of a diagnostic record.
+// Severity は diagnostic record の深刻度を識別する。
 type Severity string
 
 const (
@@ -63,10 +63,10 @@ const (
 	SeverityPartialFailure Severity = "partialFailure"
 )
 
-// Metadata carries language-specific or Analyzer-specific hints.
+// Metadata は言語固有・Analyzer 固有のヒントを運ぶ。Core は解釈しない。
 type Metadata map[string]any
 
-// Record is an Analyzer Protocol record returned by [ParseRecord].
+// Record は [ParseRecord] が返す Analyzer Protocol の record。
 type Record interface {
 	Validate() error
 	record()
@@ -89,7 +89,7 @@ type AnalysisRequest struct {
 
 func (AnalysisRequest) record() {}
 
-// Mode returns the effective [AnalysisMode].
+// Mode は実効の [AnalysisMode] を返す。
 func (r AnalysisRequest) Mode() AnalysisMode {
 	if r.AnalysisMode == "" {
 		return AnalysisModeFullGraph
@@ -140,7 +140,7 @@ type SourceLocation struct {
 	EndColumn   *int   `json:"endColumn,omitempty"`
 }
 
-// Diagnostic is an Analyzer-to-Core non-fatal diagnostic record.
+// Diagnostic は Analyzer から Core への、致命的でない診断 record。
 type Diagnostic struct {
 	SchemaVersion   string          `json:"schemaVersion"`
 	RecordType      RecordType      `json:"recordType"`
