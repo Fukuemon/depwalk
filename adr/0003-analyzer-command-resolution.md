@@ -10,7 +10,7 @@
 
 ## 背景
 
-ADR-0001 で Core と Analyzer を JSONL over STDIN/STDOUT の process SPI で結合すると決めたが、Core 側には「どの Analyzer をどう起動するか」を決める配線がまだ無かった (`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけ)。Java Analyzer を初号機として Core から実行するには、この起動コマンド解決の配線が必要になる。
+ADR-0001 で Core と Analyzer を JSONL over STDIN/STDOUT の process SPI で結合すると決めた。しかし Core 側には「どの Analyzer をどう起動するか」を決める配線がまだ無かった。`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけである。Java Analyzer を初号機として Core から実行するには、この起動コマンド解決の配線が必要になる。
 
 Design Doc の成功条件 S5 は「**2 つ目以降**の言語 Analyzer 追加時に Core モジュールへ差分が発生しないこと」を求める。初号機 (Java) 導入に伴う言語非依存な初回配線自体は S5 の対象外である。ただしこの初回配線を言語固有の作り (例: `java` コマンドや jar path を Core に埋め込む) にしてしまうと、2 つ目以降の Analyzer 追加時に Core への分岐追加が避けられなくなる。したがって初回配線の設計そのものが S5 の担保方法を左右する。
 
@@ -23,7 +23,7 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 - metadata passthrough (`--analyzer-meta key=value`) も同様の原則に従う。Core は `analysisRequest.metadata` へ素通しするだけで、key / value の意味 (例: Java の `classpath`) を解釈しない。
 - 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入しない。必要になった時点で ③ の前段として追加できる形にしておく。
 
-**shell-word 分割の字句規則** (2026-07-12 追記、同日 PR レビュー指摘により規則を修正): 空白 (space / tab / newline) を語の区切りとする。single quote / double quote は語の結合に使え、quote 内の空白は区切りにならない (quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote のみが特別)。quote 外の backslash は、直後の 1 文字が特殊文字 (space / tab / newline / single quote / double quote / backslash) の場合に限り escape として働き、それ以外の文字が続く場合 (文字列末尾を含む) はリテラルの backslash として扱う。これにより `C:\jdk\bin\java.exe` のような quote 不要の Windows 絶対パスを無傷で分割できる。未終端の quote は validation error として実行前に拒否する。変数展開・glob 展開・コマンド置換は一切行わない。実装と contract test は `core/internal/cli` の `splitAnalyzerCommand` を正本とする (#34 で `core/internal/analyze` から移設: 起動コマンドの解決は use case ではなくコンポジションルートの責務)。
+**shell-word 分割の字句規則** (2026-07-12 追記、同日 PR レビュー指摘により規則を修正): 空白 (space / tab / newline) を語の区切りとする。single quote / double quote は語の結合に使え、quote 内の空白は区切りにならない (quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote のみが特別)。quote 外の backslash は、直後の 1 文字が特殊文字 (space / tab / newline / single quote / double quote / backslash) の場合に限り escape として働く。それ以外の文字が続く場合 (文字列末尾を含む) はリテラルの backslash として扱う。これにより `C:\jdk\bin\java.exe` のような quote 不要の Windows 絶対パスを無傷で分割できる。未終端の quote は validation error として実行前に拒否する。変数展開・glob 展開・コマンド置換は一切行わない。実装と contract test は `core/internal/cli` の `splitAnalyzerCommand` を正本とする。#34 で `core/internal/analyze` から移設した (起動コマンドの解決は use case ではなくコンポジションルートの責務)。
 
 具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と metadata 合成規則は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) を正本とする。決定経緯は [issue #9](https://github.com/Fukuemon/depwalk/issues/9) に残す。
 

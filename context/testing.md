@@ -50,7 +50,7 @@ Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実
 
 ## path 比較は real path 基準 (macOS symlink)
 
-macOS では `/tmp` と `/var/folders` が `/private` 配下への symlink であり、JUnit の `@TempDir` / `Files.createTempDirectory` / Go の `t.TempDir()` はいずれも symlink 側の path を返す。一方 Gradle model や `toRealPath()` 済みの source root は `/private/...` を返す。片側だけ real 化して `relativize` すると `../../private/...` のような壊れた相対 path になり、record path 破損や glob 不一致として現れる。
+macOS では `/tmp` と `/var/folders` が `/private` 配下への symlink である。JUnit の `@TempDir` / `Files.createTempDirectory` / Go の `t.TempDir()` はいずれも symlink 側の path を返す。一方 Gradle model や `toRealPath()` 済みの source root は `/private/...` を返す。片側だけ real 化して `relativize` すると `../../private/...` のような壊れた相対 path になる。これが record path の破損や glob 不一致として現れる。
 
 - production 契約: Analyzer は `workspaceRoot` と source root を **両方 real path 化してから** 相対化する。
 - test 側: 一時 directory を workspace として使うときは作成直後に `.toRealPath()` してから request / 期待値の基準にする。JavaParser の CU storage path も real path の file を parse に渡して揃える。
