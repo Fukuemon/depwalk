@@ -63,3 +63,11 @@ commit-msg:
     ticket-number:
       glob: "**/*"
       run: hooks/commit-msg/check_ticket_number.sh {1}
+
+# git worktree を作った直後に共有プロセス層を繋ぐ。
+# 配布は symlink で追跡されないため、worktree には配布物が 1 つも来ない。
+# 手当てしないと lefthook.yml だけが残り、hook が silent に no-op になる。
+post-checkout:
+  commands:
+    link-worktree:
+      run: bash scripts/link-worktree.sh
