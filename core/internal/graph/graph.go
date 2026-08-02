@@ -1,34 +1,38 @@
-// Package graph holds the call graph built from Analyzer records and
-// provides the read-only view that the Traversal Engine explores.
+// Package graph は Analyzer の record から構築した呼び出しグラフを保持し、
+// Traversal Engine が探索する読み取り専用の view を提供する。
 //
-// A [Graph] stores nodes keyed by the Analyzer Protocol methodId and
-// directed edges keyed by edgeId. Callers register records via
-// [Graph.AddNode] and [Graph.AddEdge], and readers look up nodes with
-// [Graph.Node] and walk adjacency with [Graph.Neighbors]. The package
-// never mutates registered data after insertion; traversal packages
-// depend only on this read API, not on the internal representation.
+// [Graph] は node を Analyzer Protocol の methodId、有向 edge を edgeId で
+// キーに持つ。登録は [Graph.AddNode] / [Graph.AddEdge]、参照は [Graph.Node] と
+// [Graph.Neighbors] で行う。
+//
+// 登録後のデータは変更しない。探索側はこの読み取り API だけに依存し、
+// 内部表現には依存しない。内部表現を変えても探索側が壊れないようにするためである。
 package graph
 
-// Direction selects which adjacency a graph read follows.
+// Direction は graph の読み取りがどちらの隣接を辿るかを選ぶ。
 type Direction string
 
 const (
-	// DirectionCaller walks edges toward the methods that call a node.
+	// DirectionCaller は node を呼んでいるメソッドへ向かう edge を辿る。
 	DirectionCaller Direction = "caller"
-	// DirectionCallee walks edges toward the methods a node calls.
+	// DirectionCallee は node が呼んでいるメソッドへ向かう edge を辿る。
 	DirectionCallee Direction = "callee"
 )
 
-// Node is a call graph node identified by the Analyzer Protocol methodId.
+// Node は Analyzer Protocol の methodId で識別される呼び出しグラフの node。
 type Node struct {
 	ID     string
 	Symbol Symbol
 }
 
-// SourceLocation identifies a source range relative to the workspace root.
-// It is a graph-owned value type independent of the Analyzer wire format;
-// wire records are converted into it at the protocol boundary. StartColumn,
-// EndLine, and EndColumn are optional and nil when the Analyzer omitted them.
+// SourceLocation は workspace root からの相対でソース範囲を表す。
+//
+// Analyzer の wire 形式とは独立した graph 固有の値型である。wire record は
+// protocol 境界で本型へ変換する。domain 層から wire 表現への import を
+// ゼロにするためであり、型の重複は境界隔離のコストとして受け入れる
+// (判断の正本は adr/0007-layered-architecture-refactor.md)。
+//
+// StartColumn / EndLine / EndColumn は optional で、Analyzer が省いた場合は nil。
 type SourceLocation struct {
 	Path        string
 	StartLine   int
@@ -37,11 +41,12 @@ type SourceLocation struct {
 	EndColumn   *int
 }
 
-// Symbol describes a method represented by a [Node]. Source is optional.
-// Metadata is an optional graph-owned opaque JSON object copied from the
-// Analyzer record; the graph, traversal, and output layers never interpret
-// its keys. A nil map means the record had no metadata; an empty map means
-// the record carried an explicit empty object.
+// Symbol は [Node] が表すメソッドの情報。Source は optional。
+//
+// Metadata は Analyzer の record から複製した opaque な JSON object で、
+// graph / traversal / output のいずれも key の意味を解釈しない。
+// nil は「record に metadata が無かった」、空 map は「明示的に空の object を
+// 持っていた」を表す。この差は JSON 出力に現れるため潰さない。
 type Symbol struct {
 	QualifiedName string
 	Signature     string
@@ -49,10 +54,9 @@ type Symbol struct {
 	Metadata      map[string]any
 }
 
-// Edge is a directed call edge identified by the Analyzer Protocol edgeId.
-// CallerID and CalleeID reference [Node] IDs. Metadata is an optional
-// graph-owned opaque JSON object with the same omitted-versus-empty semantics
-// as [Symbol.Metadata].
+// Edge は Analyzer Protocol の edgeId で識別される有向の呼び出し edge。
+// CallerID / CalleeID は [Node] の ID を参照する。
+// Metadata は [Symbol.Metadata] と同じく opaque で、nil と空 map を区別する。
 type Edge struct {
 	ID       string
 	CallerID string
@@ -61,8 +65,7 @@ type Edge struct {
 	Metadata map[string]any
 }
 
-// Graph is an in-memory call graph. The zero value is not usable; create
-// one with [New].
+// Graph は in-memory の呼び出しグラフ。ゼロ値は使えない。[New] で作る。
 type Graph struct {
 	nodes map[string]Node
 	edges map[string]Edge
@@ -72,7 +75,7 @@ type Graph struct {
 	incoming map[string][]Edge
 }
 
-// New returns an empty [Graph].
+// New は空の [Graph] を返す。
 func New() *Graph {
 	return &Graph{
 		nodes:    map[string]Node{},
@@ -82,9 +85,10 @@ func New() *Graph {
 	}
 }
 
-// AddNode registers a node. A node whose ID is already registered is
-// ignored (first registration wins), matching the deterministic methodId
-// contract of the Analyzer Protocol.
+// AddNode は node を登録する。
+//
+// 登録済みの ID は無視する (先勝ち)。Analyzer Protocol が methodId を決定的に
+// 生成する契約なので、同じ ID なら同じ node であり、上書きする意味がない。
 func (g *Graph) AddNode(n Node) {
 	if _, ok := g.nodes[n.ID]; ok {
 		return
@@ -92,11 +96,11 @@ func (g *Graph) AddNode(n Node) {
 	g.nodes[n.ID] = n
 }
 
-// AddEdge registers a directed edge. An edge whose ID is already
-// registered is ignored (first registration wins). Callers must only
-// register edges whose endpoints are (or will be) registered nodes: the
-// Analyzer Protocol guarantees this by rejecting edges to unresolved
-// symbols, and the record-loading layer is responsible for upholding it.
+// AddEdge は有向 edge を登録する。登録済みの ID は無視する (先勝ち)。
+//
+// 両端が登録済み (または後で登録される) node であることは呼び出し側の責任。
+// 本関数では検査しない。参照完全性は stream 全体を見ないと判定できず、
+// その責務は protocol 層の ACL が持つためである。
 func (g *Graph) AddEdge(e Edge) {
 	if _, ok := g.edges[e.ID]; ok {
 		return
@@ -106,18 +110,17 @@ func (g *Graph) AddEdge(e Edge) {
 	g.incoming[e.CalleeID] = append(g.incoming[e.CalleeID], e)
 }
 
-// Node returns the node registered under id. The second result reports
-// whether the node exists; callers must check it instead of relying on
-// the zero value.
+// Node は id で登録された node を返す。第 2 戻り値は存在したかどうか。
+// ゼロ値で判定せず、必ずこちらを見ること。
 func (g *Graph) Node(id string) (Node, bool) {
 	n, ok := g.nodes[id]
 	return n, ok
 }
 
-// Nodes returns a snapshot containing every registered node. No iteration
-// order is guaranteed. The returned slice may be modified by the caller;
-// nested pointer and map fields retain the same read-only ownership contract
-// as values returned by [Graph.Node].
+// Nodes は登録済みの全 node の snapshot を返す。順序は保証しない。
+//
+// 返す slice は呼び出し側が変更してよい。ただし要素内の pointer / map は
+// [Graph.Node] と同じく読み取り専用として扱うこと。
 func (g *Graph) Nodes() []Node {
 	nodes := make([]Node, 0, len(g.nodes))
 	for _, node := range g.nodes {
@@ -126,12 +129,11 @@ func (g *Graph) Nodes() []Node {
 	return nodes
 }
 
-// Neighbors returns the edges adjacent to the node id in the given
-// direction: for [DirectionCallee] the edges the node calls, for
-// [DirectionCaller] the edges that call the node. Unknown IDs, leaf
-// nodes, and invalid directions yield an empty slice. The returned
-// slice is shared with the graph's internal adjacency and must not be
-// modified by the caller.
+// Neighbors は id の node に隣接する edge を dir 方向で返す。
+// 未知の ID・葉 node・不正な direction はいずれも空を返す。
+//
+// 返す slice は graph 内部の隣接情報と共有している。**呼び出し側が変更しては
+// ならない。** 複製を返さないのは、探索がホットパスで毎回の確保を避けるため。
 func (g *Graph) Neighbors(id string, dir Direction) []Edge {
 	switch dir {
 	case DirectionCaller:
