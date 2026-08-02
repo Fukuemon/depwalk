@@ -1,0 +1,19 @@
+{
+  "filters": {
+    "node-types": {
+      "nodeTypes": [
+        "BlockQuote",
+        "ListItem",
+        "Table",
+        "CodeBlock",
+        "Code",
+        "Html"
+      ]
+    }
+  },
+  "rules": {
+    "sentence-length": {
+      "max": 140
+    }
+  }
+}

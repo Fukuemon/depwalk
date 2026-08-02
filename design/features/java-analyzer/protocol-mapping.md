@@ -194,4 +194,10 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 
 ### 未解決の呼び出しに付ける診断情報
 
-`JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目 — `resolutionPhase` (失敗した解決段階) / `exceptionClass` (resolver 例外のクラス名のみ、message は含めない) / `receiverKind` (receiver 式種別、AST ノード種別名または実装で定義した固定表記) / `receiverTypeResolved` (receiver 型取得成否、真偽値) — を含める。診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は同じ内容で含める。** 出力先は成功時に逐次出力される `diagnostic` record になる。 metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
+`JAVA_INCOMPLETE_ANALYSIS` の `error.details.metadata` には、既存の reason / callKind / target / candidate に加えて、sanitize 済みの診断 4 項目を含める。
+
+- `resolutionPhase` — 失敗した解決段階
+- `exceptionClass` — resolver 例外のクラス名のみ (message は含めない)
+- `receiverKind` — receiver 式種別 (AST ノード種別名、または実装で定義した固定表記)
+- `receiverTypeResolved` — receiver 型を取得できたか (真偽値)
+  診断 metadata は解決失敗時点で内部記録し、その call site が primary diagnostic として終端した場合のみ Protocol へ出力する (救済成功時は出力しない)。**`metadata.allowIncompleteAnalysis` で primary diagnostic が exit 0 のまま残る場合も、この 4 項目は同じ内容で含める。** 出力先は成功時に逐次出力される `diagnostic` record になる。 metadata は opaque な key-value であり Protocol schema は変更しない。sanitize 制約 (source 本文・絶対 path・classpath entry・credential・raw exception message の禁止) を維持する。本 doc を正本とする。
