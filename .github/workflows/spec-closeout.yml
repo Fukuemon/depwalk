@@ -135,7 +135,7 @@ jobs:
 
           ## 却下する場合
 
-          この PR を close すれば spec は残る。ただし残存検査 (\`make -f sdd-template.mk check-specs\`) は検出し続けるため、残す理由を issue #${ISSUE} にコメントで残しておくとよい。
+          この PR を close すれば spec は残る。ただし残存検査 (\`bash scripts/check-specs-residue.sh\`) は検出し続けるため、残す理由を issue #${ISSUE} にコメントで残しておくとよい。
 
           ## Related Issues
 
