@@ -2,7 +2,7 @@
 
 ソースコードの静的解析でメソッド間の **呼び出し関係 (caller / callee)** を抽出し、**変更影響調査**を支援する CLI ツール。「あるメソッドを直したいが、どこから呼ばれ・どこを呼んでいるか」を手作業で追う負荷を自動化し、CI 上でも実行できる形で提供する。
 
-> **Status: 設計フェーズ (Draft)** — 設計の正本は [design/DesignDoc.md](design/DesignDoc.md)。実装は未着手で、ビルド/テストのコマンドは未確定 ([context/project.md](context/project.md) 参照)。
+> **Status: Java / Spring Boot 向けの中核機能まで実装済み。** Core (Go) と Java Analyzer が動作し、CI で unit / E2E テストが回っている。次に進める対象は [DesignDoc の Future Work](design/DesignDoc.md#future-work-rollout-plan) を参照。
 
 ## なぜ作るか (Why)
 
@@ -18,14 +18,35 @@ depwalk はこの調査を静的解析で自動化し、CLI として CI に組�
 ## できること (What)
 
 - 指定メソッドの **呼び出し元 (caller) を再帰探索** / **呼び出し先 (callee) を探索**
-- 呼び出しグラフを **Console / JSON / DOT / Mermaid** で出力 (グラフのビューワ自体は提供しない)
+- 呼び出しグラフを **Console / JSON** で出力
 - 言語別 **Analyzer をプラグインとして追加**できる Core / Protocol
 
-Phase1 は **Java / Spring Boot** を対象 (JavaParser ベース)。Kotlin / TypeScript / Vue / Go は将来対象。
+対象は **Java / Spring Boot**。interface 越しの呼び出しは SootUp の型階層と Spring の DI 情報で実装候補まで解決する。Kotlin / TypeScript / Vue / Go は将来対象。
 
 ### 対象外 (Non Goals)
 
 Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / 実行時 Proxy の動的解析、IDE Plugin / Web UI の提供。本ツールは CLI に限定する。
+
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断の正本は [ADR-0010](adr/0010-defer-graph-visualization.md))。
+
+## 使い方
+
+Java Analyzer の jar をビルドしてから、Core CLI に解析させる。
+
+```sh
+# Analyzer の jar をビルド
+cd analyzers/java && ./gradlew shadowJar
+
+# 呼び出し元を探索する
+depwalk analyze <workspace-root> \
+  --language java \
+  --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" \
+  --method "com.example.UserService#findById(java.lang.Long)" \
+  --direction caller \
+  --format json
+```
+
+`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。コマンドの正本は [context/project.yml](context/project.yml) の `commands`。
 
 ## アーキテクチャ
 
@@ -40,19 +61,6 @@ Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / �
 
 詳細は [design/DesignDoc.md](design/DesignDoc.md) (C4 L1/L2・モジュール責務・Communication Protocol) を参照。
 
-## 設計フェーズの進行
-
-feature 単位で設計を issue 駆動で進めている。
-
-| ドメイン            | 内容                                       | 設計 issue |
-| ------------------- | ------------------------------------------ | ---------- |
-| `traversal`         | Caller / Callee 探索 (Traversal Engine)    | #6         |
-| `output`            | 出力形式 (Console / JSON / DOT / Mermaid)  | #7         |
-| `analyzer-protocol` | Analyzer SPI + Protocol + Model (共通契約) | #8         |
-| `java-analyzer`     | Java/Spring 解析の言語別実装               | #9         |
-
-各 issue の要求は [specs/](specs/)、未決の論点は DesignDoc の Open Questions (Q1〜Q4) で管理する。
-
 ## ドキュメント構成
 
 本リポジトリは Spec Driven Development (SDD) テンプレートを土台に運用する。正本は層ごとに分かれる。
@@ -60,23 +68,30 @@ feature 単位で設計を issue 駆動で進めている。
 | 層                | 文書                                       | 役割                                             |
 | ----------------- | ------------------------------------------ | ------------------------------------------------ |
 | Why / What + How  | [design/DesignDoc.md](design/DesignDoc.md) | 統合モード: Why/What を内包した system landscape |
-| How (feature)     | [design/features/](design/features/)       | feature 単位の設計 (未着手)                      |
+| How (feature)     | [design/features/](design/features/)       | feature 単位の設計 (6 feature)                   |
 | How (規約 / 契約) | [context/](context/)                       | 技術規約・codebase architecture・運用契約        |
-| 固有値            | [context/project.md](context/project.md)   | repo / 命名 / コマンド / 対象ドメイン / ラベル   |
-| 意思決定          | [adr/](adr/)                               | 長期参照する技術選定・境界 (未着手)              |
-| 作業文書          | [specs/](specs/)                           | issue / 機能単位の要求・設計・テスト観点         |
+| 固有値            | [context/project.yml](context/project.yml) | repo / 命名 / コマンド / 対象ドメイン / ラベル   |
+| 意思決定          | [adr/](adr/)                               | 長期参照する技術選定・境界 (ADR-0001〜0010)      |
+| 作業文書          | [specs/](specs/)                           | issue 単位の要求・設計 (close 時に削除する)      |
+
+**どこから読むか**が分からないときは [context/reading-map.yaml](context/reading-map.yaml) を引く。触るコードパスから「読むべき文書」を逆引きできる索引で、各文書の frontmatter から生成している。
+
+各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する (正本は [ADR-0008](adr/0008-doc-freshness-and-reading-map.md))。
 
 > 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節を正本とする。
-> AI エージェントの操作契約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) (正本は [.rulesync/](.rulesync/)、`rulesync` で各 provider へ生成)。
+> AI エージェントの操作契約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) (正本は sdd-template リポジトリ、`rulesync` で各 provider へ生成)。
 
 ## ディレクトリ
 
 ```text
+core/        # Core CLI (Go) — graph / traversal / output / protocol / analyzer / cli
+analyzers/   # 言語別 Analyzer — java/ (JavaParser / SymbolSolver / SootUp)
 design/      # Design Doc (landscape) と feature 設計
-context/     # 技術規約・運用契約 + project.md (固有値・Label Policy)
-specs/       # 設計フェーズの requirements / spec (issue 単位)
+context/     # 技術規約・運用契約 + project.yml (固有値・Label Policy)
 adr/         # Architecture Decision Records
+specs/       # issue 単位の作業文書 (close 時に削除する)
+testdata/    # JSONL contract fixture / E2E fixture
 templates/   # 各文書のテンプレート
-.rulesync/   # AI 設定の単一情報源 (rules / skills / hooks / permissions / mcp)
+scripts/     # 生成・検査スクリプト (依存図 / 読み取りマップ / 鮮度 / drift)
 hooks/       # protected branch / 文書検証 / markdown 整形などの hook
 ```
