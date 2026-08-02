@@ -41,7 +41,7 @@ description: >-
 - 誰がどう使うか
 - なぜ必要か (背景 / 課題)
 - 完了の条件は何か (受け入れ基準)
-- 関連する [PRD](../../PRD.md) / [Design Doc](../../design/DesignDoc.md) の節
+- 関連する `PRD.md` / `design/DesignDoc.md` の節 (統合モードでは DesignDoc の Why / What 節)
 
 ### 2. ドラフト作成 (必須 — スキップ禁止)
 
