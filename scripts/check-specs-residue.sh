@@ -2,7 +2,7 @@
 # closed issue の spec dir が残っていないかを検査する (closeout 契約の機械検査)。
 # 契約の正本は `spec-lifecycle` skill の references/closeout.md。
 #
-#   bash scripts/check-specs-residue.sh                                   # 消費 repo では make -f sdd-template.mk check-specs
+#   bash scripts/check-specs-residue.sh
 #   SPECS_CHECK_REPO=<owner>/<repo> bash scripts/check-specs-residue.sh   # repo を明示する (既定は gh の origin)
 #
 # 終了コード: 0 = 残存なし / 1 = 残存あり (closeout 未実施) / 2 = 検査不能 (gh 認証・権限・想定外の値)
@@ -25,7 +25,10 @@ resolve_specs_dir() {
 SPECS_REL="$(resolve_specs_dir)"
 SPECS_DIR="$ROOT/$SPECS_REL"
 
-[ -d "$SPECS_DIR" ] || { echo "no $SPECS_REL/; skip"; exit 0; }
+# specs/ 自体が無いのは、closeout がすべて完了した (または spec をまだ 1 つも
+# 作っていない) 定常状態。残存ゼロが事実として成立しているため、検査不能 (exit 2)
+# ではなく成功として扱う。これは意図した挙動 (issue #16)。
+[ -d "$SPECS_DIR" ] || { echo "no $SPECS_REL/; 残存なし (specs dir 自体が無い)"; exit 0; }
 command -v gh >/dev/null || { echo "gh CLI が必要です (issue の state を引くため)" >&2; exit 2; }
 
 REPO="${SPECS_CHECK_REPO:-}"
