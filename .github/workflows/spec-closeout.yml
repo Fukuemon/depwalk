@@ -5,9 +5,11 @@ name: Spec closeout
 # 機械判定できないため、可否は PR のマージで人が決める。手順の正本は `spec-lifecycle` skill の
 # references/closeout.md、消費 repo 側の設定手順は README。
 #
-# 前提: Settings → Actions → General で Workflow permissions = Read and write と
-# "Allow GitHub Actions to create and approve pull requests" を有効にする。`issues` イベントは
-# デフォルトブランチ版が実行されるため、本ファイルをマージするまで発火しない。
+# 前提: Settings → Actions → General で "Allow GitHub Actions to create and approve pull requests"
+# を有効にする (未設定は Open deletion PR step が検出して案内する)。Workflow permissions
+# (default_workflow_permissions) は Read のままでよい — contents: write は下の permissions 宣言で
+# 足りている (実測)。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
+# マージするまで発火しない。
 #
 # secret CLOSEOUT_PR_TOKEN (任意、contents:write / pull-requests:write を持つ PAT):
 # 既定の github.token による push / PR 作成は再帰実行防止で workflow を発火させないため、
@@ -118,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/body.md <<BODY
-          ## Summary
+          ## 概要
 
           issue #${ISSUE} が close されたため、\`${DIR}\` の削除を提案する。**この PR をマージするかどうかが削除の判断**であり、自動では消していない。
 
@@ -137,15 +139,24 @@ jobs:
 
           この PR を close すれば spec は残る。ただし残存検査 (\`bash scripts/check-specs-residue.sh\`) は検出し続けるため、残す理由を issue #${ISSUE} にコメントで残しておくとよい。
 
-          ## Related Issues
+          ## 関連 issue
 
           - Refs #${ISSUE}
 
           ---
           この PR は \`.github/workflows/spec-closeout.yml\` が自動起票した。
           BODY
-          gh pr create \
+          # 前提未設定 (Actions の PR 作成許可) は踏むまで分からず、素のエラーからは
+          # 設定箇所に辿り着きにくい。既知原因を検出して案内へ変換する。
+          if ! gh pr create \
             --base "$BASE" \
             --head "$BRANCH" \
             --title "chore: closeout #${ISSUE} — spec を削除" \
-            --body-file /tmp/body.md
+            --body-file /tmp/body.md 2> /tmp/pr-err.txt; then
+            cat /tmp/pr-err.txt >&2
+            if grep -q "not permitted to create or approve pull requests" /tmp/pr-err.txt; then
+              echo "::error::既知の前提未設定: repo の Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests' を有効にすること (README の closeout 前提)。"
+              echo "::error::なお Workflow permissions (default_workflow_permissions) は Read のままでよい — contents: write は本 workflow の permissions 宣言で足りている。"
+            fi
+            exit 1
+          fi
