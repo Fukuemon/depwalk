@@ -63,6 +63,10 @@ commit-msg:
     ticket-number:
       glob: "**/*"
       run: hooks/commit-msg/check_ticket_number.sh {1}
+    # AI の attribution trailer を落とす。.claude/settings.json で無効化して
+    # いるが、それでも入った commit が積み上がったため機械検査を置く。
+    no-ai-attribution:
+      run: bash hooks/commit-msg/check_no_ai_attribution.sh {1}
 
 # git worktree を作った直後に共有プロセス層を繋ぐ。
 # 配布は symlink で追跡されないため、worktree には配布物が 1 つも来ない。
