@@ -2,13 +2,11 @@
 
 ## 状態
 
-提案
+承認
 
 ## 決定日
 
-2026-08-01 (起案)
-
-> 状態が「提案」の間は起案日を記す。承認時に決定日へ置き換える。
+2026-08-01
 
 ## 背景
 
@@ -85,7 +83,7 @@ CLI 限定という前提はアーキテクチャ全体 (単一バイナリ配�
 
 - spec 更新要否: 否。[issue #40](https://github.com/Fukuemon/depwalk/issues/40) は文書整備の issue であり、本 ADR は同 issue の推敲作業中に生じたスコープ判断として独立に記録する
 - context / AI 向け設定更新要否: 否
-- 後続: `FormatDOT` / `FormatMermaid` 定数の削除を別 issue で起票する
+- 後続: `FormatDOT` / `FormatMermaid` 定数の削除を別 issue で起票する (実施: [#64](https://github.com/Fukuemon/depwalk/issues/64) / PR #65。あわせて feature doc と context の記述も PR #70 で落とした)
 
 ## 関連ドキュメント / チケット
 
