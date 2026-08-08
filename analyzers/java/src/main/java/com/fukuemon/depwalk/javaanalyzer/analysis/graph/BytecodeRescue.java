@@ -640,7 +640,9 @@ final class BytecodeRescue {
      * method の functional interface parameter が実際に instantiate される型
      * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできない
      * (external な receiver を持つ method が in-scope 型を引数に取り得るため、
-     * false exclusion の原因になる)。
+     * false exclusion の原因になる)。unqualified static import 経由で lambda を
+     * 直接引数に渡す形も同じ理由で対象外とする: static import 元の class が
+     * external でも lambda parameter の実型は独立しており、根拠にできない。
      */
     boolean lambdaParamReceiverIsExternal(MethodCallExpr mce) {
         if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
