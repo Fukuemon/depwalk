@@ -12,6 +12,8 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.InitializerDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.EnclosedExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -23,6 +25,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.expr.TypeExpr;
+import com.github.javaparser.ast.expr.TypePatternExpr;
 import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
@@ -366,6 +369,9 @@ final class BytecodeRescue {
                 if (initializer != null) {
                     return chainForwardOwner(initializer, enclosingTypeNode, depth + 1);
                 }
+                if (sameNameLocalDeclared(nameExpr)) {
+                    return null;
+                }
                 return enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
             }
         }
@@ -457,6 +463,31 @@ final class BytecodeRescue {
         return null;
     }
 
+    /**
+     * 囲み member 内に同名の local 宣言 (変数宣言・for ヘッダ・try-resource・
+     * catch 節・パターン変数・parameter) が存在するか。field フォールバックの
+     * 前提検査に使う: {@link #uniqueLocalInitializer} は block 直下の宣言文しか
+     * 見ないため、それ以外の位置で宣言された同名 local が field を shadowing
+     * していると、local への呼び出しを field 型で誤判定して false exclusion に
+     * 倒れる余地がある。use 位置で実際に shadowing しているかまでは判定しない
+     * (過剰検出は diagnostic 残留にしか倒れない保守側)。
+     */
+    private static boolean sameNameLocalDeclared(NameExpr nameExpr) {
+        String name = nameExpr.getNameAsString();
+        Node member = nameExpr;
+        Node parent = nameExpr.getParentNode().orElse(null);
+        while (parent != null && !(parent instanceof TypeDeclaration)) {
+            member = parent;
+            parent = parent.getParentNode().orElse(null);
+        }
+        return member.findAll(VariableDeclarator.class).stream()
+                        .anyMatch(declarator -> declarator.getNameAsString().equals(name))
+                || member.findAll(Parameter.class).stream()
+                        .anyMatch(parameter -> parameter.getNameAsString().equals(name))
+                || member.findAll(TypePatternExpr.class).stream()
+                        .anyMatch(pattern -> pattern.getNameAsString().equals(name));
+    }
+
     /** 囲み型の bytecode field 型 (classfile 根拠の receiver 補完)。 */
     private String enclosingBytecodeFieldType(String fieldName, Node enclosingTypeNode) {
         if (enclosingTypeNode == null) {
@@ -540,6 +571,11 @@ final class BytecodeRescue {
                     continue;
                 }
                 // local に該当が無ければ囲み型の bytecode field 型で判定する。
+                // ただし囲み member 内に同名 local 宣言が見えるときは、field を
+                // shadowing した local を誤判定する余地があるため採用しない。
+                if (sameNameLocalDeclared(nameExpr)) {
+                    return false;
+                }
                 String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
                 if (fieldType == null || declIndex.find(fieldType).isPresent()) {
                     return false;

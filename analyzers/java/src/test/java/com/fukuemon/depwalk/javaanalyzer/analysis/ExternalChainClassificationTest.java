@@ -305,6 +305,67 @@ class ExternalChainClassificationTest {
                 () -> "chain forward resolution must rescue text(): " + edges);
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void shadowedFieldNameStaysDiagnosticInsteadOfAdoptingFieldType() throws Exception {
+        // 囲み型に external 型の field value があり、external method へ渡した
+        // lambda の parameter (型推論不能) が同名で field を shadowing している。
+        // lambda parameter は initializer を持たないため initializer 遡及で
+        // 辿れず、そのまま field 型へフォールバックすると lambda parameter への
+        // 呼び出しを field 型根拠で external と誤除外する。同名 local 宣言
+        // (parameter 含む) が見えるときは field 型を採用せず diagnostic を
+        // 維持する (false exclusion の回帰ガード)。field の classfile 根拠を
+        // 成立させるため、Handler は field だけの縮小版を compile して classes
+        // に置く (lambda 側は javac では型が付かないため compile しない)。
+        Path classes = compile("shadow-src", "shadow-classes",
+                Map.of(
+                        "com/example/ext/ExtDep.java", """
+                                package com.example.ext;
+                                public class ExtDep {
+                                    public String text() { return "x"; }
+                                }
+                                """,
+                        "com/example/ext/ExtApi.java", """
+                                package com.example.ext;
+                                public final class ExtApi {
+                                    private ExtApi() {}
+                                    public static <T> void each(java.util.function.Consumer<T> fn) {}
+                                }
+                                """,
+                        "com/example/Handler.java", """
+                                package com.example;
+                                import com.example.ext.ExtDep;
+                                public class Handler {
+                                    ExtDep value;
+                                }
+                                """));
+
+        Path workspace = temp.resolve("shadow-workspace");
+        write(workspace, "com/example/Handler.java", """
+                package com.example;
+                import com.example.ext.ExtApi;
+                import com.example.ext.ExtDep;
+                public class Handler {
+                    ExtDep value;
+                    void run() {
+                        ExtApi.each(value -> value.text());
+                    }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size());
+        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        assertTrue(details.stream().anyMatch(d ->
+                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                () -> "shadowed lambda parameter must keep text() as a diagnostic, not excluded via the field type: "
+                        + details);
+    }
+
     private Path compile(String srcDir, String classesDir, Map<String, String> sources) throws Exception {
         Path build = temp.resolve(srcDir);
         List<String> files = new java.util.ArrayList<>();
