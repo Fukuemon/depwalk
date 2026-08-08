@@ -11,7 +11,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io
-verified_commit: 2d82ed3
+verified_commit: 6292e9a
 ---
 
 # Java Analyzer: Protocol への写像

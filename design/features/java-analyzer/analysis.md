@@ -10,7 +10,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: 2d82ed3
+verified_commit: 6292e9a
 ---
 
 # Java Analyzer: 解析エンジン
@@ -105,8 +105,8 @@ bytecode 救済 (project bytecode member index) と `external-target` 除外分�
 
 receiver 型が取得できない call は、次の順で分類を試みてから diagnostic 化する。いずれも classfile / 確定 AST のみを根拠とし、推測による型付けは行わない。
 
-1. **chain の前進解決**: receiver chain の各 link を project bytecode candidate の戻り値型 (descriptor / generic Signature 由来) で前進解決し、owner 型を復元できたら通常の救済 / external 分類を適用する。候補が一意でない link・primitive / 配列戻り値・project 外 classfile の link では前進しない。暗黙 this link は囲み型、型不明の単純名は確定 AST の initializer (囲み callable 内で同名宣言が一意の場合のみ) または囲み型の bytecode field 型で補完する。
-2. **起点遡及の external 判定**: 前進解決できない場合、chain・変数 initializer・`this.field` を遡って最初に静的型が取れる起点を探し、その型が scope 外 (source 宣言索引に無い) なら `external-target` 除外へ分類する。起点が scope 内型・暗黙 this、または起点の型も取れない場合は保守的に diagnostic に残す。
-3. **lambda parameter 規則**: receiver が lambda parameter の場合、その lambda の引数先 (受け手 method call の receiver、または代入先変数の宣言型) を同じ起点遡及で判定し、scope 外なら `external-target` へ分類する。受け手が暗黙 this / scope 内型なら diagnostic に残す。
+1. **chain の前進解決**: receiver chain の各 link を project bytecode candidate の戻り値型 (descriptor / generic Signature 由来) で前進解決し、owner 型を復元できたら通常の救済 / external 分類を適用する。候補が一意でない link・primitive / 配列戻り値・project 外 classfile の link では前進しない。暗黙 this link は囲み型、型不明の単純名は確定 AST の initializer (囲み callable 内で同名宣言が一意の場合のみ) または囲み型の bytecode field 型で補完する。field 型補完は、囲み member 内に同名の local 宣言 (parameter / パターン変数含む) が見えない場合に限る — block 直下以外 (for ヘッダ・try-resource・catch 節等) で宣言された local が field を shadowing しているとき、field 型での誤判定 (false exclusion) を避ける。
+2. **起点遡及の external 判定**: 前進解決できない場合、chain・変数 initializer・`this.field` を遡って最初に静的型が取れる起点を探し、その型が scope 外 (source 宣言索引に無い) なら `external-target` 除外へ分類する。起点が scope 内型・暗黙 this、または起点の型も取れない場合は保守的に diagnostic に残す。単純名起点の field 型補完には規則 1 と同じ同名 local 宣言の検査を適用する。
+3. **lambda parameter 規則**: receiver が lambda parameter の場合、lambda が代入される変数の宣言型 (= functional interface 型そのもの) が scope 外なら `external-target` へ分類する。lambda を直接 method 引数に渡す形 (unqualified static import 経由を含む) は external 判定の根拠にしない — 受け手 method の receiver 型や static import 元の class は、lambda parameter が実際に instantiate される型と独立した情報であり、external でも in-scope 型の parameter を取り得るため diagnostic に残す。
 
-SAM arity を推論できない method reference は、参照名が owner classfile 上で一意の場合だけ候補採用する (一意でなければ不採用の保守側)。
+SAM arity を推論できない method reference は救済しない。候補列挙は owner classfile の宣言 member に限られ継承 overload を検証できないため、宣言上の名前一意を参照先の一意の根拠にできない (diagnostic に残す保守側)。

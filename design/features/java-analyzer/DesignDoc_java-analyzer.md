@@ -8,7 +8,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: 2d82ed3
+verified_commit: 6292e9a
 ---
 
 # Feature 設計: Java Analyzer
