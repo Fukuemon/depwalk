@@ -183,8 +183,7 @@ final class BytecodeRescue {
     }
 
     /**
-     * method reference の候補選択 (multi-agent review 指摘反映:
-     * 2026-07-22)。JLS 15.13.1 の 2 つの解釈だけを候補にする:
+     * method reference の候補選択。JLS 15.13.1 の 2 つの解釈だけを候補にする:
      * <ul>
      * <li>{@code Type::m} ({@code typeNameScope=true}): static なら arity=samArity、
      *     instance (unbound reference) なら arity=samArity-1 のみが有効。両方に
@@ -192,18 +191,16 @@ final class BytecodeRescue {
      * <li>{@code expr::m} ({@code typeNameScope=false}、bound reference): instance
      *     の arity=samArity のみが有効 (static、または samArity-1 は無効)。</li>
      * </ul>
-     * SAM arity を推論できない場合は、上記の (arity, static/instance) 検証ができ
-     * ないため、より保守的に「参照形式に矛盾しない (typeNameScope なら static も
-     * instance も許容、bound なら instance のみ) 名前一意の member」だけを採用する。
+     * SAM arity を推論できない場合は救済しない。かつては「参照形式に矛盾しない
+     * 名前一意の member」を arity 検証なしで採用していたが、候補列挙は owner
+     * classfile の宣言 member に限られ継承 overload が見えないため、宣言上の
+     * 名前一意が参照先の一意を意味しない (親クラスの同名 overload が実際の
+     * 参照先のとき誤った edge になる)。曖昧なら救済せず diagnostic に残す。
      */
     private SootUpTypeHierarchyIndex.MethodCandidate selectMethodReferenceCandidate(
             String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
         if (samArity < 0) {
-            var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
-                    .filter(method -> method.methodName().equals(methodName))
-                    .filter(method -> typeNameScope || !method.isStatic())
-                    .toList();
-            return byName.size() == 1 ? byName.get(0) : null;
+            return null;
         }
         if (typeNameScope) {
             var staticCandidate = uniqueMethodByArityAndStatic(ownerBinaryName, methodName, samArity, true);
