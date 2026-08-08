@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class CrossModuleBytecodeRescueTest {
 
+    /** SootUp 2.0 が読める classfile 範囲に合わせる (BytecodeOnlyMemberTest と同じ)。 */
+    private static final String FIXTURE_CLASSFILE_RELEASE = "17";
+
     @TempDir
     Path temp;
 
@@ -66,7 +69,7 @@ class CrossModuleBytecodeRescueTest {
         compile(appClasses, List.of(libClasses), "app-src-copy", "com/example/app/AppService.java",
                 Files.readString(appSrc.resolve("com/example/app/AppService.java")));
 
-        AnalysisTestSupport.Ran ran = MultiContextAnalysisTestSupport.run(workspace, projects(), null);
+        AnalysisTestSupport.Ran ran = MultiContextAnalysisTestSupport.run(workspace, projects(libClasses), null);
 
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#getName()");
@@ -99,7 +102,7 @@ class CrossModuleBytecodeRescueTest {
         compile(appClasses, List.of(libClasses), "app-src-copy", "com/example/app/AppService.java",
                 Files.readString(appSrc.resolve("com/example/app/AppService.java")));
 
-        AnalysisTestSupport.Ran ran = MultiContextAnalysisTestSupport.run(workspace, projects(), null);
+        AnalysisTestSupport.Ran ran = MultiContextAnalysisTestSupport.run(workspace, projects(libClasses), null);
 
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#<init>(java.lang.String)");
@@ -107,8 +110,59 @@ class CrossModuleBytecodeRescueTest {
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
-    /** :app が :lib に依存する 2 context 構成 (E2E の multi-module fixture の最小形)。 */
-    private List<MultiContextAnalysisTestSupport.Project> projects() {
+    @SuppressWarnings("unchecked")
+    @Test
+    void rescuesCrossModuleCallWhenDependencyAppearsAsJarOnClasspath() throws Exception {
+        // Gradle model は依存 project を jar として classpath へ返すことがある。
+        // その場合 classpath 照合では :lib の output と分からず、model の
+        // project 依存関係からの解決だけが cross-module 救済の根拠になる。
+        // classes directory 直載せのケースでは退行を検知できない、この解決
+        // 経路そのものを固定する。
+        compile(libClasses, List.of(), "lib-full", "com/example/lib/LibModel.java", """
+                package com.example.lib;
+                public class LibModel {
+                    private String name;
+                    public String getName() { return name; }
+                }
+                """);
+        Path libJar = temp.resolve("lib.jar");
+        try (var out = new java.util.jar.JarOutputStream(Files.newOutputStream(libJar))) {
+            out.putNextEntry(new java.util.jar.JarEntry("com/example/lib/LibModel.class"));
+            out.write(Files.readAllBytes(libClasses.resolve("com/example/lib/LibModel.class")));
+            out.closeEntry();
+        }
+        write(libSrc, "com/example/lib/LibModel.java", """
+                package com.example.lib;
+                public class LibModel {
+                    private String name;
+                }
+                """);
+        write(appSrc, "com/example/app/AppService.java", """
+                package com.example.app;
+                import com.example.lib.LibModel;
+                public class AppService {
+                    public String use(LibModel model) { return model.getName(); }
+                }
+                """);
+        compile(appClasses, List.of(libJar), "app-src-copy", "com/example/app/AppService.java",
+                Files.readString(appSrc.resolve("com/example/app/AppService.java")));
+
+        AnalysisTestSupport.Ran ran = MultiContextAnalysisTestSupport.run(workspace, projects(libJar), null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#getName()");
+        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
+    }
+
+    /**
+     * :app が :lib に依存する 2 context 構成 (E2E の multi-module fixture の最小形)。
+     *
+     * @param appClasspathEntry :app の compile classpath に載せる :lib の成果物。
+     *     classes directory を渡すと classpath 照合でも project output と分かる形、
+     *     jar を渡すと model の依存関係からしか :lib の output を解決できない形になる
+     */
+    private List<MultiContextAnalysisTestSupport.Project> projects(Path appClasspathEntry) {
         MultiContextAnalysisTestSupport.Project lib = new MultiContextAnalysisTestSupport.Project(
                 ":lib",
                 workspace.resolve("lib"),
@@ -120,7 +174,7 @@ class CrossModuleBytecodeRescueTest {
                 ":app",
                 workspace.resolve("app"),
                 List.of(appSrc),
-                List.of(libClasses),
+                List.of(appClasspathEntry),
                 List.of(appClasses),
                 List.of(":lib"));
         return List.of(lib, app);
@@ -138,7 +192,8 @@ class CrossModuleBytecodeRescueTest {
             throws Exception {
         Path build = temp.resolve(srcDirName);
         write(build, relative, source);
-        List<String> args = new ArrayList<>(List.of("--release", "17", "-d", classesDir.toString()));
+        List<String> args = new ArrayList<>(
+                List.of("--release", FIXTURE_CLASSFILE_RELEASE, "-d", classesDir.toString()));
         if (!classpath.isEmpty()) {
             args.add("-cp");
             args.add(String.join(java.io.File.pathSeparator, classpath.stream().map(Path::toString).toList()));

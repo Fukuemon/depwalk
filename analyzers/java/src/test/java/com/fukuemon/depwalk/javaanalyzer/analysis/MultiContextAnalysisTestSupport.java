@@ -1,17 +1,16 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
+import com.fukuemon.depwalk.javaanalyzer.Main;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
 import com.fukuemon.depwalk.javaanalyzer.analysis.context.AnalysisContextFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.pipeline.AnalysisRunner;
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel;
+import com.fukuemon.depwalk.javaanalyzer.io.ProtocolObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
 import com.fukuemon.depwalk.javaanalyzer.preflight.PreflightValidator;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
-import com.fukuemon.depwalk.javaanalyzer.protocol.ErrorRecord;
-import com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -126,6 +125,9 @@ final class MultiContextAnalysisTestSupport {
      * fake model の discovery 経路で解析を実行する。exit code / record 出力の
      * 契約は {@code Main} の discovery 成功・完全性 gate 失敗経路と同じ形に揃える
      * (成功 0、{@code JAVA_INCOMPLETE_ANALYSIS} は error record + 1)。
+     * 返す {@link AnalysisTestSupport.Ran} の第 3 要素は stderr 全文ではなく
+     * {@code callSiteSummary} のみ (失敗時は空文字。{@code Main} 経由なら stderr に
+     * 加わる MetricsReporter 出力は含まない)。
      *
      * @param workspaceRoot fake build の root (= workspace)
      * @param projects fake model に載せる project (1 件以上)
@@ -153,7 +155,7 @@ final class MultiContextAnalysisTestSupport {
         AnalysisContextFactory.Result contexts = AnalysisContextFactory.discoveredContexts(
                 workspaceRoot.toRealPath(), model, validated.classpath());
 
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = ProtocolObjectMapper.create();
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         String summary;
         int exitCode;
@@ -164,14 +166,7 @@ final class MultiContextAnalysisTestSupport {
                 summary = stats.callSiteSummary();
                 exitCode = 0;
             } catch (IncompleteAnalysisException e) {
-                writer.write(new ErrorRecord(
-                        ProtocolSchema.VERSION,
-                        ErrorRecord.RECORD_TYPE,
-                        JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
-                        e.getMessage(),
-                        null,
-                        e.metadata(),
-                        e.details()));
+                writer.write(Main.incompleteAnalysisRecord(e));
                 summary = "";
                 exitCode = 1;
             }
