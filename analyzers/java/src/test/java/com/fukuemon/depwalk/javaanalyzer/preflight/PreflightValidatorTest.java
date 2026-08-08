@@ -165,6 +165,34 @@ class PreflightValidatorTest {
         assertTrue(validated.allowIncompleteAnalysis());
     }
 
+    @Test
+    void allowIncompleteAnalysisStaysDisabledByExplicitFalseFlag() throws Exception {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("false")));
+
+        PreflightValidator.Validated validated = PreflightValidator.validate(request);
+
+        assertFalse(validated.allowIncompleteAnalysis());
+    }
+
+    @Test
+    void rejectsAllowIncompleteAnalysisWithNonCanonicalValue() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("TRUE")));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsAllowIncompleteAnalysisWithMultipleElements() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("true", "false")));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
     private AnalysisRequest requestWithLanguageAndMetadata(String language, Map<String, Object> metadata) {
         return requestWithLanguageAndMetadataAndWorkspaceRoot(language, metadata, tempDir.toString());
     }
