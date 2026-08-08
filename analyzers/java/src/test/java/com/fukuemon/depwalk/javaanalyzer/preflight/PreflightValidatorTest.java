@@ -13,7 +13,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PreflightValidatorTest {
 
@@ -142,6 +144,53 @@ class PreflightValidatorTest {
         PreflightValidator.Validated validated = PreflightValidator.validate(request);
 
         assertEquals(List.of(jar.toString()), validated.classpath());
+    }
+
+    @Test
+    void allowIncompleteAnalysisDefaultsToFalseWhenKeyIsAbsent() throws Exception {
+        AnalysisRequest request = requestWithLanguageAndMetadata("java", Map.of("classpath", List.of()));
+
+        PreflightValidator.Validated validated = PreflightValidator.validate(request);
+
+        assertFalse(validated.allowIncompleteAnalysis());
+    }
+
+    @Test
+    void allowIncompleteAnalysisIsEnabledOnlyByExplicitTrueFlag() throws Exception {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("true")));
+
+        PreflightValidator.Validated validated = PreflightValidator.validate(request);
+
+        assertTrue(validated.allowIncompleteAnalysis());
+    }
+
+    @Test
+    void allowIncompleteAnalysisStaysDisabledByExplicitFalseFlag() throws Exception {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("false")));
+
+        PreflightValidator.Validated validated = PreflightValidator.validate(request);
+
+        assertFalse(validated.allowIncompleteAnalysis());
+    }
+
+    @Test
+    void rejectsAllowIncompleteAnalysisWithNonCanonicalValue() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("TRUE")));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void rejectsAllowIncompleteAnalysisWithMultipleElements() {
+        AnalysisRequest request = requestWithLanguageAndMetadata(
+                "java", Map.of("classpath", List.of(), "allowIncompleteAnalysis", List.of("true", "false")));
+
+        AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
     }
 
     private AnalysisRequest requestWithLanguageAndMetadata(String language, Map<String, Object> metadata) {

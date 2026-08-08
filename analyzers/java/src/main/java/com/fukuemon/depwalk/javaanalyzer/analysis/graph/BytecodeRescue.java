@@ -10,8 +10,11 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyInde
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.InitializerDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.EnclosedExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -23,6 +26,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.expr.TypeExpr;
+import com.github.javaparser.ast.expr.TypePatternExpr;
 import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
@@ -119,7 +123,7 @@ final class BytecodeRescue {
         if (candidate == null) {
             return null;
         }
-        // 型名 scope の static call を instance member で救済しない (偽 edge 防止、PR #26)。
+        // 型名 scope の static call を instance member で救済しない (偽 edge 防止)。
         // forward 経路の owner は式評価由来で型名 scope になり得ないが、guard の非対称を残さない。
         if (!candidate.isStatic() && mce.getScope().isPresent() && isTypeNameScope(mce.getScope().get())) {
             return null;
@@ -183,8 +187,7 @@ final class BytecodeRescue {
     }
 
     /**
-     * method reference の候補選択 (multi-agent review 指摘反映:
-     * 2026-07-22)。JLS 15.13.1 の 2 つの解釈だけを候補にする:
+     * method reference の候補選択。JLS 15.13.1 の 2 つの解釈だけを候補にする:
      * <ul>
      * <li>{@code Type::m} ({@code typeNameScope=true}): static なら arity=samArity、
      *     instance (unbound reference) なら arity=samArity-1 のみが有効。両方に
@@ -192,18 +195,14 @@ final class BytecodeRescue {
      * <li>{@code expr::m} ({@code typeNameScope=false}、bound reference): instance
      *     の arity=samArity のみが有効 (static、または samArity-1 は無効)。</li>
      * </ul>
-     * SAM arity を推論できない場合は、上記の (arity, static/instance) 検証ができ
-     * ないため、より保守的に「参照形式に矛盾しない (typeNameScope なら static も
-     * instance も許容、bound なら instance のみ) 名前一意の member」だけを採用する。
+     * SAM arity を推論できない場合は救済しない。候補列挙は owner classfile の
+     * 宣言 member に限られ継承 overload が見えず、宣言上の名前一意を参照先の
+     * 一意の根拠にできないため、曖昧として diagnostic に残す。
      */
     private SootUpTypeHierarchyIndex.MethodCandidate selectMethodReferenceCandidate(
             String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
         if (samArity < 0) {
-            var byName = bytecodeIndex.declaredCallableMethods(ownerBinaryName).stream()
-                    .filter(method -> method.methodName().equals(methodName))
-                    .filter(method -> typeNameScope || !method.isStatic())
-                    .toList();
-            return byName.size() == 1 ? byName.get(0) : null;
+            return null;
         }
         if (typeNameScope) {
             var staticCandidate = uniqueMethodByArityAndStatic(ownerBinaryName, methodName, samArity, true);
@@ -369,6 +368,9 @@ final class BytecodeRescue {
                 if (initializer != null) {
                     return chainForwardOwner(initializer, enclosingTypeNode, depth + 1);
                 }
+                if (sameNameLocalDeclared(nameExpr)) {
+                    return null;
+                }
                 return enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
             }
         }
@@ -438,9 +440,8 @@ final class BytecodeRescue {
 
     /**
      * {@code block} 直下の文のうち、{@code child} (を祖先に持つ文) より前にある
-     * 同名 {@code VariableDeclarator} の initializer (multi-agent review 指摘
-     * 反映: 2026-07-22。前方参照は無効、かつ use を含まない兄弟文の宣言は
-     * 対象にしない)。
+     * 同名 {@code VariableDeclarator} の initializer (前方参照は無効、かつ use を
+     * 含まない兄弟文の宣言は対象にしない)。
      */
     private static Expression declaratorBeforeInBlock(BlockStmt block, Node child, String name) {
         for (Statement statement : block.getStatements()) {
@@ -458,6 +459,36 @@ final class BytecodeRescue {
             }
         }
         return null;
+    }
+
+    /**
+     * 囲み member 内に同名の local 宣言 (変数宣言・for ヘッダ・try-resource・
+     * catch 節・パターン変数・parameter) が存在するか。field フォールバックの
+     * 前提検査に使う: {@link #uniqueLocalInitializer} は block 直下の宣言文しか
+     * 見ないため、それ以外の位置で宣言された同名 local が field を shadowing
+     * していると、local への呼び出しを field 型で誤判定して false exclusion に
+     * 倒れる余地がある。use 位置で実際に shadowing しているかまでは判定しない
+     * (過剰検出は diagnostic 残留にしか倒れない保守側)。
+     */
+    private static boolean sameNameLocalDeclared(NameExpr nameExpr) {
+        String name = nameExpr.getNameAsString();
+        Node member = nameExpr;
+        Node parent = nameExpr.getParentNode().orElse(null);
+        while (parent != null && !(parent instanceof TypeDeclaration)) {
+            member = parent;
+            parent = parent.getParentNode().orElse(null);
+        }
+        // FieldDeclaration 直下の declarator は field であり local ではない
+        // (field initializer 内からの遡上や、member 内の local class の field を
+        // 同名 local として誤検出しない)。
+        return member.findAll(VariableDeclarator.class).stream()
+                        .filter(declarator ->
+                                !(declarator.getParentNode().orElse(null) instanceof FieldDeclaration))
+                        .anyMatch(declarator -> declarator.getNameAsString().equals(name))
+                || member.findAll(Parameter.class).stream()
+                        .anyMatch(parameter -> parameter.getNameAsString().equals(name))
+                || member.findAll(TypePatternExpr.class).stream()
+                        .anyMatch(pattern -> pattern.getNameAsString().equals(name));
     }
 
     /** 囲み型の bytecode field 型 (classfile 根拠の receiver 補完)。 */
@@ -505,7 +536,7 @@ final class BytecodeRescue {
 
     /**
      * 式の起点型を遡及し、根拠を伴って scope 外と判定できる場合だけ true
-     * (規則 (i) の実体、multi-agent review 指摘反映: 2026-07-22)。
+     * (規則 (i) の実体)。
      */
     private boolean rootIsExternal(Expression start, Node enclosingTypeNode) {
         List<MethodCallExpr> links = new ArrayList<>();
@@ -543,6 +574,9 @@ final class BytecodeRescue {
                     continue;
                 }
                 // local に該当が無ければ囲み型の bytecode field 型で判定する。
+                if (sameNameLocalDeclared(nameExpr)) {
+                    return false;
+                }
                 String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
                 if (fieldType == null || declIndex.find(fieldType).isPresent()) {
                     return false;
@@ -583,7 +617,7 @@ final class BytecodeRescue {
             if (returnType == null || isPrimitiveOrVoid(returnType) || returnType.endsWith("[]")) {
                 return false;
             }
-            // PR review 指摘反映 (2026-07-22): full classpath 経路 (uniqueDeclaredMethodOnClasspath)
+            // full classpath 経路 (uniqueDeclaredMethodOnClasspath)
             // には project 限定の bytecodeIndex.genericReturnType 相当の generic Signature
             // 読み取りが無く、境界なし type variable の戻り値は descriptor erasure で
             // Object になる。in-scope な実際の型引数を見失ったまま前進すると false
@@ -632,8 +666,8 @@ final class BytecodeRescue {
     }
 
     /**
-     * lambda parameter 起点の external 判定 (external 分類規則 (ii)、PR review
-     * 指摘反映で範囲を縮小: 2026-07-22)。receiver が lambda parameter で、
+     * lambda parameter 起点の external 判定 (external 分類規則 (ii))。
+     * receiver が lambda parameter で、
      * lambda 自体が代入される変数の宣言型 (= functional interface 型そのもの)
      * が scope 外なら true。scope 内 functional interface / 判定不能は false。
      *
@@ -643,7 +677,8 @@ final class BytecodeRescue {
      * method の functional interface parameter が実際に instantiate される型
      * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできない
      * (external な receiver を持つ method が in-scope 型を引数に取り得るため、
-     * false exclusion の原因になる)。
+     * false exclusion の原因になる)。unqualified static import 経由で lambda を
+     * 直接引数に渡す形も同じ理由で対象外とする。
      */
     boolean lambdaParamReceiverIsExternal(MethodCallExpr mce) {
         if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
@@ -704,7 +739,12 @@ final class BytecodeRescue {
         }
     }
 
-    /** scope が単純名 / this.field で、囲み型の bytecode-only field なら field 型を返す。 */
+    /**
+     * scope が単純名 / this.field で、囲み型の bytecode-only field なら field 型を返す。
+     * 単純名は {@link #sameNameLocalDeclared} が偽の場合だけ field とみなす。
+     * この経路は救済 owner の復元に使われ、誤認は偽 edge に倒れうる。
+     * this.field 形は shadowing され得ないため検査しない。
+     */
     private String bytecodeFieldReceiverType(MethodCallExpr mce, Node enclosingTypeNode) {
         if (mce.getScope().isEmpty() || enclosingTypeNode == null) {
             return null;
@@ -712,6 +752,9 @@ final class BytecodeRescue {
         String fieldName = null;
         var scope = mce.getScope().get();
         if (scope instanceof NameExpr nameExpr) {
+            if (sameNameLocalDeclared(nameExpr)) {
+                return null;
+            }
             fieldName = nameExpr.getNameAsString();
         } else if (scope instanceof FieldAccessExpr fieldAccess
                 && fieldAccess.getScope() instanceof ThisExpr) {

@@ -90,6 +90,46 @@ class ReferenceSuperRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    void doesNotRescueMethodReferenceWhenSamArityIsUnknown() throws Exception {
+        Path classes = compileFixture("arity-src", "arity-classes", "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                    public String getName() { return "x"; }
+                }
+                """);
+        Path workspace = temp.resolve("arity-workspace");
+        write(workspace, "com/example/Owner.java", """
+                package com.example;
+                public class Owner {
+                }
+                """);
+        // 代入先の functional interface 型が解決できず SAM arity を推論できない
+        // method reference。owner (Owner) は in-scope で名前も宣言上一意だが、
+        // arity 検証なしの救済は継承 overload を見誤るため行わない。
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    void use() { MissingFunction f = Owner::getName; }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(1, ran.exitCode(), ran.stderr());
+        List<Map<String, Object>> errors = ran.byType("error");
+        assertEquals(1, errors.size(), () -> errors.toString());
+        Map<String, Object> error = errors.get(0);
+        assertEquals("JAVA_INCOMPLETE_ANALYSIS", error.get("code"));
+        List<Map<String, Object>> details = (List<Map<String, Object>>) error.get("details");
+        assertTrue(details.stream().anyMatch(detail ->
+                        "unresolved-method-reference".equals(
+                                ((Map<String, Object>) detail.get("metadata")).get("reason"))),
+                () -> "method reference must stay diagnostic when SAM arity is unknown: " + details);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
     void rescuesExplicitSuperToBytecodeOnlyConstructor() throws Exception {
         Path classes = compileFixture("base-src", "base-classes", "com/example/Base.java", """
                 package com.example;
