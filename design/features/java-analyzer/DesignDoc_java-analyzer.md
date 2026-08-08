@@ -8,7 +8,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: 6292e9a
+verified_commit: 828e897
 ---
 
 # Feature 設計: Java Analyzer
@@ -284,6 +284,7 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 - parse pre-flight、allowlist 外 resolver fatal、atomic mutation、call inventory / outcome ledger、initializer caller 展開、`silentOmission == 0`、共通 failure details
 - call-site driven project bytecode member index、bytecode-only member の location 省略と owner metadata、Graph deep copy
 - `fullGraph` / `reachableFromEntrypoints` の出力範囲 (宣言列挙 ∪ call site 由来、entrypoints 空は全体扱い)
+- **複数 context (依存 project 関係) を要する規則** — cross-module bytecode 救済など — は、in-memory の fake build model から production の context 構築 (`discoveredContexts`) を通して `AnalysisRunner` を直接駆動して検証する (`MultiContextAnalysisTestSupport`)。build model は Tooling API が構造的に adapt する interface のため、fake でも root 検証・依存 context id 導出は production コードが行う。unit test の検証範囲から外れるのは model 取得 (Tooling API / Gradle daemon / provider 配布) だけで、その部分は実 jar E2E (`TestGradleMultiProjectCLI` 等) が実 Gradle で担う
 
 **Go 側 process contract (fake analyzer / JVM 不要)**
 
