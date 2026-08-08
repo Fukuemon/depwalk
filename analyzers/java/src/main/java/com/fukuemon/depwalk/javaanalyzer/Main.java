@@ -107,14 +107,7 @@ public final class Main {
                 MetricsReporter.report(errStream, summary);
                 return 0;
             } catch (IncompleteAnalysisException e) {
-                writer.write(new ErrorRecord(
-                        ProtocolSchema.VERSION,
-                        ErrorRecord.RECORD_TYPE,
-                        JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
-                        e.getMessage(),
-                        null,
-                        e.metadata(),
-                        e.details()));
+                writer.write(incompleteAnalysisRecord(e));
                 return 1;
             } catch (AnalyzerFatalException e) {
                 writer.write(ErrorRecord.of(e.errorCode().code(), e.getMessage()));
@@ -171,6 +164,21 @@ public final class Main {
         DepwalkGradleModel model =
                 new GradleModelDiscovery(new GradleToolingClient(), errStream).discover(workspaceRoot);
         return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
+    }
+
+    /**
+     * 完全性 gate 失敗を protocol の {@code error} record へ写す。exit 契約を
+     * 揃えるため、unit test の実行 helper とここで共有する (二重実装の drift 防止)。
+     */
+    public static ErrorRecord incompleteAnalysisRecord(IncompleteAnalysisException e) {
+        return new ErrorRecord(
+                ProtocolSchema.VERSION,
+                ErrorRecord.RECORD_TYPE,
+                JavaErrorCode.JAVA_INCOMPLETE_ANALYSIS.code(),
+                e.getMessage(),
+                null,
+                e.metadata(),
+                e.details());
     }
 
     private static int reportInternalError(RecordWriter writer, PrintStream errStream, Throwable e) {

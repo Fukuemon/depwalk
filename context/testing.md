@@ -7,7 +7,7 @@ governs:
   - core/e2e
   - testdata
   - analyzers/java/src/test
-verified_commit: 9654928
+verified_commit: 828e897
 ---
 
 # Testing Conventions
@@ -47,6 +47,7 @@ Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実
 
 - Go 側の unit / contract test は fake analyzer (任意の実行可能ファイル) で回せるため、CI の Go job に JVM を要求しない。
 - E2E だけが JDK 25 + build 済み fat jar を要求する。CI は「Go job (JVM 不要)」と「Java + E2E job (JDK 25 / Gradle build)」に分ける。
+- 複数 context (project 依存関係) を要する Java unit test は、実 Gradle を起動せず in-memory の fake build model から production の context 構築を通して解析 pipeline を駆動する。model 取得 (Tooling API / daemon) の検証は E2E 側だけが担う (E2E はほかに CLI 結合・graph 全体照合等も担う。境界の詳細は Java Analyzer feature doc のテスト観点)。
 
 ## path 比較は real path 基準 (macOS symlink)
 
