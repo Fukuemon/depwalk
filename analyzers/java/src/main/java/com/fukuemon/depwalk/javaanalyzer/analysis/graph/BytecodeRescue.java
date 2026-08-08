@@ -195,11 +195,9 @@ final class BytecodeRescue {
      * <li>{@code expr::m} ({@code typeNameScope=false}、bound reference): instance
      *     の arity=samArity のみが有効 (static、または samArity-1 は無効)。</li>
      * </ul>
-     * SAM arity を推論できない場合は救済しない。かつては「参照形式に矛盾しない
-     * 名前一意の member」を arity 検証なしで採用していたが、候補列挙は owner
-     * classfile の宣言 member に限られ継承 overload が見えないため、宣言上の
-     * 名前一意が参照先の一意を意味しない (親クラスの同名 overload が実際の
-     * 参照先のとき誤った edge になる)。曖昧なら救済せず diagnostic に残す。
+     * SAM arity を推論できない場合は救済しない。候補列挙は owner classfile の
+     * 宣言 member に限られ継承 overload が見えず、宣言上の名前一意を参照先の
+     * 一意の根拠にできないため、曖昧として diagnostic に残す。
      */
     private SootUpTypeHierarchyIndex.MethodCandidate selectMethodReferenceCandidate(
             String ownerBinaryName, String methodName, boolean typeNameScope, int samArity) {
@@ -576,8 +574,6 @@ final class BytecodeRescue {
                     continue;
                 }
                 // local に該当が無ければ囲み型の bytecode field 型で判定する。
-                // ただし囲み member 内に同名 local 宣言が見えるときは、field を
-                // shadowing した local を誤判定する余地があるため採用しない。
                 if (sameNameLocalDeclared(nameExpr)) {
                     return false;
                 }
@@ -682,8 +678,7 @@ final class BytecodeRescue {
      * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできない
      * (external な receiver を持つ method が in-scope 型を引数に取り得るため、
      * false exclusion の原因になる)。unqualified static import 経由で lambda を
-     * 直接引数に渡す形も同じ理由で対象外とする: static import 元の class が
-     * external でも lambda parameter の実型は独立しており、根拠にできない。
+     * 直接引数に渡す形も同じ理由で対象外とする。
      */
     boolean lambdaParamReceiverIsExternal(MethodCallExpr mce) {
         if (!(mce.getScope().orElse(null) instanceof NameExpr name)) {
@@ -746,11 +741,9 @@ final class BytecodeRescue {
 
     /**
      * scope が単純名 / this.field で、囲み型の bytecode-only field なら field 型を返す。
-     * 単純名は囲み member 内に同名の local 宣言が見えない場合だけ field とみなす
-     * ({@link #sameNameLocalDeclared})。この経路は救済 owner の復元に使われるため、
-     * shadowing された local を field 型で誤認すると false exclusion ではなく
-     * 誤った edge (偽 edge) に倒れうる。this.field 形は shadowing され得ないため
-     * 検査しない。
+     * 単純名は {@link #sameNameLocalDeclared} が偽の場合だけ field とみなす。
+     * この経路は救済 owner の復元に使われ、誤認は偽 edge に倒れうる。
+     * this.field 形は shadowing され得ないため検査しない。
      */
     private String bytecodeFieldReceiverType(MethodCallExpr mce, Node enclosingTypeNode) {
         if (mce.getScope().isEmpty() || enclosingTypeNode == null) {

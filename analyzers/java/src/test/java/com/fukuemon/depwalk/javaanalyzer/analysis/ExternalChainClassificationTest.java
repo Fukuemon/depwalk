@@ -310,13 +310,11 @@ class ExternalChainClassificationTest {
     void shadowedFieldNameStaysDiagnosticInsteadOfAdoptingFieldType() throws Exception {
         // 囲み型に external 型の field value があり、external method へ渡した
         // lambda の parameter (型推論不能) が同名で field を shadowing している。
-        // lambda parameter は initializer を持たないため initializer 遡及で
-        // 辿れず、そのまま field 型へフォールバックすると lambda parameter への
-        // 呼び出しを field 型根拠で external と誤除外する。同名 local 宣言
-        // (parameter 含む) が見えるときは field 型を採用せず diagnostic を
-        // 維持する (false exclusion の回帰ガード)。field の classfile 根拠を
-        // 成立させるため、Handler は field だけの縮小版を compile して classes
-        // に置く (lambda 側は javac では型が付かないため compile しない)。
+        // field 型へフォールバックすると lambda parameter への呼び出しを
+        // external と誤除外するため、diagnostic 維持を固定する回帰ガード。
+        // field の classfile 根拠を成立させるため、Handler は field だけの
+        // 縮小版を compile して classes に置く (lambda 側は javac では型が
+        // 付かないため compile しない)。
         Path classes = compile("shadow-src", "shadow-classes",
                 Map.of(
                         "com/example/ext/ExtDep.java", """
