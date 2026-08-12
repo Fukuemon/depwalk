@@ -13,19 +13,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                        |
-| --- | --------------------------- | ---------- | ---------- | ----------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-08-11 | issue #82 / requirements.md 起票済み                        |
-| 2   | 下書き                      | 完了       | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分)                |
-| 3   | 上位文書突合                | 完了       | 2026-08-11 | 矛盾 (変更提案) なし                                        |
-| 4   | 論点整理                    | 完了       | 2026-08-11 | D1〜D8 を洗い出し                                           |
-| 5   | 論点解決                    | レビュー済 | 2026-08-13 | D1〜D12 全件確定。clarify gate 再レビュー PASS (拡大分含む) |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                                             |
-| 7   | Content / Data 設計         | 未着手     |            |                                                             |
-| 8   | Performance / Security 設計 | 未着手     |            |                                                             |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                                             |
-| 10  | 実装分割                    | 未着手     |            |                                                             |
-| 11  | レビュー済                  | 未着手     |            |                                                             |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                          |
+| --- | --------------------------- | ---------- | ---------- | ------------------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-08-11 | issue #82 / requirements.md 起票済み                          |
+| 2   | 下書き                      | 完了       | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分)                  |
+| 3   | 上位文書突合                | 完了       | 2026-08-11 | 矛盾 (変更提案) なし                                          |
+| 4   | 論点整理                    | 完了       | 2026-08-11 | D1〜D8 を洗い出し                                             |
+| 5   | 論点解決                    | レビュー済 | 2026-08-13 | D1〜D12 全件確定。clarify gate 再レビュー PASS (拡大分含む)   |
+| 6   | Interface / Routing 設計    | 完了       | 2026-08-13 | clarify の決定 (D2/D5/D6/D7/D11) を展開し、diagram で整合確認 |
+| 7   | Content / Data 設計         | 完了       | 2026-08-13 | in-memory index 3 種 + 突合表 (D1/D3/D7)                      |
+| 8   | Performance / Security 設計 | 完了       | 2026-08-13 | index ベース突合・sanitize 制約維持・heap 指針 (D10)          |
+| 9   | Test / Metrics 設計         | 完了       | 2026-08-13 | D8 (既存方式踏襲) + 実測指標 (V5 の基準値 3.9%)               |
+| 10  | 実装分割                    | 未着手     |            |                                                               |
+| 11  | レビュー済                  | 未着手     |            |                                                               |
 
 ## 上位文書整合
 
@@ -289,18 +289,49 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ## フロー / シーケンス
 
-(diagram phase で生成)
+CLI ツールのため「ユーザー操作」は `depwalk analyze` の実行 1 点に集約される。flowchart は実行起点の分岐 (D10 / D11 のエラー経路含む)、sequence は解析内部での新機構の組み込み位置を描く。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    Start["利用者が depwalk analyze を実行<br/>(--analyzer-meta gradleJavaHome=… は任意)"] --> Disc{"build-model discovery<br/>(--source-root 指定時は bypass)"}
+    Disc -->|"daemon JVM 非互換"| DErr["JAVA_GRADLE_MODEL_ERROR<br/>(gradleJavaHome 指定で回避可: D11)"]
+    Disc -->|"成功"| Analyze["Java Analyzer が解析実行<br/>(entry point 分類 / イベント edge /<br/>callable 追跡 / 型伝播救済層)"]
+    Analyze -->|"OutOfMemoryError で異常終了"| OOM["Core が stderr の OOM パターンを検知し<br/>-Xmx 増加の対処付きエラーを報告 (D10)"]
+    Analyze -->|"成功 (診断あり含む)"| Out{"出力形式"}
+    Out -->|"console"| Console["tree 表示 + entry point 標識 (D6)<br/>診断は理由コード付きで表示"]
+    Out -->|"json"| Json["nodes/edges + metadata 透過表出<br/>(entry point 標識・イベント/callable 標識を含む)"]
+    Analyze -->|"未解決が残り allowIncompleteAnalysis=false"| Incomplete["JAVA_INCOMPLETE_ANALYSIS<br/>(既存の完全性 gate。変更なし)"]
 ```
 
 ### Sequence
 
 ```mermaid
 sequenceDiagram
+    actor User as 利用者
+    participant CLI as Core (CLI)
+    participant AZ as Java Analyzer
+    participant OUT as Output Engine
+
+    User->>CLI: depwalk analyze [--analyzer-meta gradleJavaHome=…]
+    CLI->>AZ: analysisRequest (JSONL)
+    Note over AZ: discovery (daemon JVM は<br/>gradleJavaHome 指定を優先: D11)
+    AZ->>AZ: 1st pass index 構築<br/>(SpringDiIndex / アノテーション index (D3) /<br/>イベント index (D7) / callable 突合表 (D1))
+    AZ->>AZ: call graph 構築<br/>solver 失敗時は型伝播救済層 (D9)<br/>→ 既存 bytecode 救済へ接続
+    AZ->>AZ: entry point 分類 (metadata 付与: D2)<br/>イベント edge / callable edge 生成 (D5 / D7)<br/>DAO marker は runtime-provided 化 (D12)
+    AZ-->>CLI: methodSymbol / callEdge / diagnostic (JSONL)
+    alt analyzer が OOM で異常終了
+        AZ--xCLI: 非ゼロ exit + stderr に OutOfMemoryError
+        CLI-->>User: 対処 (-Xmx 増加) 付きエラー (D10)
+    else 正常終了
+        CLI->>OUT: graph + metadata (opaque passthrough)
+        alt console
+            OUT-->>User: tree + entry point 標識 (D6)
+        else json
+            OUT-->>User: nodes/edges (metadata 透過)
+        end
+    end
 ```
 
 ## 実装分割
@@ -377,6 +408,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開                                                                            |
 | 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (D3 改訂 / D9〜D11 追加)、clarify 再開                                 |
 | 2026-08-13 | Fukuemon | D9〜D12 を確定し全セクションへ展開 (型伝播救済層 / DAO marker / OOM 検知 / daemon JVM 指定)、実装分割を P1〜P7 へ改訂 |
+| 2026-08-13 | Fukuemon | diagram: 実行起点 flowchart と解析内部 sequence を生成 (D10/D11 のエラー経路含む)                                     |
 
 ## 備考
 
