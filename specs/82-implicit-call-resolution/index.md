@@ -51,7 +51,7 @@
 
 - `design/DesignDoc.md`: Why/What (統合 PRD) / Future Work「解析精度の強化」
 - 関連 issue / ticket: [#82](https://github.com/Fukuemon/depwalk/issues/82) (本 spec) / [#27](https://github.com/Fukuemon/depwalk/issues/27) (実測手法の前例) / [#21](https://github.com/Fukuemon/depwalk/issues/21) (Interface Dispatch / Spring DI 解決)
-- 要求文書: [requirements.md](requirements.md) (受け入れ基準 EARS 6 件の正本)
+- 要求文書: [requirements.md](requirements.md) (受け入れ基準 EARS の正本。件数は requirements 側に従う)
 
 ## 背景
 
@@ -96,7 +96,7 @@
 
 - 変更影響調査を行う開発者 (CLI 利用者)。操作主体は既存 `depwalk analyze` の実行者で、新たな操作は増やさない
 
-EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け入れ基準 (EARS)」6 件を正本とする (二重管理しない)。
+EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け入れ基準 (EARS)」を正本とする (二重管理しない。件数も requirements 側に従う)。
 
 ## 設計時の論点
 
@@ -279,7 +279,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ### テスト観点
 
-- requirements.md の EARS 6 件を検証可能な粒度に落とす (検証境界は D8)
+- requirements.md の EARS 全件を検証可能な粒度に落とす (検証境界は D8)
 - `silentOmission == 0` と outcome ledger 終端保証の非回帰
 
 ### 計測指標
