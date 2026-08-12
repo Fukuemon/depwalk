@@ -49,3 +49,11 @@ Verdict: NEEDS_WORK → 修正 → **PASS**
 - diagram: Mermaid 2 図の構文妥当・機能仕様 / EARS / エラーケース 1〜7 との整合を確認
 - track: 差分テーブルの過不足を確認。指摘 1 件 (D10 の Core 側挙動の design 反映先が未整理) → analyzer-protocol / cli feature doc への反映行を追記して解消 (stderr の protocol 非 parse 契約は不変と明記)
 - 設計判断への差し戻しなし
+
+## Review 2026-08-13 (最終 gate: sync〜prompts 累積)
+
+Verdict: NEEDS_WORK → 修正 → **PASS**
+
+- 正本ハンドオフ完了を確認 (feature doc / context / ADR-0012 反映済み、spec は決定時スナップショットへ降格、全論点に反映先判定)
+- prompts 7 本の自己完結性を確認 (frontmatter + 10 節、antipatterns 注入、実依存 depends_on、差分修正モード規則の遵守)
+- D12 改訂 (marker → cross-module DI 調査) の整合を確認。指摘は実装対象テーブルの旧表記 1 箇所のみ → 修正して PASS
