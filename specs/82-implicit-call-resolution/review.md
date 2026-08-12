@@ -23,3 +23,12 @@ Verdict: NEEDS_WORK
 5. Performance / Security 設計の Performance が括弧書きプレースホルダのみ
 
 いずれも clarify 成果の同期・記入であり、設計判断の変更は不要。反映後の再レビューで PASS 可能な水準。
+
+## Review 2026-08-12 (clarify gate 再レビュー)
+
+Verdict: PASS
+
+- 前回指摘 5 件はすべて解消を確認 (メタ同期 / 未来形表現 / 影響テーブル記入 / Performance 節)
+- 全観点 PASS。prompts 自己完結性と正本境界は N/A (prompts 未生成・sync 未実行)
+- sync 時の留意: D2 (schema 拡張案の比較却下) は phase-sync の ADR 化基準で再判定すること
+- 非ブロッキング備考: 空 mermaid ブロックは diagram phase 未着手の正規状態
