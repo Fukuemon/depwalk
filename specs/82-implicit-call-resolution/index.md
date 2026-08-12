@@ -31,20 +31,20 @@
 
 - PRD 更新要否: 不要 (統合モード。DesignDoc の Why/What は Future Work の消化で、スコープ変更なし)
 - Design Doc 更新要否: 要 (完了後に Future Work「解析精度の強化」の記述を更新。sync / closeout で扱う)
-- ADR 起票要否: 未確定 (D2: Protocol 表現が opaque metadata で閉じるなら不要の見込み)
+- ADR 起票要否: 不要 (D2 で opaque metadata 表現に確定し Protocol 契約変更が発生しないため。sync 時に ADR 化基準で再判定する)
 
-| 上位文書    | 節 / 該当箇所                                                        | 整合方針 (継承 / 補足 / 変更提案)                                                                                 |
-| ----------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Design Doc  | Non Goals (Runtime Trace / Reflection 非対象) / Future Work          | 継承 (静的解析の範囲内で edge を増やす。実行時計測はしない)                                                       |
-| feature doc | java-analyzer: 救済規則・outcome ledger・完全性 gate (`analysis.md`) | 補足 (新分類・新 edge も outcome ledger の終端保証と `silentOmission == 0` に従う)                                |
-| feature doc | java-analyzer: `protocol-mapping.md`「lambda は独立 node にしない」  | 継承 (callable invocation 解決でも symbolKind enum / node 化方針は変えない。edge の張り先は D5 で確定)            |
-| feature doc | analyzer-protocol: `callEdge.metadata` / `diagnostic.code` は opaque | 補足 (entry point 分類・イベント edge の標識は opaque metadata / `JAVA_` code 新設で表現できる見込み。D2 で確定)  |
-| feature doc | output: JSON の `nodes[].metadata` / `edges[].metadata` 透過表出     | 補足 (JSON は既存透過で表出可能。Console での entry point 表現は D6 で確定し、必要なら sync で output doc へ反映) |
-| context     | architecture: Java Analyzer 内部境界 (SootUp / JavaParser 隔離)      | 継承 (ArchUnit gate を維持。新機構も既存 layer 内に置く)                                                          |
-| context     | engineering: 依存方向 gate / testing: 検証境界                       | 継承                                                                                                              |
-| ADR-0004    | Runtime Trace 保留 / 根拠なき推測の禁止 / 観測可能性の方針           | 継承 (ソース根拠のある edge のみ追加。条件評価はしない)                                                           |
-| ADR-0005    | SootUp + Spring DI 解決 (candidate edge / resolution / provenance)   | 補足 (イベント edge の候補列挙・曖昧扱いは DI 候補 edge の既存規則に揃える)                                       |
-| ADR-0007    | レイヤードアーキテクチャ                                             | 継承                                                                                                              |
+| 上位文書    | 節 / 該当箇所                                                        | 整合方針 (継承 / 補足 / 変更提案)                                                                                        |
+| ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Design Doc  | Non Goals (Runtime Trace / Reflection 非対象) / Future Work          | 継承 (静的解析の範囲内で edge を増やす。実行時計測はしない)                                                              |
+| feature doc | java-analyzer: 救済規則・outcome ledger・完全性 gate (`analysis.md`) | 補足 (新分類・新 edge も outcome ledger の終端保証と `silentOmission == 0` に従う)                                       |
+| feature doc | java-analyzer: `protocol-mapping.md`「lambda は独立 node にしない」  | 継承 (callable invocation 解決でも symbolKind enum / node 化方針は変えない。edge の張り先は D5 で確定)                   |
+| feature doc | analyzer-protocol: `callEdge.metadata` / `diagnostic.code` は opaque | 補足 (entry point 分類・イベント edge の標識は opaque metadata / `JAVA_` code 新設で表現する。D2 で確定済み)             |
+| feature doc | output: JSON の `nodes[].metadata` / `edges[].metadata` 透過表出     | 変更提案 (JSON は既存透過で表出可能。Console への entry point 表示を D6 で決定済みのため、sync で output doc を改訂する) |
+| context     | architecture: Java Analyzer 内部境界 (SootUp / JavaParser 隔離)      | 継承 (ArchUnit gate を維持。新機構も既存 layer 内に置く)                                                                 |
+| context     | engineering: 依存方向 gate / testing: 検証境界                       | 継承                                                                                                                     |
+| ADR-0004    | Runtime Trace 保留 / 根拠なき推測の禁止 / 観測可能性の方針           | 継承 (ソース根拠のある edge のみ追加。条件評価はしない)                                                                  |
+| ADR-0005    | SootUp + Spring DI 解決 (candidate edge / resolution / provenance)   | 補足 (イベント edge の候補列挙・曖昧扱いは DI 候補 edge の既存規則に揃える)                                              |
+| ADR-0007    | レイヤードアーキテクチャ                                             | 継承                                                                                                                     |
 
 ## 関連資料
 
@@ -224,7 +224,8 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ### Performance
 
-- (diagram / track phase までに index 構築コストと突合コストの見積もりを記述)
+- 新設 index (アノテーション / イベント / callable 突合表) は 1st pass で 1 回だけ構築し、call site ごとの走査を索引参照に置き換える (SpringDiIndex と同じ構築様式)。構築コストは workspace のメソッド数・call site 数に線形
+- 受け入れ計測は実プロジェクト実測 (#27 と同手法) で行い、解析時間の顕著な悪化がないことを確認する。閾値の数値化はせず、実測値の前後比較で判断する
 
 ### Security / Privacy
 
@@ -297,9 +298,9 @@ D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱す�
 
 ### Design Doc への影響
 
-| 対象節 | 変更内容 | 理由 |
-| ------ | -------- | ---- |
-|        |          |      |
+| 対象節                     | 変更内容                                                                     | 理由                |
+| -------------------------- | ---------------------------------------------------------------------------- | ------------------- |
+| Future Work (Rollout Plan) | 「解析精度の強化」の項を実装完了後に消化済みとして更新する (source: clarify) | Rollout Plan の消化 |
 
 ### feature doc への影響
 
@@ -311,23 +312,19 @@ D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱す�
 
 ### context への影響
 
-| 対象 doc / 節 | 変更内容 | 理由 |
-| ------------- | -------- | ---- |
-|               |          |      |
+なし — 新機構は java-analyzer / output の既存境界内に収まり、architecture / engineering / testing の規約変更を伴わない (D6 の Console 変更も output モジュール内で閉じる)。
 
 ### ADR の新規 / 更新
 
-| ADR ID | 変更内容 | 理由 |
-| ------ | -------- | ---- |
-|        |          |      |
+なし — D2 で Protocol schema 変更が発生しないと確定したため新規 ADR は不要。ADR-0002 (永続ストアなし) / ADR-0004 (Runtime Trace 保留) / ADR-0007 (layer 構造) はいずれも継承であり更新しない。sync 時に ADR 化基準で再判定する。
 
 ## レビュー
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照。
 
-| 日付 | 結果 (PASS / NEEDS_WORK) | 指摘要点 | 対応 |
-| ---- | ------------------------ | -------- | ---- |
-|      |                          |          |      |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                       | 対応   |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------ | ------ |
+| 2026-08-12 | NEEDS_WORK               | メタ同期漏れ 2 件・空表行 2 件・プレースホルダ残骸 1 件 (設計判断の変更は不要) | 対応中 |
 
 ## 変更履歴
 
