@@ -32,3 +32,12 @@ Verdict: PASS
 - 全観点 PASS。prompts 自己完結性と正本境界は N/A (prompts 未生成・sync 未実行)
 - sync 時の留意: D2 (schema 拡張案の比較却下) は phase-sync の ADR 化基準で再判定すること
 - 非ブロッキング備考: 空 mermaid ブロックは diagram phase 未着手の正規状態
+
+## Review 2026-08-13 (clarify gate 再レビュー: 実測に基づくスコープ拡大分)
+
+Verdict: NEEDS_WORK → 修正 → NEEDS_WORK (件数同期のみ) → 修正 → **PASS**
+
+- 対象: D3 改訂 + D9〜D12 の追加確定、requirements の V5/V6・EARS 3 件追加、実装分割 P1〜P7
+- 1 回目指摘 5 件: D12 の requirements 未反映 / 未解決件数の定義不一致 (2,062 vs 2,114) / メタ更新日 / requirements 未決事項の状態 / ADR-0006 整合行 — すべて反映
+- 2 回目指摘: spec 側「EARS 6 件」の件数記載が requirements (9 件) と不整合 → 件数を持たない正本参照へ変更し解消
+- 設計判断 (D1〜D12) への差し戻しはなし。D9 は #31 の保守化決定と非矛盾、D11 は ADR-0006 の明示 override 方針と整合と確認された
