@@ -183,13 +183,13 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 正規 target は `context/project.yml` の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                                                                                    |
-| ------------------- | :------: | --------------------------------------------------------------------------------------------------------------------------- |
-| `core`              |    ◯     | analyzer 異常終了時の OOM パターン検知と対処付きエラー報告 (D10)                                                            |
-| `traversal`         |    -     | 変更なし (metadata を解釈しない既存契約を維持)                                                                              |
-| `output`            |    ◯     | Console tree への entry point 標識の表示 (D6。意味解釈は entry point key に限定)                                            |
-| `analyzer-protocol` |    -     | 変更なし (D2 で opaque metadata 表現に確定。schema / Core parser 無変更)                                                    |
-| `java-analyzer`     |    ◯     | entry point 分類 / イベント突合 index / callable 追跡 / 型伝播救済層 (D9) / DAO marker (D12) / daemon JVM 指定 (D11) の実装 |
+| モジュール          | 実装有無 | 主な責務                                                                                                                                  |
+| ------------------- | :------: | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`              |    ◯     | analyzer 異常終了時の OOM パターン検知と対処付きエラー報告 (D10)                                                                          |
+| `traversal`         |    -     | 変更なし (metadata を解釈しない既存契約を維持)                                                                                            |
+| `output`            |    ◯     | Console tree への entry point 標識の表示 (D6。意味解釈は entry point key に限定)                                                          |
+| `analyzer-protocol` |    -     | 変更なし (D2 で opaque metadata 表現に確定。schema / Core parser 無変更)                                                                  |
+| `java-analyzer`     |    ◯     | entry point 分類 / イベント突合 index / callable 追跡 / 型伝播救済層 (D9) / cross-module DI 候補解決 (D12) / daemon JVM 指定 (D11) の実装 |
 
 ## 機能仕様
 
