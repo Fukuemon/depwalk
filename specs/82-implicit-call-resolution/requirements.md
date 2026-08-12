@@ -59,13 +59,13 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 - **イベント edge の解決**: `publishEvent()` の引数型 (型階層含む) と `@EventListener` / `@TransactionalEventListener` の listener メソッドを突合し edge を生成する
 - **callable 値渡しの invocation 解決**: functional interface の invocation site から、静的に追跡可能な範囲で渡された lambda / method reference 本体への edge を生成する (追跡可能範囲の境界定義は設計で確定)
 - **stream / generics chain の型解決強化** (追記 2026-08-13): 実環境検証プロジェクトの実測で未解決の支配形状が「stream / lambda chain 内の generics 型推論失敗」と判明したため、この形状の解決強化をスコープに加える。方式は設計で確定する (件数の定義: 未解決診断は計 2,114 件で、内訳は outcome ledger の未解決終端 2,062 件 + DI「Bean 候補なし」52 件。全 call site 52,411 の 3.9% が ledger 未解決終端)
-- **codegen DAO interface の runtime-provided marker 追加** (追記 2026-08-13): annotation processing で実装が生成される DAO interface への DI 解決が「Bean 候補なし」となる形状 (実測 52 件) を、既存 `@Mapper` と同構造の marker 追加で解消する。受け入れは V4 の傘下 (解消されない場合も diagnostic として観測可能) とする
+- **cross-module DI 候補解決の調査・修正** (追記 2026-08-13、改訂 2026-08-13): 「Bean 候補なし」52 件の根拠再検証で、impl クラスが別 Gradle module に実在するのに bean 候補が引けない形状 (cross-module の DI index 解決欠陥の疑い) と、impl 不在 (正しい診断) の 2 形状に分かれると判明した。前者を調査・修正する。初版の「codegen DAO marker 追加」案は根拠誤りのため取り下げ。受け入れは V4 の傘下 (解消されない場合も diagnostic として観測可能) とする
 - **解析実行の運用堅牢化** (追記 2026-08-13): Gradle daemon JVM 非互換の回避手段の提供・文書化と、OutOfMemoryError の診断化 (raw stack で異常終了させない)・heap 指針の文書化をスコープに加える (実測で検出した実行阻害要因)
 - 上記すべてで、解決不能ケースの diagnostic 分類 (理由コード) を定める
 
 ### やらないこと
 
-- 実測根拠のない Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis) — 既存の `@Mapper` / Spring Data 対応で据え置き (改訂 2026-08-13: 実測で検出した codegen DAO marker の追加は「やること」へ移動)
+- Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis) — 既存の `@Mapper` / Spring Data 対応で据え置き (改訂 2026-08-13: 一時「codegen DAO marker 追加」を「やること」へ移したが、根拠再検証で取り下げて除外へ戻した)
 - Runtime Trace / Reflection / AspectJ Runtime / 実行時 Proxy 解析 (ADR-0004 の保留を維持)
 - 条件アノテーション (`@Profile` 等) の条件評価 (既存方針どおり記録のみ)
 - `@Async` の非同期境界の表現変更 (呼び出し edge 自体は既存解決で生成されるため対象外)
@@ -175,6 +175,7 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 | 2026-08-12 | Fukuemon | R3 を broadcast 意味論に合わせて改訂 (spec D7)                                                                                   |
 | 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (entry point 2 件追加 / chain 型解決強化 / 運用堅牢化)、V5・V6 と EARS 3 件を追加 |
 | 2026-08-13 | Fukuemon | codegen DAO marker 追加を「やること」へ反映 (spec D12)、未解決件数の定義を注記、未決事項 4 件を確定済みへ同期                    |
+| 2026-08-13 | Fukuemon | D12 を根拠再検証により「cross-module DI 候補解決の調査・修正」へ改訂 (marker 追加は取り下げ)                                     |
 
 ## 備考
 

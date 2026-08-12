@@ -74,7 +74,7 @@
 
 ### やらないこと
 
-- 実測根拠のない Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis)。実測で検出した codegen DAO marker の追加は D12 でスコープに含める
+- Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis) — 既存の `@Mapper` / Spring Data 対応で据え置き (D12 初版の codegen DAO marker 案は根拠再検証で取り下げ、cross-module DI 調査へ差し替え)
 - Runtime Trace / Reflection / AspectJ Runtime / 実行時 Proxy 解析 (ADR-0004 の保留を維持)
 - 条件アノテーション (`@Profile` 等) の条件評価 (既存方針どおり記録のみ)
 - `@Async` の非同期境界の表現変更 (呼び出し edge は既存解決で生成済み)
@@ -148,10 +148,11 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
   - 方式: solver 失敗時に receiver 式の型を段階導出して既存救済へ接続する。① local 変数は宣言・初期化子の型 ② chain 途中は bytecode の generic signature (メソッド戻り型) ③ lambda parameter は functional interface の型引数。SAM arity も functional interface の bytecode から導出する
   - 制約: 常に型根拠を維持し、#31 が禁じた「宣言上の名前一意を根拠にする救済」には踏み込まない (R1 と整合)
   - トレードオフ / 却下した代替案: JavaParser solver 本体の補強は失敗箇所が内部に散在し副作用範囲が読めない。名前ベース救済の拡大は #31 の確定判断と正面衝突する
-- **D12: codegen DAO interface の runtime-provided marker を追加する** (決定 2026-08-13)
-  - 実測根拠: annotation processing で実装が生成される DAO interface への DI 解決が「Bean 候補なし」となる形状が 52 件。`@Mapper` (ランタイム/ビルド時に実装が供給され source に実装クラスが存在しない) と同構造
-  - 規則: 該当 DAO annotation を既知 runtime-provided マーカー集合へ追加する。「やらないこと」の Mapper 系マーカー拡張の除外は「実測根拠のない marker (`@FeignClient` / XML ベース MyBatis) は追加しない」へ精密化する
-  - トレードオフ: marker 集合の管理点が 1 つ増えるが、検出は既存機構の流用で実装コストが小さい
+- **D12: 「Bean 候補なし」52 件は cross-module DI 候補解決の欠陥調査・修正で対処する** (決定 2026-08-13)
+  - **改訂 (2026-08-13)**: 初版は「codegen DAO marker の追加」としたが、sync 前の根拠再検証で annotation processing 由来でないと判明し差し替えた (該当 framework の import 0 件)
+  - 実測事実: 52 件 (19 種の interface) は 2 形状に分かれる。(a) impl クラスが別 Gradle module の source に実在するのに bean 候補が引けない (cross-module の DI index 解決欠陥の疑い) (b) impl が workspace のどこにも存在しない (「Bean 候補なし」は正しい診断)
+  - 規則: (a) の形状を調査し、DI index が解析 context 境界を跨いで候補を解決できるよう修正する。(b) は正しい診断として維持し変更しない。marker 追加は行わない
+  - トレードオフ: 調査を伴うため実装コストは marker 追加案より大きいが、marker 追加では 52 件は解消しない (根拠が誤っていた)
 - **D10: OOM は Core 側で検知して対処付きエラーとして報告し、heap 指針を文書化する** (決定 2026-08-13)
   - 規則: analyzer の異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` の増加を促す対処付きエラーで報告する。heap の目安 (プロジェクト規模との関係) を利用者向け文書に記載する
   - 根拠: OOM 後の JVM 内での error record 出力はメモリ確保を伴い成功する保証がない。Core 側検知は確実に案内できる
@@ -229,7 +230,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 - `callEdge.metadata.viaCallableInvocation: true` (callable invocation edge。既存 `viaLambda` / `viaMethodReference` とは独立。D5)
 - diagnostic code 追加 (`JavaDiagnosticCode` enum): イベント型未解決 / callable 追跡不能の 2 系統 (severity はいずれも `info` または `warning`、prompts phase で確定)
 - `metadata.gradleJavaHome` (仮称、string 配列・要素 1): discovery が Gradle daemon JVM の指定として使う (D11)。protocol-mapping の metadata 契約表へ追記する
-- runtime-provided marker 集合へ codegen DAO annotation を追加 (D12。検出は既存機構の流用)
+- cross-module DI 候補解決の調査・修正 (D12。impl が別 module に実在するのに bean 候補が引けない形状の解消)
 - Core: analyzer 異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` 増加の対処を含むエラーで報告 (D10。Protocol 変更なし)
 
 ## Content / Data 設計
@@ -319,7 +320,7 @@ sequenceDiagram
     Note over AZ: discovery (daemon JVM は<br/>gradleJavaHome 指定を優先: D11)
     AZ->>AZ: 1st pass index 構築<br/>(SpringDiIndex / アノテーション index (D3) /<br/>イベント index (D7) / callable 突合表 (D1))
     AZ->>AZ: call graph 構築<br/>solver 失敗時は型伝播救済層 (D9)<br/>→ 既存 bytecode 救済へ接続
-    AZ->>AZ: entry point 分類 (metadata 付与: D2)<br/>イベント edge / callable edge 生成 (D5 / D7)<br/>DAO marker は runtime-provided 化 (D12)
+    AZ->>AZ: entry point 分類 (metadata 付与: D2)<br/>イベント edge / callable edge 生成 (D5 / D7)<br/>cross-module DI 候補解決 (D12)
     AZ-->>CLI: methodSymbol / callEdge / diagnostic (JSONL)
     alt analyzer が OOM で異常終了
         AZ--xCLI: 非ゼロ exit + stderr に OutOfMemoryError
@@ -346,7 +347,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | P2    | `java-analyzer` | イベント index + publish→listener edge 生成 (D7 の専用規則)                      | P1 (検出基盤)          |
 | P3    | `java-analyzer` | callable 追跡 (D1 の 1 段写像) + invocation edge (D5 の意味論)                   | なし (P1 と並列可)     |
 | P4    | `output`        | Console tree への entry point 標識表示 (D6)                                      | P1 (metadata key)      |
-| P5    | `java-analyzer` | 型伝播救済層 (D9) + codegen DAO marker 追加 (D12)                                | なし (P1〜P4 と並列可) |
+| P5    | `java-analyzer` | 型伝播救済層 (D9) + cross-module DI 候補解決の調査・修正 (D12)                   | なし (P1〜P4 と並列可) |
 | P6    | `java-analyzer` | daemon JVM 指定 `gradleJavaHome` (D11) + 回避手順の文書化                        | なし                   |
 | P7    | `core`          | OOM パターン検知と対処付きエラー報告 (D10) + heap 指針の文書化                   | なし                   |
 
@@ -374,7 +375,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | java-analyzer `protocol-mapping.md` / analyzer-protocol feature doc (metadata の Core 内保持) | **変更提案**: 「Output は metadata を意味解釈しない」を「entry point 標識 key に限り Console が意味解釈する」へ改訂 (source: clarify D6)                                                                           | Console での entry point 表示の決定と既存契約が矛盾するため |
 | output `DesignDoc_output.md` (Console ツリー表現 / 行の書式)                                  | **変更提案**: entry point 標識の表示規則を追加 (source: clarify D6)                                                                                                                                                | Console の行書式が変わるため正本の更新が必要                |
 | java-analyzer `protocol-mapping.md` (metadata 契約) / `discovery.md`                          | `gradleJavaHome` key と daemon JVM 指定の規則を追記 (source: clarify D11)                                                                                                                                          | 実測で検出した daemon JVM 非互換の回避手段                  |
-| java-analyzer `DesignDoc_java-analyzer.md` (runtime-provided マーカー)                        | codegen DAO annotation を既知マーカー集合へ追加 (source: clarify D12)                                                                                                                                              | 実測 52 件の「Bean 候補なし」解消                           |
+| java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (Spring DI 解決)                   | cross-module の bean 候補解決の規則を調査結果に応じて追記 (source: clarify D12。調査完了後に内容確定)                                                                                                              | impl が別 module に実在するのに候補が引けない形状の解消     |
 | java-analyzer `analysis.md` (救済規則)                                                        | 型伝播救済層 (receiver 型の段階導出・SAM arity の bytecode 導出) を追記 (source: clarify D9)                                                                                                                       | 実測未解決の支配形状 (約 91%) への対処                      |
 | java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (entry point 分類)                 | entry point アノテーション集合 (D3 の既知集合 + 1 段 meta-annotation) と分類規則 (edge 非生成・終端根拠のみ: R4) を追記 (source: track)                                                                            | 分類規則の durable な正本を feature doc に置く              |
 | java-analyzer `analysis.md` (イベント edge)                                                   | broadcast 意味論の突合規則 (型階層合致 / 無条件 = unique / 条件付きのみ ambiguous / raw type 近似) を追記 (source: track)                                                                                          | D7 で確定した edge 生成規則の正本反映                       |
