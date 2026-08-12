@@ -5,7 +5,7 @@
 - Issue: `#82`
 - ステータス: `Draft`
 - 作成日: 2026-08-11
-- 更新日: 2026-08-11
+- 更新日: 2026-08-12
 - Branch: `feature/82`
 - Owner: Fukuemon
 
@@ -19,7 +19,7 @@
 | 2   | 下書き                      | 完了   | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分) |
 | 3   | 上位文書突合                | 完了   | 2026-08-11 | 矛盾 (変更提案) なし                         |
 | 4   | 論点整理                    | 完了   | 2026-08-11 | D1〜D8 を洗い出し                            |
-| 5   | 論点解決                    | 未着手 |            |                                              |
+| 5   | 論点解決                    | 完了   | 2026-08-12 | D1〜D8 全件確定 (実装突合ゲート通過済み)     |
 | 6   | Interface / Routing 設計    | 未着手 |            |                                              |
 | 7   | Content / Data 設計         | 未着手 |            |                                              |
 | 8   | Performance / Security 設計 | 未着手 |            |                                              |
@@ -66,6 +66,7 @@
 - イベント edge の解決: `ApplicationEventPublisher#publishEvent()` の引数型 (型階層含む) と `@EventListener` / `@TransactionalEventListener` の listener メソッドを突合し、候補 edge を生成する
 - callable 値渡しの invocation 解決: functional interface の invocation site から、静的に追跡可能な範囲で渡された lambda / method reference 実体への edge を生成する
 - 各系統の解決不能ケースの diagnostic 分類 (`JAVA_` code 体系への追加) を定める
+- Console tree への entry point 標識の表示 (output / Go。意味解釈は entry point key に限定)
 
 ### やらないこと
 
@@ -96,24 +97,50 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                                            | 決定候補                                                                                                                          | 決定 |
-| --- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| D1  | callable 値渡しの静的追跡範囲をどこまで広げるか                                                                                 | (a) 同一メソッド内のみ / (b) 同一クラス内 (field 代入含む) / (c) Bean 境界越え                                                    | 未決 |
-| D2  | entry point / イベント edge の Protocol 表現。opaque metadata + `JAVA_` diagnostic code 新設で閉じるか、schema 拡張 (要 ADR) か | opaque metadata で閉じる見込み (methodSymbol.metadata に entry point 標識 / callEdge.metadata にイベント標識)                     | 未決 |
-| D3  | 対象アノテーション集合の確定 (jakarta / javax の版差、meta-annotation の検出深さ)                                               | Spring 標準 + jakarta/javax 両対応 / 合成アノテーションは 1 段 or 再帰                                                            | 未決 |
-| D4  | 実装分割 (entry point / イベント / callable を prompts でどう分けるか)                                                          | 3 系統を独立 prompt に分割 (相互依存が薄い)                                                                                       | 未決 |
-| D5  | lambda invocation edge の張り先の意味論。「lambda は独立 node にしない」制約下で invocation site → 何に edge を張るか           | (a) lambda の囲みメソッドへ張り標識 metadata で区別 / (b) edge を張らず診断のみ / (c) method reference のみ対象にし lambda は外す | 未決 |
-| D6  | entry point 分類の Output 表現 (JSON は metadata 透過で足りるか、Console tree での見せ方、output feature doc への反映要否)      | JSON: 既存 `nodes[].metadata` 透過 / Console: 表現追加の要否を判断                                                                | 未決 |
-| D7  | イベント edge の表現規則 (caller は publishEvent call site の囲みメソッドか、resolution / provenance / conditional の値体系)    | DI candidate edge の metadata 規則 (`resolution` / `provenance` / `conditional`) に揃え、provenance へ `spring-event` 等を追加    | 未決 |
-| D8  | テストの検証境界 (Java unit / fixture / required E2E のどこで何を担保するか)                                                    | 分類・突合ロジックは Java unit、E2E は patterns fixture 方式 (#30 の基盤) を踏襲                                                  | 未決 |
+なし (D1〜D8 の全件を解決済み。「解決済みの論点」を参照)
 
 ## 解決済みの論点
 
-(clarify phase で確定したものを「設計時の論点」から移す)
+- **D2: entry point / イベント edge は opaque metadata + `JAVA_` diagnostic code 新設で表現し、Protocol schema は変更しない** (決定 2026-08-11)
+  - 表現: entry point は `methodSymbol.metadata` の標識、イベント edge は `callEdge.metadata` (`provenance` の値追加)。診断は `JavaDiagnosticCode` enum への code 追加
+  - 根拠: metadata / diagnostic code は opaque 契約のため Core parser / validator 無変更で成立する。JSON 出力は既存の `nodes[].metadata` / `edges[].metadata` 透過で即座に表出される。ADR 不要
+  - トレードオフ / 却下した代替案: schema 拡張 (新 field / record) は言語非依存の一級表現になるが、Protocol 契約変更 (要 ADR)・Core 改修・他言語 Analyzer への契約負担が生じ、複数言語要求がない現時点では過剰設計。Console で意味解釈が必要になった場合の契約整理は D6 で扱う
+- **D3: 対象アノテーションは javax / jakarta 両版対応とし、meta-annotation は 1 段まで検出する** (決定 2026-08-12)
+  - 集合: ライフサイクル `@Scheduled` / `@PostConstruct` / `@PreDestroy` (後者 2 つは `javax.annotation` / `jakarta.annotation` 両 FQN)、イベント `@EventListener` / `@TransactionalEventListener`、Web `@RequestMapping` + Spring 提供 composed (`@GetMapping` / `@PostMapping` / `@PutMapping` / `@DeleteMapping` / `@PatchMapping`) を既知集合として明示列挙
+  - 検出深さ: 利用者定義の合成アノテーションは 1 段だけ辿る。2 段以上の入れ子は検出不能であり、制約として文書化する (検出できないものは診断も出せない)
+  - トレードオフ / 却下した代替案: 直接付与のみは自作 composed が普通に使われる Web 層で取りこぼす。再帰解決は Spring の意味論に忠実だが実装・検証コストに対して 2 段以上の実例が稀
+- **D7: イベント edge は broadcast 意味論を反映した専用規則で表現する** (決定 2026-08-12)
+  - 規則: caller = `publishEvent()` call site の囲みメソッド、callee = 引数の静的型とその型階層に合致する listener。`provenance` に `spring-event` を追加
+  - 確度: 無条件 listener への edge は複数あっても各々確定 (`resolution: unique`)。条件付き listener のみ `conditional: true` + `conditionTypes` (既存規則流用) で `ambiguous`
+  - 根拠: Spring DI は実行時に 1 つだけ配線されるため複数候補 = 曖昧が正しいが、イベントは合致 listener が全て実行される broadcast 意味論であり、複数 listener への edge を「曖昧」とすると利用者が確度を誤読する
+  - requirements R3 の精密化: 「一意に絞れない場合は曖昧候補」は条件付き listener に限って適用する (requirements.md に追記済み)
+  - 制約: generics を使ったイベント型の突合は raw type 一致で近似し、制約として文書化する
+- **D5: callable invocation edge は method reference → 参照先メソッド、lambda → 囲みメソッド (標識付き) へ張る** (決定 2026-08-12)
+  - 規則: invocation site の囲みメソッドを caller とし、method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ edge を張る。通常呼び出しと区別する標識 metadata (`viaCallableInvocation: true` 等、既存 `viaLambda` / `viaMethodReference` とは独立) を付ける
+  - 根拠: lambda 本体は独立 node ではなく囲みメソッド node の一部 (protocol-mapping の決定を維持)。囲みメソッドへの edge は「invoker は M 内で定義されたコードを実行する」を表し、影響調査の到達性 (lambda 本体の変更が invoker に伝播する) として正確
+  - トレードオフ / 却下した代替案: lambda 側 edge は囲みメソッド全体への近似で粒度が粗い (標識で明示し文書化)。method reference のみ対応は V3 が部分達成に留まる。診断のみは V3 未達で requirements 改訂が必要になるため却下
+- **D1: callable の静的追跡範囲は「同一メソッド内 + workspace メソッドへの引数渡し 1 段」とする** (決定 2026-08-12)
+  - 規則: (1) 同一メソッド内の local 変数経由の invocation、(2) workspace メソッドの functional interface parameter へ call site から渡された callable と、そのメソッド内の parameter への invocation の突合。複数 call site から異なる callable が渡る場合は各 edge を call site 根拠付きで全列挙する
+  - 根拠: template method パターン (`retry(() -> doWork())`) が実コードで支配的。#27 実測の残余も「chain / lambda の起点が scope 内」の形状に収束しており、1 段写像で汎用 dataflow 解析なしに閉じる
+  - 対象外: field 経由・多段の受け渡し・Bean 境界越えは diagnostic に残し、効果実測後に拡張を判断する。invocation site が外部ライブラリ内にあるケース (`stream.map(...)` 等) は原理的に対象外 (workspace 内に invocation site が存在しない)
+  - トレードオフ / 却下した代替案: 同一メソッド内のみは実コードで稀なパターンしか拾えない。field・多段対応は dataflow 解析の複雑度と誤 edge リスクが跳ね、R1 (根拠なき推測の禁止) と緊張する
+- **D6: entry point 標識は JSON 透過に加えて Console にも表示する** (決定 2026-08-12)
+  - 規則: JSON は既存の `nodes[].metadata` 透過で表出する (実装不要)。Console は出力層で entry point 標識 (metadata key) を意味解釈し、tree の該当 node 行に根拠 (検出アノテーション) を表示する
+  - 影響: 「Output は metadata を意味解釈しない」(protocol-mapping で決定済み) の改訂と output feature doc の更新が必要 = 上位文書への変更提案。sync phase で back-propagate する。実装対象に `output` (Go) が加わる
+  - 根拠: Console は主要 UI であり、V1 (entry point と未解決の区別) の体験を Console で完結させる
+  - トレードオフ / 却下した代替案: JSON 完結案は本 issue が java-analyzer に閉じて小さいが、Console 利用者が entry point 標識を直接見られない。意味解釈の対象は entry point 標識の key に限定し、他 metadata (dispatch / viaLambda 等) の Console 表示は Future Work「CLI の使い勝手」に残す (スコープ拡大を防ぐ)
+- **D8: テストは既存方式を踏襲し、ロジック = Java unit / 系統ごとの最小再現 = patterns fixture + required E2E / Console = Go unit で担保する** (決定 2026-08-12)
+  - 配分: entry point 検出・イベント突合・callable 追跡・diagnostic の分岐は Java unit (#30 の複数 context 基盤)。系統ごとの最小再現 fixture が CLI 経由で edge / 標識になる成功期待は patterns fixture + required E2E (既存方式)。Console の entry point 表示は Go 側 output の unit test。`silentOmission == 0` / outcome ledger 終端の非回帰は既存の完全性 gate テストの対象拡大
+  - 根拠: 既存 `context/testing.md` / #30 の検証境界の整理とそのまま揃い、保守の認知負荷が最小
+  - トレードオフ / 却下した代替案: Java unit のみは CLI までの保証がなく受け入れ確認が手動になる。E2E 中心は原因特定が遅く、meta-annotation 版差などの分岐網羅でテスト時間が膨らむ
+- **D4: 実装は 4 分割とし、P1 (検出基盤 + entry point) を起点に P2 (イベント) / P4 (Console) が続き、P3 (callable) は並列とする** (決定 2026-08-12)
+  - 分割: P1 アノテーション検出基盤 + entry point 分類 (java-analyzer) / P2 イベント突合 + edge 生成 (java-analyzer、P1 の検出基盤に依存) / P3 callable 追跡 (java-analyzer、独立) / P4 Console の entry point 表示 (output、P1 の metadata key に依存)
+  - 根拠: PR が系統単位で独立して revert でき、各 prompt に fixture + unit + E2E を同梱できて D8 の検証境界と一致する。P3 は P1 と並列実装できる
+  - トレードオフ / 却下した代替案: 基盤先行の 5 分割は P0 単独で利用者価値がなく過剰設計を誘発する。2 分割は java-analyzer 側 PR が肥大しレビューと revert が困難
 
 ## 未確定事項
 
-- D1〜D8 (上表)。1 件でも残っていれば下流 phase は止める
+なし (D1〜D8 の全件を解決済み)
 
 ## 実装対象
 
@@ -123,8 +150,8 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 | ------------------- | :------: | ---------------------------------------------------------------------------------- |
 | `core`              |    -     | 変更なし見込み (metadata は opaque passthrough 済み。D2 の決定で変わり得る)        |
 | `traversal`         |    -     | 変更なし見込み (metadata を解釈しない既存契約を維持)                               |
-| `output`            |  未確定  | D6 の決定次第 (Console での entry point 表現を追加する場合のみ)                    |
-| `analyzer-protocol` |  未確定  | D2 の決定次第 (opaque metadata で閉じれば変更なし)                                 |
+| `output`            |    ◯     | Console tree への entry point 標識の表示 (D6。意味解釈は entry point key に限定)   |
+| `analyzer-protocol` |    -     | 変更なし (D2 で opaque metadata 表現に確定。schema / Core parser 無変更)           |
 | `java-analyzer`     |    ◯     | entry point 分類 / イベント突合 index / callable 追跡 / diagnostic code 追加の実装 |
 
 ## 機能仕様
@@ -139,7 +166,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 ### Reuse Policy
 
 - 新機構 (アノテーション index / イベント突合 / callable 追跡) は java-analyzer の既存 layer 構造 (ADR-0007) 内に置き、SpringDiIndex 等の既存 index 基盤の設計に揃える
-- Core / traversal / output への先回りした変更はしない (D2 / D6 が「必要」と確定した範囲のみ)
+- Core / traversal への変更はしない。output は D6 で確定した entry point 標識の表示のみ変更する (他 metadata の Console 表示は Future Work へ)
 
 ### Performance
 
@@ -160,23 +187,34 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ### Testing
 
-- 分類・突合・追跡ロジックの検証境界は D8 で確定する (Java unit / patterns fixture / required E2E の責務分担。`context/testing.md` と #30 の unit test 基盤に従う)
+- ロジック (entry point 検出 / イベント突合 / callable 追跡 / diagnostic) は Java unit、系統ごとの最小再現は patterns fixture + required E2E、Console 表示は Go 側 output unit で担保する (D8 で確定。`context/testing.md` と #30 の基盤に従う)
 
 ## Interface 設計
 
 ### UI / API / Event Interface
 
-- (clarify で D2 / D6 / D7 確定後に記述)
+- CLI / Protocol の外形は変更しない (既存 `depwalk analyze` の引数・JSONL record 種のまま)
+- Console: tree の該当 node 行に entry point 標識 (検出アノテーション名) を表示する。表示書式の詳細は P4 prompt で確定し、output feature doc へ sync する (D6)
+- JSON: `nodes[].metadata` / `edges[].metadata` の既存透過で新標識を表出する (実装不要)
 
 ### Props / Request / Response
 
-- (clarify で D2 確定後、Protocol record への具体的な metadata key / diagnostic code を記述)
+以下の metadata key / diagnostic code は仮称。最終名は prompts phase で確定し、protocol-mapping.md へ sync する。
+
+- `methodSymbol.metadata.entryPoint` (string 配列): 検出した entry point アノテーションの FQN。D3 の既知集合 + 1 段 meta-annotation 由来
+- `callEdge.metadata.provenance` へ値 `spring-event` を追加 (イベント edge。D7)
+- `callEdge.metadata.viaCallableInvocation: true` (callable invocation edge。既存 `viaLambda` / `viaMethodReference` とは独立。D5)
+- diagnostic code 追加 (`JavaDiagnosticCode` enum): イベント型未解決 / callable 追跡不能の 2 系統 (severity はいずれも `info` または `warning`、prompts phase で確定)
 
 ## Content / Data 設計
 
 ### 保存・管理するデータ
 
-- (clarify で D1 / D7 確定後、アノテーション index / イベント index / callable 追跡のデータ構造を記述)
+いずれも解析実行中の in-memory index であり、永続化しない (ADR-0002 の「永続ストアを持たない」を維持)。
+
+- アノテーション index: workspace 内メソッドの entry point アノテーション付与 (D3 の既知集合 + 1 段 meta-annotation) を 1st pass で収集。SpringDiIndex と同じ構築様式
+- イベント index: `@EventListener` / `@TransactionalEventListener` メソッドを引数型 (raw type) で引ける表。publishEvent call site の引数静的型 + 型階層と突合する (D7)
+- callable 突合表: workspace メソッドの functional interface parameter への invocation site と、call site から渡された lambda / method reference の 1 段写像 (D1)
 
 ### コンテンツ配置 / package / route
 
@@ -196,16 +234,16 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ### エラーケース
 
-| #   | ケース                                   | ユーザーへの見せ方                                    | リカバリ                         |
-| --- | ---------------------------------------- | ----------------------------------------------------- | -------------------------------- |
-| 1   | publishEvent の引数型が解決できない      | diagnostic (理由コード付き)                           | 既存の未解決診断と同じ運用       |
-| 2   | listener が条件付きで一意に絞れない      | 曖昧候補として全列挙 + 条件付き事実を metadata に記録 | 既存の条件付き Bean の扱いと同じ |
-| 3   | callable が静的に追跡できない            | diagnostic (理由コード付き)                           | 追跡範囲の境界は D1 で確定       |
-| 4   | meta-annotation 経由の付与を検出できない | diagnostic                                            | 検出深さは D3 で確定             |
+| #   | ケース                                         | ユーザーへの見せ方                                    | リカバリ                         |
+| --- | ---------------------------------------------- | ----------------------------------------------------- | -------------------------------- |
+| 1   | publishEvent の引数型が解決できない            | diagnostic (理由コード付き)                           | 既存の未解決診断と同じ運用       |
+| 2   | listener が条件付きで一意に絞れない            | 曖昧候補として全列挙 + 条件付き事実を metadata に記録 | 既存の条件付き Bean の扱いと同じ |
+| 3   | callable が D1 の追跡範囲外 (field 経由・多段) | diagnostic (理由コード付き)                           | 効果実測後に範囲拡張を判断       |
+| 4   | 2 段以上の meta-annotation 入れ子              | 検出不能 (検出できないものは診断も出せない)           | 制約として文書化する (D3)        |
 
 ### Fallback
 
-- 新機構の解決失敗は request を fatal にしない (diagnostic 終端)。完全性 gate との関係は clarify で確定する
+- 新機構の解決失敗は request を fatal にしない (diagnostic 終端)。新設 diagnostic は完全性 gate の primary outcome に加えず、advisory として扱う — 本 issue は既存保証の上に edge を追加するものであり、追加分の未解決で既存の成功挙動を fatal 側へ変えない。`silentOmission == 0` は維持する
 
 ## テスト / 評価方針
 
@@ -239,15 +277,19 @@ sequenceDiagram
 
 ### 実装タスク案
 
-(track / prompts phase で確定。D4 の決定に従う)
+D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱する (D8)。
 
-| Phase | 対象 | 概要 | 依存 |
-| ----- | ---- | ---- | ---- |
-| P1    |      |      |      |
+| Phase | 対象            | 概要                                                                             | 依存               |
+| ----- | --------------- | -------------------------------------------------------------------------------- | ------------------ |
+| P1    | `java-analyzer` | アノテーション検出基盤 (D3 の既知集合 + 1 段 meta-annotation) + entry point 分類 | なし               |
+| P2    | `java-analyzer` | イベント index + publish→listener edge 生成 (D7 の専用規則)                      | P1 (検出基盤)      |
+| P3    | `java-analyzer` | callable 追跡 (D1 の 1 段写像) + invocation edge (D5 の意味論)                   | なし (P1 と並列可) |
+| P4    | `output`        | Console tree への entry point 標識表示 (D6)                                      | P1 (metadata key)  |
 
 ### prompts 生成方針
 
-- entry point 分類 / イベント edge / callable 追跡は解析機構が独立しており、並列実装候補 (D4 で確定)
+- P1 → {P2, P4} の依存、P3 は独立。P1 完了後は P2 / P3 / P4 を並列実装できる
+- 各 prompt は java-analyzer / output のドメイン境界で閉じ、モジュールをまたがない
 
 ## 上位資料からの変更点
 
@@ -261,9 +303,11 @@ sequenceDiagram
 
 ### feature doc への影響
 
-| 対象 doc / 節 | 変更内容 | 理由 |
-| ------------- | -------- | ---- |
-|               |          |      |
+| 対象 doc / 節                                                                                 | 変更内容                                                                                                                                 | 理由                                                        |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| java-analyzer `protocol-mapping.md` (metadata 契約 / diagnostic code 体系)                    | entry point 標識・イベント edge の metadata key と新設 `JAVA_` code を追記 (source: clarify D2)                                          | opaque metadata 表現の決定を正本へ反映する                  |
+| java-analyzer `protocol-mapping.md` / analyzer-protocol feature doc (metadata の Core 内保持) | **変更提案**: 「Output は metadata を意味解釈しない」を「entry point 標識 key に限り Console が意味解釈する」へ改訂 (source: clarify D6) | Console での entry point 表示の決定と既存契約が矛盾するため |
+| output `DesignDoc_output.md` (Console ツリー表現 / 行の書式)                                  | **変更提案**: entry point 標識の表示規則を追加 (source: clarify D6)                                                                      | Console の行書式が変わるため正本の更新が必要                |
 
 ### context への影響
 
@@ -287,9 +331,10 @@ sequenceDiagram
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                      |
-| ---------- | -------- | ----------------------------- |
-| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草 |
+| 日付       | 変更者   | 変更内容                                   |
+| ---------- | -------- | ------------------------------------------ |
+| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草              |
+| 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開 |
 
 ## 備考
 
