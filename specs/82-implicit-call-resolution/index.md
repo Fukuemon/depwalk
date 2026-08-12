@@ -13,19 +13,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                         |
-| --- | --------------------------- | ---------- | ---------- | -------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-08-11 | issue #82 / requirements.md 起票済み         |
-| 2   | 下書き                      | 完了       | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分) |
-| 3   | 上位文書突合                | 完了       | 2026-08-11 | 矛盾 (変更提案) なし                         |
-| 4   | 論点整理                    | 完了       | 2026-08-11 | D1〜D8 を洗い出し                            |
-| 5   | 論点解決                    | レビュー済 | 2026-08-12 | D1〜D8 全件確定。clarify gate レビュー PASS  |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                              |
-| 7   | Content / Data 設計         | 未着手     |            |                                              |
-| 8   | Performance / Security 設計 | 未着手     |            |                                              |
-| 9   | Test / Metrics 設計         | 未着手     |            |                                              |
-| 10  | 実装分割                    | 未着手     |            |                                              |
-| 11  | レビュー済                  | 未着手     |            |                                              |
+| #   | フェーズ                    | 状態   | 最終更新   | 備考                                                                      |
+| --- | --------------------------- | ------ | ---------- | ------------------------------------------------------------------------- |
+| 1   | 起票                        | 完了   | 2026-08-11 | issue #82 / requirements.md 起票済み                                      |
+| 2   | 下書き                      | 完了   | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分)                              |
+| 3   | 上位文書突合                | 完了   | 2026-08-11 | 矛盾 (変更提案) なし                                                      |
+| 4   | 論点整理                    | 完了   | 2026-08-11 | D1〜D8 を洗い出し                                                         |
+| 5   | 論点解決                    | 進行中 | 2026-08-13 | D1〜D8 確定 (gate PASS 済)。実測によるスコープ拡大で D9〜D11 を追加し再開 |
+| 6   | Interface / Routing 設計    | 未着手 |            |                                                                           |
+| 7   | Content / Data 設計         | 未着手 |            |                                                                           |
+| 8   | Performance / Security 設計 | 未着手 |            |                                                                           |
+| 9   | Test / Metrics 設計         | 未着手 |            |                                                                           |
+| 10  | 実装分割                    | 未着手 |            |                                                                           |
+| 11  | レビュー済                  | 未着手 |            |                                                                           |
 
 ## 上位文書整合
 
@@ -62,11 +62,14 @@
 
 ### やること
 
-- アノテーション駆動 entry point の分類: `@Scheduled` / `@PostConstruct` / `@PreDestroy` / Web handler (`@RequestMapping` / `@GetMapping` 等の合成アノテーション含む) を entry point としてマークし、caller 探索の終端根拠として出力する (edge は作らない)
+- アノテーション駆動 entry point の分類: `@Scheduled` / `@PostConstruct` / `@PreDestroy` / Web handler (`@RequestMapping` / `@GetMapping` 等の合成アノテーション含む) / `@ExceptionHandler` / `@ModelAttribute` を entry point としてマークし、caller 探索の終端根拠として出力する (edge は作らない)
+  - **改訂 (2026-08-13)**: 実環境検証プロジェクトの実測で `@ExceptionHandler` (15 件) / `@ModelAttribute` (53 件) の漏れを検出し、対象集合へ追加 (D3 の改訂)
 - イベント edge の解決: `ApplicationEventPublisher#publishEvent()` の引数型 (型階層含む) と `@EventListener` / `@TransactionalEventListener` の listener メソッドを突合し、候補 edge を生成する
 - callable 値渡しの invocation 解決: functional interface の invocation site から、静的に追跡可能な範囲で渡された lambda / method reference 実体への edge を生成する
 - 各系統の解決不能ケースの diagnostic 分類 (`JAVA_` code 体系への追加) を定める
 - Console tree への entry point 標識の表示 (output / Go。意味解釈は entry point key に限定)
+- stream / generics chain の型解決強化 (**追記 (2026-08-13)**: 実環境検証プロジェクトの実測で未解決の支配形状と判明。全 call site の 3.9% が未解決で、その大半が chain 内 generics 型推論失敗。方式は D9 で確定)
+- 解析実行の運用堅牢化 (**追記 (2026-08-13)**: OutOfMemoryError の診断化と heap 指針 (D10)、Gradle daemon JVM 非互換の回避手段 (D11))
 
 ### やらないこと
 
@@ -75,6 +78,7 @@
 - 条件アノテーション (`@Profile` 等) の条件評価 (既存方針どおり記録のみ)
 - `@Async` の非同期境界の表現変更 (呼び出し edge は既存解決で生成済み)
 - Protocol の `symbolKind` enum 変更・lambda の独立 node 化 (protocol-mapping の既存決定を維持)
+- CLI の使い勝手改善 (診断の要約・フィルタ表示 / 設定ファイル / 実行時間短縮) — 実測で必要性を確認したが本 issue の対象外。Future Work「CLI の使い勝手」で扱う
 
 ## 要件の解釈
 
@@ -97,7 +101,11 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-なし (D1〜D8 の全件を解決済み。「解決済みの論点」を参照)
+| #   | 論点                                                                                                   | 決定候補                                                                                | 決定 |
+| --- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ---- |
+| D9  | stream / generics chain の型解決強化の方式 (実測で未解決の支配形状。全 call site の 3.9%)              | (a) JavaParser の型推論補強 / (b) bytecode 救済の適用条件拡張 / (c) SootUp の型情報併用 | 未決 |
+| D10 | OutOfMemoryError の診断化と heap 指針 (既定 heap で raw stack 死する)                                  | OOM を捕捉して error record 化 + 文書で heap 指針 / 起動時の既定 -Xmx 引き上げ          | 未決 |
+| D11 | Gradle daemon JVM 非互換の回避手段 (analyzer JVM が daemon に引き継がれ対象 Gradle と非互換になり得る) | `--analyzer-meta` での daemon JVM 指定 / 文書化のみ / 自動フォールバック                | 未決 |
 
 ## 解決済みの論点
 
@@ -107,6 +115,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
   - トレードオフ / 却下した代替案: schema 拡張 (新 field / record) は言語非依存の一級表現になるが、Protocol 契約変更 (要 ADR)・Core 改修・他言語 Analyzer への契約負担が生じ、複数言語要求がない現時点では過剰設計。Console で意味解釈が必要になった場合の契約整理は D6 で扱う
 - **D3: 対象アノテーションは javax / jakarta 両版対応とし、meta-annotation は 1 段まで検出する** (決定 2026-08-12)
   - 集合: ライフサイクル `@Scheduled` / `@PostConstruct` / `@PreDestroy` (後者 2 つは `javax.annotation` / `jakarta.annotation` 両 FQN)、イベント `@EventListener` / `@TransactionalEventListener`、Web `@RequestMapping` + Spring 提供 composed (`@GetMapping` / `@PostMapping` / `@PutMapping` / `@DeleteMapping` / `@PatchMapping`) を既知集合として明示列挙
+  - **改訂 (2026-08-13)**: 実環境検証プロジェクトの実測で漏れを検出した `@ExceptionHandler` / `@ModelAttribute` (web framework が呼ぶメソッド) を既知集合へ追加。検出深さ・版差方針は変更しない
   - 検出深さ: 利用者定義の合成アノテーションは 1 段だけ辿る。2 段以上の入れ子は検出不能であり、制約として文書化する (検出できないものは診断も出せない)
   - トレードオフ / 却下した代替案: 直接付与のみは自作 composed が普通に使われる Web 層で取りこぼす。再帰解決は Spring の意味論に忠実だが実装・検証コストに対して 2 段以上の実例が稀
 - **D7: イベント edge は broadcast 意味論を反映した専用規則で表現する** (決定 2026-08-12)
@@ -140,7 +149,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ## 未確定事項
 
-なし (D1〜D8 の全件を解決済み)
+- D9〜D11 (上表)。2026-08-13 のスコープ拡大 (実環境検証プロジェクトの実測) で追加。1 件でも残っていれば下流 phase は止める
 
 ## 実装対象
 
@@ -329,10 +338,11 @@ D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱す�
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                   |
-| ---------- | -------- | ------------------------------------------ |
-| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草              |
-| 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開 |
+| 日付       | 変更者   | 変更内容                                                                              |
+| ---------- | -------- | ------------------------------------------------------------------------------------- |
+| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草                                                         |
+| 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開                                            |
+| 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (D3 改訂 / D9〜D11 追加)、clarify 再開 |
 
 ## 備考
 

@@ -48,14 +48,18 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 | V2  | イベント publish → listener の edge が生成され、イベント経由の caller / callee 探索が途切れない                                |
 | V3  | functional interface 経由で起動される lambda / method reference の実体が、解決可能な範囲で edge になり、不能な場合は診断に残る |
 | V4  | いずれの新分類・新 edge も silent omission を生まない (解決できないケースは必ず diagnostic / metadata として観測可能)          |
+| V5  | stream / generics chain 形状の未解決が実測で減少する (実環境検証プロジェクトの再計測で未解決率 3.9% から改善。追記 2026-08-13) |
+| V6  | 実環境の解析実行が阻害要因 (daemon JVM 非互換 / OOM) で raw 失敗せず、診断または文書化された手順で対処できる (追記 2026-08-13) |
 
 ## スコープ
 
 ### やること
 
-- **アノテーション駆動 entry point の分類**: `@Scheduled` / `@PostConstruct` / `@PreDestroy` / Web handler (`@RequestMapping` / `@GetMapping` 等の合成アノテーション含む) を entry point としてマークし、caller 探索の終端根拠として出力する
+- **アノテーション駆動 entry point の分類**: `@Scheduled` / `@PostConstruct` / `@PreDestroy` / Web handler (`@RequestMapping` / `@GetMapping` 等の合成アノテーション含む) / `@ExceptionHandler` / `@ModelAttribute` を entry point としてマークし、caller 探索の終端根拠として出力する (改訂 2026-08-13: 実環境検証プロジェクトの実測で後者 2 件の漏れを検出し追加)
 - **イベント edge の解決**: `publishEvent()` の引数型 (型階層含む) と `@EventListener` / `@TransactionalEventListener` の listener メソッドを突合し edge を生成する
 - **callable 値渡しの invocation 解決**: functional interface の invocation site から、静的に追跡可能な範囲で渡された lambda / method reference 本体への edge を生成する (追跡可能範囲の境界定義は設計で確定)
+- **stream / generics chain の型解決強化** (追記 2026-08-13): 実環境検証プロジェクトの実測で未解決の支配形状が「stream / lambda chain 内の generics 型推論失敗」(未解決 2,062 件中の大半、全 call site の 3.9%) と判明したため、この形状の解決強化をスコープに加える。方式は設計で確定する
+- **解析実行の運用堅牢化** (追記 2026-08-13): Gradle daemon JVM 非互換の回避手段の提供・文書化と、OutOfMemoryError の診断化 (raw stack で異常終了させない)・heap 指針の文書化をスコープに加える (実測で検出した実行阻害要因)
 - 上記すべてで、解決不能ケースの diagnostic 分類 (理由コード) を定める
 
 ### やらないこと
@@ -64,6 +68,7 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 - Runtime Trace / Reflection / AspectJ Runtime / 実行時 Proxy 解析 (ADR-0004 の保留を維持)
 - 条件アノテーション (`@Profile` 等) の条件評価 (既存方針どおり記録のみ)
 - `@Async` の非同期境界の表現変更 (呼び出し edge 自体は既存解決で生成されるため対象外)
+- CLI の使い勝手改善 (診断の要約・フィルタ表示 / 設定ファイル / 実行時間短縮) — 実測で必要性を確認したが本 issue の対象外。Future Work「CLI の使い勝手」で扱う
 
 ## 業務ルール
 
@@ -130,6 +135,9 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 - WHEN functional interface の invocation site に渡された lambda / method reference が静的追跡可能な範囲にあるとき、THE SYSTEM SHALL invocation site から実体 (lambda 本体の帰属メソッド / 参照先メソッド) への edge を生成する。
 - IF 上記のいずれかが解決できない場合、THEN THE SYSTEM SHALL 理由コード付き diagnostic を記録し、silent omission にしない。
 - THE SYSTEM SHALL 本機能追加後も `silentOmission == 0` と既存の outcome ledger 終端保証を維持する。
+- WHEN stream / lambda chain 内の generics 型推論が既存 solver で失敗したとき、THE SYSTEM SHALL 強化された解決手段 (方式は設計で確定) で解決を試み、なお不能な場合は既存どおり diagnostic に残す。(追記 2026-08-13)
+- IF 解析実行が OutOfMemoryError に到達した場合、THEN THE SYSTEM SHALL raw stack trace のまま異常終了せず、原因と対処 (heap 指針) を示す error として報告する。(追記 2026-08-13)
+- WHEN Gradle daemon JVM が対象 Gradle の互換範囲外のとき、THE SYSTEM SHALL 利用者が daemon JVM を指定できる手段または文書化された回避手順を提供する。(追記 2026-08-13)
 
 ## 未決事項（論点）
 
@@ -160,10 +168,11 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                       |
-| ---------- | -------- | ---------------------------------------------- |
-| 2026-08-11 | Fukuemon | 初版起案、issue #82 起票                       |
-| 2026-08-12 | Fukuemon | R3 を broadcast 意味論に合わせて改訂 (spec D7) |
+| 日付       | 変更者   | 変更内容                                                                                                                         |
+| ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Fukuemon | 初版起案、issue #82 起票                                                                                                         |
+| 2026-08-12 | Fukuemon | R3 を broadcast 意味論に合わせて改訂 (spec D7)                                                                                   |
+| 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (entry point 2 件追加 / chain 型解決強化 / 運用堅牢化)、V5・V6 と EARS 3 件を追加 |
 
 ## 備考
 
