@@ -41,3 +41,11 @@ Verdict: NEEDS_WORK → 修正 → NEEDS_WORK (件数同期のみ) → 修正 �
 - 1 回目指摘 5 件: D12 の requirements 未反映 / 未解決件数の定義不一致 (2,062 vs 2,114) / メタ更新日 / requirements 未決事項の状態 / ADR-0006 整合行 — すべて反映
 - 2 回目指摘: spec 側「EARS 6 件」の件数記載が requirements (9 件) と不整合 → 件数を持たない正本参照へ変更し解消
 - 設計判断 (D1〜D12) への差し戻しはなし。D9 は #31 の保守化決定と非矛盾、D11 は ADR-0006 の明示 override 方針と整合と確認された
+
+## Review 2026-08-13 (track gate: diagram〜track 累積)
+
+Verdict: NEEDS_WORK → 修正 → **PASS**
+
+- diagram: Mermaid 2 図の構文妥当・機能仕様 / EARS / エラーケース 1〜7 との整合を確認
+- track: 差分テーブルの過不足を確認。指摘 1 件 (D10 の Core 側挙動の design 反映先が未整理) → analyzer-protocol / cli feature doc への反映行を追記して解消 (stderr の protocol 非 parse 契約は不変と明記)
+- 設計判断への差し戻しなし
