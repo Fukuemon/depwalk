@@ -13,19 +13,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態   | 最終更新   | 備考                                                                      |
-| --- | --------------------------- | ------ | ---------- | ------------------------------------------------------------------------- |
-| 1   | 起票                        | 完了   | 2026-08-11 | issue #82 / requirements.md 起票済み                                      |
-| 2   | 下書き                      | 完了   | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分)                              |
-| 3   | 上位文書突合                | 完了   | 2026-08-11 | 矛盾 (変更提案) なし                                                      |
-| 4   | 論点整理                    | 完了   | 2026-08-11 | D1〜D8 を洗い出し                                                         |
-| 5   | 論点解決                    | 進行中 | 2026-08-13 | D1〜D8 確定 (gate PASS 済)。実測によるスコープ拡大で D9〜D11 を追加し再開 |
-| 6   | Interface / Routing 設計    | 未着手 |            |                                                                           |
-| 7   | Content / Data 設計         | 未着手 |            |                                                                           |
-| 8   | Performance / Security 設計 | 未着手 |            |                                                                           |
-| 9   | Test / Metrics 設計         | 未着手 |            |                                                                           |
-| 10  | 実装分割                    | 未着手 |            |                                                                           |
-| 11  | レビュー済                  | 未着手 |            |                                                                           |
+| #   | フェーズ                    | 状態   | 最終更新   | 備考                                                                 |
+| --- | --------------------------- | ------ | ---------- | -------------------------------------------------------------------- |
+| 1   | 起票                        | 完了   | 2026-08-11 | issue #82 / requirements.md 起票済み                                 |
+| 2   | 下書き                      | 完了   | 2026-08-11 | 実装突合: 対象 (既存 java-analyzer への増分)                         |
+| 3   | 上位文書突合                | 完了   | 2026-08-11 | 矛盾 (変更提案) なし                                                 |
+| 4   | 論点整理                    | 完了   | 2026-08-11 | D1〜D8 を洗い出し                                                    |
+| 5   | 論点解決                    | 完了   | 2026-08-13 | D1〜D12 全件確定 (D9〜D12 は実測に基づく拡大分)。gate 再レビュー待ち |
+| 6   | Interface / Routing 設計    | 未着手 |            |                                                                      |
+| 7   | Content / Data 設計         | 未着手 |            |                                                                      |
+| 8   | Performance / Security 設計 | 未着手 |            |                                                                      |
+| 9   | Test / Metrics 設計         | 未着手 |            |                                                                      |
+| 10  | 実装分割                    | 未着手 |            |                                                                      |
+| 11  | レビュー済                  | 未着手 |            |                                                                      |
 
 ## 上位文書整合
 
@@ -73,7 +73,7 @@
 
 ### やらないこと
 
-- Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis)
+- 実測根拠のない Mapper 系マーカーの拡張 (`@FeignClient` / XML ベース MyBatis)。実測で検出した codegen DAO marker の追加は D12 でスコープに含める
 - Runtime Trace / Reflection / AspectJ Runtime / 実行時 Proxy 解析 (ADR-0004 の保留を維持)
 - 条件アノテーション (`@Profile` 等) の条件評価 (既存方針どおり記録のみ)
 - `@Async` の非同期境界の表現変更 (呼び出し edge は既存解決で生成済み)
@@ -101,11 +101,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-| #   | 論点                                                                                                   | 決定候補                                                                                | 決定 |
-| --- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ---- |
-| D9  | stream / generics chain の型解決強化の方式 (実測で未解決の支配形状。全 call site の 3.9%)              | (a) JavaParser の型推論補強 / (b) bytecode 救済の適用条件拡張 / (c) SootUp の型情報併用 | 未決 |
-| D10 | OutOfMemoryError の診断化と heap 指針 (既定 heap で raw stack 死する)                                  | OOM を捕捉して error record 化 + 文書で heap 指針 / 起動時の既定 -Xmx 引き上げ          | 未決 |
-| D11 | Gradle daemon JVM 非互換の回避手段 (analyzer JVM が daemon に引き継がれ対象 Gradle と非互換になり得る) | `--analyzer-meta` での daemon JVM 指定 / 文書化のみ / 自動フォールバック                | 未決 |
+なし (D1〜D12 の全件を解決済み。「解決済みの論点」を参照)
 
 ## 解決済みの論点
 
@@ -146,22 +142,39 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
   - 分割: P1 アノテーション検出基盤 + entry point 分類 (java-analyzer) / P2 イベント突合 + edge 生成 (java-analyzer、P1 の検出基盤に依存) / P3 callable 追跡 (java-analyzer、独立) / P4 Console の entry point 表示 (output、P1 の metadata key に依存)
   - 根拠: PR が系統単位で独立して revert でき、各 prompt に fixture + unit + E2E を同梱できて D8 の検証境界と一致する。P3 は P1 と並列実装できる
   - トレードオフ / 却下した代替案: 基盤先行の 5 分割は P0 単独で利用者価値がなく過剰設計を誘発する。2 分割は java-analyzer 側 PR が肥大しレビューと revert が困難
+- **D9: chain 型解決の強化は「型伝播救済層」の追加で行う** (決定 2026-08-13)
+  - 実測根拠: 実環境検証プロジェクトの未解決 2,114 件の全件機械分類で、約 91% が stream / builder 連鎖・generics 局所変数の receiver 型導出失敗、method reference の一部が Lombok 生成 getter + SAM arity 推論失敗と判明。呼び先メソッド自体は bytecode に存在し、型さえ導出できれば既存 bytecode 救済 (#27/#30) が効く
+  - 方式: solver 失敗時に receiver 式の型を段階導出して既存救済へ接続する。① local 変数は宣言・初期化子の型 ② chain 途中は bytecode の generic signature (メソッド戻り型) ③ lambda parameter は functional interface の型引数。SAM arity も functional interface の bytecode から導出する
+  - 制約: 常に型根拠を維持し、#31 が禁じた「宣言上の名前一意を根拠にする救済」には踏み込まない (R1 と整合)
+  - トレードオフ / 却下した代替案: JavaParser solver 本体の補強は失敗箇所が内部に散在し副作用範囲が読めない。名前ベース救済の拡大は #31 の確定判断と正面衝突する
+- **D12: codegen DAO interface の runtime-provided marker を追加する** (決定 2026-08-13)
+  - 実測根拠: annotation processing で実装が生成される DAO interface への DI 解決が「Bean 候補なし」となる形状が 52 件。`@Mapper` (ランタイム/ビルド時に実装が供給され source に実装クラスが存在しない) と同構造
+  - 規則: 該当 DAO annotation を既知 runtime-provided マーカー集合へ追加する。「やらないこと」の Mapper 系マーカー拡張の除外は「実測根拠のない marker (`@FeignClient` / XML ベース MyBatis) は追加しない」へ精密化する
+  - トレードオフ: marker 集合の管理点が 1 つ増えるが、検出は既存機構の流用で実装コストが小さい
+- **D10: OOM は Core 側で検知して対処付きエラーとして報告し、heap 指針を文書化する** (決定 2026-08-13)
+  - 規則: analyzer の異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` の増加を促す対処付きエラーで報告する。heap の目安 (プロジェクト規模との関係) を利用者向け文書に記載する
+  - 根拠: OOM 後の JVM 内での error record 出力はメモリ確保を伴い成功する保証がない。Core 側検知は確実に案内できる
+  - トレードオフ / 却下した代替案: analyzer 側 error record 化は Protocol に乗る正規表現になるが best effort に留まる。文書化のみは raw stack 死の体験が残る
+- **D11: Gradle daemon JVM は `--analyzer-meta` で指定可能にする** (決定 2026-08-13)
+  - 規則: metadata key (仮称 `gradleJavaHome`、要素 1) を追加し、discovery が daemon JVM 指定として使う。対象プロジェクトへのファイル追加なしで非互換を回避できる。回避手順を文書化する
+  - 根拠: 実測で analyzer の JVM が daemon に引き継がれ対象 Gradle と非互換になった。対象 repo を汚さない回避手段が必要
+  - トレードオフ / 却下した代替案: 文書化のみは対象プロジェクトへの `gradle.properties` 追加を利用者に求める。互換 JDK の自動探索は暗黙の JVM 選択となり discovery の明示性方針と相性が悪い
 
 ## 未確定事項
 
-- D9〜D11 (上表)。2026-08-13 のスコープ拡大 (実環境検証プロジェクトの実測) で追加。1 件でも残っていれば下流 phase は止める
+なし (D1〜D12 の全件を解決済み)
 
 ## 実装対象
 
 正規 target は `context/project.yml` の対象ドメイン一覧を正本とする。
 
-| モジュール          | 実装有無 | 主な責務                                                                           |
-| ------------------- | :------: | ---------------------------------------------------------------------------------- |
-| `core`              |    -     | 変更なし見込み (metadata は opaque passthrough 済み。D2 の決定で変わり得る)        |
-| `traversal`         |    -     | 変更なし見込み (metadata を解釈しない既存契約を維持)                               |
-| `output`            |    ◯     | Console tree への entry point 標識の表示 (D6。意味解釈は entry point key に限定)   |
-| `analyzer-protocol` |    -     | 変更なし (D2 で opaque metadata 表現に確定。schema / Core parser 無変更)           |
-| `java-analyzer`     |    ◯     | entry point 分類 / イベント突合 index / callable 追跡 / diagnostic code 追加の実装 |
+| モジュール          | 実装有無 | 主な責務                                                                                                                    |
+| ------------------- | :------: | --------------------------------------------------------------------------------------------------------------------------- |
+| `core`              |    ◯     | analyzer 異常終了時の OOM パターン検知と対処付きエラー報告 (D10)                                                            |
+| `traversal`         |    -     | 変更なし (metadata を解釈しない既存契約を維持)                                                                              |
+| `output`            |    ◯     | Console tree への entry point 標識の表示 (D6。意味解釈は entry point key に限定)                                            |
+| `analyzer-protocol` |    -     | 変更なし (D2 で opaque metadata 表現に確定。schema / Core parser 無変更)                                                    |
+| `java-analyzer`     |    ◯     | entry point 分類 / イベント突合 index / callable 追跡 / 型伝播救済層 (D9) / DAO marker (D12) / daemon JVM 指定 (D11) の実装 |
 
 ## 機能仕様
 
@@ -175,7 +188,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 ### Reuse Policy
 
 - 新機構 (アノテーション index / イベント突合 / callable 追跡) は java-analyzer の既存 layer 構造 (ADR-0007) 内に置き、SpringDiIndex 等の既存 index 基盤の設計に揃える
-- Core / traversal への変更はしない。output は D6 で確定した entry point 標識の表示のみ変更する (他 metadata の Console 表示は Future Work へ)
+- traversal への変更はしない。output は D6 で確定した entry point 標識の表示のみ、core は D10 で確定した OOM 検知のみ変更する (他 metadata の Console 表示は Future Work へ)
 
 ### Performance
 
@@ -214,6 +227,9 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 - `callEdge.metadata.provenance` へ値 `spring-event` を追加 (イベント edge。D7)
 - `callEdge.metadata.viaCallableInvocation: true` (callable invocation edge。既存 `viaLambda` / `viaMethodReference` とは独立。D5)
 - diagnostic code 追加 (`JavaDiagnosticCode` enum): イベント型未解決 / callable 追跡不能の 2 系統 (severity はいずれも `info` または `warning`、prompts phase で確定)
+- `metadata.gradleJavaHome` (仮称、string 配列・要素 1): discovery が Gradle daemon JVM の指定として使う (D11)。protocol-mapping の metadata 契約表へ追記する
+- runtime-provided marker 集合へ codegen DAO annotation を追加 (D12。検出は既存機構の流用)
+- Core: analyzer 異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` 増加の対処を含むエラーで報告 (D10。Protocol 変更なし)
 
 ## Content / Data 設計
 
@@ -244,12 +260,15 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ### エラーケース
 
-| #   | ケース                                         | ユーザーへの見せ方                                    | リカバリ                         |
-| --- | ---------------------------------------------- | ----------------------------------------------------- | -------------------------------- |
-| 1   | publishEvent の引数型が解決できない            | diagnostic (理由コード付き)                           | 既存の未解決診断と同じ運用       |
-| 2   | listener が条件付きで一意に絞れない            | 曖昧候補として全列挙 + 条件付き事実を metadata に記録 | 既存の条件付き Bean の扱いと同じ |
-| 3   | callable が D1 の追跡範囲外 (field 経由・多段) | diagnostic (理由コード付き)                           | 効果実測後に範囲拡張を判断       |
-| 4   | 2 段以上の meta-annotation 入れ子              | 検出不能 (検出できないものは診断も出せない)           | 制約として文書化する (D3)        |
+| #   | ケース                                         | ユーザーへの見せ方                                    | リカバリ                          |
+| --- | ---------------------------------------------- | ----------------------------------------------------- | --------------------------------- |
+| 1   | publishEvent の引数型が解決できない            | diagnostic (理由コード付き)                           | 既存の未解決診断と同じ運用        |
+| 2   | listener が条件付きで一意に絞れない            | 曖昧候補として全列挙 + 条件付き事実を metadata に記録 | 既存の条件付き Bean の扱いと同じ  |
+| 3   | callable が D1 の追跡範囲外 (field 経由・多段) | diagnostic (理由コード付き)                           | 効果実測後に範囲拡張を判断        |
+| 4   | 2 段以上の meta-annotation 入れ子              | 検出不能 (検出できないものは診断も出せない)           | 制約として文書化する (D3)         |
+| 5   | 型伝播救済層でも receiver 型を導出できない     | 既存どおり diagnostic (`JAVA_UNRESOLVED_SYMBOL`)      | 診断 metadata で形状を追跡 (D9)   |
+| 6   | analyzer が OutOfMemoryError で異常終了        | 対処 (`-Xmx` 増加) 付きエラーとして Core が報告       | heap 指針を文書で案内 (D10)       |
+| 7   | Gradle daemon JVM が対象 Gradle と非互換       | 既存の `JAVA_GRADLE_MODEL_ERROR` (変更なし)           | `gradleJavaHome` 指定で回避 (D11) |
 
 ### Fallback
 
@@ -287,19 +306,23 @@ sequenceDiagram
 
 ### 実装タスク案
 
-D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱する (D8)。
+D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7 を追加)。各 prompt に fixture + unit + E2E を同梱する (D8)。
 
-| Phase | 対象            | 概要                                                                             | 依存               |
-| ----- | --------------- | -------------------------------------------------------------------------------- | ------------------ |
-| P1    | `java-analyzer` | アノテーション検出基盤 (D3 の既知集合 + 1 段 meta-annotation) + entry point 分類 | なし               |
-| P2    | `java-analyzer` | イベント index + publish→listener edge 生成 (D7 の専用規則)                      | P1 (検出基盤)      |
-| P3    | `java-analyzer` | callable 追跡 (D1 の 1 段写像) + invocation edge (D5 の意味論)                   | なし (P1 と並列可) |
-| P4    | `output`        | Console tree への entry point 標識表示 (D6)                                      | P1 (metadata key)  |
+| Phase | 対象            | 概要                                                                             | 依存                   |
+| ----- | --------------- | -------------------------------------------------------------------------------- | ---------------------- |
+| P1    | `java-analyzer` | アノテーション検出基盤 (D3 の既知集合 + 1 段 meta-annotation) + entry point 分類 | なし                   |
+| P2    | `java-analyzer` | イベント index + publish→listener edge 生成 (D7 の専用規則)                      | P1 (検出基盤)          |
+| P3    | `java-analyzer` | callable 追跡 (D1 の 1 段写像) + invocation edge (D5 の意味論)                   | なし (P1 と並列可)     |
+| P4    | `output`        | Console tree への entry point 標識表示 (D6)                                      | P1 (metadata key)      |
+| P5    | `java-analyzer` | 型伝播救済層 (D9) + codegen DAO marker 追加 (D12)                                | なし (P1〜P4 と並列可) |
+| P6    | `java-analyzer` | daemon JVM 指定 `gradleJavaHome` (D11) + 回避手順の文書化                        | なし                   |
+| P7    | `core`          | OOM パターン検知と対処付きエラー報告 (D10) + heap 指針の文書化                   | なし                   |
 
 ### prompts 生成方針
 
-- P1 → {P2, P4} の依存、P3 は独立。P1 完了後は P2 / P3 / P4 を並列実装できる
-- 各 prompt は java-analyzer / output のドメイン境界で閉じ、モジュールをまたがない
+- P1 → {P2, P4} の依存、P3 / P5 / P6 / P7 は独立。P1 完了後は全系統を並列実装できる
+- 各 prompt は java-analyzer / output / core のドメイン境界で閉じ、モジュールをまたがない
+- P5 (型伝播救済層) は効果が最大 (実測未解決の約 9 割が対象) のため、実装順は P5 を先頭に置いてよい
 
 ## 上位資料からの変更点
 
@@ -318,10 +341,17 @@ D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱す�
 | java-analyzer `protocol-mapping.md` (metadata 契約 / diagnostic code 体系)                    | entry point 標識・イベント edge の metadata key と新設 `JAVA_` code を追記 (source: clarify D2)                                          | opaque metadata 表現の決定を正本へ反映する                  |
 | java-analyzer `protocol-mapping.md` / analyzer-protocol feature doc (metadata の Core 内保持) | **変更提案**: 「Output は metadata を意味解釈しない」を「entry point 標識 key に限り Console が意味解釈する」へ改訂 (source: clarify D6) | Console での entry point 表示の決定と既存契約が矛盾するため |
 | output `DesignDoc_output.md` (Console ツリー表現 / 行の書式)                                  | **変更提案**: entry point 標識の表示規則を追加 (source: clarify D6)                                                                      | Console の行書式が変わるため正本の更新が必要                |
+| java-analyzer `protocol-mapping.md` (metadata 契約) / `discovery.md`                          | `gradleJavaHome` key と daemon JVM 指定の規則を追記 (source: clarify D11)                                                                | 実測で検出した daemon JVM 非互換の回避手段                  |
+| java-analyzer `DesignDoc_java-analyzer.md` (runtime-provided マーカー)                        | codegen DAO annotation を既知マーカー集合へ追加 (source: clarify D12)                                                                    | 実測 52 件の「Bean 候補なし」解消                           |
+| java-analyzer `analysis.md` (救済規則)                                                        | 型伝播救済層 (receiver 型の段階導出・SAM arity の bytecode 導出) を追記 (source: clarify D9)                                             | 実測未解決の支配形状 (約 91%) への対処                      |
 
 ### context への影響
 
-なし — 新機構は java-analyzer / output の既存境界内に収まり、architecture / engineering / testing の規約変更を伴わない (D6 の Console 変更も output モジュール内で閉じる)。
+| 対象 doc / 節                       | 変更内容                                                                           | 理由                                   |
+| ----------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------- |
+| `context/toolchain.md` ほか運用文書 | heap 指針 (`-Xmx` の目安) と daemon JVM 回避手順を追記 (source: clarify D10 / D11) | 実測で検出した実行阻害要因の運用手順化 |
+
+上記以外は既存境界内に収まり、architecture / engineering / testing の規約変更を伴わない (D6 の Console 変更も output モジュール内で閉じる)。
 
 ### ADR の新規 / 更新
 
@@ -338,11 +368,12 @@ D4 で確定した 4 分割。各 prompt に fixture + unit + E2E を同梱す�
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                                              |
-| ---------- | -------- | ------------------------------------------------------------------------------------- |
-| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草                                                         |
-| 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開                                            |
-| 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (D3 改訂 / D9〜D11 追加)、clarify 再開 |
+| 日付       | 変更者   | 変更内容                                                                                                              |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Fukuemon | scaffold: index.md 初版を起草                                                                                         |
+| 2026-08-12 | Fukuemon | clarify: D1〜D8 を確定し全セクションへ展開                                                                            |
+| 2026-08-13 | Fukuemon | 実環境検証プロジェクトの実測を受けスコープ拡大 (D3 改訂 / D9〜D11 追加)、clarify 再開                                 |
+| 2026-08-13 | Fukuemon | D9〜D12 を確定し全セクションへ展開 (型伝播救済層 / DAO marker / OOM 検知 / daemon JVM 指定)、実装分割を P1〜P7 へ改訂 |
 
 ## 備考
 
