@@ -31,7 +31,7 @@
 
 - PRD 更新要否: 不要 (統合モード。DesignDoc の Why/What は Future Work の消化で、スコープ変更なし)
 - Design Doc 更新要否: 要 (完了後に Future Work「解析精度の強化」の記述を更新。sync / closeout で扱う)
-- ADR 起票要否: 不要 (D2 で opaque metadata 表現に確定し Protocol 契約変更が発生しないため。sync 時に ADR 化基準で再判定する)
+- ADR 起票要否: 済 — [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) を起票 (sync の ADR 化基準で再判定した結果。D1/D2/D5/D6/D7/D9/D10/D11 の判断群を集約)
 
 | 上位文書    | 節 / 該当箇所                                                        | 整合方針 (継承 / 補足 / 変更提案)                                                                                        |
 | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -45,6 +45,7 @@
 | ADR-0004    | Runtime Trace 保留 / 根拠なき推測の禁止 / 観測可能性の方針           | 継承 (ソース根拠のある edge のみ追加。条件評価はしない)                                                                  |
 | ADR-0005    | SootUp + Spring DI 解決 (candidate edge / resolution / provenance)   | 補足 (イベント edge の候補列挙・曖昧扱いは DI 候補 edge の既存規則に揃える)                                              |
 | ADR-0006    | Gradle Tooling API discovery (daemon JVM 選択は Gradle に委任)       | 補足 (D11 の `gradleJavaHome` は明示 override の追加で暗黙の自動選択は導入しない。`discovery.md` へ追記提案)             |
+| ADR-0012    | 本 spec の判断群の記録 (sync で新規起票)                             | 起票 (判断の正本。design 各所から「判断の正本は ADR-0012」で参照)                                                        |
 | ADR-0007    | レイヤードアーキテクチャ                                             | 継承                                                                                                                     |
 
 ## 関連資料
@@ -110,57 +111,69 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
   - 表現: entry point は `methodSymbol.metadata` の標識、イベント edge は `callEdge.metadata` (`provenance` の値追加)。診断は `JavaDiagnosticCode` enum への code 追加
   - 根拠: metadata / diagnostic code は opaque 契約のため Core parser / validator 無変更で成立する。JSON 出力は既存の `nodes[].metadata` / `edges[].metadata` 透過で即座に表出される。ADR 不要
   - トレードオフ / 却下した代替案: schema 拡張 (新 field / record) は言語非依存の一級表現になるが、Protocol 契約変更 (要 ADR)・Core 改修・他言語 Analyzer への契約負担が生じ、複数言語要求がない現時点では過剰設計。Console で意味解釈が必要になった場合の契約整理は D6 で扱う
+  - 反映先判定 (sync): feature doc (protocol-mapping.md) + ADR-0012 — 反映済
 - **D3: 対象アノテーションは javax / jakarta 両版対応とし、meta-annotation は 1 段まで検出する** (決定 2026-08-12)
   - 集合: ライフサイクル `@Scheduled` / `@PostConstruct` / `@PreDestroy` (後者 2 つは `javax.annotation` / `jakarta.annotation` 両 FQN)、イベント `@EventListener` / `@TransactionalEventListener`、Web `@RequestMapping` + Spring 提供 composed (`@GetMapping` / `@PostMapping` / `@PutMapping` / `@DeleteMapping` / `@PatchMapping`) を既知集合として明示列挙
   - **改訂 (2026-08-13)**: 実環境検証プロジェクトの実測で漏れを検出した `@ExceptionHandler` / `@ModelAttribute` (web framework が呼ぶメソッド) を既知集合へ追加。検出深さ・版差方針は変更しない
   - 検出深さ: 利用者定義の合成アノテーションは 1 段だけ辿る。2 段以上の入れ子は検出不能であり、制約として文書化する (検出できないものは診断も出せない)
   - トレードオフ / 却下した代替案: 直接付与のみは自作 composed が普通に使われる Web 層で取りこぼす。再帰解決は Spring の意味論に忠実だが実装・検証コストに対して 2 段以上の実例が稀
+  - 反映先判定 (sync): feature doc (analysis.md の entry point 分類節) — 反映済 (集合の列挙は作業決定のため ADR 対象外)
 - **D7: イベント edge は broadcast 意味論を反映した専用規則で表現する** (決定 2026-08-12)
   - 規則: caller = `publishEvent()` call site の囲みメソッド、callee = 引数の静的型とその型階層に合致する listener。`provenance` に `spring-event` を追加
   - 確度: 無条件 listener への edge は複数あっても各々確定 (`resolution: unique`)。条件付き listener のみ `conditional: true` + `conditionTypes` (既存規則流用) で `ambiguous`
   - 根拠: Spring DI は実行時に 1 つだけ配線されるため複数候補 = 曖昧が正しいが、イベントは合致 listener が全て実行される broadcast 意味論であり、複数 listener への edge を「曖昧」とすると利用者が確度を誤読する
   - requirements R3 の精密化: 「一意に絞れない場合は曖昧候補」は条件付き listener に限って適用する (requirements.md に追記済み)
   - 制約: generics を使ったイベント型の突合は raw type 一致で近似し、制約として文書化する
+  - 反映先判定 (sync): feature doc (analysis.md) + ADR-0012 — 反映済
 - **D5: callable invocation edge は method reference → 参照先メソッド、lambda → 囲みメソッド (標識付き) へ張る** (決定 2026-08-12)
   - 規則: invocation site の囲みメソッドを caller とし、method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ edge を張る。通常呼び出しと区別する標識 metadata (`viaCallableInvocation: true` 等、既存 `viaLambda` / `viaMethodReference` とは独立) を付ける
   - 根拠: lambda 本体は独立 node ではなく囲みメソッド node の一部 (protocol-mapping の決定を維持)。囲みメソッドへの edge は「invoker は M 内で定義されたコードを実行する」を表し、影響調査の到達性 (lambda 本体の変更が invoker に伝播する) として正確
   - トレードオフ / 却下した代替案: lambda 側 edge は囲みメソッド全体への近似で粒度が粗い (標識で明示し文書化)。method reference のみ対応は V3 が部分達成に留まる。診断のみは V3 未達で requirements 改訂が必要になるため却下
+  - 反映先判定 (sync): feature doc (analysis.md) + ADR-0012 — 反映済
 - **D1: callable の静的追跡範囲は「同一メソッド内 + workspace メソッドへの引数渡し 1 段」とする** (決定 2026-08-12)
   - 規則: (1) 同一メソッド内の local 変数経由の invocation、(2) workspace メソッドの functional interface parameter へ call site から渡された callable と、そのメソッド内の parameter への invocation の突合。複数 call site から異なる callable が渡る場合は各 edge を call site 根拠付きで全列挙する
   - 根拠: template method パターン (`retry(() -> doWork())`) が実コードで支配的。#27 実測の残余も「chain / lambda の起点が scope 内」の形状に収束しており、1 段写像で汎用 dataflow 解析なしに閉じる
   - 対象外: field 経由・多段の受け渡し・Bean 境界越えは diagnostic に残し、効果実測後に拡張を判断する。invocation site が外部ライブラリ内にあるケース (`stream.map(...)` 等) は原理的に対象外 (workspace 内に invocation site が存在しない)
   - トレードオフ / 却下した代替案: 同一メソッド内のみは実コードで稀なパターンしか拾えない。field・多段対応は dataflow 解析の複雑度と誤 edge リスクが跳ね、R1 (根拠なき推測の禁止) と緊張する
+  - 反映先判定 (sync): feature doc (java-analyzer analysis.md / protocol-mapping.md) + ADR-0012 — 反映済
 - **D6: entry point 標識は JSON 透過に加えて Console にも表示する** (決定 2026-08-12)
   - 規則: JSON は既存の `nodes[].metadata` 透過で表出する (実装不要)。Console は出力層で entry point 標識 (metadata key) を意味解釈し、tree の該当 node 行に根拠 (検出アノテーション) を表示する
   - 影響: 「Output は metadata を意味解釈しない」(protocol-mapping で決定済み) の改訂と output feature doc の更新が必要 = 上位文書への変更提案。sync phase で back-propagate する。実装対象に `output` (Go) が加わる
   - 根拠: Console は主要 UI であり、V1 (entry point と未解決の区別) の体験を Console で完結させる
   - トレードオフ / 却下した代替案: JSON 完結案は本 issue が java-analyzer に閉じて小さいが、Console 利用者が entry point 標識を直接見られない。意味解釈の対象は entry point 標識の key に限定し、他 metadata (dispatch / viaLambda 等) の Console 表示は Future Work「CLI の使い勝手」に残す (スコープ拡大を防ぐ)
+  - 反映先判定 (sync): feature doc (output / analyzer-protocol) + ADR-0012 — 反映済
 - **D8: テストは既存方式を踏襲し、ロジック = Java unit / 系統ごとの最小再現 = patterns fixture + required E2E / Console = Go unit で担保する** (決定 2026-08-12)
   - 配分: entry point 検出・イベント突合・callable 追跡・diagnostic の分岐は Java unit (#30 の複数 context 基盤)。系統ごとの最小再現 fixture が CLI 経由で edge / 標識になる成功期待は patterns fixture + required E2E (既存方式)。Console の entry point 表示は Go 側 output の unit test。`silentOmission == 0` / outcome ledger 終端の非回帰は既存の完全性 gate テストの対象拡大
   - 根拠: 既存 `context/testing.md` / #30 の検証境界の整理とそのまま揃い、保守の認知負荷が最小
   - トレードオフ / 却下した代替案: Java unit のみは CLI までの保証がなく受け入れ確認が手動になる。E2E 中心は原因特定が遅く、meta-annotation 版差などの分岐網羅でテスト時間が膨らむ
+  - 反映先判定 (sync): spec で閉じる (既存 context/testing.md の方式踏襲であり新規規約なし)
 - **D4: 実装は 4 分割とし、P1 (検出基盤 + entry point) を起点に P2 (イベント) / P4 (Console) が続き、P3 (callable) は並列とする** (決定 2026-08-12)
   - 分割: P1 アノテーション検出基盤 + entry point 分類 (java-analyzer) / P2 イベント突合 + edge 生成 (java-analyzer、P1 の検出基盤に依存) / P3 callable 追跡 (java-analyzer、独立) / P4 Console の entry point 表示 (output、P1 の metadata key に依存)
   - 根拠: PR が系統単位で独立して revert でき、各 prompt に fixture + unit + E2E を同梱できて D8 の検証境界と一致する。P3 は P1 と並列実装できる
   - トレードオフ / 却下した代替案: 基盤先行の 5 分割は P0 単独で利用者価値がなく過剰設計を誘発する。2 分割は java-analyzer 側 PR が肥大しレビューと revert が困難
+  - 反映先判定 (sync): spec で閉じる (実装分割は prompts の入力であり durable 設計ではない)
 - **D9: chain 型解決の強化は「型伝播救済層」の追加で行う** (決定 2026-08-13)
   - 実測根拠: 実環境検証プロジェクトの未解決診断 2,114 件 (outcome ledger の未解決終端 2,062 件 + DI「Bean 候補なし」52 件。requirements の件数注記と同定義) の全件機械分類で、約 91% が stream / builder 連鎖・generics 局所変数の receiver 型導出失敗、method reference の一部が Lombok 生成 getter + SAM arity 推論失敗と判明。呼び先メソッド自体は bytecode に存在し、型さえ導出できれば既存 bytecode 救済 (#27/#30) が効く
   - 方式: solver 失敗時に receiver 式の型を段階導出して既存救済へ接続する。① local 変数は宣言・初期化子の型 ② chain 途中は bytecode の generic signature (メソッド戻り型) ③ lambda parameter は functional interface の型引数。SAM arity も functional interface の bytecode から導出する
   - 制約: 常に型根拠を維持し、#31 が禁じた「宣言上の名前一意を根拠にする救済」には踏み込まない (R1 と整合)
   - トレードオフ / 却下した代替案: JavaParser solver 本体の補強は失敗箇所が内部に散在し副作用範囲が読めない。名前ベース救済の拡大は #31 の確定判断と正面衝突する
+  - 反映先判定 (sync): feature doc (analysis.md の型伝播救済層節) + ADR-0012 — 反映済
 - **D12: 「Bean 候補なし」52 件は cross-module DI 候補解決の欠陥調査・修正で対処する** (決定 2026-08-13)
   - **改訂 (2026-08-13)**: 初版は「codegen DAO marker の追加」としたが、sync 前の根拠再検証で annotation processing 由来でないと判明し差し替えた (該当 framework の import 0 件)
   - 実測事実: 52 件 (19 種の interface) は 2 形状に分かれる。(a) impl クラスが別 Gradle module の source に実在するのに bean 候補が引けない (cross-module の DI index 解決欠陥の疑い) (b) impl が workspace のどこにも存在しない (「Bean 候補なし」は正しい診断)
   - 規則: (a) の形状を調査し、DI index が解析 context 境界を跨いで候補を解決できるよう修正する。(b) は正しい診断として維持し変更しない。marker 追加は行わない
   - トレードオフ: 調査を伴うため実装コストは marker 追加案より大きいが、marker 追加では 52 件は解消しない (根拠が誤っていた)
+  - 反映先判定 (sync): 調査完了後に feature doc へ反映 (現時点は spec / issue で管理)
 - **D10: OOM は Core 側で検知して対処付きエラーとして報告し、heap 指針を文書化する** (決定 2026-08-13)
   - 規則: analyzer の異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` の増加を促す対処付きエラーで報告する。heap の目安 (プロジェクト規模との関係) を利用者向け文書に記載する
   - 根拠: OOM 後の JVM 内での error record 出力はメモリ確保を伴い成功する保証がない。Core 側検知は確実に案内できる
   - トレードオフ / 却下した代替案: analyzer 側 error record 化は Protocol に乗る正規表現になるが best effort に留まる。文書化のみは raw stack 死の体験が残る
+  - 反映先判定 (sync): feature doc (cli / analyzer-protocol) + context (toolchain) + ADR-0012 — 反映済
 - **D11: Gradle daemon JVM は `--analyzer-meta` で指定可能にする** (決定 2026-08-13)
   - 規則: metadata key (仮称 `gradleJavaHome`、要素 1) を追加し、discovery が daemon JVM 指定として使う。対象プロジェクトへのファイル追加なしで非互換を回避できる。回避手順を文書化する
   - 根拠: 実測で analyzer の JVM が daemon に引き継がれ対象 Gradle と非互換になった。対象 repo を汚さない回避手段が必要
   - トレードオフ / 却下した代替案: 文書化のみは対象プロジェクトへの `gradle.properties` 追加を利用者に求める。互換 JDK の自動探索は暗黙の JVM 選択となり discovery の明示性方針と相性が悪い
+  - 反映先判定 (sync): feature doc (discovery.md / protocol-mapping.md) + context (toolchain) + ADR-0012 — 反映済
 
 ## 未確定事項
 
@@ -215,22 +228,24 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
 
 ## Interface 設計
 
+> **決定時スナップショット** (sync 2026-08-13 で正本ハンドオフ済み)。以後の正本は各 feature doc: 表示規則 = output `DesignDoc_output.md`、metadata key / diagnostic code = java-analyzer `protocol-mapping.md`、daemon JVM = java-analyzer `discovery.md`、OOM 検知 = cli / analyzer-protocol feature doc。判断の経緯は [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。
+
 ### UI / API / Event Interface
 
 - CLI / Protocol の外形は変更しない (既存 `depwalk analyze` の引数・JSONL record 種のまま)
-- Console: tree の該当 node 行に entry point 標識 (検出アノテーション名) を表示する。表示書式の詳細は P4 prompt で確定し、output feature doc へ sync する (D6)
+- Console: node の `Metadata.entryPoint` 存在時に行末へ `  (entry point: <simple 名>)` を付す (正本: output feature doc「行の書式」)
 - JSON: `nodes[].metadata` / `edges[].metadata` の既存透過で新標識を表出する (実装不要)
 
 ### Props / Request / Response
 
-以下の metadata key / diagnostic code は仮称。最終名は prompts phase で確定し、protocol-mapping.md へ sync する。
+sync で名称確定済み (仮称を解消)。正本は protocol-mapping.md。
 
-- `methodSymbol.metadata.entryPoint` (string 配列): 検出した entry point アノテーションの FQN。D3 の既知集合 + 1 段 meta-annotation 由来
+- `methodSymbol.metadata.entryPoint` (string 配列): 検出した entry point アノテーションの FQN (重複なし・辞書順)
 - `callEdge.metadata.provenance` へ値 `spring-event` を追加 (イベント edge。D7)
 - `callEdge.metadata.viaCallableInvocation: true` (callable invocation edge。既存 `viaLambda` / `viaMethodReference` とは独立。D5)
-- diagnostic code 追加 (`JavaDiagnosticCode` enum): イベント型未解決 / callable 追跡不能の 2 系統 (severity はいずれも `info` または `warning`、prompts phase で確定)
-- `metadata.gradleJavaHome` (仮称、string 配列・要素 1): discovery が Gradle daemon JVM の指定として使う (D11)。protocol-mapping の metadata 契約表へ追記する
-- cross-module DI 候補解決の調査・修正 (D12。impl が別 module に実在するのに bean 候補が引けない形状の解消)
+- diagnostic code: `JAVA_EVENT_UNRESOLVED` (warning) / `JAVA_CALLABLE_UNRESOLVED` (info、設計上の制約による対象外を表す)
+- `metadata.gradleJavaHome` (string 配列・要素 1): discovery が Gradle daemon JVM の指定として使う (D11)
+- cross-module DI 候補解決の調査・修正 (D12。impl が別 module に実在するのに bean 候補が引けない形状の解消。design 反映は調査後)
 - Core: analyzer 異常終了時に stderr の OutOfMemoryError パターンを検知し、`-Xmx` 増加の対処を含むエラーで報告 (D10。Protocol 変更なし)
 
 ## Content / Data 設計
@@ -369,30 +384,34 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 
 ### feature doc への影響
 
-| 対象 doc / 節                                                                                 | 変更内容                                                                                                                                                                                                           | 理由                                                        |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| java-analyzer `protocol-mapping.md` (metadata 契約 / diagnostic code 体系)                    | entry point 標識・イベント edge の metadata key と新設 `JAVA_` code を追記 (source: clarify D2)                                                                                                                    | opaque metadata 表現の決定を正本へ反映する                  |
-| java-analyzer `protocol-mapping.md` / analyzer-protocol feature doc (metadata の Core 内保持) | **変更提案**: 「Output は metadata を意味解釈しない」を「entry point 標識 key に限り Console が意味解釈する」へ改訂 (source: clarify D6)                                                                           | Console での entry point 表示の決定と既存契約が矛盾するため |
-| output `DesignDoc_output.md` (Console ツリー表現 / 行の書式)                                  | **変更提案**: entry point 標識の表示規則を追加 (source: clarify D6)                                                                                                                                                | Console の行書式が変わるため正本の更新が必要                |
-| java-analyzer `protocol-mapping.md` (metadata 契約) / `discovery.md`                          | `gradleJavaHome` key と daemon JVM 指定の規則を追記 (source: clarify D11)                                                                                                                                          | 実測で検出した daemon JVM 非互換の回避手段                  |
-| java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (Spring DI 解決)                   | cross-module の bean 候補解決の規則を調査結果に応じて追記 (source: clarify D12。調査完了後に内容確定)                                                                                                              | impl が別 module に実在するのに候補が引けない形状の解消     |
-| java-analyzer `analysis.md` (救済規則)                                                        | 型伝播救済層 (receiver 型の段階導出・SAM arity の bytecode 導出) を追記 (source: clarify D9)                                                                                                                       | 実測未解決の支配形状 (約 91%) への対処                      |
-| java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (entry point 分類)                 | entry point アノテーション集合 (D3 の既知集合 + 1 段 meta-annotation) と分類規則 (edge 非生成・終端根拠のみ: R4) を追記 (source: track)                                                                            | 分類規則の durable な正本を feature doc に置く              |
-| java-analyzer `analysis.md` (イベント edge)                                                   | broadcast 意味論の突合規則 (型階層合致 / 無条件 = unique / 条件付きのみ ambiguous / raw type 近似) を追記 (source: track)                                                                                          | D7 で確定した edge 生成規則の正本反映                       |
-| java-analyzer `analysis.md` / `protocol-mapping.md` (callable 追跡)                           | 追跡範囲 (同一メソッド内 + 引数渡し 1 段) と edge 意味論 (method reference → 参照先 / lambda → 囲みメソッド + 標識) を追記 (source: track)                                                                         | D1 / D5 で確定した追跡・表現規則の正本反映                  |
-| analyzer-protocol feature doc (Analyzer 異常終了時の扱い) / cli feature doc (エラー表示)      | Core が analyzer 異常終了時に stderr の OOM パターンを検知し対処付きエラーで報告する挙動を追記 (source: track D10)。stderr を protocol record として parse しない既存契約は変更しない (終了後の診断ヒント抽出のみ) | D10 の Core 側恒久挙動の正本を design に置く                |
+| 対象 doc / 節                                                                                 | 変更内容                                                                                                                                                                                                                                         | 理由                                                        |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| java-analyzer `protocol-mapping.md` (metadata 契約 / diagnostic code 体系)                    | entry point 標識・イベント edge の metadata key と新設 `JAVA_` code を追記 (source: clarify D2)。**反映済** (sync 2026-08-13)                                                                                                                    | opaque metadata 表現の決定を正本へ反映する                  |
+| java-analyzer `protocol-mapping.md` / analyzer-protocol feature doc (metadata の Core 内保持) | **変更提案**: 「Output は metadata を意味解釈しない」を「entry point 標識 key に限り Console が意味解釈する」へ改訂 (source: clarify D6)。**反映済** (sync 2026-08-13)                                                                           | Console での entry point 表示の決定と既存契約が矛盾するため |
+| output `DesignDoc_output.md` (Console ツリー表現 / 行の書式)                                  | **変更提案**: entry point 標識の表示規則を追加 (source: clarify D6)。**反映済** (sync 2026-08-13)                                                                                                                                                | Console の行書式が変わるため正本の更新が必要                |
+| java-analyzer `protocol-mapping.md` (metadata 契約) / `discovery.md`                          | `gradleJavaHome` key と daemon JVM 指定の規則を追記 (source: clarify D11)。**反映済** (sync 2026-08-13)                                                                                                                                          | 実測で検出した daemon JVM 非互換の回避手段                  |
+| java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (Spring DI 解決)                   | cross-module の bean 候補解決の規則を調査結果に応じて追記 (source: clarify D12。調査完了後に内容確定)                                                                                                                                            | impl が別 module に実在するのに候補が引けない形状の解消     |
+| java-analyzer `analysis.md` (救済規則)                                                        | 型伝播救済層 (receiver 型の段階導出・SAM arity の bytecode 導出) を追記 (source: clarify D9)。**反映済** (sync 2026-08-13)                                                                                                                       | 実測未解決の支配形状 (約 91%) への対処                      |
+| java-analyzer `DesignDoc_java-analyzer.md` / `analysis.md` (entry point 分類)                 | entry point アノテーション集合 (D3 の既知集合 + 1 段 meta-annotation) と分類規則 (edge 非生成・終端根拠のみ: R4) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                            | 分類規則の durable な正本を feature doc に置く              |
+| java-analyzer `analysis.md` (イベント edge)                                                   | broadcast 意味論の突合規則 (型階層合致 / 無条件 = unique / 条件付きのみ ambiguous / raw type 近似) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                                          | D7 で確定した edge 生成規則の正本反映                       |
+| java-analyzer `analysis.md` / `protocol-mapping.md` (callable 追跡)                           | 追跡範囲 (同一メソッド内 + 引数渡し 1 段) と edge 意味論 (method reference → 参照先 / lambda → 囲みメソッド + 標識) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                         | D1 / D5 で確定した追跡・表現規則の正本反映                  |
+| analyzer-protocol feature doc (Analyzer 異常終了時の扱い) / cli feature doc (エラー表示)      | Core が analyzer 異常終了時に stderr の OOM パターンを検知し対処付きエラーで報告する挙動を追記 (source: track D10)。stderr を protocol record として parse しない既存契約は変更しない (終了後の診断ヒント抽出のみ)。**反映済** (sync 2026-08-13) | D10 の Core 側恒久挙動の正本を design に置く                |
 
 ### context への影響
 
-| 対象 doc / 節                       | 変更内容                                                                           | 理由                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------- |
-| `context/toolchain.md` ほか運用文書 | heap 指針 (`-Xmx` の目安) と daemon JVM 回避手順を追記 (source: clarify D10 / D11) | 実測で検出した実行阻害要因の運用手順化 |
+| 対象 doc / 節                       | 変更内容                                                                                                                                                         | 理由                                   |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `context/toolchain.md` ほか運用文書 | heap 指針 (`-Xmx` の目安) と daemon JVM 回避手順を追記 (source: clarify D10 / D11)。**反映済** (sync 2026-08-13: `context/toolchain.md`「実環境解析の運用指針」) | 実測で検出した実行阻害要因の運用手順化 |
 
 上記以外は既存境界内に収まり、architecture / engineering / testing の規約変更を伴わない (D6 の Console 変更も output モジュール内で閉じる)。
 
 ### ADR の新規 / 更新
 
-なし — D2 で Protocol schema 変更が発生しないと確定したため新規 ADR は不要。ADR-0002 (永続ストアなし) / ADR-0004 (Runtime Trace 保留) / ADR-0007 (layer 構造) はいずれも継承であり更新しない。sync 時に ADR 化基準で再判定する。
+| ADR ID   | 変更内容                                                                                                                    | 理由                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| ADR-0012 | 新規起票 (framework 暗黙呼び出し解決と型伝播救済の設計判断。D1/D2/D5/D6/D7/D9/D10/D11 を集約)。**反映済** (sync 2026-08-13) | sync の ADR 化基準 (比較判断は ADR 既定) で再判定した結果、spec 削除後も判断の経緯を残すため起票 |
+
+ADR-0002 (永続ストアなし) / ADR-0004 (Runtime Trace 保留) / ADR-0007 (layer 構造) は継承であり更新しない。
 
 ## レビュー
 
@@ -418,6 +437,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | 2026-08-13 | Fukuemon | diagram: 実行起点 flowchart と解析内部 sequence を生成 (D10/D11 のエラー経路含む)                                     |
 | 2026-08-13 | Fukuemon | track: feature doc 反映行 3 件 (entry point 分類 / イベント edge / callable 追跡の規則) を追記                        |
 | 2026-08-13 | Fukuemon | track gate 指摘対応: D10 の Core 側挙動の design 反映先 (analyzer-protocol / cli feature doc) を追記                  |
+| 2026-08-13 | Fukuemon | sync: ADR-0012 起票、feature doc / context へ正本ハンドオフ (反映済注記・反映先判定・key 名確定)                      |
 
 ## 備考
 

@@ -110,3 +110,35 @@ receiver 型が取得できない call は、次の順で分類を試みてか�
 3. **lambda parameter 規則**: receiver が lambda parameter の場合、lambda が代入される変数の宣言型 (= functional interface 型そのもの) が scope 外なら `external-target` へ分類する。lambda を直接 method 引数に渡す形 (unqualified static import 経由を含む) は external 判定の根拠にしない — 受け手 method の receiver 型や static import 元の class は、lambda parameter が実際に instantiate される型と独立した情報であり、external でも in-scope 型の parameter を取り得るため diagnostic に残す。
 
 SAM arity を推論できない method reference は救済しない。候補列挙は owner classfile の宣言 member に限られ継承 overload を検証できないため、宣言上の名前一意を参照先の一意の根拠にできない (diagnostic に残す保守側)。
+
+### 型伝播救済層 (未実装。実装は #82 で進行中)
+
+上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
+
+1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
+2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する
+3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の functional interface の型引数 (bytecode の generic Signature 由来) から導出する
+
+SAM arity も functional interface の bytecode から導出する (例: `java.util.function.Function#apply` = arity 1)。これにより arity 推論失敗による救済スキップを減らすが、「宣言上の名前一意を根拠にする救済はしない」保守側の原則は変更しない。
+
+## framework 由来の暗黙呼び出しの解決 (未実装。実装は #82 で進行中)
+
+framework が実行時に起動する呼び出しを、ソース上の根拠 (アノテーション / 型 / AST) を伴う範囲で解決する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。解決不能は diagnostic に残し、`silentOmission == 0` を維持する。
+
+### entry point 分類
+
+対象アノテーションを付与されたメソッドを framework entry point として分類し、`methodSymbol.metadata.entryPoint` (検出アノテーション FQN の配列) で標識する。edge は作らず、caller 探索の終端根拠のみ付与する (擬似 caller node を合成しない)。対象集合は次を既知集合として明示列挙する。
+
+- ライフサイクル: `org.springframework.scheduling.annotation.Scheduled` / `PostConstruct` / `PreDestroy` (後者 2 つは `javax.annotation` / `jakarta.annotation` の両 FQN)
+- イベント: `org.springframework.context.event.EventListener` / `org.springframework.transaction.event.TransactionalEventListener`
+- Web: `org.springframework.web.bind.annotation.RequestMapping` + Spring 提供 composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
+
+利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。2 段以上の入れ子は検出できず、診断も出せないため制約として扱う。
+
+### イベント edge
+
+`ApplicationEventPublisher#publishEvent()` の call site を起点に、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッド、`provenance` には `spring-event` を積む。イベントは合致 listener が全て実行される broadcast 意味論のため、無条件 listener への edge は複数でも各々確定 (`resolution: unique`) とし、条件付き listener のみ既存規則 (`conditional` / `conditionTypes`) で `ambiguous` とする。generics を使ったイベント型の突合は raw type 一致で近似する (制約)。
+
+### callable invocation
+
+functional interface の invocation site から、渡された callable の実体への edge を生成する。method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ張り、`viaCallableInvocation: true` で通常呼び出しと区別する (lambda 本体は独立 node にしない既存決定を維持。囲みメソッドへの edge は「invoker はそのメソッド内で定義されたコードを実行する」の意味)。静的追跡範囲は (1) 同一メソッド内の local 変数経由、(2) workspace メソッドの functional interface parameter への引数渡し 1 段、に限定する。複数 call site から異なる callable が渡る場合は各 edge を call site 根拠付きで全列挙する。field 経由・多段の受け渡し・invocation site が外部ライブラリ内にあるケースは対象外で、前 2 者は diagnostic に残す。

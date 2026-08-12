@@ -114,7 +114,7 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 
 **`metadata` の Core 内保持**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。
 
-`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する で決定。表出を定めるのは [Output feature doc](../output/DesignDoc_output.md))。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) が定める。
+`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。例外として `methodSymbol.metadata` の `entryPoint` key に限り Console が表示のために意味解釈する (未実装、実装は #82 で進行中。判断の正本は [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。表示規則と例外の範囲を定めるのは [Output feature doc](../output/DesignDoc_output.md)) で決定。表出を定めるのは [Output feature doc](../output/DesignDoc_output.md))。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) が定める。
 
 #### `SourceLocation`
 
@@ -144,6 +144,8 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 valid `error` record、非ゼロ exit、stdout の parse / schema error のいずれも request-level fatal であり、それ以前に受領した graph record と diagnostic を含む全成功候補を無効にする。Core は valid graph record を非公開 staging Graph へ 1-pass 変換し、exit `0`、fatal なし、stream 全体の参照完全性を確認した場合だけ公開する。fatal 時に保持してよい解析結果は共通 `error.details` に正規化された failure detail だけである。
 
 `diagnostic.severity` は `info` / `warning` / `partialFailure` とする。不正 JSONL、schema 不準拠、未対応 `schemaVersion` は Analyzer が表現する `error` ではなく、Core 側 validation error として扱う。
+
+**異常終了時の stderr の扱い**: Analyzer stderr は protocol record として parse しない (この契約は変更しない)。ただし Analyzer process が valid `error` record を出力せずに異常終了した場合に限り、Core は stderr の内容を診断ヒントとして照合してよい (例: `OutOfMemoryError` パターンを検知して heap 増加の対処を含むエラーを表示する)。ヒント抽出は終了後のエラー表示の補助であり、解析結果の解釈・graph 構築には一切使わない (未実装、実装は #82 で進行中。判断の正本は [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。
 
 ### 画面・デザイン
 
