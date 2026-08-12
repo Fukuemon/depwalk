@@ -5,7 +5,7 @@
 - Issue: `#82`
 - ステータス: `Draft`
 - 作成日: 2026-08-11
-- 更新日: 2026-08-12
+- 更新日: 2026-08-13
 - Branch: `feature/82`
 - Owner: Fukuemon
 
@@ -44,6 +44,7 @@
 | context     | engineering: 依存方向 gate / testing: 検証境界                       | 継承                                                                                                                     |
 | ADR-0004    | Runtime Trace 保留 / 根拠なき推測の禁止 / 観測可能性の方針           | 継承 (ソース根拠のある edge のみ追加。条件評価はしない)                                                                  |
 | ADR-0005    | SootUp + Spring DI 解決 (candidate edge / resolution / provenance)   | 補足 (イベント edge の候補列挙・曖昧扱いは DI 候補 edge の既存規則に揃える)                                              |
+| ADR-0006    | Gradle Tooling API discovery (daemon JVM 選択は Gradle に委任)       | 補足 (D11 の `gradleJavaHome` は明示 override の追加で暗黙の自動選択は導入しない。`discovery.md` へ追記提案)             |
 | ADR-0007    | レイヤードアーキテクチャ                                             | 継承                                                                                                                     |
 
 ## 関連資料
@@ -143,7 +144,7 @@ EARS 風の振る舞い記述は [requirements.md](requirements.md) の「受け
   - 根拠: PR が系統単位で独立して revert でき、各 prompt に fixture + unit + E2E を同梱できて D8 の検証境界と一致する。P3 は P1 と並列実装できる
   - トレードオフ / 却下した代替案: 基盤先行の 5 分割は P0 単独で利用者価値がなく過剰設計を誘発する。2 分割は java-analyzer 側 PR が肥大しレビューと revert が困難
 - **D9: chain 型解決の強化は「型伝播救済層」の追加で行う** (決定 2026-08-13)
-  - 実測根拠: 実環境検証プロジェクトの未解決 2,114 件の全件機械分類で、約 91% が stream / builder 連鎖・generics 局所変数の receiver 型導出失敗、method reference の一部が Lombok 生成 getter + SAM arity 推論失敗と判明。呼び先メソッド自体は bytecode に存在し、型さえ導出できれば既存 bytecode 救済 (#27/#30) が効く
+  - 実測根拠: 実環境検証プロジェクトの未解決診断 2,114 件 (outcome ledger の未解決終端 2,062 件 + DI「Bean 候補なし」52 件。requirements の件数注記と同定義) の全件機械分類で、約 91% が stream / builder 連鎖・generics 局所変数の receiver 型導出失敗、method reference の一部が Lombok 生成 getter + SAM arity 推論失敗と判明。呼び先メソッド自体は bytecode に存在し、型さえ導出できれば既存 bytecode 救済 (#27/#30) が効く
   - 方式: solver 失敗時に receiver 式の型を段階導出して既存救済へ接続する。① local 変数は宣言・初期化子の型 ② chain 途中は bytecode の generic signature (メソッド戻り型) ③ lambda parameter は functional interface の型引数。SAM arity も functional interface の bytecode から導出する
   - 制約: 常に型根拠を維持し、#31 が禁じた「宣言上の名前一意を根拠にする救済」には踏み込まない (R1 と整合)
   - トレードオフ / 却下した代替案: JavaParser solver 本体の補強は失敗箇所が内部に散在し副作用範囲が読めない。名前ベース救済の拡大は #31 の確定判断と正面衝突する
