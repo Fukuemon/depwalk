@@ -60,7 +60,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 - wrapper がない build: bundled version `9.6.1` を使用
 - custom provider: Gradle `7.6.5` API baseline、Java `--release 8`、classfile major 52。compile に使う再配布 API artifact (`dev.gradleplugins:gradle-api`) は `7.6.4` が最終のため `7.6.4` へ compile する (patch release は public API 不変であり、`7.6.5` より新しい API 参照を混入させない契約はより強く満たされる。確定 2026-07-18、決定経緯は [issue #24](https://github.com/Fukuemon/depwalk/issues/24))
 - Analyzer client JVM: JDK 25 固定
-- daemon JVM: target build の wrapper / Gradle 設定が選び、Gradle公式Java compatibility matrixに従う。depwalkはdownload・同梱・自動選択せず、Analyzer JDK 25を古いGradle daemonへ強制しない
+- daemon JVM: target build の wrapper / Gradle 設定が選び、Gradle公式Java compatibility matrixに従う。depwalkはdownload・同梱・自動選択せず、Analyzer JDK 25を古いGradle daemonへ強制しない。利用者は request `metadata.gradleJavaHome` (`--analyzer-meta gradleJavaHome=<path>`) で daemon JVM を明示 override できる (規則は [discovery.md](../design/features/java-analyzer/discovery.md))
 
 | CI anchor       | daemon JVM | 検証対象                                                      |
 | --------------- | ---------- | ------------------------------------------------------------- |
@@ -86,10 +86,10 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 - **SootUp 2.0.0 は classfile major 69 (Java 25) を読めない**。`guardQuery` が `unavailable` を返すため、bytecode 型階層補完と bytecode-only member 救済が例外なしに静かに無効化される (major 61 = Java 17 は読める)。解析対象 project の classes output が JDK 25 で compile されていると SootUp 依存の機能が効かないので、原因不明の `JAVA_INCOMPLETE_ANALYSIS` や候補 edge の欠落ではまず classes output の classfile version を疑う。test 内で `ToolProvider.getSystemJavaCompiler()` を使って fixture を compile するときは test JVM (JDK 25) の major になるため、`--release 17` を明示する。
 - **cross-version matrix の daemon JDK は Gradle toolchain (foojay resolver) の自動 provisioning で供給する** (`analyzers/java` の `gradleCompatibilityTest` task が `javaToolchains.launcherFor` で解決し system property で test へ渡す)。JDK 8 は arm64 macOS では Temurin が無く Zulu が供給される。anchor の JDK を解決できない場合は skip 成功にせず fail させる契約。daemon JVM の固定は一時 copy した fixture の `gradle.properties` へ `org.gradle.java.home` を書く方式が全対象 version で機能する。
 
-## 実環境解析の運用指針 (未実装分は #82 で進行中)
+## 実環境解析の運用指針
 
 - **Analyzer heap**: 既定 heap では中規模の実環境 multi-project (目安: call site 5 万規模) で `OutOfMemoryError` になり得る。`--analyzer-cmd` の java 起動に `-Xmx` を明示する (実測では `-Xmx8g` で 7 project / call site 52,411 を解析できた)。OOM 時の Core 側の対処付きエラー報告は [cli feature doc](../design/features/cli/DesignDoc_cli.md) が定める (判断の正本は [ADR-0012](../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))
-- **Gradle daemon JVM**: Analyzer JVM (JDK 25) が daemon に引き継がれると、対象 Gradle が古い場合に互換範囲外で discovery が失敗する (`JAVA_GRADLE_MODEL_ERROR` / daemon-jvm-incompatible)。回避は `--analyzer-meta gradleJavaHome=<互換 JDK の path>` の明示指定 (規則は [discovery.md](../design/features/java-analyzer/discovery.md))。未実装の間は対象プロジェクトの `gradle.properties` に `org.gradle.java.home` を一時設定する
+- **Gradle daemon JVM**: Analyzer JVM (JDK 25) が daemon に引き継がれると、対象 Gradle が古い場合に互換範囲外で discovery が失敗する (`JAVA_GRADLE_MODEL_ERROR` / daemon-jvm-incompatible)。回避は `--analyzer-meta gradleJavaHome=<互換 JDK の path>` の明示指定 (規則は [discovery.md](../design/features/java-analyzer/discovery.md))
 
 ## Scaffold Policy
 

@@ -197,6 +197,71 @@ class PreflightValidatorTest {
         return requestWithLanguageAndMetadataAndWorkspaceRoot(language, metadata, tempDir.toString());
     }
 
+    @Test
+    void gradleJavaHomeIsIgnoredOnExplicitSourceRoots() {
+        // Explicit roots bypass the Gradle runtime entirely, so the key is not
+        // interpreted (and not validated) on this path.
+        AnalysisRequest request = requestWithLanguageAndMetadata("java", Map.of(
+                "classpath", List.of(),
+                "gradleJavaHome", List.of("/no/such/home")));
+
+        PreflightValidator.Validated validated =
+                assertDoesNotThrow(() -> PreflightValidator.validate(request));
+        assertEquals(null, validated.gradleJavaHome());
+    }
+
+    @Test
+    void gradleJavaHomeAcceptsLaunchableJavaHomeOnDiscovery() throws IOException {
+        Path javaHome = tempDir.resolve("jdk");
+        Files.createDirectories(javaHome.resolve("bin"));
+        Path javaBinary = javaHome.resolve("bin").resolve("java");
+        Files.writeString(javaBinary, "");
+        assertTrue(javaBinary.toFile().setExecutable(true));
+
+        AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
+                "gradleJavaHome", List.of(javaHome.toString())));
+
+        PreflightValidator.Validated validated =
+                assertDoesNotThrow(() -> PreflightValidator.validate(request));
+        assertEquals(javaHome, validated.gradleJavaHome());
+    }
+
+    @Test
+    void gradleJavaHomeRejectsNonLaunchablePathOnDiscovery() {
+        AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
+                "gradleJavaHome", List.of(tempDir.resolve("missing").toString())));
+
+        AnalyzerFatalException e =
+                assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    @Test
+    void gradleJavaHomeRejectsWrongElementCountOnDiscovery() {
+        AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
+                "gradleJavaHome", List.of("/a", "/b")));
+
+        AnalyzerFatalException e =
+                assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+        assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode());
+    }
+
+    /** 自動 discovery 経路 (sourceRoots 未指定) の request。 */
+    private AnalysisRequest discoveryRequestWithMetadata(Map<String, Object> metadata) {
+        return new AnalysisRequest(
+                "1",
+                "analysisRequest",
+                "req-1",
+                tempDir.toString(),
+                null,
+                "java",
+                null,
+                null,
+                null,
+                null,
+                metadata);
+    }
+
     private static AnalysisRequest requestWithLanguageAndMetadataAndWorkspaceRoot(
             String language, Map<String, Object> metadata, String workspaceRoot) {
         return new AnalysisRequest(

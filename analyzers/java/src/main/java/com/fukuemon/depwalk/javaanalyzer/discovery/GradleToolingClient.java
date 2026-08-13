@@ -20,10 +20,22 @@ import java.util.Optional;
 public final class GradleToolingClient implements ToolingClient {
 
     private final String forcedGradleVersion;
+    private final java.io.File daemonJavaHome;
 
-    /** 通常経路: wrapper があれば build distribution、なければ同梱 version。 */
+    /**
+     * 通常経路: wrapper があれば build distribution、なければ同梱 version。
+     *
+     * @param daemonJavaHome Gradle daemon に使う JVM の java home (明示 override)。
+     *     null なら選択を Gradle に委ねる (従来挙動)。request の
+     *     {@code metadata.gradleJavaHome} に対応する (ADR-0012)
+     */
+    public GradleToolingClient(java.nio.file.Path daemonJavaHome) {
+        this.forcedGradleVersion = null;
+        this.daemonJavaHome = daemonJavaHome != null ? daemonJavaHome.toFile() : null;
+    }
+
     public GradleToolingClient() {
-        this(null);
+        this((java.nio.file.Path) null);
     }
 
     /**
@@ -34,15 +46,19 @@ public final class GradleToolingClient implements ToolingClient {
      */
     public GradleToolingClient(String forcedGradleVersion) {
         this.forcedGradleVersion = forcedGradleVersion;
+        this.daemonJavaHome = null;
     }
 
     @Override
     public BuildEnvironmentInfo buildEnvironment(Path workspaceRoot) throws ToolingRequestException {
         try (ProjectConnection connection = connect(workspaceRoot)) {
-            BuildEnvironment environment = connection.model(BuildEnvironment.class)
+            var launcher = connection.model(BuildEnvironment.class)
                     .setStandardOutput(OutputStream.nullOutputStream())
-                    .setStandardError(OutputStream.nullOutputStream())
-                    .get();
+                    .setStandardError(OutputStream.nullOutputStream());
+            if (daemonJavaHome != null) {
+                launcher.setJavaHome(daemonJavaHome);
+            }
+            BuildEnvironment environment = launcher.get();
             String gradleVersion = environment.getGradle().getGradleVersion();
             Optional<Integer> daemonJavaMajor =
                     javaMajorFromJavaHome(environment.getJava().getJavaHome());
@@ -57,11 +73,14 @@ public final class GradleToolingClient implements ToolingClient {
     @Override
     public DepwalkGradleModel model(Path workspaceRoot, Path initScript) throws ToolingRequestException {
         try (ProjectConnection connection = connect(workspaceRoot)) {
-            return connection.model(DepwalkGradleModel.class)
+            var launcher = connection.model(DepwalkGradleModel.class)
                     .withArguments("--init-script", initScript.toString())
                     .setStandardOutput(OutputStream.nullOutputStream())
-                    .setStandardError(OutputStream.nullOutputStream())
-                    .get();
+                    .setStandardError(OutputStream.nullOutputStream());
+            if (daemonJavaHome != null) {
+                launcher.setJavaHome(daemonJavaHome);
+            }
+            return launcher.get();
         } catch (RuntimeException e) {
             throw new ToolingRequestException(
                     DiscoveryFailure.Phase.MODEL_REQUEST,

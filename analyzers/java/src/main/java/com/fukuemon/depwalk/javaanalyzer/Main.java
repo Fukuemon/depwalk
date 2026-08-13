@@ -161,8 +161,8 @@ public final class Main {
                     workspaceRoot, request.sourceRoots(), validated.classpath(), request.metadata());
         }
         AnalysisContextFactory.rejectLanguageMetadataOnDiscovery(request.metadata());
-        DepwalkGradleModel model =
-                new GradleModelDiscovery(new GradleToolingClient(), errStream).discover(workspaceRoot);
+        DepwalkGradleModel model = new GradleModelDiscovery(
+                new GradleToolingClient(validated.gradleJavaHome()), errStream).discover(workspaceRoot);
         return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
     }
 

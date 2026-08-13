@@ -21,6 +21,7 @@ public final class PreflightValidator {
     private static final String METADATA_CLASSPATH = "classpath";
     private static final String METADATA_LIFT_EXCLUDE_PACKAGES = "liftExcludePackages";
     private static final String METADATA_ALLOW_INCOMPLETE_ANALYSIS = "allowIncompleteAnalysis";
+    private static final String METADATA_GRADLE_JAVA_HOME = "gradleJavaHome";
 
     private PreflightValidator() {
     }
@@ -38,8 +39,11 @@ public final class PreflightValidator {
      *     true のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、
      *     解決済み graph と診断を確認可能な形で公開する
      *     (java-analyzer feature doc「Parse・resolution・call 完全性」)
+     * @param gradleJavaHome {@code metadata.gradleJavaHome} の検証済み値 (自動 discovery 時のみ。
+     *     null は未指定 = daemon JVM の選択を Gradle に委ねる)。明示 {@code sourceRoots} 経路は
+     *     Gradle runtime を bypass するため解釈せず無視する (java-analyzer feature doc「metadata 契約」)
      */
-    public record Validated(List<String> classpath, boolean allowIncompleteAnalysis) {
+    public record Validated(List<String> classpath, boolean allowIncompleteAnalysis, Path gradleJavaHome) {
     }
 
     /**
@@ -85,12 +89,46 @@ public final class PreflightValidator {
 
         validateWorkspaceRoot(request.workspaceRoot());
         boolean allowIncompleteAnalysis = false;
+        Path gradleJavaHome = null;
         if (metadata != null) {
             validateLiftExcludePackages(metadata);
             allowIncompleteAnalysis = readAllowIncompleteAnalysis(metadata);
+            if (!explicitSourceRoots) {
+                gradleJavaHome = readGradleJavaHome(metadata);
+            }
         }
 
-        return new Validated(classpath, allowIncompleteAnalysis);
+        return new Validated(classpath, allowIncompleteAnalysis, gradleJavaHome);
+    }
+
+    /**
+     * {@code gradleJavaHome} は自動 discovery の Gradle daemon JVM を明示 override する
+     * (java-analyzer feature doc「metadata 契約」/ discovery.md、判断の正本は ADR-0012)。
+     * key 不在なら null (選択は Gradle に委ねる)。指定時は要素 1 の string で、実在する
+     * directory かつ {@code bin/java} を持つ java home でなければ
+     * {@code JAVA_INVALID_REQUEST} で fatal とする。
+     */
+    private static Path readGradleJavaHome(Map<String, Object> metadata) throws AnalyzerFatalException {
+        if (!metadata.containsKey(METADATA_GRADLE_JAVA_HOME)) {
+            return null;
+        }
+        Object raw = metadata.get(METADATA_GRADLE_JAVA_HOME);
+        if (raw instanceof List<?> rawList && rawList.size() == 1
+                && rawList.get(0) instanceof String value && !value.isBlank()) {
+            Path javaHome = Path.of(value);
+            boolean launchable = Files.isDirectory(javaHome)
+                    && (Files.isExecutable(javaHome.resolve("bin").resolve("java"))
+                            || Files.isExecutable(javaHome.resolve("bin").resolve("java.exe")));
+            if (launchable) {
+                return javaHome;
+            }
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.metadata.gradleJavaHome does not point to a launchable java home: " + value);
+        }
+        throw new AnalyzerFatalException(
+                JavaErrorCode.JAVA_INVALID_REQUEST,
+                "analysisRequest.metadata.gradleJavaHome must be a single-element array of a java home path");
     }
 
     /**
