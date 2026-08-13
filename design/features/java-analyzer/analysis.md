@@ -113,19 +113,21 @@ receiver 型が取得できない call は、次の順で分類を試みてか�
 
 SAM arity を推論できない method reference は救済しない。候補列挙は owner classfile の宣言 member に限られ継承 overload を検証できないため、宣言上の名前一意を参照先の一意の根拠にできない (diagnostic に残す保守側)。
 
-### 型伝播救済層 (未実装。実装は #82 で進行中)
+### 型伝播救済層
 
 上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
 
 1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
-2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する
-3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の functional interface の型引数 (bytecode の generic Signature 由来) から導出する
+2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する (`Collectors.toMap` / `groupingBy` の結果 Map、bound method reference の適用を含む)
+3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の receiver の要素型 (手段 2 で復元した型引数) から導出する
+
+JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う (解決済みの erasure と導出の erasure が食い違う場合は解決結果を正とする)。
 
 SAM arity も functional interface の bytecode から導出する (例: `java.util.function.Function#apply` = arity 1)。これにより arity 推論失敗による救済スキップを減らすが、「宣言上の名前一意を根拠にする救済はしない」保守側の原則は変更しない。
 
 適用順序: 本救済層は「呼び出し元の型が分からないとき」の既存規則群と同じ分類段階に統合する。手段 2 (chain link の generic signature) は既存規則 1 (chain の前進解決) の適用拡大、手段 3 (lambda parameter の型引数) は既存規則 3 (lambda parameter 規則) の前段の型導出であり、順序は「手段 1 (local 宣言・初期化子) → 規則 1 + 手段 2 → 手段 3 → 規則 2 (起点遡及の external 判定) → 規則 3 → diagnostic」とする。導出できた型は既存 bytecode 救済 / external 分類にそのまま渡す。
 
-## framework 由来の暗黙呼び出しの解決 (未実装。実装は #82 で進行中)
+## framework 由来の暗黙呼び出しの解決
 
 framework が実行時に起動する呼び出しを、ソース上の根拠 (アノテーション / 型 / AST) を伴う範囲で解決する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。解決不能は diagnostic に残し、`silentOmission == 0` を維持する。
 

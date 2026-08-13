@@ -58,6 +58,7 @@ final class BytecodeRescue {
     private final WorkspaceSourceDeclarationIndex declIndex;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
     private final ReachableOwners reachableOwners;
+    private final GenericChainTypes genericChainTypes;
 
     /**
      * @param sootUpIndex full classpath 視点の型階層・宣言 member 索引 (external chain の前進検証に使う)
@@ -74,6 +75,18 @@ final class BytecodeRescue {
         this.declIndex = declIndex;
         this.bytecodeIndex = bytecodeIndex;
         this.reachableOwners = reachableOwners;
+        this.genericChainTypes = new GenericChainTypes(bytecodeIndex);
+    }
+
+    /**
+     * generic 前進導出 (手段②③) による receiver の owner 型。erasure だけの
+     * {@link #chainForwardOwner} で辿れない JDK stream / collection 連鎖と
+     * lambda parameter を、宣言型・classfile Signature・JDK の宣言済み generic
+     * 意味論の固定表で導出する。導出できなければ null。
+     */
+    String genericChainOwner(Expression scope) {
+        GenericChainTypes.Model model = genericChainTypes.typeOf(scope);
+        return model != null ? model.binaryName() : null;
     }
 
     /**

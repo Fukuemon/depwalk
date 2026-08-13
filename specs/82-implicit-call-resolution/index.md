@@ -368,6 +368,18 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | P6    | `java-analyzer` | daemon JVM 指定 `gradleJavaHome` (D11) + 回避手順の文書化                        | なし                   |
 | P7    | `core`          | OOM パターン検知と対処付きエラー報告 (D10) + heap 指針の文書化                   | なし                   |
 
+### P5 の実測記録 (V5 判定)
+
+実環境検証プロジェクトの再計測 (2026-08-14、手順は context/toolchain.md「実環境解析の運用指針」):
+
+| 指標                                      | 実装前 (基準) | 実装後      |
+| ----------------------------------------- | ------------- | ----------- |
+| ledger 未解決終端 (call site 52,411 分母) | 2,062 (3.9%)  | 714 (1.36%) |
+| unresolvedSymbols counter                 | 2,114         | 766         |
+| silentOmission                            | 0             | 0           |
+
+**V5 (2.0% 以下) を達成**。寄与は、同一 compilation unit 内の bytecode-only member 参照の AST 注入 (2,114 → 1,403) と、型伝播救済層の generic 前進導出 = chain generic Signature 伝播 + lambda parameter 型導出 (1,403 → 766)。
+
 ### prompts 生成方針
 
 - P1 → {P2, P4} の依存、P3 / P5 / P6 / P7 は独立。P1 完了後は全系統を並列実装できる
@@ -399,6 +411,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | java-analyzer `analysis.md` / `protocol-mapping.md` (callable 追跡)                           | 追跡範囲 (同一メソッド内 + 引数渡し 1 段) と edge 意味論 (method reference → 参照先 / lambda → 囲みメソッド + 標識) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                                                 | D1 / D5 で確定した追跡・表現規則の正本反映                  |
 | analyzer-protocol feature doc (Analyzer 異常終了時の扱い) / cli feature doc (エラー表示)      | Core が analyzer 異常終了時に stderr の OOM パターンを検知し対処付きエラーで報告する挙動を追記 (source: track D10)。stderr を protocol record として parse しない既存契約は変更しない (終了後の診断ヒント抽出のみ)。**反映済** (sync 2026-08-13)                         | D10 の Core 側恒久挙動の正本を design に置く                |
 | java-analyzer `analysis.md` (callable invocation の制約)                                      | 実装で確定した追跡制約 (functional interface 限定 / 再代入・constructor 実体・override 越し・varargs・constructor 引数は対象外 / 未追跡 SAM invocation は advisory 診断) を追記 (source: 実装 P3)。**反映済**                                                            | 実装と正本の drift 防止                                     |
+| java-analyzer `analysis.md` (solver 層の bytecode member 合成)                                | AST への member 注入 (同一 compilation unit 内参照と solver 内部 AST 直接構築宣言の解決) の契約を追記 (source: 実装 P5。実環境の最小再現で、未解決の支配形状が TypeSolver を経由しない同一 CU 内参照と判明したため)。**反映済**                                          | solver 層合成の構造的盲点への対処を正本へ反映する           |
 
 ### context への影響
 

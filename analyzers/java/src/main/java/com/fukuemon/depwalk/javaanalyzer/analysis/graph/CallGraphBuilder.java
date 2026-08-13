@@ -343,6 +343,11 @@ public final class CallGraphBuilder {
             if (receiverOwner == null && mce.getScope().isPresent()) {
                 String forwardOwner =
                         bytecodeRescue.chainForwardOwner(mce.getScope().get(), ctx.enclosingTypeNode());
+                if (forwardOwner == null) {
+                    // erasure の前進解決で辿れない JDK stream / collection 連鎖と
+                    // lambda parameter は、generic 前進導出 (手段②③) で owner を復元する。
+                    forwardOwner = bytecodeRescue.genericChainOwner(mce.getScope().get());
+                }
                 if (forwardOwner != null) {
                     if (declIndex.find(forwardOwner).isEmpty()) {
                         commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
