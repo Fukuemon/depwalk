@@ -23,6 +23,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EventListenerIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiagnosticEmitter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
@@ -185,6 +186,7 @@ public final class AnalysisRunner {
 
         SpringDiIndex springDiIndex = createSpringDiIndex(contexts, scope);
         EntryPointIndex entryPointIndex = new EntryPointIndex();
+        EventListenerIndex eventListenerIndex = new EventListenerIndex();
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot, entryPointIndex);
         GraphAccumulator accumulator = new GraphAccumulator();
         // resolver とは独立した call-site inventory と source 宣言索引
@@ -203,6 +205,9 @@ public final class AnalysisRunner {
             // Annotation resolution failures are swallowed inside SpringAnnotations.fqn,
             // so this accept introduces no new fatal path (no try/catch needed).
             entryPointIndex.accept(unit);
+            // Listener declarations that fail to resolve are skipped inside accept;
+            // the second pass diagnoses them through the normal declaration path.
+            eventListenerIndex.accept(unit);
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
@@ -244,7 +249,8 @@ public final class AnalysisRunner {
                     ledger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
-                    reachable));
+                    reachable,
+                    eventListenerIndex));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);

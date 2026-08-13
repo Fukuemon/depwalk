@@ -13,7 +13,9 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EventListenerIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
+import com.fukuemon.depwalk.javaanalyzer.protocol.Diagnostic;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
 
@@ -39,6 +41,7 @@ import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclarat
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.types.ResolvedIntersectionType;
+import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.nio.file.Path;
@@ -74,6 +77,7 @@ public final class CallGraphBuilder {
     private final MethodSymbolFactory methodSymbols;
     private final BytecodeRescue bytecodeRescue;
     private final SpringInjectionMatcher springInjections;
+    private final EventListenerIndex eventListenerIndex;
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
     private final WorkspaceSourceDeclarationIndex declIndex;
@@ -102,7 +106,8 @@ public final class CallGraphBuilder {
             CallSiteOutcomeLedger ledger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
-            Set<String> reachableContextIds) {
+            Set<String> reachableContextIds,
+            EventListenerIndex eventListenerIndex) {
         this.sourceLocations = new SourceLocations(workspaceRoot);
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
@@ -115,6 +120,7 @@ public final class CallGraphBuilder {
         this.declIndex = declIndex;
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
+        this.eventListenerIndex = eventListenerIndex;
     }
 
     /**
@@ -295,6 +301,10 @@ public final class CallGraphBuilder {
     // ------------------------------------------------------------------
 
     private void processMethodCall(MethodCallExpr mce, WalkContext ctx) {
+        // Event edges are additional to the normal outcome of this call site: the
+        // publishEvent call itself typically terminates as an excluded external target,
+        // while the listener edges below are emitted outside the outcome ledger.
+        emitEventEdges(mce, ctx);
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
@@ -968,6 +978,112 @@ public final class CallGraphBuilder {
                 accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
             }
         }
+    }
+
+    private static final String EVENT_PUBLISHER_TYPE = "org.springframework.context.ApplicationEventPublisher";
+
+    /**
+     * publish → listener の candidate edge を生成する (broadcast 意味論、ADR-0012)。
+     * caller は call site の囲みメソッド、callee は引数の静的型とその型階層 (raw 近似)
+     * に合致する listener。無条件 listener は複数でも各々 unique、条件付きのみ ambiguous。
+     * receiver が publisher と確認できない場合は対象外 (edge も診断も出さない保守側)。
+     */
+    private void emitEventEdges(MethodCallExpr mce, WalkContext ctx) {
+        if (!"publishEvent".equals(mce.getNameAsString())
+                || mce.getArguments().size() != 1
+                || eventListenerIndex.isEmpty()) {
+            return;
+        }
+        Expression scope = mce.getScope().orElse(null);
+        if (scope == null || !isEventPublisher(scope)) {
+            return;
+        }
+        List<String> eventTypes;
+        try {
+            ResolvedType argType = mce.getArgument(0).calculateResolvedType();
+            eventTypes = argType.isReferenceType() ? typeAndAncestors(argType.asReferenceType()) : List.of();
+        } catch (RuntimeException | LinkageError e) {
+            eventTypes = null;
+        }
+        if (eventTypes == null || eventTypes.isEmpty()) {
+            // Advisory diagnostic outside the outcome ledger: the call site itself is
+            // still classified by the normal path. The message stays free of source text.
+            accumulator.addDiagnostic(Diagnostic.of(
+                    JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.severity(),
+                    JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.code(),
+                    "failed to resolve the event argument type of publishEvent",
+                    sourceLocations.sourceLocationOf(mce),
+                    ctx.callerMethodIds().isEmpty() ? null : ctx.callerMethodIds().get(0),
+                    null));
+            return;
+        }
+
+        Map<String, EventListenerIndex.Listener> matched = new LinkedHashMap<>();
+        for (String eventType : eventTypes) {
+            for (EventListenerIndex.Listener listener : eventListenerIndex.listenersFor(eventType)) {
+                matched.putIfAbsent(
+                        listener.declaringType() + "#" + listener.methodName()
+                                + "(" + String.join(",", listener.parameterTypes()) + ")",
+                        listener);
+            }
+        }
+        if (matched.isEmpty()) {
+            return;
+        }
+        SourceLocation callSite = sourceLocations.sourceLocationOf(mce);
+        for (EventListenerIndex.Listener listener : matched.values()) {
+            MethodSymbol listenerSymbol = methodSymbols.buildCandidateMethodSymbol(
+                    new SootUpTypeHierarchyIndex.MethodCandidate(
+                            listener.declaringType(), listener.methodName(), listener.parameterTypes()));
+            accumulator.addNode(listenerSymbol);
+            boolean conditional = !listener.conditionTypes().isEmpty();
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("resolution", conditional ? "ambiguous" : "unique");
+            metadata.put("provenance", List.of("spring-event"));
+            if (conditional) {
+                metadata.put("conditional", true);
+                metadata.put("conditionTypes", listener.conditionTypes());
+            }
+            for (String callerId : edgeCallers(mce, ctx)) {
+                accumulator.addEdge(callerId, listenerSymbol.methodId(), callSite, metadata);
+            }
+        }
+    }
+
+    /** receiver の静的型が {@code ApplicationEventPublisher} またはその subtype かを判定する。 */
+    private static boolean isEventPublisher(Expression scope) {
+        try {
+            ResolvedType type = scope.calculateResolvedType();
+            if (!type.isReferenceType()) {
+                return false;
+            }
+            ResolvedReferenceType reference = type.asReferenceType();
+            if (EVENT_PUBLISHER_TYPE.equals(reference.getQualifiedName())) {
+                return true;
+            }
+            for (ResolvedReferenceType ancestor : reference.getAllAncestors()) {
+                if (EVENT_PUBLISHER_TYPE.equals(ancestor.getQualifiedName())) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
+    /** 引数の静的型とその型階層の raw binary name 列 (解決できた ancestor のみの best effort)。 */
+    private static List<String> typeAndAncestors(ResolvedReferenceType reference) {
+        Set<String> types = new LinkedHashSet<>();
+        types.add(BinaryNames.erasureOf(reference));
+        try {
+            for (ResolvedReferenceType ancestor : reference.getAllAncestors()) {
+                types.add(BinaryNames.erasureOf(ancestor));
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // Partially resolvable hierarchies keep the resolvable prefix (raw approximation).
+        }
+        return List.copyOf(types);
     }
 
     private static void addSootCandidates(

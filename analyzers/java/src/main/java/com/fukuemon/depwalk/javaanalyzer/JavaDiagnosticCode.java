@@ -26,7 +26,10 @@ public enum JavaDiagnosticCode {
     JAVA_AMBIGUOUS_CANDIDATE("warning"),
 
     /** 条件付き Bean の実行時条件を評価せず候補として保持した。 */
-    JAVA_CONDITIONAL_BEAN("info");
+    JAVA_CONDITIONAL_BEAN("info"),
+
+    /** {@code publishEvent} の引数型が静的に解決できず、イベント edge を張れない。 */
+    JAVA_EVENT_UNRESOLVED("warning");
 
     private final String severity;
 
