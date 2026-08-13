@@ -22,28 +22,15 @@ import java.util.TreeSet;
  */
 public final class EntryPointIndex {
 
-    static final Set<String> ENTRY_POINT_ANNOTATIONS = Set.of(
-            "org.springframework.scheduling.annotation.Scheduled",
-            "javax.annotation.PostConstruct",
-            "jakarta.annotation.PostConstruct",
-            "javax.annotation.PreDestroy",
-            "jakarta.annotation.PreDestroy",
-            "org.springframework.context.event.EventListener",
-            "org.springframework.transaction.event.TransactionalEventListener",
-            "org.springframework.web.bind.annotation.RequestMapping",
-            "org.springframework.web.bind.annotation.GetMapping",
-            "org.springframework.web.bind.annotation.PostMapping",
-            "org.springframework.web.bind.annotation.PutMapping",
-            "org.springframework.web.bind.annotation.DeleteMapping",
-            "org.springframework.web.bind.annotation.PatchMapping",
-            "org.springframework.web.bind.annotation.ExceptionHandler",
-            "org.springframework.web.bind.annotation.ModelAttribute");
+    private static final Set<String> ENTRY_POINT_ANNOTATIONS = SpringAnnotations.ENTRY_POINT_ANNOTATIONS;
 
     private final Map<String, Set<String>> composedToEntryPoints = new LinkedHashMap<>();
 
     /**
      * First pass: record user-defined annotations that directly carry an entry point
-     * annotation (one meta level only).
+     * annotation (one meta level only). Duplicated declarations keep the first entry
+     * (first-wins, consistent with the other first-pass indexes). Local annotation
+     * declarations without a resolvable qualified name are skipped.
      */
     public void accept(CompilationUnit unit) {
         for (AnnotationDeclaration declaration : unit.findAll(AnnotationDeclaration.class)) {
@@ -56,7 +43,7 @@ public final class EntryPointIndex {
             }
             if (!carried.isEmpty()) {
                 declaration.getFullyQualifiedName()
-                        .ifPresent(fqn -> composedToEntryPoints.put(fqn, Set.copyOf(carried)));
+                        .ifPresent(fqn -> composedToEntryPoints.putIfAbsent(fqn, Set.copyOf(carried)));
             }
         }
     }
@@ -64,15 +51,33 @@ public final class EntryPointIndex {
     /**
      * Entry point annotation FQNs detected on the node, sorted and deduplicated.
      * Composed annotations contribute the carried entry point FQN, not their own name,
-     * so the marker always names a known framework annotation.
+     * so the marker always names a known framework annotation. Only method-level
+     * annotations are inspected by callers; type-level mappings are out of scope.
      */
     public List<String> entryPointsOf(NodeWithAnnotations<?> node) {
-        Set<String> found = new TreeSet<>();
+        return entryPointsOfAnnotationFqns(annotationFqnsOf(node));
+    }
+
+    /**
+     * Raw annotation FQNs of the node, for callers that must resolve annotations
+     * eagerly but map them to entry points later (the composed-annotation map may
+     * not be complete until every compilation unit has been accepted).
+     */
+    public List<String> annotationFqnsOf(NodeWithAnnotations<?> node) {
+        List<String> fqns = new java.util.ArrayList<>();
         for (AnnotationExpr annotation : node.getAnnotations()) {
             String fqn = SpringAnnotations.fqn(annotation);
-            if (fqn == null) {
-                continue;
+            if (fqn != null) {
+                fqns.add(fqn);
             }
+        }
+        return List.copyOf(fqns);
+    }
+
+    /** Maps already-resolved annotation FQNs to entry point FQNs (sorted, deduplicated). */
+    public List<String> entryPointsOfAnnotationFqns(List<String> annotationFqns) {
+        Set<String> found = new TreeSet<>();
+        for (String fqn : annotationFqns) {
             if (ENTRY_POINT_ANNOTATIONS.contains(fqn)) {
                 found.add(fqn);
                 continue;

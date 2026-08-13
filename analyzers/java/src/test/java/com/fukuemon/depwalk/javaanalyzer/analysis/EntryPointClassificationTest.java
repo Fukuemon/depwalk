@@ -61,6 +61,23 @@ class EntryPointClassificationTest {
     }
 
     @Test
+    void listenerKeepsMarkerEvenWithCallerEdges() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
+        assertEquals(0, ran.exitCode(), ran.stderr());
+
+        // The marker means "the framework may invoke this directly" and is independent
+        // of caller edges: a directly-called listener carries both.
+        assertEquals(
+                List.of("org.springframework.context.event.EventListener"),
+                entryPointOf(ran, "java:com.example.Listener#onEvent()"));
+        assertTrue(ran.byType("callEdge").stream().anyMatch(edge ->
+                        "java:com.example.Listener#invokeDirectly()".equals(edge.get("callerMethodId"))
+                                && "java:com.example.Listener#onEvent()".equals(edge.get("calleeMethodId"))),
+                "direct call to the listener must stay an edge");
+    }
+
+    @Test
     void classificationAddsNoEdgesAndKeepsPlainMethodsUnmarked() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
@@ -69,12 +86,11 @@ class EntryPointClassificationTest {
         assertNull(entryPointOf(ran, "java:com.example.Api#plain()"));
         assertNull(entryPointOf(ran, "java:com.example.Jobs#helper()"));
 
-        // Only real source calls become edges: init -> helper and nightly -> helper.
+        // Only real source calls become edges. The fixture has exactly three call
+        // expressions (Jobs.init -> helper, Jobs.nightly -> helper,
+        // Listener.invokeDirectly -> onEvent); annotations add none.
         List<Map<String, Object>> edges = ran.byType("callEdge");
-        assertEquals(2, edges.size(), "entry point classification must not add edges: " + edges);
-        for (Map<String, Object> edge : edges) {
-            assertEquals("java:com.example.Jobs#helper()", edge.get("calleeMethodId"));
-        }
+        assertEquals(3, edges.size(), "entry point classification must not add edges: " + edges);
     }
 
     @SuppressWarnings("unchecked")

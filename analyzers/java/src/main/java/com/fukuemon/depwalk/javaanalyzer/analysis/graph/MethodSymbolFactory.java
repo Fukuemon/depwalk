@@ -4,7 +4,6 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResult;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
-import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
 
@@ -13,7 +12,6 @@ import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.CompactConstructorDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.RecordDeclaration;
-import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 
@@ -33,19 +31,16 @@ final class MethodSymbolFactory {
     private final SourceLocations sourceLocations;
     private final SourceMethodIndex sourceMethodIndex;
     private final ReachableOwners reachableOwners;
-    private final EntryPointIndex entryPointIndex;
 
     MethodSymbolFactory(
             GraphAccumulator accumulator,
             SourceLocations sourceLocations,
             SourceMethodIndex sourceMethodIndex,
-            ReachableOwners reachableOwners,
-            EntryPointIndex entryPointIndex) {
+            ReachableOwners reachableOwners) {
         this.accumulator = accumulator;
         this.sourceLocations = sourceLocations;
         this.sourceMethodIndex = sourceMethodIndex;
         this.reachableOwners = reachableOwners;
-        this.entryPointIndex = entryPointIndex;
     }
 
     MethodSymbol buildMethodSymbol(AttributionResult attribution, ResolvedMethodDeclaration resolved) {
@@ -60,13 +55,13 @@ final class MethodSymbolFactory {
         if (attribution.outcome() == AttributionResult.Outcome.SCOPE_INTERNAL) {
             Node ast = resolved.toAst().orElse(null);
             sourceLocation = ast != null ? sourceLocations.sourceLocationOf(ast) : null;
-            // Every path that builds this symbol (declaration walk or call-site callee)
-            // reaches the same AST, so first-wins node dedupe never drops the marker.
-            if (ast instanceof NodeWithAnnotations<?> annotated) {
-                List<String> entryPoints = entryPointIndex.entryPointsOf(annotated);
-                if (!entryPoints.isEmpty()) {
-                    metadata = Map.of("entryPoint", entryPoints);
-                }
+            // The marker is looked up by methodId, not from the AST, so every build path
+            // (declaration walk, call-site callee even when toAst() is empty, candidate
+            // remapping via SourceMethodIndex.find) yields the same metadata and the
+            // first-wins node dedupe cannot drop it.
+            List<String> entryPoints = sourceMethodIndex.entryPointsFor(methodId);
+            if (!entryPoints.isEmpty()) {
+                metadata = Map.of("entryPoint", entryPoints);
             }
         } else if (attribution.outcome() == AttributionResult.Outcome.LIFTED) {
             metadata = Map.of(

@@ -185,7 +185,7 @@ public final class AnalysisRunner {
 
         SpringDiIndex springDiIndex = createSpringDiIndex(contexts, scope);
         EntryPointIndex entryPointIndex = new EntryPointIndex();
-        SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
+        SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot, entryPointIndex);
         GraphAccumulator accumulator = new GraphAccumulator();
         // resolver とは独立した call-site inventory と source 宣言索引
         // (adr/0005-adopt-sootup-and-spring-di-resolution.md)。
@@ -200,6 +200,8 @@ public final class AnalysisRunner {
             // inventory / 宣言索引の不変条件違反は diagnostic へ降格せず internal fatal のまま伝播させる。
             inventory.accept(unit);
             declIndex.accept(unit, contextByFile.get(file).id());
+            // Annotation resolution failures are swallowed inside SpringAnnotations.fqn,
+            // so this accept introduces no new fatal path (no try/catch needed).
             entryPointIndex.accept(unit);
             try {
                 springDiIndex.accept(unit);
@@ -242,8 +244,7 @@ public final class AnalysisRunner {
                     ledger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
-                    reachable,
-                    entryPointIndex));
+                    reachable));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);

@@ -33,6 +33,28 @@ final class SpringAnnotations {
             "org.springframework.web.bind.annotation.RestController",
             CONFIGURATION);
 
+    /**
+     * Framework entry point annotations: methods the framework may invoke directly.
+     * The marker semantics and the composed-annotation detection live in
+     * {@link EntryPointIndex}; this set is the single source of the FQNs.
+     */
+    static final Set<String> ENTRY_POINT_ANNOTATIONS = Set.of(
+            "org.springframework.scheduling.annotation.Scheduled",
+            "javax.annotation.PostConstruct",
+            "jakarta.annotation.PostConstruct",
+            "javax.annotation.PreDestroy",
+            "jakarta.annotation.PreDestroy",
+            "org.springframework.context.event.EventListener",
+            "org.springframework.transaction.event.TransactionalEventListener",
+            "org.springframework.web.bind.annotation.RequestMapping",
+            "org.springframework.web.bind.annotation.GetMapping",
+            "org.springframework.web.bind.annotation.PostMapping",
+            "org.springframework.web.bind.annotation.PutMapping",
+            "org.springframework.web.bind.annotation.DeleteMapping",
+            "org.springframework.web.bind.annotation.PatchMapping",
+            "org.springframework.web.bind.annotation.ExceptionHandler",
+            "org.springframework.web.bind.annotation.ModelAttribute");
+
     private SpringAnnotations() {
     }
 
@@ -152,7 +174,7 @@ final class SpringAnnotations {
                 || QUALIFIER.equals(fqn)
                 || SPRING_CONDITIONAL.equals(fqn)
                 || STEREOTYPES.contains(fqn)
-                || EntryPointIndex.ENTRY_POINT_ANNOTATIONS.contains(fqn)
+                || ENTRY_POINT_ANNOTATIONS.contains(fqn)
                 || fqn.startsWith("org.springframework.boot.autoconfigure.condition.Conditional");
     }
 

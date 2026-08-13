@@ -135,7 +135,7 @@ framework が実行時に起動する呼び出しを、ソース上の根拠 (�
 - イベント: `org.springframework.context.event.EventListener` / `org.springframework.transaction.event.TransactionalEventListener`
 - Web (すべて `org.springframework.web.bind.annotation` 配下): `RequestMapping` + Spring 提供 composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
 
-利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。2 段以上の入れ子は検出できず、診断も出せないため制約として扱う。
+利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。次はいずれも検出対象外で、診断も出さない制約とする: 2 段以上の入れ子 / 型 level の mapping アノテーション (メソッド level のみ対象) / nested・local に宣言された合成アノテーション / 合成アノテーションの利用側 FQN が型解決・import 復元のいずれでも得られない場合。
 
 ### イベント edge
 

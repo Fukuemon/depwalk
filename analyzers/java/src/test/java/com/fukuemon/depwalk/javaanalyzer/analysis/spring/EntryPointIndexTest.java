@@ -57,6 +57,73 @@ class EntryPointIndexTest {
     }
 
     @Test
+    void detectsListenerAndRemainingWebAnnotations() {
+        CompilationUnit unit = StaticJavaParser.parse("""
+                package com.example;
+
+                import org.springframework.context.event.EventListener;
+                import org.springframework.transaction.event.TransactionalEventListener;
+                import org.springframework.web.bind.annotation.DeleteMapping;
+                import org.springframework.web.bind.annotation.PatchMapping;
+                import org.springframework.web.bind.annotation.PutMapping;
+                import org.springframework.web.bind.annotation.RequestMapping;
+
+                class Handlers {
+                    @EventListener void onEvent() { }
+                    @TransactionalEventListener void afterCommit() { }
+                    @RequestMapping("/x") void root() { }
+                    @PutMapping("/x") void put() { }
+                    @DeleteMapping("/x") void delete() { }
+                    @PatchMapping("/x") void patch() { }
+                }
+                """);
+        EntryPointIndex index = new EntryPointIndex();
+        index.accept(unit);
+        ClassOrInterfaceDeclaration type = unit.getClassByName("Handlers").orElseThrow();
+
+        assertEquals(
+                List.of("org.springframework.context.event.EventListener"),
+                entryPointsOf(index, type, "onEvent"));
+        assertEquals(
+                List.of("org.springframework.transaction.event.TransactionalEventListener"),
+                entryPointsOf(index, type, "afterCommit"));
+        assertEquals(
+                List.of("org.springframework.web.bind.annotation.RequestMapping"),
+                entryPointsOf(index, type, "root"));
+        assertEquals(
+                List.of("org.springframework.web.bind.annotation.PutMapping"),
+                entryPointsOf(index, type, "put"));
+        assertEquals(
+                List.of("org.springframework.web.bind.annotation.DeleteMapping"),
+                entryPointsOf(index, type, "delete"));
+        assertEquals(
+                List.of("org.springframework.web.bind.annotation.PatchMapping"),
+                entryPointsOf(index, type, "patch"));
+    }
+
+    @Test
+    void ambiguousWildcardImportsAcrossJavaxAndJakartaDetectNothing() {
+        // Wildcard import recovery refuses ambiguous candidates: with both javax and
+        // jakarta star imports the simple name maps to two known FQNs, so no marker
+        // (and no diagnostic) is produced. This pins the conservative behavior.
+        CompilationUnit unit = StaticJavaParser.parse("""
+                package com.example;
+
+                import jakarta.annotation.*;
+                import javax.annotation.*;
+
+                class Ambiguous {
+                    @PostConstruct void init() { }
+                }
+                """);
+        EntryPointIndex index = new EntryPointIndex();
+        index.accept(unit);
+        ClassOrInterfaceDeclaration type = unit.getClassByName("Ambiguous").orElseThrow();
+
+        assertTrue(entryPointsOf(index, type, "init").isEmpty());
+    }
+
+    @Test
     void detectsEntryPointAnnotationsFromWildcardImports() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;
