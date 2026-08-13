@@ -20,7 +20,7 @@ import java.util.Optional;
 public final class GradleToolingClient implements ToolingClient {
 
     private final String forcedGradleVersion;
-    private final java.io.File daemonJavaHome;
+    private final File daemonJavaHome;
 
     /**
      * 通常経路: wrapper があれば build distribution、なければ同梱 version。
@@ -29,13 +29,8 @@ public final class GradleToolingClient implements ToolingClient {
      *     null なら選択を Gradle に委ねる (従来挙動)。request の
      *     {@code metadata.gradleJavaHome} に対応する (ADR-0012)
      */
-    public GradleToolingClient(java.nio.file.Path daemonJavaHome) {
-        this.forcedGradleVersion = null;
-        this.daemonJavaHome = daemonJavaHome != null ? daemonJavaHome.toFile() : null;
-    }
-
-    public GradleToolingClient() {
-        this((java.nio.file.Path) null);
+    public GradleToolingClient(Path daemonJavaHome) {
+        this(null, daemonJavaHome);
     }
 
     /**
@@ -45,8 +40,13 @@ public final class GradleToolingClient implements ToolingClient {
      * @param forcedGradleVersion 強制する Gradle version。{@code null} なら通常経路
      */
     public GradleToolingClient(String forcedGradleVersion) {
+        this(forcedGradleVersion, null);
+    }
+
+    /** matrix test が forced version と daemon java home を同時に使うための combined 形。 */
+    GradleToolingClient(String forcedGradleVersion, Path daemonJavaHome) {
         this.forcedGradleVersion = forcedGradleVersion;
-        this.daemonJavaHome = null;
+        this.daemonJavaHome = daemonJavaHome != null ? daemonJavaHome.toFile() : null;
     }
 
     @Override

@@ -237,6 +237,16 @@ class PreflightValidatorTest {
     }
 
     @Test
+    void gradleJavaHomeRejectsBlankAndNonStringAndEmptyOnDiscovery() {
+        for (Object value : List.of(List.of(" "), List.of(42), List.of())) {
+            AnalysisRequest request = discoveryRequestWithMetadata(Map.of("gradleJavaHome", value));
+            AnalyzerFatalException e =
+                    assertThrows(AnalyzerFatalException.class, () -> PreflightValidator.validate(request));
+            assertEquals(JavaErrorCode.JAVA_INVALID_REQUEST, e.errorCode(), String.valueOf(value));
+        }
+    }
+
+    @Test
     void gradleJavaHomeRejectsWrongElementCountOnDiscovery() {
         AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
                 "gradleJavaHome", List.of("/a", "/b")));

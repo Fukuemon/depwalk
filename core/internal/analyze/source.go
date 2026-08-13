@@ -48,7 +48,7 @@ func (o Outcome) Err() error {
 		if o.HeapExhausted {
 			return fmt.Errorf(
 				"analyzer process exited with code %d: the analyzer ran out of heap (OutOfMemoryError); "+
-					"add or increase -Xmx on the java command in --analyzer-cmd", o.ExitCode)
+					"add or increase -Xmx on the java command in --analyzer-cmd (or DEPWALK_ANALYZER_CMD)", o.ExitCode)
 		}
 		return fmt.Errorf("analyzer process exited with code %d", o.ExitCode)
 	}

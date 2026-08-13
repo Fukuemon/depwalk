@@ -73,7 +73,7 @@ flag は 2 群に分かれ、互いに独立している。
 
 - Cobra 既定 (RunE エラーを常に exit 1) に委ねず、CLI 層でエラー種別を判別して 0/1/2 を返す。
 - エラーメッセージ・候補一覧・diagnostics は stderr、探索結果のみ stdout (JSON の機械パース性の保護)。
-- Analyzer が valid `error` record なしで異常終了した場合、stderr の `OutOfMemoryError` パターンを検知したときは「analyzer の heap 不足。`--analyzer-cmd` の `-Xmx` を増やす」という対処を含むエラーを表示する (exit 1。検知規則の契約は [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の「異常終了時の stderr の扱い」)。
+- Analyzer が valid `error` record なしで異常終了した場合、stderr の `java.lang.OutOfMemoryError` パターンを検知したときは「analyzer の heap 不足。`--analyzer-cmd` (または `DEPWALK_ANALYZER_CMD`) の java 起動に `-Xmx` を追加・増加する」という対処を含むエラーを表示する (exit 1。検知規則の契約は [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の「異常終了時の stderr の扱い」)。
 
 ## テスト (CLI プロセス E2E)
 

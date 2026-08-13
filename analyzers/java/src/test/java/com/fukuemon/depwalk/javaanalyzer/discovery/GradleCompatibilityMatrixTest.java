@@ -36,30 +36,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("gradle-compat")
 class GradleCompatibilityMatrixTest {
 
-    @ParameterizedTest(name = "Gradle {0} / daemon JDK {1}")
+    @ParameterizedTest(name = "Gradle {0} / daemon JDK {1} (gradleJavaHome={2})")
     @CsvSource({
-            "7.6.5, 8",
-            "8.14.5, 17",
-            "9.6.1, 25",
+            // 7.6.5 anchor は request metadata 相当の gradleJavaHome 経路で daemon JVM を
+            // 固定し、override が gradle.properties と等価に機能することを検証する。
+            "7.6.5, 8, true",
+            "8.14.5, 17, false",
+            "9.6.1, 25, false",
     })
-    void discoversTheSameModelOnEachAnchor(String gradleVersion, int daemonJavaMajor) throws Exception {
+    void discoversTheSameModelOnEachAnchor(
+            String gradleVersion, int daemonJavaMajor, boolean viaGradleJavaHome) throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk" + daemonJavaMajor);
         assertNotNull(jdkHome, "daemon JDK " + daemonJavaMajor
                 + " was not provisioned; run via ./gradlew gradleCompatibilityTest");
 
-        // fixture を一時 copy し、daemon JVM を gradle.properties で固定する。
+        // fixture を一時 copy し、daemon JVM を gradle.properties または
+        // gradleJavaHome override で固定する。
         Path source = Path.of("..", "..", "testdata", "fixtures", "java", "multi-module-spring-project")
                 .toAbsolutePath().normalize();
         Path workspace = Files.createTempDirectory("depwalk-matrix-" + gradleVersion + "-").toRealPath();
         try {
             copyFixture(source, workspace);
-            Files.writeString(workspace.resolve("gradle.properties"),
-                    "org.gradle.java.home=" + jdkHome + "\n");
+            GradleToolingClient client;
+            if (viaGradleJavaHome) {
+                client = new GradleToolingClient(gradleVersion, Path.of(jdkHome));
+            } else {
+                Files.writeString(workspace.resolve("gradle.properties"),
+                        "org.gradle.java.home=" + jdkHome + "\n");
+                client = new GradleToolingClient(gradleVersion);
+            }
 
             ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
             PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
-            GradleModelDiscovery discovery =
-                    new GradleModelDiscovery(new GradleToolingClient(gradleVersion), stderr);
+            GradleModelDiscovery discovery = new GradleModelDiscovery(client, stderr);
 
             DepwalkGradleModel model = discovery.discover(workspace);
 

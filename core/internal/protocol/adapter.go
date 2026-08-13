@@ -73,6 +73,9 @@ func (a *Adapter) Run(
 		}
 	})
 	if err != nil {
+		if heapExhausted(runResult) {
+			err = fmt.Errorf("%w (the analyzer ran out of heap: java.lang.OutOfMemoryError on stderr)", err)
+		}
 		return analyze.Outcome{}, err
 	}
 	return analyze.Outcome{
@@ -91,7 +94,7 @@ func (a *Adapter) Run(
 func heapExhausted(result RunResult) bool {
 	return result.ExitCode != 0 &&
 		result.AnalyzerError == nil &&
-		strings.Contains(result.Stderr, "OutOfMemoryError")
+		strings.Contains(result.Stderr, "java.lang.OutOfMemoryError")
 }
 
 func diagnosticsToDomain(records []Diagnostic) []analyze.Diagnostic {

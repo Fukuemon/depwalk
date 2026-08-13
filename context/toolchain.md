@@ -88,7 +88,7 @@ Core 実装基盤の技術選定は [ADR-0002](../adr/0002-core-implementation-f
 
 ## 実環境解析の運用指針
 
-- **Analyzer heap**: 既定 heap では中規模の実環境 multi-project (目安: call site 5 万規模) で `OutOfMemoryError` になり得る。`--analyzer-cmd` の java 起動に `-Xmx` を明示する (実測では `-Xmx8g` で 7 project / call site 52,411 を解析できた)。OOM 時の Core 側の対処付きエラー報告は [cli feature doc](../design/features/cli/DesignDoc_cli.md) が定める (判断の正本は [ADR-0012](../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))
+- **Analyzer heap**: 既定 heap では中規模の実環境 multi-project (目安: call site 5 万規模) で `OutOfMemoryError` になり得る。`--analyzer-cmd` (または `DEPWALK_ANALYZER_CMD`) の java 起動に `-Xmx` を明示する (実測では `-Xmx8g` で 7 project / call site 52,411 を解析できた)。OOM 時の Core 側の対処付きエラー報告は [cli feature doc](../design/features/cli/DesignDoc_cli.md) が定める (判断の正本は [ADR-0012](../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))
 - **Gradle daemon JVM**: Analyzer JVM (JDK 25) が daemon に引き継がれると、対象 Gradle が古い場合に互換範囲外で discovery が失敗する (`JAVA_GRADLE_MODEL_ERROR` / daemon-jvm-incompatible)。回避は `--analyzer-meta gradleJavaHome=<互換 JDK の path>` の明示指定 (規則は [discovery.md](../design/features/java-analyzer/discovery.md))
 
 ## Scaffold Policy

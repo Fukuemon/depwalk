@@ -113,22 +113,33 @@ public final class PreflightValidator {
             return null;
         }
         Object raw = metadata.get(METADATA_GRADLE_JAVA_HOME);
-        if (raw instanceof List<?> rawList && rawList.size() == 1
-                && rawList.get(0) instanceof String value && !value.isBlank()) {
-            Path javaHome = Path.of(value);
-            boolean launchable = Files.isDirectory(javaHome)
-                    && (Files.isExecutable(javaHome.resolve("bin").resolve("java"))
-                            || Files.isExecutable(javaHome.resolve("bin").resolve("java.exe")));
-            if (launchable) {
-                return javaHome;
-            }
+        if (!(raw instanceof List<?> rawList) || rawList.size() != 1) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.metadata.gradleJavaHome must be a single-element array");
+        }
+        if (!(rawList.get(0) instanceof String value) || value.isBlank()) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.metadata.gradleJavaHome must contain a non-blank java home path");
+        }
+        Path javaHome;
+        try {
+            javaHome = Path.of(value);
+        } catch (java.nio.file.InvalidPathException e) {
+            throw new AnalyzerFatalException(
+                    JavaErrorCode.JAVA_INVALID_REQUEST,
+                    "analysisRequest.metadata.gradleJavaHome is not a valid path");
+        }
+        boolean launchable = Files.isDirectory(javaHome)
+                && (Files.isExecutable(javaHome.resolve("bin").resolve("java"))
+                        || Files.isExecutable(javaHome.resolve("bin").resolve("java.exe")));
+        if (!launchable) {
             throw new AnalyzerFatalException(
                     JavaErrorCode.JAVA_INVALID_REQUEST,
                     "analysisRequest.metadata.gradleJavaHome does not point to a launchable java home: " + value);
         }
-        throw new AnalyzerFatalException(
-                JavaErrorCode.JAVA_INVALID_REQUEST,
-                "analysisRequest.metadata.gradleJavaHome must be a single-element array of a java home path");
+        return javaHome;
     }
 
     /**
