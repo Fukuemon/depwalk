@@ -1087,8 +1087,10 @@ public final class CallGraphBuilder {
         } catch (RuntimeException | LinkageError e) {
             return;
         }
-        // Only abstract methods declared on an interface qualify as SAM invocations.
-        if (!invoked.isAbstract() || !invoked.declaringType().isInterface()) {
+        // Only the single abstract method of a functional interface qualifies as a
+        // SAM invocation. Plain interface calls (e.g. injected Spring beans) must not
+        // reach the tracking or the advisory diagnostic below.
+        if (!invoked.isAbstract() || !isFunctionalInterfaceSam(invoked)) {
             return;
         }
         Object receiverDecl;
@@ -1098,27 +1100,38 @@ public final class CallGraphBuilder {
             return;
         }
 
-        List<CallablePassIndex.CallableTarget> callables = List.of();
+        List<CallablePassIndex.CallableTarget> callables;
         if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration) {
             callables = callablesForParameter(receiver.getNameAsString(), mce, ctx);
         } else if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration) {
-            diagnostics.reportCallableUnresolved(mce, ctx.callerMethodIds());
-            return;
+            callables = List.of();
         } else {
             callables = callablesForLocal(receiver.getNameAsString(), mce);
         }
+        // Constructor-bodied callables are out of scope (their symbol shape differs);
+        // dropping them here keeps the first-wins node content invariant intact.
+        callables = callables.stream()
+                .filter(callable -> !MethodIds.CONSTRUCTOR_TOKEN.equals(callable.methodName()))
+                .filter(callable -> reachableOwners.find(callable.declaringType()).isPresent())
+                .toList();
+        if (callables.isEmpty()) {
+            // Every untracked SAM invocation is surfaced symmetrically (field stores,
+            // unmapped parameters, untrackable locals) so the tracking gap stays
+            // observable. Advisory only: the ledger is untouched.
+            diagnostics.reportCallableUnresolved(mce, ctx.callerMethodIds());
+            return;
+        }
         List<String> callers = edgeCallers(mce, ctx);
-        if (callables.isEmpty() || callers.isEmpty()) {
+        if (callers.isEmpty()) {
             return;
         }
 
         SourceLocation callSite = sourceLocations.sourceLocationOf(mce);
-        Map<String, Object> metadata = Map.of("viaCallableInvocation", true);
+        Map<String, Object> metadata = ctx.viaLambda()
+                ? Map.of("viaCallableInvocation", true, "viaLambda", true)
+                : Map.of("viaCallableInvocation", true);
         java.util.LinkedHashSet<String> emitted = new java.util.LinkedHashSet<>();
         for (CallablePassIndex.CallableTarget callable : callables) {
-            if (reachableOwners.find(callable.declaringType()).isEmpty()) {
-                continue;
-            }
             MethodSymbol calleeSymbol = methodSymbols.buildCandidateMethodSymbol(
                     new SootUpTypeHierarchyIndex.MethodCandidate(
                             callable.declaringType(), callable.methodName(), callable.parameterTypes()));
@@ -1129,6 +1142,22 @@ public final class CallGraphBuilder {
             for (String callerId : callers) {
                 accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
             }
+        }
+    }
+
+    /** declaring interface が functional interface (抽象メソッドがちょうど 1 個) かを判定する。 */
+    private static boolean isFunctionalInterfaceSam(ResolvedMethodDeclaration invoked) {
+        try {
+            var declaringType = invoked.declaringType();
+            if (!declaringType.isInterface()) {
+                return false;
+            }
+            long abstractCount = declaringType.getDeclaredMethods().stream()
+                    .filter(method -> method.isAbstract())
+                    .count();
+            return abstractCount == 1;
+        } catch (RuntimeException | LinkageError e) {
+            return false;
         }
     }
 
@@ -1170,23 +1199,51 @@ public final class CallGraphBuilder {
         if (reassigned) {
             return List.of();
         }
+        // Only declarators that lexically precede the invocation and whose enclosing
+        // block contains it are candidates; several matches mean the tracking cannot
+        // pick one without guessing, so it gives up.
+        List<com.github.javaparser.ast.body.VariableDeclarator> candidates = new ArrayList<>();
         for (com.github.javaparser.ast.body.VariableDeclarator declarator
                 : enclosing.findAll(com.github.javaparser.ast.body.VariableDeclarator.class)) {
-            if (!declarator.getNameAsString().equals(variableName)) {
+            if (!declarator.getNameAsString().equals(variableName)
+                    || !beginsBefore(declarator, mce)
+                    || !enclosingBlockContains(declarator, mce)) {
                 continue;
             }
-            Expression initializer = declarator.getInitializer().orElse(null);
-            if (initializer == null) {
-                return List.of();
-            }
-            try {
-                CallablePassIndex.CallableTarget target = CallablePassIndex.targetOf(initializer);
-                return target != null ? List.of(target) : List.<CallablePassIndex.CallableTarget>of();
-            } catch (RuntimeException | LinkageError e) {
-                return List.of();
+            candidates.add(declarator);
+        }
+        if (candidates.size() != 1) {
+            return List.of();
+        }
+        Expression initializer = candidates.get(0).getInitializer().orElse(null);
+        if (initializer == null) {
+            return List.of();
+        }
+        try {
+            CallablePassIndex.CallableTarget target = CallablePassIndex.targetOf(initializer);
+            return target != null ? List.of(target) : List.<CallablePassIndex.CallableTarget>of();
+        } catch (RuntimeException | LinkageError e) {
+            return List.of();
+        }
+    }
+
+    private static boolean beginsBefore(Node first, Node second) {
+        return first.getBegin().isPresent() && second.getBegin().isPresent()
+                && first.getBegin().get().isBefore(second.getBegin().get());
+    }
+
+    /** declarator の直近ブロックが invocation を字句的に包含するかを判定する。 */
+    private static boolean enclosingBlockContains(Node declarator, Node invocation) {
+        Node block = declarator.findAncestor(com.github.javaparser.ast.stmt.BlockStmt.class).orElse(null);
+        if (block == null) {
+            return false;
+        }
+        for (Node ancestor = invocation; ancestor != null; ancestor = ancestor.getParentNode().orElse(null)) {
+            if (ancestor == block) {
+                return true;
             }
         }
-        return List.of();
+        return false;
     }
 
     /** receiver の静的型が {@code ApplicationEventPublisher} またはその subtype かを判定する。 */

@@ -42,17 +42,26 @@ public final class CallablePassIndex {
 
     private final Map<String, List<CallableTarget>> targetsByParameter = new LinkedHashMap<>();
 
-    /** First pass: record lambda / method reference arguments to workspace methods. */
+    /**
+     * First pass: record lambda / method reference arguments by the statically
+     * resolved target declaration. Targets are indexed regardless of ownership;
+     * edge emission restricts callees to reachable workspace methods. Variadic
+     * argument positions beyond the declared parameters are indexed but never
+     * looked up (the invocation side reads declared parameter indexes only), so
+     * variadic callables stay untracked by design.
+     */
     public void accept(CompilationUnit unit) {
         for (MethodCallExpr call : unit.findAll(MethodCallExpr.class)) {
+            String targetId = null;
             for (int i = 0; i < call.getArguments().size(); i++) {
                 Expression argument = call.getArgument(i);
                 if (!(argument instanceof LambdaExpr) && !(argument instanceof MethodReferenceExpr)) {
                     continue;
                 }
                 try {
-                    ResolvedMethodDeclaration target = call.resolve();
-                    String targetId = methodIdOf(target);
+                    if (targetId == null) {
+                        targetId = methodIdOf(call.resolve());
+                    }
                     CallableTarget callable = targetOf(argument);
                     if (callable != null) {
                         targetsByParameter

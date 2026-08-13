@@ -398,6 +398,7 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 | java-analyzer `analysis.md` (イベント edge)                                                   | broadcast 意味論の突合規則 (型階層合致 / 無条件 = unique / 条件付きのみ ambiguous / raw type 近似) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                                                                  | D7 で確定した edge 生成規則の正本反映                       |
 | java-analyzer `analysis.md` / `protocol-mapping.md` (callable 追跡)                           | 追跡範囲 (同一メソッド内 + 引数渡し 1 段) と edge 意味論 (method reference → 参照先 / lambda → 囲みメソッド + 標識) を追記 (source: track)。**反映済** (sync 2026-08-13)                                                                                                 | D1 / D5 で確定した追跡・表現規則の正本反映                  |
 | analyzer-protocol feature doc (Analyzer 異常終了時の扱い) / cli feature doc (エラー表示)      | Core が analyzer 異常終了時に stderr の OOM パターンを検知し対処付きエラーで報告する挙動を追記 (source: track D10)。stderr を protocol record として parse しない既存契約は変更しない (終了後の診断ヒント抽出のみ)。**反映済** (sync 2026-08-13)                         | D10 の Core 側恒久挙動の正本を design に置く                |
+| java-analyzer `analysis.md` (callable invocation の制約)                                      | 実装で確定した追跡制約 (functional interface 限定 / 再代入・constructor 実体・override 越し・varargs・constructor 引数は対象外 / 未追跡 SAM invocation は advisory 診断) を追記 (source: 実装 P3)。**反映済**                                                            | 実装と正本の drift 防止                                     |
 
 ### context への影響
 

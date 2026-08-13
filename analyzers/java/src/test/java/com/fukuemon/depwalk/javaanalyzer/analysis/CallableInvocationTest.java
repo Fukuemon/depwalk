@@ -35,12 +35,22 @@ class CallableInvocationTest {
         assertEquals(0, ran.exitCode(), ran.stderr());
         assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
 
-        // Two call sites pass different callables to retry; each yields its own edge
-        // from the invoking method: lambda -> its enclosing method, reference -> target.
-        assertTrue(callableEdge(ran, RETRY, FROM_LAMBDA).isPresent(),
-                "retry must link back to the lambda's enclosing method: " + ran.byType("callEdge"));
-        assertTrue(callableEdge(ran, RETRY, STATIC_WORK).isPresent(),
-                "retry must link to the referenced method: " + ran.byType("callEdge"));
+        // Two call sites pass different callables to retry; the invocation enumerates
+        // exactly those callees, each anchored at the invocation site inside retry.
+        List<Map<String, Object>> retryEdges = ran.byType("callEdge").stream()
+                .filter(edge -> RETRY.equals(edge.get("callerMethodId"))
+                        && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation")))
+                .toList();
+        assertEquals(
+                List.of(FROM_LAMBDA, STATIC_WORK),
+                retryEdges.stream().map(edge -> (String) edge.get("calleeMethodId")).sorted().toList(),
+                "retry must enumerate exactly the passed callables: " + retryEdges);
+        for (Map<String, Object> edge : retryEdges) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> callSite = (Map<String, Object>) edge.get("callSite");
+            assertEquals("com/example/Retry.java", callSite.get("path"),
+                    "the edge anchor is the invocation site inside retry: " + edge);
+        }
     }
 
     @Test
@@ -57,25 +67,49 @@ class CallableInvocationTest {
     }
 
     @Test
-    void reassignedLocalIsNotTracked() throws Exception {
+    void reassignedLocalIsNotTrackedAndSurfacesTheAdvisory() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
         assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
                         USE_REASSIGNED.equals(edge.get("callerMethodId"))
                                 && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation"))),
                 "reassigned locals must not be tracked (no guessed callee)");
+        assertTrue(ran.byType("diagnostic").stream().anyMatch(diagnostic ->
+                        "JAVA_CALLABLE_UNRESOLVED".equals(diagnostic.get("code"))
+                                && "java:com.example.LocalUse#useReassigned()".equals(
+                                        diagnostic.get("relatedMethodId"))),
+                "untracked SAM invocations are surfaced symmetrically: " + ran.byType("diagnostic"));
     }
 
     @Test
-    void fieldStoredCallableSurfacesAdvisoryInfoDiagnostic() throws Exception {
+    void fieldStoredCallableSurfacesAdvisoryInfoDiagnosticWithoutEdges() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
         assertEquals(0, ran.exitCode(), ran.stderr());
+        String invokeStored = "java:com.example.FieldUse#invokeStored()";
+        assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
+                        invokeStored.equals(edge.get("callerMethodId"))
+                                && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation"))),
+                "field-stored callables must not produce guessed edges");
         assertTrue(ran.byType("diagnostic").stream().anyMatch(diagnostic ->
                         "JAVA_CALLABLE_UNRESOLVED".equals(diagnostic.get("code"))
-                                && "info".equals(diagnostic.get("severity"))),
+                                && "info".equals(diagnostic.get("severity"))
+                                && invokeStored.equals(diagnostic.get("relatedMethodId"))),
                 "field-stored callable invocation must surface the advisory info: " + ran.byType("diagnostic"));
         assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
+    }
+
+    @Test
+    void plainInterfaceCallsAreNeitherTrackedNorDiagnosed() throws Exception {
+        // Non-functional interfaces (e.g. injected services) must stay out of both
+        // the tracking and the advisory diagnostic (noise regression).
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
+        assertTrue(ran.byType("diagnostic").stream().noneMatch(diagnostic ->
+                        "JAVA_CALLABLE_UNRESOLVED".equals(diagnostic.get("code"))
+                                && "java:com.example.PlainInterfaceUse#call()".equals(
+                                        diagnostic.get("relatedMethodId"))),
+                "plain interface calls must not surface the callable advisory: " + ran.byType("diagnostic"));
     }
 
     private static Optional<Map<String, Object>> callableEdge(
