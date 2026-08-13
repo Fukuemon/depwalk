@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.pipeline;
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.LiftExcludePackages;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallablePassIndex;
@@ -169,8 +170,9 @@ public final class AnalysisRunner {
                 buildBytecodeIndexes(contexts, contextById, reachableDependencies, classesOutputOwners);
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = bytecodeIndexes.sootUpByContext();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = bytecodeIndexes.bytecodeIndexByContext();
-        Map<String, JavaParser> parserByContext =
-                buildParsers(contexts, contextById, reachableDependencies, bytecodeIndexByContext);
+        Map<String, BytecodeMemberAstInjector> injectorByContext = new LinkedHashMap<>();
+        Map<String, JavaParser> parserByContext = buildParsers(
+                contexts, contextById, reachableDependencies, bytecodeIndexByContext, injectorByContext);
         long contextBuildMillis = (System.nanoTime() - contextBuildStart) / 1_000_000;
 
         // graph record 出力前に全 file の parse を検証する。失敗は request 全体 fatal。
@@ -266,6 +268,10 @@ public final class AnalysisRunner {
         for (Path file : scope.allFiles()) {
             SourceSetAnalysisContext context = contextByFile.get(file);
             CompilationUnit cu = parseOrFail(parserByContext.get(context.id()), file);
+            // Same-unit references never reach the type solver, so bytecode-only
+            // members are injected into the walked AST here; the first pass indexes
+            // stay on the uninjected shape (they only inventory source declarations).
+            injectorByContext.get(context.id()).inject(cu);
             builderByContext.get(context.id()).process(cu);
             analyzedFileCount++;
             // cu はここでスコープを抜け、以降 GC 対象になる (AST の逐次破棄)。
@@ -381,7 +387,8 @@ public final class AnalysisRunner {
             List<SourceSetAnalysisContext> contexts,
             Map<String, SourceSetAnalysisContext> contextById,
             Map<String, Set<String>> reachableDependencies,
-            Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext) throws IOException {
+            Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext,
+            Map<String, BytecodeMemberAstInjector> injectorByContext) throws IOException {
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
             List<Path> solverRoots = new ArrayList<>(context.sourceRoots());
@@ -403,6 +410,8 @@ public final class AnalysisRunner {
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
             parserByContext.put(context.id(), new JavaParser(config));
+            injectorByContext.put(context.id(), new BytecodeMemberAstInjector(
+                    bytecodeIndexByContext.get(context.id())));
         }
         return parserByContext;
     }

@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
@@ -13,6 +14,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EventListenerIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
@@ -158,6 +160,12 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof MethodDeclaration md) {
+            if (md.containsData(BytecodeMemberAstInjector.INJECTED)) {
+                // Injected bytecode-only members exist for resolution only; they are
+                // not source declarations, have no body, and calls to them are emitted
+                // under the bytecode-only member contract below.
+                return;
+            }
             walkCallableDeclaration(
                     node,
                     ctx,
@@ -366,9 +374,27 @@ public final class CallGraphBuilder {
             return;
         }
 
-        // solver が合成した bytecode-only member は、既存の bytecode-only member と同じ
-        // 出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、ADR-0005)
-        // で emit する。
+        // AST へ注入した bytecode-only member と solver が合成した bytecode-only member は、
+        // 既存の bytecode-only member と同じ出力契約 (sourceLocation 省略 + owner metadata
+        // + calleeOrigin edge、ADR-0005) で emit する。
+        SootUpTypeHierarchyIndex.MethodCandidate injected = injectedCandidate(resolved);
+        if (injected != null) {
+            // 型名 scope の static call を instance の注入 member で解決しない
+            // (JavaParser は AST member の static 性を型名 scope で検査しないため、
+            // synthesized 経路と同じ guard を emit 前に通す)。
+            if (!injected.isStatic() && mce.getScope().isPresent()
+                    && BytecodeRescue.isTypeNameScope(mce.getScope().get())) {
+                Map<String, Object> guardMetadata = diagnostics.metadataOf(
+                        UnresolvedDiagnostics.PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null);
+                diagnostics.reportUnresolved(mce, ctx.callerMethodIds(), guardMetadata);
+                commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                        "unresolved-method-call", mce.getNameAsString(), guardMetadata);
+                return;
+            }
+            emitBytecodeOnlyCall(mce, ctx, injectedRescue(injected), false);
+            commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+            return;
+        }
         if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
             // 型名 scope の static call を instance 合成 member で解決しない
             // (usage 経路は staticOnly を持たないため、emit 前にここで検査する)。
@@ -531,6 +557,12 @@ public final class CallGraphBuilder {
         // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、
         // ADR-0005) で emit する (従来この経路は通常 symbol として emit され、
         // この出力契約から漏れていた)。
+        SootUpTypeHierarchyIndex.MethodCandidate injected = injectedCandidate(resolved);
+        if (injected != null) {
+            emitBytecodeOnlyCall(mre, ctx, injectedRescue(injected), true);
+            commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+            return;
+        }
         if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
             emitBytecodeOnlyCall(mre, ctx, synthesizedRescue(synthesized), true);
             commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
@@ -778,12 +810,26 @@ public final class CallGraphBuilder {
 
     /** solver が合成した bytecode-only member を、救済経路と同じ出力契約へ載せる。 */
     private BytecodeRescue.Rescue synthesizedRescue(SynthesizedBytecodeMethodDeclaration synthesized) {
+        return injectedRescue(synthesized.candidate());
+    }
+
+    /** AST へ注入した bytecode-only member を、救済経路と同じ出力契約へ載せる。 */
+    private BytecodeRescue.Rescue injectedRescue(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         return new BytecodeRescue.Rescue(
-                bytecodeRescue.requireReachableOwner(synthesized),
-                synthesized.candidate().declaringType(),
-                synthesized.getName(),
-                synthesized.candidate().parameterTypes(),
+                bytecodeRescue.requireReachableOwner(candidate),
+                candidate.declaringType(),
+                candidate.methodName(),
+                candidate.parameterTypes(),
                 "method");
+    }
+
+    /** 解決結果が AST 注入 member ならその bytecode candidate、そうでなければ null。 */
+    private static SootUpTypeHierarchyIndex.MethodCandidate injectedCandidate(ResolvedMethodDeclaration resolved) {
+        if (resolved instanceof JavaParserMethodDeclaration declaration
+                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
+            return declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
+        }
+        return null;
     }
 
     /** 救済で採用した bytecode-only member を node + edge として出力する (ADR-0005 の出力契約)。 */

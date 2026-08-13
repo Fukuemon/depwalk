@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 
@@ -60,6 +61,13 @@ public final class TypeSolverFactory {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
+        if (bytecodeIndex != null) {
+            // Declarations JavaParser builds directly from solver-internal ASTs
+            // (same-unit references, method-reference targets) never pass through
+            // the augmenting solver below, so the bytecode-only members are
+            // injected into every unit the solver parses.
+            new BytecodeMemberAstInjector(bytecodeIndex).installInto(typeSolverConfig);
+        }
         for (Path root : sourceRoots) {
             JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);
             typeSolver.add(bytecodeIndex != null

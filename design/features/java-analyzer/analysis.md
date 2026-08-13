@@ -57,6 +57,8 @@ scope 内 source 型を solver が解決するとき、同一 context の classe
 
 合成・救済の選択境界: 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は、owner class の classfile が project 所有の classes output に存在する場合だけ採用する。対象は自 context と、**model の project 依存関係で到達可能な依存 project の output** である。
 
+AST への member 注入: solver 経由の合成だけでは、TypeSolver を経由しない解決経路 (同一 compilation unit 内の参照 = 自 class の getter を `this`/暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector、および solver 内部で parse した AST から直接構築される宣言) に生成 member が見えない。このため、解析対象の parse 結果と solver 内部の parse 結果の両方へ、classes output にしか無い一意な callable member の宣言を parse 後に注入する (実環境の未解決の支配形状が entity 自身のメソッド内から自 class の生成 getter を参照する形だったため。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。注入宣言は解決専用の標識であり、source 宣言としては扱わない: caller として walk せず、注入 member への呼び出しは bytecode-only member と同じ出力契約 (定義位置省略 + owner metadata + calleeOrigin) で emit する。注入時に型解決は行わず (solver 再入の禁止)、classfile の descriptor / Signature を型名として書き下す。source に書けない匿名・local class 名 (`$` + 数字) を含む member は注入しない。first-pass の各種索引 (inventory / 宣言索引 / entry point / Spring DI) は注入前の AST で構築し、source 宣言の意味論を変えない。
+
 external artifact だけに存在する同名 class の member は、project bytecode として救済しない (「solver 層の bytecode member 合成」節の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
 
 cross-module 救済: 依存 context の source 型が持つ生成 member (Lombok constructor / getter 等) の cross-module 呼び出しも救済の対象とする。採用境界は依存 project の output を含む。

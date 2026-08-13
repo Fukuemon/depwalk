@@ -93,11 +93,11 @@ final class BytecodeRescue {
      * 前提に行われるため、ここで引けない場合は analyzer 側の不変条件違反として failfast する。
      */
     WorkspaceSourceDeclarationIndex.TypeLocation requireReachableOwner(
-            SynthesizedBytecodeMethodDeclaration synthesized) {
-        return reachableOwners.find(synthesized.candidate().declaringType())
+            SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return reachableOwners.find(candidate.declaringType())
                 .orElseThrow(() -> new IllegalStateException(
                         "synthesized bytecode member without a reachable in-scope owner: "
-                                + synthesized.candidate().declaringType() + "#" + synthesized.getName()));
+                                + candidate.declaringType() + "#" + candidate.methodName()));
     }
 
     /**
