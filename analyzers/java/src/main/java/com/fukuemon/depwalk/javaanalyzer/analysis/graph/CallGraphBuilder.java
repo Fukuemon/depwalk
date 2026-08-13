@@ -1089,8 +1089,14 @@ public final class CallGraphBuilder {
         }
         // Only the single abstract method of a functional interface qualifies as a
         // SAM invocation. Plain interface calls (e.g. injected Spring beans) must not
-        // reach the tracking or the advisory diagnostic below.
-        if (!invoked.isAbstract() || !isFunctionalInterfaceSam(invoked)) {
+        // reach the tracking or the advisory diagnostic below. Synthetic declarations
+        // (e.g. an enum's values()) may throw from isAbstract(), which simply means
+        // "not a SAM" here.
+        try {
+            if (!invoked.isAbstract() || !isFunctionalInterfaceSam(invoked)) {
+                return;
+            }
+        } catch (RuntimeException | LinkageError e) {
             return;
         }
         Object receiverDecl;
