@@ -497,24 +497,24 @@ public final class CallGraphBuilder {
 
     private void emitConstructorCall(
             ResolvedConstructorDeclaration resolved, Node callNode, WalkContext ctx, CallSiteId.CallKind kind) {
+        // 注入 constructor でも attribution (scope 除外の理由分類) は通常経路と同じに
+        // 保ち、除外理由が注入の有無で変わらないようにする。
+        TypeSite declaringSite = AttributionSites.typeSiteOf(resolved.declaringType());
+        AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
+        if (attribution.isOmitted()) {
+            commitExcluded(callNode, kind, ctx, attribution);
+            return;
+        }
         // AST 注入の bytecode-only constructor は method 側と同じ出力契約で emit する。
-        if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
-                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
-            SootUpTypeHierarchyIndex.MethodCandidate candidate =
-                    declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
-            BytecodeRescue.Rescue rescue = injectedConstructorRescue(candidate);
+        SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolved);
+        if (injectedCtor != null) {
+            BytecodeRescue.Rescue rescue = injectedConstructorRescue(injectedCtor);
             if (rescue == null) {
                 commitExcludedExternal(callNode, kind, ctx);
                 return;
             }
             emitBytecodeOnlyCall(callNode, ctx, rescue, false);
             commitEmitted(callNode, kind, ctx);
-            return;
-        }
-        TypeSite declaringSite = AttributionSites.typeSiteOf(resolved.declaringType());
-        AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
-        if (attribution.isOmitted()) {
-            commitExcluded(callNode, kind, ctx, attribution);
             return;
         }
         MethodSymbol calleeSymbol = methodSymbols.buildConstructorSymbol(attribution, resolved);
@@ -677,6 +677,19 @@ public final class CallGraphBuilder {
             diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
             commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
                     "ambiguous-constructor-reference", mre.getScope().toString(), metadata);
+            return;
+        }
+
+        // 選択結果が AST 注入の bytecode-only constructor なら、call 側と同じ出力契約で emit する。
+        SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolvedCtor);
+        if (injectedCtor != null) {
+            BytecodeRescue.Rescue rescue = injectedConstructorRescue(injectedCtor);
+            if (rescue == null) {
+                commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+                return;
+            }
+            emitBytecodeOnlyCall(mre, ctx, rescue, true);
+            commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
             return;
         }
 
@@ -847,6 +860,16 @@ public final class CallGraphBuilder {
                 "method");
     }
 
+    /** 解決結果が AST 注入の bytecode-only constructor ならその candidate。 */
+    private static SootUpTypeHierarchyIndex.MethodCandidate injectedConstructorCandidate(
+            ResolvedConstructorDeclaration resolved) {
+        if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
+                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
+            return declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
+        }
+        return null;
+    }
+
     /** AST 注入の bytecode-only constructor を、救済経路と同じ出力契約へ載せる。 */
     private BytecodeRescue.Rescue injectedConstructorRescue(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         WorkspaceSourceDeclarationIndex.TypeLocation owner =
@@ -948,9 +971,10 @@ public final class CallGraphBuilder {
     private List<String> constructorCallerIdsFor(Node enclosingType) {
         List<ConstructorDeclaration> constructors = new ArrayList<>();
         for (Node member : membersOf(enclosingType)) {
-            // 注入 constructor (Range なし) は caller 帰属に数えない (inventory と
-            // 同じ規則。source 宣言の帰属集合を注入で変えない)。
-            if (member instanceof ConstructorDeclaration cd && cd.getRange().isPresent()) {
+            // 注入 constructor は caller 帰属に数えない (source 宣言の帰属集合を
+            // 注入で変えない。inventory は注入前 AST を数えるため対称になる)。
+            if (member instanceof ConstructorDeclaration cd
+                    && !cd.containsData(BytecodeMemberAstInjector.INJECTED)) {
                 constructors.add(cd);
             }
         }

@@ -137,8 +137,10 @@ public final class ProjectBytecodeMemberIndex {
     }
 
     private static boolean isJvmInternalName(String methodName) {
+        // `$` 始まりは javac / instrumentation の合成 helper ($values / $jacocoInit 等)。
         return methodName.startsWith("lambda$")
                 || methodName.startsWith("access$")
+                || methodName.startsWith("$")
                 || methodName.equals(MethodIds.STATIC_INITIALIZER_TOKEN);
     }
 }

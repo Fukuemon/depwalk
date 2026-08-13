@@ -233,6 +233,49 @@ class SameUnitBytecodeMemberTest {
         assertEquals("project-bytecode-member", ctorMetadata.get("calleeOrigin"), ctorMetadata.toString());
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void implicitConstructorsAreNotInjectedAsBytecodeMembers() throws Exception {
+        // javac の暗黙 default constructor と非 static 内部 class の constructor
+        // (enclosing instance 引数で source と arity がずれる) は注入しない。
+        // 呼び出しは source 宣言由来の通常 edge のまま残る。
+        Path workspace = Files.createDirectories(temp.resolve("implicit-workspace"));
+        String source = """
+                package com.example;
+                public class Plain {
+                    private String name;
+
+                    public class Inner {
+                    }
+
+                    public Plain makePlain() {
+                        return new Plain();
+                    }
+
+                    public Inner makeInner() {
+                        return new Inner();
+                    }
+                }
+                """;
+        write(workspace, "com/example/Plain.java", source);
+        Path classes = Files.createDirectories(temp.resolve("implicit-classes"));
+        compile(classes, Map.of("com/example/Plain.java", source));
+
+        AnalysisTestSupport.Ran ran = run(workspace, classes);
+
+        assertEquals(0, ran.exitCode(), () -> "diagnostics: " + ran.byType("diagnostic")
+                + "\nerrors: " + ran.byType("error") + "\nstderr: " + ran.stderr());
+        assertTrue(ran.byType("diagnostic").isEmpty(),
+                () -> "implicit constructors must stay resolvable: " + ran.byType("diagnostic"));
+        for (Map<String, Object> edge : ran.byType("callEdge")) {
+            if (String.valueOf(edge.get("calleeMethodId")).contains("#<init>")) {
+                Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+                assertTrue(metadata == null || metadata.get("calleeOrigin") == null,
+                        "implicit constructor must not be marked bytecode-only: " + edge);
+            }
+        }
+    }
+
     @Test
     void ambiguousOverloadIsNotInjectedAndStaysOnCompletenessGate() throws Exception {
         // 同名・同 arity が bytecode 上に複数ある member は注入しない (一意性規則)。

@@ -81,10 +81,11 @@ public final class BytecodeMemberAstInjector {
 
     /** unit 内の class / enum 宣言へ、source に無い bytecode-only member を注入する。 */
     public void inject(CompilationUnit cu) {
+        // 走査対象は class と enum。record は accessor が言語仕様で暗黙宣言される
+        // ため対象に含めない。
         for (ClassOrInterfaceDeclaration decl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
             if (decl.isInterface()) {
                 // interface に生成 member は付かない (Lombok 等の対象は class / enum)。
-                // record は accessor が言語仕様で暗黙宣言されるため対象外。
                 continue;
             }
             injectInto(decl);
@@ -109,12 +110,6 @@ public final class BytecodeMemberAstInjector {
             return;
         }
         Set<String> sourceKeys = new HashSet<>();
-        if (decl instanceof EnumDeclaration) {
-            // values() / valueOf(String) は言語仕様の暗黙宣言で、注入すると JavaParser の
-            // 暗黙解決と二重になる。
-            sourceKeys.add("values/0");
-            sourceKeys.add("valueOf/1");
-        }
         for (MethodDeclaration method : decl.getMethods()) {
             sourceKeys.add(method.getNameAsString() + "/" + method.getParameters().size());
         }
@@ -125,6 +120,11 @@ public final class BytecodeMemberAstInjector {
             arityCounts.merge(candidateKey(candidate), 1, Integer::sum);
         }
         for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
+            if (decl instanceof EnumDeclaration && isImplicitEnumMember(candidate)) {
+                // values() / valueOf(String) は言語仕様の暗黙宣言で、注入すると
+                // JavaParser の暗黙解決と二重になる。
+                continue;
+            }
             if (arityCounts.get(candidateKey(candidate)) != 1 || !sourceKeys.add(candidateKey(candidate))) {
                 continue;
             }
@@ -166,6 +166,14 @@ public final class BytecodeMemberAstInjector {
         return candidate.methodName() + "/" + candidate.parameterTypes().size();
     }
 
+    private static boolean isImplicitEnumMember(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        if ("values".equals(candidate.methodName()) && candidate.parameterTypes().isEmpty()) {
+            return true;
+        }
+        return "valueOf".equals(candidate.methodName())
+                && candidate.parameterTypes().equals(List.of("java.lang.String"));
+    }
+
     /**
      * source に無い bytecode-only constructor (@AllArgsConstructor 等の生成
      * constructor) を注入する。source に constructor が 1 つでも書かれると暗黙
@@ -174,6 +182,12 @@ public final class BytecodeMemberAstInjector {
      * 複数ある形は曖昧として注入しない (member と同じ一意性規則)。
      */
     private void injectConstructorsInto(ClassOrInterfaceDeclaration decl) {
+        // 非 static 内部 class の bytecode constructor は先頭に enclosing instance
+        // 引数を持ち、source の呼び出し形と arity がずれる。注入すると暗黙 default
+        // constructor まで消えて偽の未解決を生むため対象外にする。
+        if (decl.isNestedType() && !decl.isStatic()) {
+            return;
+        }
         String binaryName = BinaryNames.forTypeLikeNode(decl);
         if (!speakable(binaryName)) {
             return;
@@ -181,6 +195,15 @@ public final class BytecodeMemberAstInjector {
         List<SootUpTypeHierarchyIndex.MethodCandidate> candidates =
                 bytecodeIndex.declaredConstructors(binaryName);
         if (candidates.isEmpty()) {
+            return;
+        }
+        // source に constructor が無く bytecode も 0 引数 1 件だけなら、それは javac の
+        // 暗黙 default constructor であり、注入すると source 実在の宣言を bytecode-only
+        // と偽装する。言語仕様の暗黙宣言は注入しない (enum の values / valueOf と同じ規則)。
+        boolean sourceHasConstructors = !decl.getConstructors().isEmpty();
+        if (!sourceHasConstructors
+                && candidates.size() == 1
+                && candidates.get(0).parameterTypes().isEmpty()) {
             return;
         }
         Set<Integer> sourceArities = new HashSet<>();
