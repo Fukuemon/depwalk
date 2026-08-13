@@ -29,7 +29,10 @@ public enum JavaDiagnosticCode {
     JAVA_CONDITIONAL_BEAN("info"),
 
     /** {@code publishEvent} の引数型が静的に解決できず、イベント edge を張れない。 */
-    JAVA_EVENT_UNRESOLVED("warning");
+    JAVA_EVENT_UNRESOLVED("warning"),
+
+    /** callable が静的追跡範囲 (同一メソッド内 / 引数渡し 1 段) の外にあり、invocation edge を張れない。 */
+    JAVA_CALLABLE_UNRESOLVED("info");
 
     private final String severity;
 

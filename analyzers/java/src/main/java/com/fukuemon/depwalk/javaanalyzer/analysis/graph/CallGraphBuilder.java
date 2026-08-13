@@ -77,6 +77,7 @@ public final class CallGraphBuilder {
     private final BytecodeRescue bytecodeRescue;
     private final SpringInjectionMatcher springInjections;
     private final EventListenerIndex eventListenerIndex;
+    private final CallablePassIndex callablePassIndex;
     private final ReachableOwners reachableOwners;
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
@@ -107,7 +108,8 @@ public final class CallGraphBuilder {
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
             Set<String> reachableContextIds,
-            EventListenerIndex eventListenerIndex) {
+            EventListenerIndex eventListenerIndex,
+            CallablePassIndex callablePassIndex) {
         this.sourceLocations = new SourceLocations(workspaceRoot);
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
@@ -121,6 +123,7 @@ public final class CallGraphBuilder {
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
         this.eventListenerIndex = eventListenerIndex;
+        this.callablePassIndex = callablePassIndex;
     }
 
     /**
@@ -305,6 +308,7 @@ public final class CallGraphBuilder {
         // publishEvent call itself typically terminates as an excluded external target,
         // while the listener edges below are emitted outside the outcome ledger.
         emitEventEdges(mce, ctx);
+        emitCallableInvocationEdges(mce, ctx);
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
@@ -1061,6 +1065,128 @@ public final class CallGraphBuilder {
                 accumulator.addEdge(callerId, listenerSymbol.methodId(), callSite, metadata);
             }
         }
+    }
+
+    /**
+     * functional interface の invocation site から、渡された callable 実体への edge を
+     * 生成する (ADR-0012)。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
+     * lambda / method reference の直接 initializer) と (2) workspace メソッドの
+     * parameter への引数渡し 1 段。field 経由は JAVA_CALLABLE_UNRESOLVED (info) の
+     * advisory 診断に残す。callee は method reference → 参照先、lambda → 定義側の
+     * 囲みメソッドで、`viaCallableInvocation: true` を標識する。到達可能 context の
+     * callee のみ対象 (external / 非依存 context へは張らない)。
+     */
+    private void emitCallableInvocationEdges(MethodCallExpr mce, WalkContext ctx) {
+        Expression scope = mce.getScope().orElse(null);
+        if (!(scope instanceof com.github.javaparser.ast.expr.NameExpr receiver)) {
+            return;
+        }
+        ResolvedMethodDeclaration invoked;
+        try {
+            invoked = mce.resolve();
+        } catch (RuntimeException | LinkageError e) {
+            return;
+        }
+        // Only abstract methods declared on an interface qualify as SAM invocations.
+        if (!invoked.isAbstract() || !invoked.declaringType().isInterface()) {
+            return;
+        }
+        Object receiverDecl;
+        try {
+            receiverDecl = receiver.resolve();
+        } catch (RuntimeException | LinkageError e) {
+            return;
+        }
+
+        List<CallablePassIndex.CallableTarget> callables = List.of();
+        if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration) {
+            callables = callablesForParameter(receiver.getNameAsString(), mce, ctx);
+        } else if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration) {
+            diagnostics.reportCallableUnresolved(mce, ctx.callerMethodIds());
+            return;
+        } else {
+            callables = callablesForLocal(receiver.getNameAsString(), mce);
+        }
+        List<String> callers = edgeCallers(mce, ctx);
+        if (callables.isEmpty() || callers.isEmpty()) {
+            return;
+        }
+
+        SourceLocation callSite = sourceLocations.sourceLocationOf(mce);
+        Map<String, Object> metadata = Map.of("viaCallableInvocation", true);
+        java.util.LinkedHashSet<String> emitted = new java.util.LinkedHashSet<>();
+        for (CallablePassIndex.CallableTarget callable : callables) {
+            if (reachableOwners.find(callable.declaringType()).isEmpty()) {
+                continue;
+            }
+            MethodSymbol calleeSymbol = methodSymbols.buildCandidateMethodSymbol(
+                    new SootUpTypeHierarchyIndex.MethodCandidate(
+                            callable.declaringType(), callable.methodName(), callable.parameterTypes()));
+            if (!emitted.add(calleeSymbol.methodId())) {
+                continue;
+            }
+            accumulator.addNode(calleeSymbol);
+            for (String callerId : callers) {
+                accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
+            }
+        }
+    }
+
+    /** 引数渡し 1 段: 囲みメソッドの parameter へ渡された callable を索引から引く。 */
+    private List<CallablePassIndex.CallableTarget> callablesForParameter(
+            String parameterName, MethodCallExpr mce, WalkContext ctx) {
+        if (callablePassIndex.isEmpty() || ctx.callerMethodIds().size() != 1) {
+            return List.of();
+        }
+        MethodDeclaration enclosing = mce.findAncestor(MethodDeclaration.class).orElse(null);
+        if (enclosing == null) {
+            return List.of();
+        }
+        NodeList<com.github.javaparser.ast.body.Parameter> parameters = enclosing.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (parameters.get(i).getNameAsString().equals(parameterName)) {
+                return callablePassIndex.callablesFor(ctx.callerMethodIds().get(0), i);
+            }
+        }
+        return List.of();
+    }
+
+    /**
+     * 同一メソッド内: lambda / method reference を直接 initializer に持ち、再代入の
+     * ない local 変数の invocation。再代入がある場合は追跡しない (根拠のない実体を
+     * 推測しない)。
+     */
+    private List<CallablePassIndex.CallableTarget> callablesForLocal(String variableName, MethodCallExpr mce) {
+        Node enclosing = mce.findAncestor(MethodDeclaration.class).map(Node.class::cast)
+                .or(() -> mce.findAncestor(ConstructorDeclaration.class).map(Node.class::cast))
+                .orElse(null);
+        if (enclosing == null) {
+            return List.of();
+        }
+        boolean reassigned = enclosing
+                .findAll(com.github.javaparser.ast.expr.AssignExpr.class).stream()
+                .anyMatch(assign -> assign.getTarget() instanceof com.github.javaparser.ast.expr.NameExpr name
+                        && name.getNameAsString().equals(variableName));
+        if (reassigned) {
+            return List.of();
+        }
+        for (com.github.javaparser.ast.body.VariableDeclarator declarator
+                : enclosing.findAll(com.github.javaparser.ast.body.VariableDeclarator.class)) {
+            if (!declarator.getNameAsString().equals(variableName)) {
+                continue;
+            }
+            Expression initializer = declarator.getInitializer().orElse(null);
+            if (initializer == null) {
+                return List.of();
+            }
+            try {
+                CallablePassIndex.CallableTarget target = CallablePassIndex.targetOf(initializer);
+                return target != null ? List.of(target) : List.<CallablePassIndex.CallableTarget>of();
+            } catch (RuntimeException | LinkageError e) {
+                return List.of();
+            }
+        }
+        return List.of();
     }
 
     /** receiver の静的型が {@code ApplicationEventPublisher} またはその subtype かを判定する。 */

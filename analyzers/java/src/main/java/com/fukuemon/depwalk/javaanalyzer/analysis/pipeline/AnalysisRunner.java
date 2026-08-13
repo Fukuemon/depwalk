@@ -5,6 +5,7 @@ import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.LiftExcludePackages;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
+import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallablePassIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
@@ -187,6 +188,7 @@ public final class AnalysisRunner {
         SpringDiIndex springDiIndex = createSpringDiIndex(contexts, scope);
         EntryPointIndex entryPointIndex = new EntryPointIndex();
         EventListenerIndex eventListenerIndex = new EventListenerIndex();
+        CallablePassIndex callablePassIndex = new CallablePassIndex();
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot, entryPointIndex);
         GraphAccumulator accumulator = new GraphAccumulator();
         // resolver とは独立した call-site inventory と source 宣言索引
@@ -208,6 +210,7 @@ public final class AnalysisRunner {
             // Listener declarations that fail to resolve are skipped inside accept;
             // the second pass diagnoses them through the normal declaration path.
             eventListenerIndex.accept(unit);
+            callablePassIndex.accept(unit);
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
@@ -250,7 +253,8 @@ public final class AnalysisRunner {
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
                     reachable,
-                    eventListenerIndex));
+                    eventListenerIndex,
+                    callablePassIndex));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);

@@ -121,6 +121,22 @@ final class UnresolvedDiagnostics {
                 null));
     }
 
+    /**
+     * functional interface の invocation だが callable が静的追跡範囲 (同一メソッド内 /
+     * 引数渡し 1 段) の外にあり invocation edge を張れなかった advisory 診断 (info)。
+     * 設計上の制約による対象外を表し、outcome ledger には触れない。
+     */
+    void reportCallableUnresolved(Node callNode, List<String> callerMethodIds) {
+        String relatedMethodId = callerMethodIds.isEmpty() ? null : callerMethodIds.get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_CALLABLE_UNRESOLVED.severity(),
+                JavaDiagnosticCode.JAVA_CALLABLE_UNRESOLVED.code(),
+                "the invoked callable is outside the static tracking scope",
+                sourceLocations.sourceLocationOf(callNode),
+                relatedMethodId,
+                null));
+    }
+
     void reportSootUnavailable(
             SootUpTypeHierarchyIndex.Resolution resolution,
             String targetType,
