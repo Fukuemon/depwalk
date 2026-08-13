@@ -139,7 +139,7 @@ framework が実行時に起動する呼び出しを、ソース上の根拠 (�
 
 ### イベント edge
 
-receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) である `publishEvent` 呼び出しの call site を起点に、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッド、`provenance` には `spring-event` を積む。イベントは合致 listener が全て実行される broadcast 意味論のため、無条件 listener への edge は複数でも各々確定 (`resolution: unique`) とし、条件付き listener のみ既存規則 (`conditional` / `conditionTypes`) で `ambiguous` とする。generics を使ったイベント型の突合は raw type 一致で近似する (制約)。
+receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) である `publishEvent` 呼び出し (receiver 省略の暗黙 this は囲み型が subtype の場合に対象) の call site を起点に、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッド、`provenance` には `spring-event` を積む。イベントは合致 listener が全て実行される broadcast 意味論のため、無条件 listener への edge は複数でも各々確定 (`resolution: unique`) とし、条件付き listener のみ既存規則 (`conditional` / `conditionTypes`) で `ambiguous` とする。generics を使ったイベント型の突合は raw type 一致で近似する (制約)。この近似が過剰一致しうる listener (型変数・型引数付き parameter) への edge は `unique` とせず `ambiguous` に落とす。条件アノテーションに加え、listener annotation の `condition` (SpEL) 属性と `@TransactionalEventListener` の transaction phase 依存も実行時条件として扱い、`conditional: true` + `conditionTypes` 付きの `ambiguous` とする (broadcast の確定性が成立しないため)。突合対象の listener は candidate 再対応付けと同じく publisher context から Gradle 依存で到達可能な context に限る。対象は単一引数のメソッド形式のみで、`classes` 属性・引数 0 の形式は対象外 (制約、診断なし)。
 
 ### callable invocation
 

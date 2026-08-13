@@ -106,6 +106,21 @@ final class UnresolvedDiagnostics {
                 null));
     }
 
+    /**
+     * publishEvent の引数型が解決できずイベント edge を張れなかった advisory 診断。
+     * outcome ledger には触れない (call site 自体の分類は通常経路が行う)。
+     */
+    void reportEventUnresolved(Node callNode, List<String> callerMethodIds) {
+        String relatedMethodId = callerMethodIds.isEmpty() ? null : callerMethodIds.get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.severity(),
+                JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.code(),
+                "failed to resolve the event argument type of publishEvent",
+                sourceLocations.sourceLocationOf(callNode),
+                relatedMethodId,
+                null));
+    }
+
     void reportSootUnavailable(
             SootUpTypeHierarchyIndex.Resolution resolution,
             String targetType,

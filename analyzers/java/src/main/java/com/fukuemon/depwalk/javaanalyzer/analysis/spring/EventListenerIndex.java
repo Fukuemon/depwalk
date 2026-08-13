@@ -29,12 +29,20 @@ public final class EventListenerIndex {
             "org.springframework.context.event.EventListener",
             "org.springframework.transaction.event.TransactionalEventListener");
 
-    /** One indexed listener method. {@code parameterTypes} always has one element. */
+    /**
+     * One indexed listener method. {@code parameterTypes} always has one element.
+     * {@code conditionTypes} carries every runtime condition source (condition
+     * annotations, a non-empty {@code condition} SpEL attribute, or the transactional
+     * phase dependency of {@code @TransactionalEventListener}); a non-empty list makes
+     * the edge ambiguous. {@code rawApproximation} is true when the parameter type is a
+     * type variable or carries type arguments, so the raw-type match may over-match.
+     */
     public record Listener(
             String declaringType,
             String methodName,
             List<String> parameterTypes,
-            List<String> conditionTypes) {
+            List<String> conditionTypes,
+            boolean rawApproximation) {
     }
 
     private final Map<String, List<Listener>> listenersByEventType = new LinkedHashMap<>();
@@ -51,17 +59,23 @@ public final class EventListenerIndex {
             try {
                 ResolvedMethodDeclaration resolved = method.resolve();
                 String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
-                String eventType = BinaryNames.erasureOf(resolved.getParam(0).getType());
+                var paramType = resolved.getParam(0).getType();
+                String eventType = BinaryNames.erasureOf(paramType);
                 Set<String> conditions = new TreeSet<>(SpringAnnotations.conditionTypes(method));
                 method.findAncestor(TypeDeclaration.class)
                         .ifPresent(type -> conditions.addAll(SpringAnnotations.conditionTypes(type)));
+                conditions.addAll(runtimeConditionsOf(method));
+                boolean rawApproximation = paramType.isTypeVariable()
+                        || (paramType.isReferenceType()
+                                && !paramType.asReferenceType().typeParametersValues().isEmpty());
                 listenersByEventType
                         .computeIfAbsent(eventType, key -> new ArrayList<>())
                         .add(new Listener(
                                 declaringType,
                                 resolved.getName(),
                                 List.of(eventType),
-                                List.copyOf(conditions)));
+                                List.copyOf(conditions),
+                                rawApproximation));
             } catch (RuntimeException | LinkageError ignored) {
                 // The declaration walk in the second pass reports unresolved declarations.
             }
@@ -75,6 +89,28 @@ public final class EventListenerIndex {
 
     public boolean isEmpty() {
         return listenersByEventType.isEmpty();
+    }
+
+    /**
+     * Runtime conditions carried by the listener annotation itself: a non-empty
+     * {@code condition} SpEL attribute, and the transaction-phase dependency of
+     * {@code @TransactionalEventListener} (it only fires when the surrounding
+     * transaction reaches the configured phase). Both make execution conditional,
+     * so broadcast certainty does not hold and the edge must be ambiguous.
+     */
+    private static java.util.List<String> runtimeConditionsOf(MethodDeclaration method) {
+        java.util.List<String> conditions = new ArrayList<>();
+        for (AnnotationExpr annotation : method.getAnnotations()) {
+            String fqn = SpringAnnotations.fqn(annotation);
+            if (fqn == null || !LISTENER_ANNOTATIONS.contains(fqn)) {
+                continue;
+            }
+            if ("org.springframework.transaction.event.TransactionalEventListener".equals(fqn)
+                    || !SpringAnnotations.stringValues(annotation, "condition").isEmpty()) {
+                conditions.add(fqn);
+            }
+        }
+        return conditions;
     }
 
     private static boolean hasListenerAnnotation(MethodDeclaration method) {

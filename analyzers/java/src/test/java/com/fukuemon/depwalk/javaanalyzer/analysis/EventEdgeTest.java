@@ -38,16 +38,28 @@ class EventEdgeTest {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
         assertEquals(0, ran.exitCode(), ran.stderr());
+        assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
 
-        Map<String, Object> toOnOrder = eventEdge(ran, PUBLISH_ORDER, ON_ORDER).orElseThrow();
-        Map<String, Object> toAfterCommit = eventEdge(ran, PUBLISH_ORDER, AFTER_COMMIT).orElseThrow();
-        for (Map<String, Object> metadata : List.of(metadataOf(toOnOrder), metadataOf(toAfterCommit))) {
-            assertEquals("unique", metadata.get("resolution"), "broadcast listeners are each certain: " + metadata);
-            assertEquals(List.of("spring-event"), metadata.get("provenance"));
-            assertNull(metadata.get("conditional"));
-        }
+        Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, ON_ORDER).orElseThrow());
+        assertEquals("unique", metadata.get("resolution"), "broadcast listeners are each certain: " + metadata);
+        assertEquals(List.of("spring-event"), metadata.get("provenance"));
+        assertNull(metadata.get("conditional"));
         // OrderEvent does not match the SpecialOrderEvent listener (no downcast guessing).
         assertTrue(eventEdge(ran, PUBLISH_ORDER, ON_SPECIAL).isEmpty());
+    }
+
+    @Test
+    void transactionalListenerIsConditionalOnTheTransactionPhase() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
+        // @TransactionalEventListener only fires when the transaction reaches the
+        // configured phase, so broadcast certainty does not hold.
+        Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, AFTER_COMMIT).orElseThrow());
+        assertEquals("ambiguous", metadata.get("resolution"));
+        assertEquals(true, metadata.get("conditional"));
+        assertEquals(
+                List.of("org.springframework.transaction.event.TransactionalEventListener"),
+                metadata.get("conditionTypes"));
     }
 
     @Test
@@ -82,12 +94,20 @@ class EventEdgeTest {
     }
 
     @Test
-    void unresolvableEventArgumentEmitsAdvisoryDiagnostic() throws Exception {
+    void unresolvableEventArgumentEmitsAdvisoryDiagnosticOutsideTheLedger() throws Exception {
+        // An unresolvable event argument makes the publishEvent call site itself
+        // unresolvable too, so the run needs allowIncompleteAnalysis to publish.
+        // The advisory property is proven structurally: JAVA_EVENT_UNRESOLVED never
+        // appears in the ledger summary (it is not a call site outcome), and the
+        // ledger still terminates every call site (silentOmission=0).
         Map<String, Object> metadata = AnalysisTestSupport.classpathMetadata();
         metadata.put("allowIncompleteAnalysis", List.of("true"));
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 UNRESOLVED_FIXTURE, metadata, null, null, null, null);
         assertEquals(0, ran.exitCode(), ran.stderr());
+        assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
+        assertFalse(ran.stderr().contains("JAVA_EVENT_UNRESOLVED"),
+                "the advisory code must not appear as a ledger outcome: " + ran.stderr());
         assertTrue(ran.byType("diagnostic").stream().anyMatch(diagnostic ->
                         "JAVA_EVENT_UNRESOLVED".equals(diagnostic.get("code"))
                                 && "warning".equals(diagnostic.get("severity"))),

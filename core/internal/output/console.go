@@ -154,32 +154,25 @@ func formatNode(node NodeView, location *graph.SourceLocation) string {
 // formatEntryPoint renders the framework entry point marker. The "entryPoint"
 // metadata key is the only one Console interprets (the sole exception to the
 // opaque-metadata contract; see ADR-0012). Values are annotation FQNs rendered
-// as "@" + simple name, deduplicated after the conversion while keeping the
-// analyzer-emitted FQN order. Anything malformed renders nothing.
+// as "@" + simple name in lexicographic FQN order (sorted here so the output
+// stays deterministic for any analyzer), deduplicated after the conversion.
+// Non-array values and non-string elements are skipped; the marker is omitted
+// entirely when no valid FQN remains.
 func formatEntryPoint(node NodeView) string {
-	raw, ok := node.Metadata["entryPoint"]
+	values, ok := node.Metadata["entryPoint"].([]any)
 	if !ok {
 		return ""
 	}
 	var fqns []string
-	switch values := raw.(type) {
-	case []any:
-		for _, value := range values {
-			if fqn, ok := value.(string); ok {
-				fqns = append(fqns, fqn)
-			}
+	for _, value := range values {
+		if fqn, ok := value.(string); ok && fqn != "" {
+			fqns = append(fqns, fqn)
 		}
-	case []string:
-		fqns = values
-	default:
-		return ""
 	}
+	slices.Sort(fqns)
 	seen := map[string]bool{}
 	var labels []string
 	for _, fqn := range fqns {
-		if fqn == "" {
-			continue
-		}
 		label := "@" + fqn[strings.LastIndex(fqn, ".")+1:]
 		if !seen[label] {
 			seen[label] = true

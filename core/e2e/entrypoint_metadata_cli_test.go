@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -89,7 +88,10 @@ func TestCLIEntryPointMetadata(t *testing.T) {
 	if consoleResult.exitCode != 0 {
 		t.Fatalf("console CLI exit = %d, want 0; stderr:\n%s", consoleResult.exitCode, consoleResult.stderr)
 	}
-	if !strings.Contains(consoleResult.stdout, "(entry point: @Scheduled)") {
-		t.Fatalf("console output has no entry point marker:\n%s", consoleResult.stdout)
+	// Full-output match pins the marker position (after the location, callee line).
+	wantConsole := "com.example.Batch#nightly()  [com/example/Batch.java:4]  (entry point: @Scheduled)\n" +
+		"└─ com.example.Batch#helper()  [com/example/Batch.java:5]\n"
+	if consoleResult.stdout != wantConsole {
+		t.Fatalf("console output:\n%s\nwant:\n%s", consoleResult.stdout, wantConsole)
 	}
 }
