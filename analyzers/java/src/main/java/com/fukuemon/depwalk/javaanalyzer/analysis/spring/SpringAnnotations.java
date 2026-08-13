@@ -152,6 +152,7 @@ final class SpringAnnotations {
                 || QUALIFIER.equals(fqn)
                 || SPRING_CONDITIONAL.equals(fqn)
                 || STEREOTYPES.contains(fqn)
+                || EntryPointIndex.ENTRY_POINT_ANNOTATIONS.contains(fqn)
                 || fqn.startsWith("org.springframework.boot.autoconfigure.condition.Conditional");
     }
 

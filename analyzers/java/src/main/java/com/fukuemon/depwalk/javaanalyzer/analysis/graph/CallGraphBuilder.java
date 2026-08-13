@@ -13,6 +13,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.TypeSite;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
@@ -102,14 +103,16 @@ public final class CallGraphBuilder {
             CallSiteOutcomeLedger ledger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
-            Set<String> reachableContextIds) {
+            Set<String> reachableContextIds,
+            EntryPointIndex entryPointIndex) {
         this.sourceLocations = new SourceLocations(workspaceRoot);
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
         this.sootUpIndex = sootUpIndex;
         ReachableOwners reachableOwners = new ReachableOwners(declIndex, reachableContextIds);
         this.methodSymbols =
-                new MethodSymbolFactory(accumulator, sourceLocations, sourceMethodIndex, reachableOwners);
+                new MethodSymbolFactory(
+                        accumulator, sourceLocations, sourceMethodIndex, reachableOwners, entryPointIndex);
         this.bytecodeRescue = new BytecodeRescue(sootUpIndex, declIndex, bytecodeIndex, reachableOwners);
         this.ledger = ledger;
         this.declIndex = declIndex;

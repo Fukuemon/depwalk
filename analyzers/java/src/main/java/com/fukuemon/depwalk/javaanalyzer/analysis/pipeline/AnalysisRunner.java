@@ -22,6 +22,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiagnosticEmitter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
@@ -183,6 +184,7 @@ public final class AnalysisRunner {
         AttributionResolver attributionResolver = new AttributionResolver(scope.membership(), liftExcludePackages);
 
         SpringDiIndex springDiIndex = createSpringDiIndex(contexts, scope);
+        EntryPointIndex entryPointIndex = new EntryPointIndex();
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
         GraphAccumulator accumulator = new GraphAccumulator();
         // resolver とは独立した call-site inventory と source 宣言索引
@@ -198,6 +200,7 @@ public final class AnalysisRunner {
             // inventory / 宣言索引の不変条件違反は diagnostic へ降格せず internal fatal のまま伝播させる。
             inventory.accept(unit);
             declIndex.accept(unit, contextByFile.get(file).id());
+            entryPointIndex.accept(unit);
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
@@ -239,7 +242,8 @@ public final class AnalysisRunner {
                     ledger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
-                    reachable));
+                    reachable,
+                    entryPointIndex));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
