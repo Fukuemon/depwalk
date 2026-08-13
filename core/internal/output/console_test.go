@@ -89,6 +89,38 @@ func TestConsoleWriteIsDeterministicForMapInput(t *testing.T) {
 	}
 }
 
+func TestConsoleRendersEntryPointMarker(t *testing.T) {
+	view := consoleView("method:a",
+		[]NodeView{node("method:a", "A"), node("method:b", "B"), node("method:c", "C")},
+		[]EdgeView{
+			edge("edge:ab", "method:a", "method:b"),
+			edge("edge:bc", "method:b", "method:c"),
+			edge("edge:ca", "method:c", "method:a"),
+		}, nil)
+	view.Start.Metadata = map[string]any{"entryPoint": []any{
+		"org.springframework.scheduling.annotation.Scheduled",
+	}}
+	view.Nodes = append([]NodeView(nil), view.Nodes...)
+	view.Nodes[0].Metadata = view.Start.Metadata
+	// javax/jakarta variants collapse to one label after the simple-name conversion.
+	view.Nodes[1].Metadata = map[string]any{"entryPoint": []any{
+		"jakarta.annotation.PostConstruct",
+		"javax.annotation.PostConstruct",
+	}}
+
+	var got bytes.Buffer
+	if err := (consoleFormatter{}).Format(&got, view); err != nil {
+		t.Fatalf("Format() returned error: %v", err)
+	}
+	want := "A()  (entry point: @Scheduled)\n" +
+		"└─ B()  (entry point: @PostConstruct)\n" +
+		"   └─ C()\n" +
+		"      └─ A()  (cycle)  (entry point: @Scheduled)\n"
+	if got.String() != want {
+		t.Errorf("Format() output:\n%s\nwant:\n%s", got.String(), want)
+	}
+}
+
 func TestConsoleIgnoresOpaqueMetadata(t *testing.T) {
 	withoutMetadata := consoleView("method:a",
 		[]NodeView{node("method:a", "A"), node("method:b", "B")},

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
@@ -18,7 +19,7 @@ func (consoleFormatter) Format(w io.Writer, view View) error {
 	}
 
 	tree := newConsoleTree(view)
-	if _, err := fmt.Fprintln(w, formatNode(view.Start, view.Start.Source)); err != nil {
+	if _, err := fmt.Fprintln(w, formatNode(view.Start, view.Start.Source)+formatEntryPoint(view.Start)); err != nil {
 		return err
 	}
 	tree.expanded[view.Start.ID] = true
@@ -113,7 +114,9 @@ func (tree *consoleTree) writeChildren(w io.Writer, parentID, prefix string) err
 		case tree.expanded[child.node.ID]:
 			marker = "既出"
 		}
-		if _, err := fmt.Fprintf(w, "%s%s%s%s\n", prefix, connector, formatNode(child.node, child.callSite), formatMarker(marker)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s%s%s%s%s\n",
+			prefix, connector, formatNode(child.node, child.callSite),
+			formatMarker(marker), formatEntryPoint(child.node)); err != nil {
 			return err
 		}
 		if marker != "" {
@@ -146,6 +149,47 @@ func formatNode(node NodeView, location *graph.SourceLocation) string {
 		return label
 	}
 	return fmt.Sprintf("%s  [%s:%d]", label, location.Path, location.StartLine)
+}
+
+// formatEntryPoint renders the framework entry point marker. The "entryPoint"
+// metadata key is the only one Console interprets (the sole exception to the
+// opaque-metadata contract; see ADR-0012). Values are annotation FQNs rendered
+// as "@" + simple name, deduplicated after the conversion while keeping the
+// analyzer-emitted FQN order. Anything malformed renders nothing.
+func formatEntryPoint(node NodeView) string {
+	raw, ok := node.Metadata["entryPoint"]
+	if !ok {
+		return ""
+	}
+	var fqns []string
+	switch values := raw.(type) {
+	case []any:
+		for _, value := range values {
+			if fqn, ok := value.(string); ok {
+				fqns = append(fqns, fqn)
+			}
+		}
+	case []string:
+		fqns = values
+	default:
+		return ""
+	}
+	seen := map[string]bool{}
+	var labels []string
+	for _, fqn := range fqns {
+		if fqn == "" {
+			continue
+		}
+		label := "@" + fqn[strings.LastIndex(fqn, ".")+1:]
+		if !seen[label] {
+			seen[label] = true
+			labels = append(labels, label)
+		}
+	}
+	if len(labels) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("  (entry point: %s)", strings.Join(labels, ", "))
 }
 
 func formatMarker(marker string) string {

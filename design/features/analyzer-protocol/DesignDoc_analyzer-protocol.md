@@ -114,7 +114,7 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 
 **`metadata` の Core 内保持**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。
 
-`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。唯一の例外は `methodSymbol.metadata` の `entryPoint` key で、Console が表示のためにのみ意味解釈する (未実装、実装は #82 で進行中。判断の正本は [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。表示規則と例外の範囲を定めるのは [Output feature doc](../output/DesignDoc_output.md)。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) が定める。
+`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。唯一の例外は `methodSymbol.metadata` の `entryPoint` key で、Console が表示のためにのみ意味解釈する (判断の正本は [ADR-0012](../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。表示規則と例外の範囲を定めるのは [Output feature doc](../output/DesignDoc_output.md)。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) が定める。
 
 #### `SourceLocation`
 

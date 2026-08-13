@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,5 +74,22 @@ func TestCLIEntryPointMetadata(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("node %s not found in JSON output:\n%s", wantMethod, result.stdout)
+	}
+
+	// Console renders the marker from the same metadata (the only interpreted key).
+	consoleResult := runCLI(t, cliPath, t.TempDir(), javaPath, jarPath,
+		workspace,
+		"--language", "java",
+		"--source-root", ".",
+		"--analyzer-meta", "classpath=",
+		"--analyzer-meta", "javaLanguageLevel=17",
+		"--method", "com.example.Batch#nightly()",
+		"--direction", "callee",
+	)
+	if consoleResult.exitCode != 0 {
+		t.Fatalf("console CLI exit = %d, want 0; stderr:\n%s", consoleResult.exitCode, consoleResult.stderr)
+	}
+	if !strings.Contains(consoleResult.stdout, "(entry point: @Scheduled)") {
+		t.Fatalf("console output has no entry point marker:\n%s", consoleResult.stdout)
 	}
 }
