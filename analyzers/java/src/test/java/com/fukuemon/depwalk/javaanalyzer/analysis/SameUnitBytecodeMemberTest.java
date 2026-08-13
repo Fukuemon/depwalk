@@ -155,6 +155,84 @@ class SameUnitBytecodeMemberTest {
         assertEquals("com/example/Outer.java", ownerLocation.get("path"), ownerLocation.toString());
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void enumGetterAndGeneratedConstructorResolve() throws Exception {
+        // enum の @Getter 相当 (bytecode のみの getter) と、@AllArgsConstructor 相当
+        // (bytecode のみの constructor) が、AST 注入で edge になることを検証する。
+        Path workspace = Files.createDirectories(temp.resolve("enum-workspace"));
+        write(workspace, "com/example/SortColumn.java", """
+                package com.example;
+                public enum SortColumn {
+                    NAME,
+                    CODE;
+                }
+                """);
+        write(workspace, "com/example/Holder.java", """
+                package com.example;
+                public class Holder {
+                    private String name;
+                    private String code;
+                }
+                """);
+        write(workspace, "com/example/Caller.java", """
+                package com.example;
+                public class Caller {
+                    public Holder use(StringBuilder message) {
+                        message.append(SortColumn.NAME.getKey());
+                        return new Holder("a", "b");
+                    }
+                }
+                """);
+
+        Path classes = Files.createDirectories(temp.resolve("enum-classes"));
+        compile(classes, Map.of(
+                "com/example/SortColumn.java", """
+                        package com.example;
+                        public enum SortColumn {
+                            NAME,
+                            CODE;
+                            public String getKey() { return name(); }
+                        }
+                        """,
+                "com/example/Holder.java", """
+                        package com.example;
+                        public class Holder {
+                            private String name;
+                            private String code;
+                            public Holder(String name, String code) {
+                                this.name = name;
+                                this.code = code;
+                            }
+                        }
+                        """,
+                "com/example/Caller.java", """
+                        package com.example;
+                        public class Caller {
+                            public Holder use(StringBuilder message) { return null; }
+                        }
+                        """));
+
+        AnalysisTestSupport.Ran ran = run(workspace, classes);
+
+        assertEquals(0, ran.exitCode(), () -> "diagnostics: " + ran.byType("diagnostic")
+                + "\nerrors: " + ran.byType("error") + "\nstderr: " + ran.stderr());
+        Map<String, Object> getterEdge = ran.byType("callEdge").stream()
+                .filter(edge -> "java:com.example.SortColumn#getKey()".equals(edge.get("calleeMethodId")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("enum getter edge missing: " + ran.byType("callEdge")));
+        Map<String, Object> getterMetadata = (Map<String, Object>) getterEdge.get("metadata");
+        assertEquals("project-bytecode-member", getterMetadata.get("calleeOrigin"), getterMetadata.toString());
+        Map<String, Object> ctorEdge = ran.byType("callEdge").stream()
+                .filter(edge -> "java:com.example.Holder#<init>(java.lang.String,java.lang.String)"
+                        .equals(edge.get("calleeMethodId")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "generated constructor edge missing: " + ran.byType("callEdge")));
+        Map<String, Object> ctorMetadata = (Map<String, Object>) ctorEdge.get("metadata");
+        assertEquals("project-bytecode-member", ctorMetadata.get("calleeOrigin"), ctorMetadata.toString());
+    }
+
     @Test
     void ambiguousOverloadIsNotInjectedAndStaysOnCompletenessGate() throws Exception {
         // 同名・同 arity が bytecode 上に複数ある member は注入しない (一意性規則)。

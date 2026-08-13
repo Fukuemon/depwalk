@@ -257,7 +257,10 @@ public final class CallSiteInventory {
             List<ConstructorDeclaration> constructors = new ArrayList<>();
             if (enclosingType instanceof TypeDeclaration<?> td) {
                 for (BodyDeclaration<?> member : td.getMembers()) {
-                    if (member instanceof ConstructorDeclaration cd) {
+                    // Range を持たない constructor は parse 後に注入された解決専用の標識
+                    // (bytecode-only member 注入)。source の caller 帰属に数えると、
+                    // 注入前の AST で作った inventory と caller 集合がずれる。
+                    if (member instanceof ConstructorDeclaration cd && cd.getRange().isPresent()) {
                         constructors.add(cd);
                     }
                 }

@@ -43,6 +43,7 @@ import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclar
 import com.github.javaparser.resolution.types.ResolvedIntersectionType;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserConstructorDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 
 import java.nio.file.Path;
@@ -177,6 +178,10 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof ConstructorDeclaration cd) {
+            if (cd.containsData(BytecodeMemberAstInjector.INJECTED)) {
+                // 注入 constructor は解決専用の標識 (method 側の walk skip と同じ理由)。
+                return;
+            }
             walkCallableDeclaration(
                     node,
                     ctx,
@@ -492,6 +497,20 @@ public final class CallGraphBuilder {
 
     private void emitConstructorCall(
             ResolvedConstructorDeclaration resolved, Node callNode, WalkContext ctx, CallSiteId.CallKind kind) {
+        // AST 注入の bytecode-only constructor は method 側と同じ出力契約で emit する。
+        if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
+                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
+            SootUpTypeHierarchyIndex.MethodCandidate candidate =
+                    declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
+            BytecodeRescue.Rescue rescue = injectedConstructorRescue(candidate);
+            if (rescue == null) {
+                commitExcludedExternal(callNode, kind, ctx);
+                return;
+            }
+            emitBytecodeOnlyCall(callNode, ctx, rescue, false);
+            commitEmitted(callNode, kind, ctx);
+            return;
+        }
         TypeSite declaringSite = AttributionSites.typeSiteOf(resolved.declaringType());
         AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
         if (attribution.isOmitted()) {
@@ -828,6 +847,21 @@ public final class CallGraphBuilder {
                 "method");
     }
 
+    /** AST 注入の bytecode-only constructor を、救済経路と同じ出力契約へ載せる。 */
+    private BytecodeRescue.Rescue injectedConstructorRescue(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        WorkspaceSourceDeclarationIndex.TypeLocation owner =
+                bytecodeRescue.reachableOwner(candidate).orElse(null);
+        if (owner == null) {
+            return null;
+        }
+        return new BytecodeRescue.Rescue(
+                owner,
+                candidate.declaringType(),
+                MethodIds.CONSTRUCTOR_TOKEN,
+                candidate.parameterTypes(),
+                "constructor");
+    }
+
     /** 解決結果が solver 合成または AST 注入の bytecode-only member ならその candidate。 */
     private static SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnlyCandidate(
             ResolvedMethodDeclaration resolved) {
@@ -914,7 +948,9 @@ public final class CallGraphBuilder {
     private List<String> constructorCallerIdsFor(Node enclosingType) {
         List<ConstructorDeclaration> constructors = new ArrayList<>();
         for (Node member : membersOf(enclosingType)) {
-            if (member instanceof ConstructorDeclaration cd) {
+            // 注入 constructor (Range なし) は caller 帰属に数えない (inventory と
+            // 同じ規則。source 宣言の帰属集合を注入で変えない)。
+            if (member instanceof ConstructorDeclaration cd && cd.getRange().isPresent()) {
                 constructors.add(cd);
             }
         }

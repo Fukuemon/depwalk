@@ -13,7 +13,10 @@ import com.github.javaparser.ast.DataKey;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.type.Type;
 
 import java.util.HashMap;
@@ -76,20 +79,25 @@ public final class BytecodeMemberAstInjector {
         });
     }
 
-    /** unit 内の全 class 宣言へ、source に無い bytecode-only member を注入する。 */
+    /** unit 内の class / enum 宣言へ、source に無い bytecode-only member を注入する。 */
     public void inject(CompilationUnit cu) {
         for (ClassOrInterfaceDeclaration decl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
             if (decl.isInterface()) {
-                // 生成 member が付くのは class (Lombok 等)。interface / enum / record は
-                // solver 側合成 (JavaParserClassDeclaration 限定) と同じ範囲で対象外とし、
-                // source 宣言のままにする。
+                // interface に生成 member は付かない (Lombok 等の対象は class / enum)。
+                // record は accessor が言語仕様で暗黙宣言されるため対象外。
                 continue;
             }
+            injectInto(decl);
+            injectConstructorsInto(decl);
+        }
+        for (EnumDeclaration decl : cu.findAll(EnumDeclaration.class)) {
+            // enum 定数の getter (@Getter 付き enum) を救済する。constructor は enum
+            // 内部からしか呼べず call site 解決に寄与しないため注入しない。
             injectInto(decl);
         }
     }
 
-    private void injectInto(ClassOrInterfaceDeclaration decl) {
+    private void injectInto(TypeDeclaration<?> decl) {
         String binaryName = BinaryNames.forTypeLikeNode(decl);
         if (!speakable(binaryName)) {
             // 匿名・local class は member を注入しても source から参照できる名前を持たない。
@@ -101,6 +109,12 @@ public final class BytecodeMemberAstInjector {
             return;
         }
         Set<String> sourceKeys = new HashSet<>();
+        if (decl instanceof EnumDeclaration) {
+            // values() / valueOf(String) は言語仕様の暗黙宣言で、注入すると JavaParser の
+            // 暗黙解決と二重になる。
+            sourceKeys.add("values/0");
+            sourceKeys.add("valueOf/1");
+        }
         for (MethodDeclaration method : decl.getMethods()) {
             sourceKeys.add(method.getNameAsString() + "/" + method.getParameters().size());
         }
@@ -125,7 +139,7 @@ public final class BytecodeMemberAstInjector {
     }
 
     private void injectCandidate(
-            ClassOrInterfaceDeclaration decl, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+            TypeDeclaration<?> decl, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         Optional<Type> returnType = renderReturnType(candidate);
         if (returnType.isEmpty()) {
             return;
@@ -150,6 +164,63 @@ public final class BytecodeMemberAstInjector {
 
     private static String candidateKey(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         return candidate.methodName() + "/" + candidate.parameterTypes().size();
+    }
+
+    /**
+     * source に無い bytecode-only constructor (@AllArgsConstructor 等の生成
+     * constructor) を注入する。source に constructor が 1 つでも書かれると暗黙
+     * default constructor が消える言語規則と同じく、bytecode の constructor 集合を
+     * 正として同 arity の source 宣言が無いものだけを足す。同 arity が bytecode 上に
+     * 複数ある形は曖昧として注入しない (member と同じ一意性規則)。
+     */
+    private void injectConstructorsInto(ClassOrInterfaceDeclaration decl) {
+        String binaryName = BinaryNames.forTypeLikeNode(decl);
+        if (!speakable(binaryName)) {
+            return;
+        }
+        List<SootUpTypeHierarchyIndex.MethodCandidate> candidates =
+                bytecodeIndex.declaredConstructors(binaryName);
+        if (candidates.isEmpty()) {
+            return;
+        }
+        Set<Integer> sourceArities = new HashSet<>();
+        for (ConstructorDeclaration constructor : decl.getConstructors()) {
+            sourceArities.add(constructor.getParameters().size());
+        }
+        Map<Integer, Integer> arityCounts = new HashMap<>();
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
+            arityCounts.merge(candidate.parameterTypes().size(), 1, Integer::sum);
+        }
+        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
+            int arity = candidate.parameterTypes().size();
+            if (arityCounts.get(arity) != 1 || !sourceArities.add(arity)) {
+                continue;
+            }
+            try {
+                injectConstructor(decl, candidate);
+            } catch (RuntimeException e) {
+                // member 注入と同じ best-effort。失敗した candidate は既存の
+                // constructor 救済経路に委ねる。
+            }
+        }
+    }
+
+    private void injectConstructor(
+            ClassOrInterfaceDeclaration decl, SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        List<Optional<Type>> parameterTypes = candidate.parameterTypes().stream()
+                .map(this::renderType)
+                .toList();
+        if (parameterTypes.stream().anyMatch(Optional::isEmpty)) {
+            return;
+        }
+        ConstructorDeclaration constructor = new ConstructorDeclaration();
+        constructor.setName(decl.getNameAsString());
+        constructor.addModifier(Modifier.Keyword.PUBLIC);
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            constructor.addParameter(parameterTypes.get(i).get(), "arg" + i);
+        }
+        constructor.setData(INJECTED, candidate);
+        decl.addMember(constructor);
     }
 
     /**

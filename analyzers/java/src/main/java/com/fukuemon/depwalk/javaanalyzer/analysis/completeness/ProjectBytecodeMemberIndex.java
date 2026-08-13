@@ -88,6 +88,15 @@ public final class ProjectBytecodeMemberIndex {
         return uniqueByArity(resolution, arity);
     }
 
+    /** 所有 class 自身の全 constructor。AST 注入候補の列挙用。 */
+    public List<SootUpTypeHierarchyIndex.MethodCandidate> declaredConstructors(String ownerBinaryName) {
+        if (!inProjectOutput(ownerBinaryName)) {
+            return List.of();
+        }
+        SootUpTypeHierarchyIndex.Resolution resolution = sootUpIndex.resolveConstructors(ownerBinaryName);
+        return resolution.isAvailable() ? resolution.candidates() : List.of();
+    }
+
     /** 所有 class 自身の全 callable method (JVM 内部 member 除外)。合成候補の列挙用。 */
     public List<SootUpTypeHierarchyIndex.MethodCandidate> declaredCallableMethods(String ownerBinaryName) {
         return declaredCache.computeIfAbsent(ownerBinaryName, this::declaredCallableMethodsUncached);
