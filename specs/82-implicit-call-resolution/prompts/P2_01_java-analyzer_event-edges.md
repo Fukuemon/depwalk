@@ -48,7 +48,7 @@ depends_on: [P1_01_java-analyzer_entry-point-classification.md]
 ### ステップ 2: publishEvent call site の突合と edge 生成
 
 1. unit テストを先に書く (テスト観点を網羅)
-2. `CallGraphBuilder` の method call 処理で `ApplicationEventPublisher#publishEvent()` の call site を検出し、引数の静的型 + 型階層で listener index と突合して candidate edge を生成する。既存の `emitDispatchCandidateEdges` の candidate edge 生成様式 (`edgeId` 重複統合 / metadata 規則) に揃える
+2. `CallGraphBuilder` の method call 処理で `ApplicationEventPublisher#publishEvent()` の call site を検出し、引数の静的型 + 型階層で listener index と突合して candidate edge を生成する。既存の `emitDispatchCandidateEdges` からは candidate edge の生成様式 (`edgeId` 重複統合・metadata の書式) のみを踏襲する。同関数は Spring DI の確度規則 (複数候補 = ambiguous) を内包するため直接再利用せず、resolution / provenance は D7 の broadcast 専用ロジックを新設する
 3. 解決不能時は `JAVA_EVENT_UNRESOLVED` (warning) を `JavaDiagnosticCode` へ追加して診断化する。診断は advisory であり完全性 gate の primary outcome に加えない
 4. patterns fixture に最小再現 (単一 listener / 複数 listener / 条件付き listener / 型階層合致 / 引数型未解決) を追加し、required E2E の成功期待を追加する
 5. `## 検証コマンド` をすべて実行する
@@ -99,7 +99,8 @@ depends_on: [P1_01_java-analyzer_entry-point-classification.md]
 
 ## 設計仕様
 
-- caller = `publishEvent()` call site の囲みメソッド、callee = 引数の静的型とその型階層に合致する listener メソッド
+- 対象 call site: receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) である `publishEvent` 呼び出し
+- caller = call site の囲みメソッド、callee = 引数の静的型とその型階層に合致する listener メソッド
 - broadcast 意味論: 無条件 listener への edge は複数でも各々確定 (`resolution: unique`)。条件付き listener のみ既存規則 (`conditional: true` + `conditionTypes`) で `ambiguous`
 - `callEdge.metadata.provenance` に `spring-event` を積む (既存 `sootup` / `spring-di` と同列。重複統合時は和集合)
 - イベント型の突合は raw type 一致で近似する

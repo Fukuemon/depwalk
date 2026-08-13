@@ -104,10 +104,11 @@ depends_on: []
 - 対象集合 (既知集合として明示列挙):
   - ライフサイクル: `org.springframework.scheduling.annotation.Scheduled` / `PostConstruct` / `PreDestroy` (後者 2 つは `javax.annotation.*` と `jakarta.annotation.*` の両 FQN)
   - イベント listener (分類のみ。edge は P2): `org.springframework.context.event.EventListener` / `org.springframework.transaction.event.TransactionalEventListener`
-  - Web: `org.springframework.web.bind.annotation.RequestMapping` + composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
+  - Web (すべて `org.springframework.web.bind.annotation` 配下の FQN): `RequestMapping` + composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
 - meta-annotation は 1 段のみ検出する。2 段以上は検出不能であり診断も出さない (制約として実装コメントで明示)
 - `methodSymbol.metadata.entryPoint`: 検出アノテーション FQN の string 配列。重複なし・辞書順
 - edge は作らない。擬似 caller node を合成しない (終端根拠のみ)
+- entry point の意味は「framework が直接起動し得るメソッド」であり caller edge の有無とは独立 (listener 系はイベント edge で caller を持ち得るが標識する)
 - `silentOmission == 0` と outcome ledger の終端保証を変更しない
 
 ## テスト観点

@@ -57,3 +57,10 @@ Verdict: NEEDS_WORK → 修正 → **PASS**
 - 正本ハンドオフ完了を確認 (feature doc / context / ADR-0012 反映済み、spec は決定時スナップショットへ降格、全論点に反映先判定)
 - prompts 7 本の自己完結性を確認 (frontmatter + 10 節、antipatterns 注入、実依存 depends_on、差分修正モード規則の遵守)
 - D12 改訂 (marker → cross-module DI 調査) の整合を確認。指摘は実装対象テーブルの旧表記 1 箇所のみ → 修正して PASS
+
+## Multi-agent review 2026-08-13 (branch diff: develop...feature/82)
+
+- 実行: claude / cursor = ok、codex = skip (timeout + リトライ失敗)。2/3 の部分結果
+- 統合指摘: high 5 件 (合意 3 + 未合意 2)・medium 12 件・low 5 件
+- 対応: high + medium を全反映 (+ 規約違反の low 1 件)。設計判断 2 件はユーザー決定 — listener は entry point 集合に残し「framework が直接起動し得るメソッド」と意味を精密化、D12 は修正必達へ格上げ (専用 EARS = cross-module fixture 成功)
+- 未対応 (low、実装時に回す): prompt のブランチ運用と D4 根拠の表現差、EARS「一意と偽らない」の用語、OOM 検知パターンの粒度 (P7 実装時に analyzer-protocol へ照合規則を明記)

@@ -12,7 +12,7 @@ depends_on: []
 
 - spec に明記された範囲だけを対象にする
 - 不明点は推測で埋めず、停止してユーザーに確認する
-- 参照 path を外れて広く探索しない (Grep / Glob / 既存実装の探索は禁止。本 prompt のステップ 1 の「調査」は列挙済み path と実測データの読解に限る)
+- 参照 path を外れて広く探索しない (Grep / Glob / 既存実装の探索は原則禁止)。例外: ステップ 1 (cross-module DI 調査) に限り、`analyzers/java/src/main/java/` 配下の読解と Grep を許可する (調査は原因未特定の欠陥を対象とするため)
 - 別 app / package を追加探索せず、この prompt 内の情報だけで判断する
 - 各作業ステップに含まれる検証 / レビュー手順をスキップしない
 - **完了条件のタスク化**: 作業開始前に「完了条件」セクションの各項目を todo として登録し、各ステップ完了時に状態を更新すること。タスク化せずに作業を開始することは禁止
@@ -62,7 +62,7 @@ depends_on: []
 ### ステップ最終: 実測評価と最終確認
 
 1. 全テスト / lint がパスすることを確認
-2. 実環境検証プロジェクトで再計測し (計測手順は `context/toolchain.md`「実環境解析の運用指針」)、未解決率が基準値 3.9% から改善していることを確認して記録する (識別名は書かない)
+2. 実環境検証プロジェクトで再計測し (計測手順は `context/toolchain.md`「実環境解析の運用指針」)、未解決率が V5 の判定基準 (ledger 未解決終端 3.9% の半減 = 2.0% 以下) を満たすことを確認して記録する (識別名は書かない)。満たさない場合は停止してユーザーへ報告する
 3. D12 の調査結果を spec の `## 上位資料からの変更点` (feature doc への影響の D12 行) に反映し、design 側 (analysis.md の Spring DI 節) へ規則を追記する
 4. commit する (規約: `workflow-git` の commit-format、AI attribution 禁止)
 
@@ -110,7 +110,8 @@ depends_on: []
 - 型伝播救済層: solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する。導出手段は (1) local 変数の宣言・初期化子 (2) chain link の bytecode generic Signature (型引数の伝播) (3) lambda parameter の functional interface 型引数。いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない
 - SAM arity は functional interface の bytecode から導出する。arity が導出できても候補が一意でなければ救済しない (保守側の原則維持)
 - 解決不能は既存どおり `JAVA_UNRESOLVED_SYMBOL` の diagnostic に残す (新 code は増やさない)
-- D12: 解析 context 境界を跨いだ bean candidate 解決を修正する。impl 不在の「Bean 候補なし」は正しい診断として維持する
+- D12 (必達): 解析 context 境界を跨いだ bean candidate 解決を修正する。受け入れ基準 = 「別 module の source に impl を持つ interface の field injection が candidate edge になる」cross-module fixture の成功。impl 不在の「Bean 候補なし」は正しい診断として維持する。修正が解析 context 構造の大改修に及ぶと調査で判明した場合は停止してユーザーへ再判断を仰ぐ
+- 型伝播の適用順序: 手段 1 (local 宣言・初期化子) → 既存規則 1 + 手段 2 (chain generic signature) → 手段 3 (lambda parameter 型引数) → 既存規則 2 (external 判定) → 既存規則 3 → diagnostic (正本: analysis.md「型伝播救済層」の適用順序)
 - `silentOmission == 0` / outcome ledger 終端保証 / ArchUnit の隔離境界 (SootUp / JavaParser) を維持する
 
 ## テスト観点
@@ -134,6 +135,7 @@ depends_on: []
 
 - [ ] ステップ 0 でブランチと Draft PR を準備した (status 遷移済みを確認)
 - [ ] D12 の原因を特定し、修正方針のユーザー確認を得てから実装した
+- [ ] cross-module fixture (別 module impl の candidate edge 化) が成功する (D12 受け入れ基準)
 - [ ] 全ステップを順序通りに実行した
 - [ ] 各ステップで diff レビューを実施し、指摘を対応した
 - [ ] `## 検証コマンド` がすべてパスする

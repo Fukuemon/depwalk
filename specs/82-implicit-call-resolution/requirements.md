@@ -42,14 +42,14 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 
 ## 提供価値(成功条件)
 
-| #   | 成功条件                                                                                                                       |
-| --- | ------------------------------------------------------------------------------------------------------------------------------ |
-| V1  | アノテーション駆動 entry point が caller 探索で「framework entry point」と根拠付きで分類され、未解決と区別できる               |
-| V2  | イベント publish → listener の edge が生成され、イベント経由の caller / callee 探索が途切れない                                |
-| V3  | functional interface 経由で起動される lambda / method reference の実体が、解決可能な範囲で edge になり、不能な場合は診断に残る |
-| V4  | いずれの新分類・新 edge も silent omission を生まない (解決できないケースは必ず diagnostic / metadata として観測可能)          |
-| V5  | stream / generics chain 形状の未解決が実測で減少する (実環境検証プロジェクトの再計測で未解決率 3.9% から改善。追記 2026-08-13) |
-| V6  | 実環境の解析実行が阻害要因 (daemon JVM 非互換 / OOM) で raw 失敗せず、診断または文書化された手順で対処できる (追記 2026-08-13) |
+| #   | 成功条件                                                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| V1  | アノテーション駆動 entry point が caller 探索で「framework entry point」と根拠付きで分類され、未解決と区別できる                                                                                       |
+| V2  | イベント publish → listener の edge が生成され、イベント経由の caller / callee 探索が途切れない                                                                                                        |
+| V3  | functional interface 経由で起動される lambda / method reference の実体が、解決可能な範囲で edge になり、不能な場合は診断に残る                                                                         |
+| V4  | いずれの新分類・新 edge も silent omission を生まない (解決できないケースは必ず diagnostic / metadata として観測可能)                                                                                  |
+| V5  | stream / generics chain 形状の未解決が実測で減少する。判定基準: 実環境検証プロジェクトの再計測で ledger 未解決終端の未解決率 3.9% が半減 (2.0% 以下) する (追記 2026-08-13、判定基準は改訂 2026-08-13) |
+| V6  | 実環境の解析実行が阻害要因 (daemon JVM 非互換 / OOM) で raw 失敗せず、診断または文書化された手順で対処できる (追記 2026-08-13)                                                                         |
 
 ## スコープ
 
@@ -59,7 +59,7 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 - **イベント edge の解決**: `publishEvent()` の引数型 (型階層含む) と `@EventListener` / `@TransactionalEventListener` の listener メソッドを突合し edge を生成する
 - **callable 値渡しの invocation 解決**: functional interface の invocation site から、静的に追跡可能な範囲で渡された lambda / method reference 本体への edge を生成する (追跡可能範囲の境界定義は設計で確定)
 - **stream / generics chain の型解決強化** (追記 2026-08-13): 実環境検証プロジェクトの実測で未解決の支配形状が「stream / lambda chain 内の generics 型推論失敗」と判明したため、この形状の解決強化をスコープに加える。方式は設計で確定する (件数の定義: 未解決診断は計 2,114 件で、内訳は outcome ledger の未解決終端 2,062 件 + DI「Bean 候補なし」52 件。全 call site 52,411 の 3.9% が ledger 未解決終端)
-- **cross-module DI 候補解決の調査・修正** (追記 2026-08-13、改訂 2026-08-13): 「Bean 候補なし」52 件の根拠再検証で、impl クラスが別 Gradle module に実在するのに bean 候補が引けない形状 (cross-module の DI index 解決欠陥の疑い) と、impl 不在 (正しい診断) の 2 形状に分かれると判明した。前者を調査・修正する。初版の「codegen DAO marker 追加」案は根拠誤りのため取り下げ。受け入れは V4 の傘下 (解消されない場合も diagnostic として観測可能) とする
+- **cross-module DI 候補解決の調査・修正** (追記 2026-08-13、改訂 2026-08-13): 「Bean 候補なし」52 件の根拠再検証で、impl クラスが別 Gradle module に実在するのに bean 候補が引けない形状 (cross-module の DI index 解決欠陥の疑い) と、impl 不在 (正しい診断) の 2 形状に分かれると判明した。前者を調査のうえ修正する (必達)。初版の「codegen DAO marker 追加」案は根拠誤りのため取り下げ。受け入れ基準は下記 EARS (cross-module fixture) とし、修正が解析 context 構造の大改修に及ぶと調査で判明した場合は停止してユーザーへ再判断を仰ぐ (改訂 2026-08-13: multi-agent review 指摘により V4 傘下から必達へ格上げ)
 - **解析実行の運用堅牢化** (追記 2026-08-13): Gradle daemon JVM 非互換の回避手段の提供・文書化と、OutOfMemoryError の診断化 (raw stack で異常終了させない)・heap 指針の文書化をスコープに加える (実測で検出した実行阻害要因)
 - 上記すべてで、解決不能ケースの diagnostic 分類 (理由コード) を定める
 
@@ -100,12 +100,12 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 
 ## 例外シナリオ
 
-| #   | シナリオ                                                            | ユーザーへの見せ方                                    | 代替手段                         |
-| --- | ------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------- |
-| 1   | publishEvent の引数型が解決できない                                 | diagnostic (理由: イベント型未解決)                   | 既存の未解決診断と同じ運用       |
-| 2   | listener が条件付き (@Profile 等) で一意に絞れない                  | 曖昧候補として全列挙 + 条件付き事実を metadata に記録 | 既存の条件付き Bean の扱いと同じ |
-| 3   | callable が複数メソッドを経由して渡され静的に追跡できない           | diagnostic (理由: callable 追跡不能)                  | 追跡可能範囲の境界は設計で定義   |
-| 4   | 合成アノテーション (meta-annotation) 経由で対象アノテーションが付与 | 検出対象に含める (検出できない場合は diagnostic)      | 対応範囲の深さは設計で確定       |
+| #   | シナリオ                                                            | ユーザーへの見せ方                                                                                         | 代替手段                         |
+| --- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1   | publishEvent の引数型が解決できない                                 | diagnostic (理由: イベント型未解決)                                                                        | 既存の未解決診断と同じ運用       |
+| 2   | listener が条件付き (@Profile 等) で一意に絞れない                  | 曖昧候補として全列挙 + 条件付き事実を metadata に記録                                                      | 既存の条件付き Bean の扱いと同じ |
+| 3   | callable が複数メソッドを経由して渡され静的に追跡できない           | diagnostic (理由: callable 追跡不能)                                                                       | 追跡可能範囲の境界は設計で定義   |
+| 4   | 合成アノテーション (meta-annotation) 経由で対象アノテーションが付与 | 1 段までは検出する。2 段以上は検出不能で診断も出せない (制約として文書化。改訂 2026-08-13: spec D3 と同期) | 検出深さは spec D3 で確定済み    |
 
 ## バリデーション方針（業務観点）
 
@@ -130,7 +130,7 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 
 ## 受け入れ基準 (EARS)
 
-- WHEN 利用者が `@Scheduled` / `@PostConstruct` / `@PreDestroy` / Web handler メソッドを caller 方向で探索したとき、THE SYSTEM SHALL そのメソッドを framework entry point として根拠 (検出アノテーション) 付きで分類し、未解決 (解析が届かない) と区別して出力する。
+- WHEN 利用者が entry point アノテーション (既知集合の正本: design/features/java-analyzer/analysis.md の entry point 分類。`@ExceptionHandler` / `@ModelAttribute` / listener 系を含む) を付与されたメソッドを caller 方向で探索したとき、THE SYSTEM SHALL そのメソッドを framework entry point として根拠 (検出アノテーション) 付きで分類し、未解決 (解析が届かない) と区別して出力する。(改訂 2026-08-13: 集合の列挙を正本参照へ変更)
 - WHEN `publishEvent()` の引数型が静的に解決でき、対応する `@EventListener` / `@TransactionalEventListener` メソッドが workspace 内に存在するとき、THE SYSTEM SHALL publish 地点から listener メソッドへの edge を生成する。
 - WHEN イベント型の型階層上に複数の listener が合致するとき、THE SYSTEM SHALL 全 listener を候補として列挙し、一意と偽らない。
 - WHEN functional interface の invocation site に渡された lambda / method reference が静的追跡可能な範囲にあるとき、THE SYSTEM SHALL invocation site から実体 (lambda 本体の帰属メソッド / 参照先メソッド) への edge を生成する。
@@ -139,15 +139,16 @@ DesignDoc の Future Work で最優先とされた「解析精度の強化」の
 - WHEN stream / lambda chain 内の generics 型推論が既存 solver で失敗したとき、THE SYSTEM SHALL 強化された解決手段 (方式は設計で確定) で解決を試み、なお不能な場合は既存どおり diagnostic に残す。(追記 2026-08-13)
 - IF 解析実行が OutOfMemoryError に到達した場合、THEN THE SYSTEM SHALL raw stack trace のまま異常終了せず、原因と対処 (heap 指針) を示す error として報告する。(追記 2026-08-13)
 - WHEN Gradle daemon JVM が対象 Gradle の互換範囲外のとき、THE SYSTEM SHALL 利用者が daemon JVM を指定できる手段または文書化された回避手順を提供する。(追記 2026-08-13)
+- WHEN interface の実装クラスが別 Gradle module の source に存在するとき、THE SYSTEM SHALL その interface への field injection を実装クラスへの candidate edge として解決する。(追記 2026-08-13: D12 の必達化に伴う受け入れ基準)
 
 ## 未決事項（論点）
 
-| #   | 論点                                                                      | 決定者      | 期限        | 状態 | メモ                                                         |
-| --- | ------------------------------------------------------------------------- | ----------- | ----------- | ---- | ------------------------------------------------------------ |
-| 1   | callable 値渡しの静的追跡範囲 (同一メソッド内 / クラス内 / Bean 境界越え) | 設計 (spec) | scaffold 時 | 確定 | spec D1 で確定 (同一メソッド内 + 引数渡し 1 段)              |
-| 2   | entry point / イベント edge の Protocol (JSONL) 上の表現                  | 設計 (spec) | scaffold 時 | 確定 | spec D2 で確定 (opaque metadata、schema 変更なし・ADR 不要)  |
-| 3   | 対象アノテーション集合の確定 (合成アノテーションの検出深さ含む)           | 設計 (spec) | scaffold 時 | 確定 | spec D3 で確定 (両版対応 + 1 段。2026-08-13 に 2 件追加改訂) |
-| 4   | 実装の分割 (1 PR か、entry point / イベント / callable の 3 段階か)       | 設計 (spec) | prompts 時  | 確定 | spec D4 で確定 (4 分割 → 拡大後 P1〜P7 へ改訂)               |
+| #   | 論点                                                                      | 決定者      | 期限        | 状態 | メモ                                                                     |
+| --- | ------------------------------------------------------------------------- | ----------- | ----------- | ---- | ------------------------------------------------------------------------ |
+| 1   | callable 値渡しの静的追跡範囲 (同一メソッド内 / クラス内 / Bean 境界越え) | 設計 (spec) | scaffold 時 | 確定 | spec D1 で確定 (同一メソッド内 + 引数渡し 1 段)                          |
+| 2   | entry point / イベント edge の Protocol (JSONL) 上の表現                  | 設計 (spec) | scaffold 時 | 確定 | spec D2 で確定 (opaque metadata、schema 変更なし)。判断の正本は ADR-0012 |
+| 3   | 対象アノテーション集合の確定 (合成アノテーションの検出深さ含む)           | 設計 (spec) | scaffold 時 | 確定 | spec D3 で確定 (両版対応 + 1 段。2026-08-13 に 2 件追加改訂)             |
+| 4   | 実装の分割 (1 PR か、entry point / イベント / callable の 3 段階か)       | 設計 (spec) | prompts 時  | 確定 | spec D4 で確定 (4 分割 → 拡大後 P1〜P7 へ改訂)                           |
 
 ## 設計着手条件チェック
 
