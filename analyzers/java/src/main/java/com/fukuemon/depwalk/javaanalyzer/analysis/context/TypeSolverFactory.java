@@ -49,6 +49,9 @@ public final class TypeSolverFactory {
      * @param classpathEntries 検証済み jar / classes dir
      * @param languageLevel 内部 parser の language level (メインパーサと一致させる)
      * @param bytecodeIndex bytecode-only member の fallback 合成に使う索引 (不要なら null)
+     * @param memberInjector solver 内部 parser の parse 結果へ bytecode-only member を
+     *     注入する injector (不要なら null)。walk 対象 AST への注入と同一 instance を
+     *     渡し、注入の生成点を呼び出し側 1 箇所に保つ
      * @return 合成 TypeSolver
      * @throws IOException jar / classes dir の読み込みに失敗した場合
      */
@@ -56,17 +59,17 @@ public final class TypeSolverFactory {
             List<Path> sourceRoots,
             List<Path> classpathEntries,
             ParserConfiguration.LanguageLevel languageLevel,
-            ProjectBytecodeMemberIndex bytecodeIndex)
+            ProjectBytecodeMemberIndex bytecodeIndex,
+            BytecodeMemberAstInjector memberInjector)
             throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
-        if (bytecodeIndex != null) {
-            // Declarations JavaParser builds directly from solver-internal ASTs
-            // (same-unit references, method-reference targets) never pass through
-            // the augmenting solver below, so the bytecode-only members are
-            // injected into every unit the solver parses.
-            new BytecodeMemberAstInjector(bytecodeIndex).installInto(typeSolverConfig);
+        if (memberInjector != null) {
+            // solver 内部で parse した AST から直接構築される宣言 (同一 unit 内参照や
+            // method reference 先) は下の augmenting solver を通らないため、solver が
+            // parse する全 unit へも member を注入する。
+            memberInjector.installInto(typeSolverConfig);
         }
         for (Path root : sourceRoots) {
             JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);

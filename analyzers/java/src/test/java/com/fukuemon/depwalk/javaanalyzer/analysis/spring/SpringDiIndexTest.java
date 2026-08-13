@@ -38,7 +38,7 @@ class SpringDiIndexTest {
         Path classesDir = compileLombokFixture();
         ParserConfiguration.LanguageLevel languageLevel = ParserConfiguration.LanguageLevel.JAVA_25;
         var typeSolver = TypeSolverFactory.createForRoots(
-                List.of(FIXTURE), List.of(classesDir), languageLevel, null);
+                List.of(FIXTURE), List.of(classesDir), languageLevel, null, null);
         JavaParser parser = new JavaParser(new ParserConfiguration()
                 .setLanguageLevel(languageLevel)
                 .setSymbolResolver(new JavaSymbolSolver(typeSolver)));

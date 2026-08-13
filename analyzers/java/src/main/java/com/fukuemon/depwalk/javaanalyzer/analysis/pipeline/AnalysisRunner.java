@@ -268,9 +268,10 @@ public final class AnalysisRunner {
         for (Path file : scope.allFiles()) {
             SourceSetAnalysisContext context = contextByFile.get(file);
             CompilationUnit cu = parseOrFail(parserByContext.get(context.id()), file);
-            // Same-unit references never reach the type solver, so bytecode-only
-            // members are injected into the walked AST here; the first pass indexes
-            // stay on the uninjected shape (they only inventory source declarations).
+            // 同一 unit 内参照は TypeSolver を経由しないため、walk する AST へ
+            // bytecode-only member をここで注入する。first pass (上のループ) は
+            // 注入前の AST を parse し直して索引化しており、source 宣言の意味論を
+            // 注入で変えない (main parser の構成には injector を入れない)。
             injectorByContext.get(context.id()).inject(cu);
             builderByContext.get(context.id()).process(cu);
             analyzedFileCount++;
@@ -404,14 +405,16 @@ public final class AnalysisRunner {
                     solverEntries.add(output);
                 }
             }
+            BytecodeMemberAstInjector injector =
+                    new BytecodeMemberAstInjector(bytecodeIndexByContext.get(context.id()));
             CombinedTypeSolver typeSolver = TypeSolverFactory.createForRoots(
-                    solverRoots, solverEntries, context.languageLevel(), bytecodeIndexByContext.get(context.id()));
+                    solverRoots, solverEntries, context.languageLevel(),
+                    bytecodeIndexByContext.get(context.id()), injector);
             ParserConfiguration config = new ParserConfiguration()
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
             parserByContext.put(context.id(), new JavaParser(config));
-            injectorByContext.put(context.id(), new BytecodeMemberAstInjector(
-                    bytecodeIndexByContext.get(context.id())));
+            injectorByContext.put(context.id(), injector);
         }
         return parserByContext;
     }

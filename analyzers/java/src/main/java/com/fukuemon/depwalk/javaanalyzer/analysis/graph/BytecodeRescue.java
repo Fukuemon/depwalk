@@ -38,6 +38,7 @@ import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.IntSupplier;
 
 /**
@@ -89,15 +90,14 @@ final class BytecodeRescue {
     }
 
     /**
-     * solver が合成した bytecode-only member の owner。合成は到達可能な scope 内 owner を
-     * 前提に行われるため、ここで引けない場合は analyzer 側の不変条件違反として failfast する。
+     * 合成 / 注入の bytecode-only member の owner の所在。owner の型が scope
+     * (include/exclude 適用後の宣言索引) に無い場合は empty を返す。solver は
+     * scope 外の source も parse するため、empty は不変条件違反ではなく
+     * 「callee が scope 外」を意味する (呼び出し側が external 分類へ落とす)。
      */
-    WorkspaceSourceDeclarationIndex.TypeLocation requireReachableOwner(
+    Optional<WorkspaceSourceDeclarationIndex.TypeLocation> reachableOwner(
             SootUpTypeHierarchyIndex.MethodCandidate candidate) {
-        return reachableOwners.find(candidate.declaringType())
-                .orElseThrow(() -> new IllegalStateException(
-                        "synthesized bytecode member without a reachable in-scope owner: "
-                                + candidate.declaringType() + "#" + candidate.methodName()));
+        return reachableOwners.find(candidate.declaringType());
     }
 
     /**
