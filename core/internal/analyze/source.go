@@ -27,6 +27,11 @@ type Outcome struct {
 	Failure         *AnalyzerFailure
 	ValidationError error
 	ExitCode        int
+	// HeapExhausted は、Analyzer が valid error record なしで異常終了し、stderr に
+	// OutOfMemoryError の痕跡があったことを表す診断ヒント。判定は port 実装 (ACL)
+	// が行い、domain は raw stderr を持たない (契約は analyzer-protocol feature doc
+	// 「異常終了時の stderr の扱い」、判断の正本は ADR-0012)。
+	HeapExhausted bool
 }
 
 // Err は run が終わった原因の失敗を返す。正常終了なら nil。
@@ -40,6 +45,11 @@ func (o Outcome) Err() error {
 		return o.Failure
 	}
 	if o.ExitCode != 0 {
+		if o.HeapExhausted {
+			return fmt.Errorf(
+				"analyzer process exited with code %d: the analyzer ran out of heap (OutOfMemoryError); "+
+					"add or increase -Xmx on the java command in --analyzer-cmd", o.ExitCode)
+		}
 		return fmt.Errorf("analyzer process exited with code %d", o.ExitCode)
 	}
 	if o.ValidationError != nil {
