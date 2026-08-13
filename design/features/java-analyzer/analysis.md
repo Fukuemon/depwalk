@@ -118,7 +118,7 @@ SAM arity を推論できない method reference は救済しない。候補列�
 上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
 
 1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
-2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する (`Collectors.toMap` / `groupingBy` の結果 Map、bound method reference の適用を含む)
+2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する (`Collectors.toMap` と 1 引数 `groupingBy` の結果 Map、bound method reference の適用を含む。downstream collector 付き `groupingBy` の値型と、project bytecode に無い型への unbound method reference は導出しない)。型変数・raw・欠落の erasure である `java.lang.Object` は owner の根拠にしない (既存の前進解決と同じ打ち切り規則)
 3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の receiver の要素型 (手段 2 で復元した型引数) から導出する
 
 JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う (解決済みの erasure と導出の erasure が食い違う場合は解決結果を正とする)。

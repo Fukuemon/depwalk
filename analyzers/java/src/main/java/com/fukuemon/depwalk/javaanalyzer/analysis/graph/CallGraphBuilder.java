@@ -345,7 +345,8 @@ public final class CallGraphBuilder {
                         bytecodeRescue.chainForwardOwner(mce.getScope().get(), ctx.enclosingTypeNode());
                 if (forwardOwner == null) {
                     // erasure の前進解決で辿れない JDK stream / collection 連鎖と
-                    // lambda parameter は、generic 前進導出 (手段②③) で owner を復元する。
+                    // lambda parameter は、generic 前進導出 (型伝播救済層の手段 2 /
+                    // 手段 3) で owner を復元する。
                     forwardOwner = bytecodeRescue.genericChainOwner(mce.getScope().get());
                 }
                 if (forwardOwner != null) {

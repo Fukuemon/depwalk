@@ -86,7 +86,12 @@ final class BytecodeRescue {
      */
     String genericChainOwner(Expression scope) {
         GenericChainTypes.Model model = genericChainTypes.typeOf(scope);
-        return model != null ? model.binaryName() : null;
+        if (model == null || ERASED_TYPE_VARIABLE_BOUND.equals(model.binaryName())) {
+            // Object は「型変数 / raw / 欠落の erasure」の可能性があり owner の根拠に
+            // ならない (既存の chain 前進解決と同じ打ち切り規則。false exclusion 防止)。
+            return null;
+        }
+        return model.binaryName();
     }
 
     /**

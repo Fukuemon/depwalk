@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * JavaParser の generic 推論が失敗した式の型を、確定した根拠だけで前進導出する
- * (java-analyzer feature doc「型伝播救済層」/ ADR-0012 の手段②③)。根拠は次の 3 つに
+ * (java-analyzer feature doc「型伝播救済層」/ adr/0012-implicit-call-resolution-and-type-propagation-rescue.md の手段 2 / 手段 3)。根拠は次の 3 つに
  * 限定し、推測による型付けは行わない。
  *
  * <ul>
@@ -59,9 +59,22 @@ final class GenericChainTypes {
             "java.util.ArrayList", "java.util.LinkedList", "java.util.HashSet",
             "java.util.LinkedHashSet", "java.util.TreeSet", "java.util.ArrayDeque");
 
+    private static final Set<String> LIST_LIKE = Set.of(
+            "java.util.List", "java.util.ArrayList", "java.util.LinkedList");
+
+    private static final Set<String> DEQUE_LIKE = Set.of(
+            "java.util.List", "java.util.ArrayList", "java.util.LinkedList",
+            "java.util.Deque", "java.util.ArrayDeque");
+
     private static final Set<String> STREAM_ELEMENT_PRESERVING = Set.of(
             "filter", "peek", "distinct", "sorted", "limit", "skip", "takeWhile", "dropWhile",
-            "sequential", "parallel", "unordered", "boxed");
+            "sequential", "parallel", "unordered");
+
+    // 単一引数 functional の入力が receiver の要素型である JDK member (toArray 等の
+    // 要素型でない functional を誤って含めないための白リスト)。
+    private static final Set<String> ELEMENT_INPUT_FUNCTIONALS = Set.of(
+            "map", "flatMap", "filter", "peek", "forEach", "forEachOrdered", "anyMatch",
+            "allMatch", "noneMatch", "removeIf", "takeWhile", "dropWhile", "ifPresent");
 
     private final ProjectBytecodeMemberIndex bytecodeIndex;
 
@@ -114,9 +127,6 @@ final class GenericChainTypes {
         for (int i = 0; i < solved.args().size(); i++) {
             Model arg = solved.args().get(i);
             args.add(Model.OBJECT.equals(arg) ? derived.arg(i) : arg);
-        }
-        if (solved.args().isEmpty() && !derived.args().isEmpty()) {
-            args.addAll(derived.args());
         }
         return new Model(solved.binaryName(), List.copyOf(args));
     }
@@ -215,12 +225,20 @@ final class GenericChainTypes {
         return bytecodeReturnModel(receiver.binaryName(), call.getNameAsString(), call.getArguments().size());
     }
 
+    /** project bytecode の一意 instance member に限る戻り値 model (method reference 用)。 */
+    private Model instanceBytecodeReturnModel(String owner, String methodName, int arity) {
+        var candidate = bytecodeIndex.uniqueMethod(owner, methodName, arity).orElse(null);
+        return candidate != null && !candidate.isStatic() ? candidateReturnModel(candidate) : null;
+    }
+
     /** project bytecode の一意 member の generic 戻り値 (Signature が無ければ erasure)。 */
     private Model bytecodeReturnModel(String owner, String methodName, int arity) {
         var candidate = bytecodeIndex.uniqueMethod(owner, methodName, arity).orElse(null);
-        if (candidate == null) {
-            return null;
-        }
+        return candidate != null ? candidateReturnModel(candidate) : null;
+    }
+
+    private Model candidateReturnModel(
+            com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex.MethodCandidate candidate) {
         var generic = bytecodeIndex.genericReturnType(candidate).orElse(null);
         if (generic != null) {
             Model model = toModel(generic);
@@ -263,7 +281,9 @@ final class GenericChainTypes {
                         arity == 0 ? new Model("java.util.stream.Stream", List.of(receiver.arg(0))) : null;
                 case "iterator" ->
                         arity == 0 ? new Model("java.util.Iterator", List.of(receiver.arg(0))) : null;
-                case "get", "getFirst", "getLast", "removeFirst", "removeLast" -> receiver.arg(0);
+                case "get" -> arity == 1 && LIST_LIKE.contains(owner) ? receiver.arg(0) : null;
+                case "getFirst", "getLast", "removeFirst", "removeLast" ->
+                        arity == 0 && DEQUE_LIKE.contains(owner) ? receiver.arg(0) : null;
                 default -> null;
             };
         }
@@ -282,9 +302,9 @@ final class GenericChainTypes {
                             ? mapped
                             : null;
                 }
-                case "toList" -> new Model("java.util.List", List.of(element));
-                case "findFirst", "findAny" -> new Model("java.util.Optional", List.of(element));
-                case "min", "max" -> new Model("java.util.Optional", List.of(element));
+                case "toList" -> arity == 0 ? new Model("java.util.List", List.of(element)) : null;
+                case "findFirst", "findAny" -> arity == 0 ? new Model("java.util.Optional", List.of(element)) : null;
+                case "min", "max" -> arity == 1 ? new Model("java.util.Optional", List.of(element)) : null;
                 case "collect" -> arity == 1
                         ? collectorResultModel(call.getArgument(0), element, lambdaBindings, depth)
                         : null;
@@ -294,8 +314,10 @@ final class GenericChainTypes {
         if ("java.util.Optional".equals(owner)) {
             Model element = receiver.arg(0);
             return switch (method) {
-                case "get", "orElseThrow", "orElse", "orElseGet" -> element;
-                case "filter" -> new Model(owner, List.of(element));
+                case "get" -> arity == 0 ? element : null;
+                case "orElseThrow" -> arity <= 1 ? element : null;
+                case "orElse", "orElseGet" -> arity == 1 ? element : null;
+                case "filter" -> arity == 1 ? new Model(owner, List.of(element)) : null;
                 case "map" -> arity == 1
                         ? wrapIfPresent(owner, functionResultModel(call.getArgument(0), element, lambdaBindings, depth))
                         : null;
@@ -307,12 +329,14 @@ final class GenericChainTypes {
             Model key = receiver.arg(0);
             Model value = receiver.arg(1);
             return switch (method) {
-                case "get", "remove", "put", "getOrDefault", "putIfAbsent", "computeIfAbsent",
-                        "computeIfPresent", "compute", "merge" -> value;
-                case "keySet" -> new Model("java.util.Set", List.of(key));
-                case "values" -> new Model("java.util.Collection", List.of(value));
-                case "entrySet" -> new Model(
-                        "java.util.Set", List.of(new Model("java.util.Map$Entry", List.of(key, value))));
+                case "get", "remove" -> arity == 1 ? value : null;
+                case "put", "getOrDefault", "putIfAbsent", "computeIfAbsent",
+                        "computeIfPresent", "compute", "merge" -> arity == 2 ? value : null;
+                case "keySet" -> arity == 0 ? new Model("java.util.Set", List.of(key)) : null;
+                case "values" -> arity == 0 ? new Model("java.util.Collection", List.of(value)) : null;
+                case "entrySet" -> arity == 0
+                        ? new Model("java.util.Set", List.of(new Model("java.util.Map$Entry", List.of(key, value))))
+                        : null;
                 default -> null;
             };
         }
@@ -339,6 +363,12 @@ final class GenericChainTypes {
         if (!(collector instanceof MethodCallExpr factory)) {
             return null;
         }
+        // 固定表は java.util.stream.Collectors の意味論であり、同名の自作 factory へ
+        // 適用しない。static import 形 (scope なし) は出所を確定できないため対象外。
+        String factoryScope = factory.getScope().map(Object::toString).orElse("");
+        if (!factoryScope.equals("Collectors") && !factoryScope.equals("java.util.stream.Collectors")) {
+            return null;
+        }
         String name = factory.getNameAsString();
         return switch (name) {
             case "toList", "toUnmodifiableList" -> new Model("java.util.List", List.of(element));
@@ -354,7 +384,9 @@ final class GenericChainTypes {
                         : null;
             }
             case "groupingBy" -> {
-                if (factory.getArguments().isEmpty()) {
+                // downstream collector 付き (2/3 引数) の値型は downstream 依存のため
+                // 導出しない (classifier 単独の 1 引数形だけ Map<K, List<E>> と確定できる)。
+                if (factory.getArguments().size() != 1) {
                     yield null;
                 }
                 Model key = functionResultModel(factory.getArgument(0), element, lambdaBindings, depth);
@@ -401,14 +433,16 @@ final class GenericChainTypes {
                 if (receiver != null) {
                     return boundReferenceResult(receiver, reference, lambdaBindings, depth);
                 }
-                // unbound instance method reference (`X::getY`): 要素型上の 0 引数 member。
+                // unbound instance method reference (`X::getY`): 要素型上の 0 引数
+                // instance member。scope の型が解決できなければ導出しない
+                // (推測による owner の当てはめはしない)。
                 String owner;
                 try {
                     owner = BinaryNames.erasureOf(typeExpr.getType().resolve());
                 } catch (RuntimeException | LinkageError e) {
-                    owner = input.binaryName();
+                    return null;
                 }
-                return bytecodeReturnModel(owner, reference.getIdentifier(), 0);
+                return instanceBytecodeReturnModel(owner, reference.getIdentifier(), 0);
             }
             // bound method reference (式 scope): receiver 式の model に入力 1 個を適用する。
             Model receiver = typeOf(scope, lambdaBindings, depth + 1);
@@ -485,7 +519,11 @@ final class GenericChainTypes {
             return null;
         }
         String owner = receiver.binaryName();
-        // 固定表の対象 API では、単一引数 functional の入力は receiver の要素型。
+        // 白リストの member に限り、単一引数 functional の入力 = receiver の要素型
+        // (`toArray(n -> ...)` のような要素型でない functional を含めない)。
+        if (!ELEMENT_INPUT_FUNCTIONALS.contains(target.getNameAsString())) {
+            return null;
+        }
         if ("java.util.stream.Stream".equals(owner)
                 || "java.util.Optional".equals(owner)
                 || COLLECTION_LIKE.contains(owner)) {
@@ -494,7 +532,7 @@ final class GenericChainTypes {
         return null;
     }
 
-    /** 囲み callable 内で同名の local 宣言が一意ならその declarator。 */
+    /** 囲み callable 内で同名の local 宣言が一意かつ anchor から可視ならその declarator。 */
     private static VariableDeclarator uniqueLocalDeclarator(Node anchor, String name) {
         Node scope = anchor;
         Node parent = scope.getParentNode().orElse(null);
@@ -507,7 +545,26 @@ final class GenericChainTypes {
         List<VariableDeclarator> matches = root.findAll(VariableDeclarator.class).stream()
                 .filter(declarator -> declarator.getNameAsString().equals(name))
                 .toList();
-        return matches.size() == 1 ? matches.get(0) : null;
+        if (matches.size() != 1) {
+            return null;
+        }
+        return visibleFrom(matches.get(0), anchor) ? matches.get(0) : null;
+    }
+
+    /**
+     * 宣言の可視範囲 (宣言文を含む block、for 系は statement 自体) が anchor を
+     * 含むかを検査する。兄弟 block や内側の匿名 class の同名宣言を、名前だけの
+     * 一致で採用すると誤った型 → 誤 owner に繋がるため。
+     */
+    private static boolean visibleFrom(VariableDeclarator declarator, Node anchor) {
+        var statement = declarator.findAncestor(com.github.javaparser.ast.stmt.Statement.class).orElse(null);
+        if (statement == null) {
+            return false;
+        }
+        Node visibilityRoot = statement instanceof ExpressionStmt
+                ? statement.getParentNode().orElse(null)
+                : statement;
+        return visibilityRoot != null && (visibilityRoot == anchor || visibilityRoot.isAncestorOf(anchor));
     }
 
     /** 囲み callable の parameter で同名のもの (lambda parameter を除く)。 */

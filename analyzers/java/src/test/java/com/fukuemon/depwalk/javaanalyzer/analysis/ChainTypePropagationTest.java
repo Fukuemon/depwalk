@@ -91,6 +91,59 @@ class ChainTypePropagationTest {
         }
     }
 
+    @Test
+    void groupingByWithDownstreamCollectorIsNotDerived() throws Exception {
+        // downstream collector 付き groupingBy の値型は downstream 依存 (counting なら
+        // Long)。固定表が List<E> と誤導出すると偽 edge になるため、導出しないことを
+        // 「Item への edge が出ない」ことで固定する。
+        Path workspace = Files.createDirectories(temp.resolve("grouping-workspace"));
+        write(workspace, "com/example/Item.java", """
+                package com.example;
+                public class Item {
+                    private String ulid;
+                    private String code;
+                }
+                """);
+        String useCase = """
+                package com.example;
+                import java.util.List;
+                import java.util.stream.Collectors;
+                public class GroupingUseCase {
+                    public String run(List<Item> itemList) {
+                        final var countMap = itemList.stream()
+                            .collect(Collectors.groupingBy(Item::getUlid, Collectors.counting()));
+                        return countMap.values().stream()
+                            .map(count -> count.getCode())
+                            .findFirst()
+                            .orElse(null);
+                    }
+                }
+                """;
+        write(workspace, "com/example/GroupingUseCase.java", useCase);
+
+        Path classes = Files.createDirectories(temp.resolve("grouping-classes"));
+        compile(classes, Map.of("com/example/Item.java", """
+                package com.example;
+                public class Item {
+                    private String ulid;
+                    private String code;
+                    public String getUlid() { return ulid; }
+                    public String getCode() { return code; }
+                }
+                """));
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("classpath", List.of(classes.toString()));
+        metadata.put("javaLanguageLevel", List.of(RELEASE));
+        metadata.put("allowIncompleteAnalysis", List.of("true"));
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+
+        // count は実際には Long であり、Item の member を callee にしてはならない。
+        assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
+                        String.valueOf(edge.get("calleeMethodId")).startsWith("java:com.example.Item#getCode")),
+                () -> "downstream-dependent value type must not be derived: " + ran.byType("callEdge"));
+    }
+
     private void compile(Path classesDir, Map<String, String> sources) throws Exception {
         Path build = temp.resolve("compile-src");
         List<String> args = new ArrayList<>(List.of("--release", RELEASE, "-d", classesDir.toString()));

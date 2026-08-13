@@ -374,11 +374,11 @@ D4 で確定した分割 (改訂 2026-08-13: スコープ拡大に伴い P5〜P7
 
 | 指標                                      | 実装前 (基準) | 実装後      |
 | ----------------------------------------- | ------------- | ----------- |
-| ledger 未解決終端 (call site 52,411 分母) | 2,062 (3.9%)  | 714 (1.36%) |
-| unresolvedSymbols counter                 | 2,114         | 766         |
+| ledger 未解決終端 (call site 52,411 分母) | 2,062 (3.9%)  | 766 (1.46%) |
+| unresolvedSymbols counter                 | 2,114         | 818         |
 | silentOmission                            | 0             | 0           |
 
-**V5 (2.0% 以下) を達成**。寄与は、同一 compilation unit 内の bytecode-only member 参照の AST 注入 (2,114 → 1,403) と、型伝播救済層の generic 前進導出 = chain generic Signature 伝播 + lambda parameter 型導出 (1,403 → 766)。
+**V5 (2.0% 以下) を達成**。寄与は、同一 compilation unit 内の bytecode-only member 参照の AST 注入 (unresolvedSymbols 2,114 → 1,403) と、型伝播救済層の generic 前進導出 = chain generic Signature 伝播 + lambda parameter 型導出 (1,403 → 818。レビュー指摘による偽 edge / false exclusion 防止 guard 込みの最終値)。
 
 ### prompts 生成方針
 
