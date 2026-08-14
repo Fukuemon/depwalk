@@ -34,6 +34,11 @@ type Outcome struct {
 	HeapExhausted bool
 }
 
+// HeapExhaustedHint は analyzer の heap 不足を伝える定型文。protocol 層のエラー
+// wrap と本 package の Err で同じ文言を使う (説明の二重管理を避ける)。
+const HeapExhaustedHint = "the analyzer ran out of heap (OutOfMemoryError); " +
+	"add or increase -Xmx on the java command in --analyzer-cmd (or DEPWALK_ANALYZER_CMD)"
+
 // Err は run が終わった原因の失敗を返す。正常終了なら nil。
 //
 // **判定順に意味がある。** Analyzer 側の致命的な結果 (error record または非ゼロ
@@ -46,9 +51,7 @@ func (o Outcome) Err() error {
 	}
 	if o.ExitCode != 0 {
 		if o.HeapExhausted {
-			return fmt.Errorf(
-				"analyzer process exited with code %d: the analyzer ran out of heap (OutOfMemoryError); "+
-					"add or increase -Xmx on the java command in --analyzer-cmd (or DEPWALK_ANALYZER_CMD)", o.ExitCode)
+			return fmt.Errorf("analyzer process exited with code %d: %s", o.ExitCode, HeapExhaustedHint)
 		}
 		return fmt.Errorf("analyzer process exited with code %d", o.ExitCode)
 	}

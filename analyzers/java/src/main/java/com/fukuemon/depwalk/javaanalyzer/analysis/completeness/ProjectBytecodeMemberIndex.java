@@ -1,6 +1,5 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
-import com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 
@@ -137,10 +136,13 @@ public final class ProjectBytecodeMemberIndex {
     }
 
     private static boolean isJvmInternalName(String methodName) {
-        // `$` 始まりは javac / instrumentation の合成 helper ($values / $jacocoInit 等)。
+        // `$` 始まりでも source に書ける正当な名前はあるため、一律には弾かず
+        // 既知の合成 helper 名だけを除外する。
         return methodName.startsWith("lambda$")
                 || methodName.startsWith("access$")
-                || methodName.startsWith("$")
+                || methodName.equals("$values")
+                || methodName.startsWith("$jacoco")
+                || methodName.startsWith("$deserializeLambda$")
                 || methodName.equals(MethodIds.STATIC_INITIALIZER_TOKEN);
     }
 }

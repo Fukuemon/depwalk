@@ -1,13 +1,11 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.tools.ToolProvider;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,15 +23,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 検証する位置: builder 風 chain の引数、暗黙 this 呼び出し、switch selector と
  * その case 本体 (selector の解決失敗が本体を巻き込まないこと)。
  */
+@DisplayName("同一 compilation unit 内の bytecode-only member 参照の解決")
 class SameUnitBytecodeMemberTest {
-
-    private static final String RELEASE = "17";
 
     @TempDir
     Path temp;
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("同一 unit 内から bytecode-only getter を呼ぶとき、chain 引数・暗黙 this・switch selector のどこでも edge になる")
     void sameUnitCallsToBytecodeOnlyGettersResolveEverywhere() throws Exception {
         Path workspace = Files.createDirectories(temp.resolve("workspace"));
         write(workspace, "com/example/AssignType.java", """
@@ -77,7 +75,7 @@ class SameUnitBytecodeMemberTest {
                 """);
 
         Path classes = Files.createDirectories(temp.resolve("classes"));
-        compile(classes, Map.of(
+        compile("getter-compile-src", classes, Map.of(
                 "com/example/AssignType.java", """
                         package com.example;
                         public enum AssignType {
@@ -157,6 +155,7 @@ class SameUnitBytecodeMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("enum の bytecode-only getter と生成 constructor を呼ぶとき、AST 注入で edge になる")
     void enumGetterAndGeneratedConstructorResolve() throws Exception {
         // enum の @Getter 相当 (bytecode のみの getter) と、@AllArgsConstructor 相当
         // (bytecode のみの constructor) が、AST 注入で edge になることを検証する。
@@ -186,7 +185,7 @@ class SameUnitBytecodeMemberTest {
                 """);
 
         Path classes = Files.createDirectories(temp.resolve("enum-classes"));
-        compile(classes, Map.of(
+        compile("enum-compile-src", classes, Map.of(
                 "com/example/SortColumn.java", """
                         package com.example;
                         public enum SortColumn {
@@ -235,6 +234,7 @@ class SameUnitBytecodeMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("暗黙 default constructor と内部 class constructor の呼び出しは、bytecode-only member として注入されず通常 edge のままになる")
     void implicitConstructorsAreNotInjectedAsBytecodeMembers() throws Exception {
         // javac の暗黙 default constructor と非 static 内部 class の constructor
         // (enclosing instance 引数で source と arity がずれる) は注入しない。
@@ -259,7 +259,7 @@ class SameUnitBytecodeMemberTest {
                 """;
         write(workspace, "com/example/Plain.java", source);
         Path classes = Files.createDirectories(temp.resolve("implicit-classes"));
-        compile(classes, Map.of("com/example/Plain.java", source));
+        compile("implicit-compile-src", classes, Map.of("com/example/Plain.java", source));
 
         AnalysisTestSupport.Ran ran = run(workspace, classes);
 
@@ -267,16 +267,25 @@ class SameUnitBytecodeMemberTest {
                 + "\nerrors: " + ran.byType("error") + "\nstderr: " + ran.stderr());
         assertTrue(ran.byType("diagnostic").isEmpty(),
                 () -> "implicit constructors must stay resolvable: " + ran.byType("diagnostic"));
-        for (Map<String, Object> edge : ran.byType("callEdge")) {
-            if (String.valueOf(edge.get("calleeMethodId")).contains("#<init>")) {
-                Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
-                assertTrue(metadata == null || metadata.get("calleeOrigin") == null,
-                        "implicit constructor must not be marked bytecode-only: " + edge);
-            }
+        // 先に constructor edge の存在を固定する。存在検証なしで calleeOrigin 不在
+        // だけを見ると、edge が 1 本も出ない退行でも成立してしまう。
+        List<Map<String, Object>> ctorEdges = ran.byType("callEdge").stream()
+                .filter(edge -> String.valueOf(edge.get("calleeMethodId")).contains("#<init>"))
+                .toList();
+        for (String callee : List.of(
+                "java:com.example.Plain#<init>()", "java:com.example.Plain$Inner#<init>()")) {
+            assertTrue(ctorEdges.stream().anyMatch(edge -> callee.equals(edge.get("calleeMethodId"))),
+                    () -> "missing constructor edge to " + callee + ": " + ran.byType("callEdge"));
+        }
+        for (Map<String, Object> edge : ctorEdges) {
+            Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+            assertTrue(metadata == null || metadata.get("calleeOrigin") == null,
+                    "implicit constructor must not be marked bytecode-only: " + edge);
         }
     }
 
     @Test
+    @DisplayName("同名・同 arity が bytecode 上に複数ある member は注入せず、呼び出しは完全性 gate に残る")
     void ambiguousOverloadIsNotInjectedAndStaysOnCompletenessGate() throws Exception {
         // 同名・同 arity が bytecode 上に複数ある member は注入しない (一意性規則)。
         // 呼び出しは未解決のまま完全性 gate に残る (偽 edge を作らない)。
@@ -290,7 +299,7 @@ class SameUnitBytecodeMemberTest {
                 }
                 """);
         Path classes = Files.createDirectories(temp.resolve("overload-classes"));
-        compile(classes, Map.of("com/example/Holder.java", """
+        compile("overload-compile-src", classes, Map.of("com/example/Holder.java", """
                 package com.example;
                 public class Holder {
                     public String pick(String value) { return value; }
@@ -312,10 +321,7 @@ class SameUnitBytecodeMemberTest {
     }
 
     private AnalysisTestSupport.Ran run(Path workspace, Path classes) throws Exception {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("classpath", List.of(classes.toString()));
-        metadata.put("javaLanguageLevel", List.of(RELEASE));
-        return AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+        return AnalysisTestSupport.run(workspace, AnalysisTestSupport.classesDirMetadata(classes));
     }
 
     private static Map<String, Object> nodeOf(AnalysisTestSupport.Ran ran, String methodId) {
@@ -326,20 +332,13 @@ class SameUnitBytecodeMemberTest {
                         methodId + " node missing: " + ran.byType("methodSymbol")));
     }
 
-    private void compile(Path classesDir, Map<String, String> sources) throws Exception {
-        Path build = temp.resolve("compile-src-" + sources.hashCode());
-        List<String> args = new ArrayList<>(List.of("--release", RELEASE, "-d", classesDir.toString()));
-        for (Map.Entry<String, String> source : sources.entrySet()) {
-            write(build, source.getKey(), source.getValue());
-            args.add(build.resolve(source.getKey()).toString());
-        }
-        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
-        assertEquals(0, rc, "fixture compile failed");
+    /** compile 用 source の置き場は呼び出し側が意図の分かる名前で指定する。 */
+    private void compile(String buildDirName, Path classesDir, Map<String, String> sources) throws Exception {
+        AnalysisTestSupport.compileFixture(
+                temp.resolve(buildDirName), classesDir, AnalysisTestSupport.FIXTURE_RELEASE, List.of(), sources);
     }
 
     private void write(Path root, String relative, String source) throws Exception {
-        Path file = root.resolve(relative);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, source);
+        AnalysisTestSupport.writeSource(root, relative, source);
     }
 }

@@ -19,6 +19,10 @@ public class Listeners {
     void onOrderConditionally(OrderEvent event) {
     }
 
+    @EventListener(condition = "#event != null")
+    void onOrderWhenExpression(OrderEvent event) {
+    }
+
     @EventListener
     void onSpecial(SpecialOrderEvent event) {
     }

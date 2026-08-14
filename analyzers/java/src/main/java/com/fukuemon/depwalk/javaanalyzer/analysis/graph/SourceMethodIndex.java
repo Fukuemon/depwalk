@@ -24,6 +24,9 @@ import java.util.Optional;
  * <p>呼び出し先候補が宣言ファイルより先に処理されても定義位置を付与できるよう、グラフ生成前の
  * 走査で {@link MethodSymbol} を収集する。メモリ使用量を抑えるため、保持するのは protocol 出力に
  * 必要なシンボル情報だけであり、{@link CompilationUnit} やその他の AST node は保持しない。
+ *
+ * <p>{@link EntryPointIndex} を保持しており、合成アノテーションの対応表が完成する全 unit の
+ * {@link #accept} 完了後でないと entry point 標識を正しく引けない (順序依存)。
  */
 public final class SourceMethodIndex {
 
@@ -78,9 +81,9 @@ public final class SourceMethodIndex {
                         signature,
                         sourceLocation,
                         null));
-                // Annotation FQNs are resolved now (the AST is discarded after this pass)
-                // but mapped to entry points lazily in find(): composed-annotation
-                // declarations may live in a file that has not been accepted yet.
+                // アノテーション FQN はこの時点で解決する (この pass の後 AST は破棄される) が、
+                // entry point への対応付けは find() まで遅延する。合成アノテーションの宣言が
+                // 未 accept の file にありうるため。
                 List<String> annotationFqns = entryPointIndex.annotationFqnsOf(method);
                 if (!annotationFqns.isEmpty()) {
                     annotationFqnsByMethodId.putIfAbsent(methodId, annotationFqns);

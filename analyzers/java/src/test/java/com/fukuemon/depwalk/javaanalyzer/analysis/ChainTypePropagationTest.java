@@ -1,13 +1,11 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.tools.ToolProvider;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,14 +19,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * で edge になることを検証する。導出の根拠は AST の宣言型・classes output の
  * Signature・JDK コレクション API の宣言済み generic 意味論に限る。
  */
+@DisplayName("型伝播救済層の generic 前進導出")
 class ChainTypePropagationTest {
-
-    private static final String RELEASE = "17";
 
     @TempDir
     Path temp;
 
     @Test
+    @DisplayName("generic 推論が壊れる stream chain の中でも、lambda parameter 経由の生成 getter 呼び出しが edge になる")
     void lambdaParamGetterInsideBrokenInferenceChainBecomesEdge() throws Exception {
         Path workspace = Files.createDirectories(temp.resolve("workspace"));
         // walk する source の Item は getter を持たない (bytecode のみ = Lombok 相当)。
@@ -60,7 +58,7 @@ class ChainTypePropagationTest {
         write(workspace, "com/example/UseCase.java", useCase);
 
         Path classes = Files.createDirectories(temp.resolve("classes"));
-        compile(classes, Map.of(
+        compile("chain-compile-src", classes, Map.of(
                 "com/example/Item.java", """
                         package com.example;
                         public class Item {
@@ -72,10 +70,8 @@ class ChainTypePropagationTest {
                         """,
                 "com/example/UseCase.java", useCase));
 
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("classpath", List.of(classes.toString()));
-        metadata.put("javaLanguageLevel", List.of(RELEASE));
-        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+        AnalysisTestSupport.Ran ran =
+                AnalysisTestSupport.run(workspace, AnalysisTestSupport.classesDirMetadata(classes));
 
         assertEquals(0, ran.exitCode(), () -> "diagnostics: " + ran.byType("diagnostic")
                 + "\nerrors: " + ran.byType("error") + "\nstderr: " + ran.stderr());
@@ -92,6 +88,7 @@ class ChainTypePropagationTest {
     }
 
     @Test
+    @DisplayName("downstream collector 付き groupingBy の値型は導出せず、誤った Item への edge を作らない")
     void groupingByWithDownstreamCollectorIsNotDerived() throws Exception {
         // downstream collector 付き groupingBy の値型は downstream 依存 (counting なら
         // Long)。固定表が List<E> と誤導出すると偽 edge になるため、導出しないことを
@@ -122,7 +119,7 @@ class ChainTypePropagationTest {
         write(workspace, "com/example/GroupingUseCase.java", useCase);
 
         Path classes = Files.createDirectories(temp.resolve("grouping-classes"));
-        compile(classes, Map.of("com/example/Item.java", """
+        compile("grouping-compile-src", classes, Map.of("com/example/Item.java", """
                 package com.example;
                 public class Item {
                     private String ulid;
@@ -132,32 +129,30 @@ class ChainTypePropagationTest {
                 }
                 """));
 
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("classpath", List.of(classes.toString()));
-        metadata.put("javaLanguageLevel", List.of(RELEASE));
+        Map<String, Object> metadata = AnalysisTestSupport.classesDirMetadata(classes);
         metadata.put("allowIncompleteAnalysis", List.of("true"));
-        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata, null, null, null, null);
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(workspace, metadata);
 
+        // allowIncompleteAnalysis=true なので、未解決の count.getCode() が残っても
+        // exit code は 0 のまま publish される。
+        assertEquals(0, ran.exitCode(), ran.stderr());
+        // 解析が動いた正の証拠: GroupingUseCase#run の methodSymbol が出力されている。
+        assertTrue(ran.byType("methodSymbol").stream().anyMatch(node ->
+                        "java:com.example.GroupingUseCase#run(java.util.List)".equals(node.get("methodId"))),
+                () -> "GroupingUseCase#run must be analyzed: " + ran.byType("methodSymbol"));
         // count は実際には Long であり、Item の member を callee にしてはならない。
         assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
                         String.valueOf(edge.get("calleeMethodId")).startsWith("java:com.example.Item#getCode")),
                 () -> "downstream-dependent value type must not be derived: " + ran.byType("callEdge"));
     }
 
-    private void compile(Path classesDir, Map<String, String> sources) throws Exception {
-        Path build = temp.resolve("compile-src");
-        List<String> args = new ArrayList<>(List.of("--release", RELEASE, "-d", classesDir.toString()));
-        for (Map.Entry<String, String> source : sources.entrySet()) {
-            write(build, source.getKey(), source.getValue());
-            args.add(build.resolve(source.getKey()).toString());
-        }
-        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
-        assertEquals(0, rc, "fixture compile failed");
+    /** compile 用 source の置き場は呼び出し側が意図の分かる名前で指定する。 */
+    private void compile(String buildDirName, Path classesDir, Map<String, String> sources) throws Exception {
+        AnalysisTestSupport.compileFixture(
+                temp.resolve(buildDirName), classesDir, AnalysisTestSupport.FIXTURE_RELEASE, List.of(), sources);
     }
 
     private void write(Path root, String relative, String source) throws Exception {
-        Path file = root.resolve(relative);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, source);
+        AnalysisTestSupport.writeSource(root, relative, source);
     }
 }

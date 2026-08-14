@@ -12,13 +12,13 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Detects framework entry point annotations without putting Spring on the classpath.
+ * Spring を classpath に置かずに framework entry point アノテーションを検出する。
  *
- * <p>An entry point is a method the framework may invoke directly; the marker is
- * independent of whether the method also has caller edges (see ADR-0012). The first
- * pass records workspace annotation declarations that carry a known entry point
- * annotation, so user-defined composed annotations are detected one meta level deep.
- * Deeper nesting is undetectable by design and produces no diagnostic.
+ * <p>entry point は framework が直接起動しうる method であり、標識は caller edge の有無と
+ * 独立している (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。
+ * first pass で、既知の entry point アノテーションを担持する workspace のアノテーション宣言を
+ * 記録し、ユーザー定義の合成アノテーションをメタ 1 段まで検出する。より深い入れ子は設計上
+ * 検出対象外であり、診断も出さない。
  */
 public final class EntryPointIndex {
 
@@ -27,13 +27,17 @@ public final class EntryPointIndex {
     private final Map<String, Set<String>> composedToEntryPoints = new LinkedHashMap<>();
 
     /**
-     * First pass: record user-defined annotations that directly carry an entry point
-     * annotation (one meta level only). Duplicated declarations keep the first entry
-     * (first-wins, consistent with the other first-pass indexes). Local annotation
-     * declarations without a resolvable qualified name are skipped.
+     * first pass: entry point アノテーションを直接 (メタ 1 段のみ) 担持するユーザー定義
+     * アノテーションを記録する。重複宣言は最初の entry を保持する (他の first-pass 索引と
+     * 揃えた first-wins)。修飾名を解決できない local アノテーション宣言は読み飛ばす。
      */
     public void accept(CompilationUnit unit) {
         for (AnnotationDeclaration declaration : unit.findAll(AnnotationDeclaration.class)) {
+            if (!declaration.isTopLevelType()) {
+                // nested / local に宣言した合成アノテーションは検出対象外
+                // (design/features/java-analyzer/analysis.md の制約)。
+                continue;
+            }
             Set<String> carried = new TreeSet<>();
             for (AnnotationExpr annotation : declaration.getAnnotations()) {
                 String fqn = SpringAnnotations.fqn(annotation);
@@ -49,19 +53,21 @@ public final class EntryPointIndex {
     }
 
     /**
-     * Entry point annotation FQNs detected on the node, sorted and deduplicated.
-     * Composed annotations contribute the carried entry point FQN, not their own name,
-     * so the marker always names a known framework annotation. Only method-level
-     * annotations are inspected by callers; type-level mappings are out of scope.
+     * node 上で検出した entry point アノテーション FQN (辞書順・重複なし)。合成アノテーションは
+     * 自身の名前でなく担持している entry point FQN で数えるため、標識は常に既知の framework
+     * アノテーション名になる。呼び出し側が検査するのは method レベルのアノテーションのみ
+     * (型レベルの対応付けは対象外)。
      */
-    public List<String> entryPointsOf(NodeWithAnnotations<?> node) {
+    // 実経路は annotationFqnsOf + entryPointsOfAnnotationFqns の 2 段。この合成形は
+    // 同 package の unit test だけが使う。
+    List<String> entryPointsOf(NodeWithAnnotations<?> node) {
         return entryPointsOfAnnotationFqns(annotationFqnsOf(node));
     }
 
     /**
-     * Raw annotation FQNs of the node, for callers that must resolve annotations
-     * eagerly but map them to entry points later (the composed-annotation map may
-     * not be complete until every compilation unit has been accepted).
+     * node の生のアノテーション FQN 列。アノテーション解決は即時に行い、entry point への
+     * 対応付けは後で行う呼び出し側のための形 (合成アノテーションの対応表は全 compilation
+     * unit の accept が終わるまで完全にならない)。
      */
     public List<String> annotationFqnsOf(NodeWithAnnotations<?> node) {
         List<String> fqns = new java.util.ArrayList<>();
@@ -74,7 +80,7 @@ public final class EntryPointIndex {
         return List.copyOf(fqns);
     }
 
-    /** Maps already-resolved annotation FQNs to entry point FQNs (sorted, deduplicated). */
+    /** 解決済みアノテーション FQN 列を entry point FQN (辞書順・重複なし) へ対応付ける。 */
     public List<String> entryPointsOfAnnotationFqns(List<String> annotationFqns) {
         Set<String> found = new TreeSet<>();
         for (String fqn : annotationFqns) {

@@ -1,6 +1,22 @@
 package e2e
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// mkdirFor は workspace 配下の相対 path の親 directory を作成し、
+// ファイルの絶対 path を返す。一時 workspace へ fixture source を並べる
+// テストが共有する。
+func mkdirFor(t *testing.T, workspace, relative string) string {
+	t.Helper()
+	path := filepath.Join(workspace, filepath.FromSlash(relative))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir for %s: %v", relative, err)
+	}
+	return path
+}
 
 // TestE2ERequired は skipOrFail が t.Skip と t.Fatal を選ぶ分岐条件を検証する。
 //

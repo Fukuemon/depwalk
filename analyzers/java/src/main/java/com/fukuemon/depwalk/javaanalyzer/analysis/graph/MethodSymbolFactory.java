@@ -55,10 +55,10 @@ final class MethodSymbolFactory {
         if (attribution.outcome() == AttributionResult.Outcome.SCOPE_INTERNAL) {
             Node ast = resolved.toAst().orElse(null);
             sourceLocation = ast != null ? sourceLocations.sourceLocationOf(ast) : null;
-            // The marker is looked up by methodId, not from the AST, so every build path
-            // (declaration walk, call-site callee even when toAst() is empty, candidate
-            // remapping via SourceMethodIndex.find) yields the same metadata and the
-            // first-wins node dedupe cannot drop it.
+            // entry point 標識は AST でなく methodId で引く。どの生成経路 (宣言 walk /
+            // toAst() が空の call-site callee / SourceMethodIndex.find 経由の candidate
+            // 再対応付け) でも同じ metadata になり、first-wins の node 重複排除で標識が
+            // 落ちない。
             List<String> entryPoints = sourceMethodIndex.entryPointsFor(methodId);
             if (!entryPoints.isEmpty()) {
                 metadata = Map.of("entryPoint", entryPoints);

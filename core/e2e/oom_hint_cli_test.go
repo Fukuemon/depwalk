@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,11 @@ import (
 // exit 1 になることを確かめる。fake analyzer は stderr へ OOM を書いて死ぬだけの
 // script で、stdout には何も出さない (error record なしの経路)。
 func TestCLIOOMHint(t *testing.T) {
+	// fake analyzer が POSIX shell script (#!/bin/sh) であり、Windows では
+	// 実行できないため skip する。
+	if runtime.GOOS == "windows" {
+		t.Skip("fake analyzer は POSIX shell に依存する")
+	}
 	cliPath := buildCoreCLI(t)
 
 	script := filepath.Join(t.TempDir(), "oom-analyzer.sh")

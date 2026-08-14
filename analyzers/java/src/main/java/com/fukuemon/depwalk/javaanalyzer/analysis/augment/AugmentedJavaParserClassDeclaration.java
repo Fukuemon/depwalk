@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.GenericSignatureReader;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;

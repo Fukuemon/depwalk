@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.GenericSignatureReader;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 
@@ -66,6 +67,13 @@ final class GenericChainTypes {
             "java.util.List", "java.util.ArrayList", "java.util.LinkedList",
             "java.util.Deque", "java.util.ArrayDeque");
 
+    // 固定表の意味論を適用する Map 型の明示列挙。名前 pattern (java.util.* かつ *Map) の
+    // 判定は、意味論を確認していない型まで意図せず対象へ含めるため採らない。
+    private static final Set<String> MAP_LIKE = Set.of(
+            "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap", "java.util.TreeMap",
+            "java.util.SortedMap", "java.util.NavigableMap",
+            "java.util.concurrent.ConcurrentHashMap", "java.util.concurrent.ConcurrentMap");
+
     private static final Set<String> STREAM_ELEMENT_PRESERVING = Set.of(
             "filter", "peek", "distinct", "sorted", "limit", "skip", "takeWhile", "dropWhile",
             "sequential", "parallel", "unordered");
@@ -92,8 +100,9 @@ final class GenericChainTypes {
             return null;
         }
         // JavaParser は推論が壊れた chain でも「型引数を Object へ落とした」結果を
-        // 返すことがある (部分成功)。劣化のない解決結果だけを正とし、劣化して
-        // いれば自前導出とマージして型引数を補う。
+        // 返すことがある (部分成功)。Object へ落ちた型引数を持つ場合だけ自前導出と
+        // マージして補う。raw (型引数 0 個) は劣化と扱わずそのまま採用する。全ての
+        // 型引数なし型で導出を走らせるコストを避けるため。
         Model solved = trySolvedModel(expression);
         if (solved != null && solved.args().stream().noneMatch(Model.OBJECT::equals)) {
             return solved;
@@ -254,7 +263,7 @@ final class GenericChainTypes {
     }
 
     private static Model toModel(
-            com.fukuemon.depwalk.javaanalyzer.analysis.augment.GenericSignatureReader.BytecodeType model) {
+            GenericSignatureReader.BytecodeType model) {
         if (model.typeVariable() || model.arrayDims() > 0) {
             return null;
         }
@@ -325,7 +334,7 @@ final class GenericChainTypes {
                 default -> null;
             };
         }
-        if (owner.startsWith("java.util.") && owner.endsWith("Map")) {
+        if (MAP_LIKE.contains(owner)) {
             Model key = receiver.arg(0);
             Model value = receiver.arg(1);
             return switch (method) {
@@ -479,6 +488,7 @@ final class GenericChainTypes {
 
     private Model boundReferenceResult(
             Model receiver, MethodReferenceExpr reference, Map<String, Model> lambdaBindings, int depth) {
+        // この関数は Function 適用 (入力 1 個) の文脈からしか呼ばれないため、probe は常に 1 引数で足りる。
         MethodCallExpr probe = new MethodCallExpr(reference.getIdentifier(), new NameExpr("arg0"));
         return memberResultModel(receiver, probe, lambdaBindings, depth + 1);
     }

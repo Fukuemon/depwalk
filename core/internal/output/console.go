@@ -151,13 +151,12 @@ func formatNode(node NodeView, location *graph.SourceLocation) string {
 	return fmt.Sprintf("%s  [%s:%d]", label, location.Path, location.StartLine)
 }
 
-// formatEntryPoint renders the framework entry point marker. The "entryPoint"
-// metadata key is the only one Console interprets (the sole exception to the
-// opaque-metadata contract; see ADR-0012). Values are annotation FQNs rendered
-// as "@" + simple name in lexicographic FQN order (sorted here so the output
-// stays deterministic for any analyzer), deduplicated after the conversion.
-// Non-array values and non-string elements are skipped; the marker is omitted
-// entirely when no valid FQN remains.
+// formatEntryPoint は framework 由来 entry point の標識を描画する。Console が意味
+// 解釈する metadata key は "entryPoint" だけ (opaque metadata 契約の唯一の例外。
+// adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。値はアノテー
+// ションの FQN で、FQN の辞書順に並べてから "@" + 単純名へ変換し、変換後に重複を
+// 除く (analyzer によらず出力を決定的にするため)。配列でない値・string でない要素
+// は読み飛ばし、有効な FQN が残らなければ標識自体を出さない。
 func formatEntryPoint(node NodeView) string {
 	values, ok := node.Metadata["entryPoint"].([]any)
 	if !ok {

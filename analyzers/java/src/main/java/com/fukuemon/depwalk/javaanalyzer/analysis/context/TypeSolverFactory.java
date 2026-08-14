@@ -81,7 +81,7 @@ public final class TypeSolverFactory {
         // record の canonical constructor 解決 (JavaParserRecordDeclaration) は
         // solver 内部 CU の Parameter#resolve() を呼ぶため、resolver 不在だと
         // "Symbol resolution not configured" の IllegalStateException になる
-        // (#24 実プロジェクト検証で検出)。config は parse 時に参照されるため
+        // (実プロジェクト検証で検出)。config は parse 時に参照されるため
         // 循環参照でも post-hoc 設定で機能する。
         typeSolverConfig.setSymbolResolver(new JavaSymbolSolver(typeSolver));
         List<Path> entries = classpathEntries.stream()

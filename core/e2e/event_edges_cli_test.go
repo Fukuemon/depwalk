@@ -2,8 +2,6 @@ package e2e
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -81,13 +79,4 @@ func TestCLIEventEdgeMetadata(t *testing.T) {
 		return
 	}
 	t.Fatalf("event edge to the listener not found in JSON output:\n%s", result.stdout)
-}
-
-func mkdirFor(t *testing.T, workspace, relative string) string {
-	t.Helper()
-	path := filepath.Join(workspace, filepath.FromSlash(relative))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir for %s: %v", relative, err)
-	}
-	return path
 }

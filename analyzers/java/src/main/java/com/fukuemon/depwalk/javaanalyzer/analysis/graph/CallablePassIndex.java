@@ -20,22 +20,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * One-hop mapping from a workspace method parameter to the callables passed to it.
+ * workspace method の parameter から、そこへ渡された callable への 1 hop の対応表。
  *
- * <p>Feeds the callable invocation edges (ADR-0012): when a lambda or method
- * reference is passed as an argument to a workspace method, invoking the matching
- * parameter inside that method links back to the callable body. Only the direct
- * argument-passing hop is indexed; field stores and multi-hop flows stay out of
- * scope by design. Resolution failures are skipped silently — the passing call
- * site itself is classified by the normal second-pass processing.
+ * <p>callable invocation edge の生成
+ * (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) に使う: lambda /
+ * method reference を workspace method の引数に渡した場合、その method 内で該当 parameter を
+ * invoke する箇所を callable 本体へ結び付ける。索引するのは直接の引数渡し 1 hop のみで、
+ * field への格納と多段の流れは設計上対象外。解決失敗は黙って読み飛ばす (渡している call
+ * site 自体の終端は通常の second pass 処理が分類する)。
+ *
+ * <p>複数の call site から渡された callable は同一の parameter キーへ集約される。これは
+ * invocation 側で候補を全列挙する設計 (design/features/java-analyzer/analysis.md の
+ * callable 追跡) のためであり、call site ごとに分離しない。
  */
 public final class CallablePassIndex {
 
     /**
-     * The callable body an invocation should link to: the referenced method for a
-     * method (or constructor) reference, the lexically enclosing method for a lambda
-     * (the lambda body belongs to that node; the marker keeps the approximation
-     * observable).
+     * invocation の結び付け先となる callable 本体。method (constructor) reference は
+     * 参照先、lambda は字句的に囲む method (lambda body はその node に属する近似で、
+     * 近似であることは edge の標識で観測できる)。
      */
     public record CallableTarget(String declaringType, String methodName, List<String> parameterTypes) {
     }
@@ -43,12 +46,11 @@ public final class CallablePassIndex {
     private final Map<String, List<CallableTarget>> targetsByParameter = new LinkedHashMap<>();
 
     /**
-     * First pass: record lambda / method reference arguments by the statically
-     * resolved target declaration. Targets are indexed regardless of ownership;
-     * edge emission restricts callees to reachable workspace methods. Variadic
-     * argument positions beyond the declared parameters are indexed but never
-     * looked up (the invocation side reads declared parameter indexes only), so
-     * variadic callables stay untracked by design.
+     * first pass: lambda / method reference 引数を、静的に解決した渡し先宣言で索引する。
+     * 所有 context を問わず索引し、edge 出力側で callee を到達可能な workspace method へ
+     * 制限する。宣言 parameter 数を超える可変長引数位置は索引されるが参照されない
+     * (invocation 側は宣言 parameter の index しか引かない) ため、可変長へ渡した callable は
+     * 設計上未追跡のまま。
      */
     public void accept(CompilationUnit unit) {
         for (MethodCallExpr call : unit.findAll(MethodCallExpr.class)) {
@@ -69,13 +71,13 @@ public final class CallablePassIndex {
                                 .add(callable);
                     }
                 } catch (RuntimeException | LinkageError ignored) {
-                    // The passing call site is diagnosed by the normal path if needed.
+                    // 渡している call site 自体は必要なら通常経路が診断する。
                 }
             }
         }
     }
 
-    /** Callables passed to the given parameter of the given method. Empty when none. */
+    /** 指定 method の指定 parameter へ渡された callable。無ければ空。 */
     public List<CallableTarget> callablesFor(String methodId, int parameterIndex) {
         return targetsByParameter.getOrDefault(parameterKey(methodId, parameterIndex), List.of());
     }
@@ -89,9 +91,8 @@ public final class CallablePassIndex {
     }
 
     /**
-     * The callable body a lambda / method reference expression stands for, or null
-     * when it cannot be determined (unsupported shape or resolution failure is
-     * propagated to the caller as an exception).
+     * lambda / method reference 式が表す callable 本体。未対応の形なら null。
+     * 解決失敗は例外のまま呼び出し側へ伝播する。
      */
     static CallableTarget targetOf(Expression callableExpression) {
         if (callableExpression instanceof MethodReferenceExpr reference) {
@@ -136,7 +137,7 @@ public final class CallablePassIndex {
         return null;
     }
 
-    /** The method or constructor lexically enclosing the lambda expression. */
+    /** lambda 式を字句的に囲む method または constructor。 */
     private static CallableTarget enclosingCallableOf(Node node) {
         MethodDeclaration method = node.findAncestor(MethodDeclaration.class).orElse(null);
         if (method != null) {
@@ -161,7 +162,7 @@ public final class CallablePassIndex {
                     MethodIds.CONSTRUCTOR_TOKEN,
                     List.copyOf(parameterTypes));
         }
-        // Lambdas in initializers are out of scope (their calls are folded elsewhere).
+        // initializer 内の lambda は対象外 (その呼び出しは別経路で畳み込まれる)。
         return null;
     }
 }

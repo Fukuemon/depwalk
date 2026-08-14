@@ -1,5 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.GenericSignatureReader;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
@@ -9,7 +11,6 @@ import com.github.javaparser.ParseResult;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.Processor;
 import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.DataKey;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -39,7 +40,7 @@ import java.util.regex.Pattern;
  * 「solver 層の bytecode member 合成」の AST 注入節。
  *
  * <p>注入宣言は解決専用の標識であり source 宣言として扱わない: 由来の bytecode
- * candidate を {@link #INJECTED} で保持し、graph builder は注入 member への呼び出しを
+ * candidate を {@link InjectedDeclarations#KEY} で保持し、graph builder は注入 member への呼び出しを
  * bytecode-only member の出力契約 (adr/0005-adopt-sootup-and-spring-di-resolution.md)
  * で emit し、caller としては walk しない。
  *
@@ -48,10 +49,6 @@ import java.util.regex.Pattern;
  * 制約であり、resolvability の検査を持たないのはこのためである。
  */
 public final class BytecodeMemberAstInjector {
-
-    /** 注入宣言の標識。由来の bytecode candidate を保持する。 */
-    public static final DataKey<SootUpTypeHierarchyIndex.MethodCandidate> INJECTED = new DataKey<>() {
-    };
 
     // 匿名・local class の名前部 ($ + 数字) は source に書けない。
     private static final Pattern UNSPEAKABLE_NAME_PART = Pattern.compile("\\$\\d");
@@ -159,7 +156,7 @@ public final class BytecodeMemberAstInjector {
         for (int i = 0; i < parameterTypes.size(); i++) {
             method.addParameter(parameterTypes.get(i).get(), "arg" + i);
         }
-        method.setData(INJECTED, candidate);
+        method.setData(InjectedDeclarations.KEY, candidate);
     }
 
     private static String candidateKey(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
@@ -197,9 +194,11 @@ public final class BytecodeMemberAstInjector {
         if (candidates.isEmpty()) {
             return;
         }
-        // source に constructor が無く bytecode も 0 引数 1 件だけなら、それは javac の
-        // 暗黙 default constructor であり、注入すると source 実在の宣言を bytecode-only
-        // と偽装する。言語仕様の暗黙宣言は注入しない (enum の values / valueOf と同じ規則)。
+        // source に constructor が無く bytecode も 0 引数 1 件だけなら、暗黙 default
+        // constructor と同じ形なので注入しない (注入すると source 実在の宣言を
+        // bytecode-only と偽装する)。生成された 0 引数 constructor (@NoArgsConstructor
+        // 等) も同じ形になるが、その場合も呼び出しは暗黙 default として通常どおり
+        // 解決されるため、注入しない側に倒して困らない。
         boolean sourceHasConstructors = !decl.getConstructors().isEmpty();
         if (!sourceHasConstructors
                 && candidates.size() == 1
@@ -242,7 +241,7 @@ public final class BytecodeMemberAstInjector {
         for (int i = 0; i < parameterTypes.size(); i++) {
             constructor.addParameter(parameterTypes.get(i).get(), "arg" + i);
         }
-        constructor.setData(INJECTED, candidate);
+        constructor.setData(InjectedDeclarations.KEY, candidate);
         decl.addMember(constructor);
     }
 

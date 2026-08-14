@@ -75,7 +75,7 @@ func TestCLIEntryPointMetadata(t *testing.T) {
 		t.Fatalf("node %s not found in JSON output:\n%s", wantMethod, result.stdout)
 	}
 
-	// Console renders the marker from the same metadata (the only interpreted key).
+	// Console は同じ metadata から標識を描画する (解釈される key は entryPoint のみ)。
 	consoleResult := runCLI(t, cliPath, t.TempDir(), javaPath, jarPath,
 		workspace,
 		"--language", "java",
@@ -88,7 +88,7 @@ func TestCLIEntryPointMetadata(t *testing.T) {
 	if consoleResult.exitCode != 0 {
 		t.Fatalf("console CLI exit = %d, want 0; stderr:\n%s", consoleResult.exitCode, consoleResult.stderr)
 	}
-	// Full-output match pins the marker position (after the location, callee line).
+	// 出力全文の一致で標識の位置 (location の後、callee 行) を固定する。
 	wantConsole := "com.example.Batch#nightly()  [com/example/Batch.java:4]  (entry point: @Scheduled)\n" +
 		"└─ com.example.Batch#helper()  [com/example/Batch.java:5]\n"
 	if consoleResult.stdout != wantConsole {

@@ -206,11 +206,11 @@ public final class AnalysisRunner {
             // inventory / 宣言索引の不変条件違反は diagnostic へ降格せず internal fatal のまま伝播させる。
             inventory.accept(unit);
             declIndex.accept(unit, contextByFile.get(file).id());
-            // Annotation resolution failures are swallowed inside SpringAnnotations.fqn,
-            // so this accept introduces no new fatal path (no try/catch needed).
+            // アノテーション解決の失敗は SpringAnnotations.fqn の内部で握られるため、
+            // この accept は新しい fatal 経路を作らない (try/catch 不要)。
             entryPointIndex.accept(unit);
-            // Listener declarations that fail to resolve are skipped inside accept;
-            // the second pass diagnoses them through the normal declaration path.
+            // 解決できない listener 宣言は accept 内で索引から漏れる (登録漏れは
+            // publish 側の JAVA_EVENT_UNRESOLVED warning として観測される)。
             eventListenerIndex.accept(unit);
             callablePassIndex.accept(unit);
             try {

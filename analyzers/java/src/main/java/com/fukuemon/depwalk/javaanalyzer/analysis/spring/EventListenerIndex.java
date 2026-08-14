@@ -15,13 +15,14 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Spring event listener methods indexed by their (raw) event parameter type.
+ * Spring event listener method を (raw の) event parameter 型で索引する。
  *
- * <p>Feeds the publish-to-listener edge generation (broadcast semantics, ADR-0012):
- * every matching listener is a certain callee, ambiguity applies only to conditional
- * listeners. Only single-parameter methods directly annotated with a listener
- * annotation are indexed; the {@code classes} attribute form and composed listener
- * annotations are out of scope.
+ * <p>publish → listener の edge 生成 (broadcast 意味論、
+ * adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) に使う。合致した
+ * listener はいずれも callee になり、実行時条件を持つ listener と raw type 近似が
+ * 過剰一致しうる listener が ambiguous になる。listener アノテーションを直接付けた
+ * 単一 parameter の method だけを索引し、{@code classes} 属性形と合成 listener
+ * アノテーションは対象外。
  */
 public final class EventListenerIndex {
 
@@ -30,12 +31,12 @@ public final class EventListenerIndex {
             "org.springframework.transaction.event.TransactionalEventListener");
 
     /**
-     * One indexed listener method. {@code parameterTypes} always has one element.
-     * {@code conditionTypes} carries every runtime condition source (condition
-     * annotations, a non-empty {@code condition} SpEL attribute, or the transactional
-     * phase dependency of {@code @TransactionalEventListener}); a non-empty list makes
-     * the edge ambiguous. {@code rawApproximation} is true when the parameter type is a
-     * type variable or carries type arguments, so the raw-type match may over-match.
+     * 索引した listener method 1 件。{@code parameterTypes} は常に 1 要素。
+     * {@code conditionTypes} は条件の根拠となったアノテーション FQN を持つ
+     * (条件アノテーションの FQN と、空でない {@code condition} SpEL 属性や transactional
+     * phase 依存の根拠として listener アノテーション自身の FQN が混在する)。空でなければ
+     * edge は ambiguous になる。{@code rawApproximation} は parameter 型が型変数または
+     * 型引数付きで、raw type 突合が過剰一致しうる場合に true。
      */
     public record Listener(
             String declaringType,
@@ -48,8 +49,8 @@ public final class EventListenerIndex {
     private final Map<String, List<Listener>> listenersByEventType = new LinkedHashMap<>();
 
     /**
-     * First pass: index resolvable listener declarations. Resolution failures are
-     * skipped here; the second pass diagnoses the declaration through the normal path.
+     * first pass: 型解決できた listener 宣言を索引する。解決に失敗した宣言は
+     * 索引せず読み飛ばす。
      */
     public void accept(CompilationUnit unit) {
         for (MethodDeclaration method : unit.findAll(MethodDeclaration.class)) {
@@ -77,12 +78,13 @@ public final class EventListenerIndex {
                                 List.copyOf(conditions),
                                 rawApproximation));
             } catch (RuntimeException | LinkageError ignored) {
-                // The declaration walk in the second pass reports unresolved declarations.
+                // 解決できない listener はここで診断せず索引から漏らす。登録漏れは
+                // publish 側の JAVA_EVENT_UNRESOLVED warning として観測される。
             }
         }
     }
 
-    /** Listeners whose parameter type equals the given raw binary name. */
+    /** parameter 型が指定の raw binary name と一致する listener。 */
     public List<Listener> listenersFor(String eventTypeBinaryName) {
         return listenersByEventType.getOrDefault(eventTypeBinaryName, List.of());
     }
@@ -92,11 +94,12 @@ public final class EventListenerIndex {
     }
 
     /**
-     * Runtime conditions carried by the listener annotation itself: a non-empty
-     * {@code condition} SpEL attribute, and the transaction-phase dependency of
-     * {@code @TransactionalEventListener} (it only fires when the surrounding
-     * transaction reaches the configured phase). Both make execution conditional,
-     * so broadcast certainty does not hold and the edge must be ambiguous.
+     * listener アノテーション自身が運ぶ実行時条件: 空でない {@code condition} SpEL 属性と、
+     * {@code @TransactionalEventListener} の transaction phase 依存 (囲む transaction が
+     * 設定 phase に到達したときだけ発火する)。いずれも実行を条件付きにするため broadcast の
+     * 確実性が成り立たず、edge は ambiguous にする。返すのは条件の根拠となった listener
+     * アノテーション自身の FQN で、conditionTypes には条件アノテーションの FQN と種別が
+     * 混在して入る。
      */
     private static java.util.List<String> runtimeConditionsOf(MethodDeclaration method) {
         java.util.List<String> conditions = new ArrayList<>();

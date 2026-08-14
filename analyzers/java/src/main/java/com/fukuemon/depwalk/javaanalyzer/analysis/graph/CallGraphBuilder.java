@@ -2,9 +2,9 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
-import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
@@ -41,7 +41,6 @@ import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclarat
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.types.ResolvedIntersectionType;
-import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserConstructorDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
@@ -64,8 +63,9 @@ import java.util.function.Supplier;
  * 実装しているため、ファイル単位で 1 パス (declare + call-edge を同時に処理) で完結できる。
  *
  * <p>symbol 生成は {@link MethodSymbolFactory}、解決失敗時の bytecode 救済と external 分類は
- * {@link BytecodeRescue}、Spring DI 照合は {@link SpringInjectionMatcher}、診断は
- * {@link UnresolvedDiagnostics} が担い、本クラスは走査と各経路の調停に専念する。
+ * {@link BytecodeRescue}、Spring DI 照合は {@link SpringInjectionMatcher}、Spring イベントの
+ * 突合と edge 生成は {@link EventEdgeEmitter}、診断は {@link UnresolvedDiagnostics} が担い、
+ * 本クラスは走査と各経路の調停に専念する。
  *
  * <p>本クラスの契約の正本は java-analyzer feature doc「Parse・resolution・call 完全性」
  * (call site の終端記録と完全性 gate)。以下の各経路はこれに従う。
@@ -79,7 +79,7 @@ public final class CallGraphBuilder {
     private final MethodSymbolFactory methodSymbols;
     private final BytecodeRescue bytecodeRescue;
     private final SpringInjectionMatcher springInjections;
-    private final EventListenerIndex eventListenerIndex;
+    private final EventEdgeEmitter eventEdges;
     private final CallablePassIndex callablePassIndex;
     private final ReachableOwners reachableOwners;
     private final UnresolvedDiagnostics diagnostics;
@@ -125,7 +125,14 @@ public final class CallGraphBuilder {
         this.declIndex = declIndex;
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
-        this.eventListenerIndex = eventListenerIndex;
+        this.eventEdges = new EventEdgeEmitter(
+                accumulator,
+                methodSymbols,
+                sourceLocations,
+                eventListenerIndex,
+                reachableOwners,
+                diagnostics,
+                this::edgeCallers);
         this.callablePassIndex = callablePassIndex;
     }
 
@@ -141,7 +148,8 @@ public final class CallGraphBuilder {
         walk(cu, new WalkContext(null, List.of(), false));
     }
 
-    private record WalkContext(Node enclosingTypeNode, List<String> callerMethodIds, boolean viaLambda) {
+    // package-private: EventEdgeEmitter が walk の文脈 (囲み型 / caller) をそのまま受け取る。
+    record WalkContext(Node enclosingTypeNode, List<String> callerMethodIds, boolean viaLambda) {
         WalkContext withCaller(List<String> callerIds) {
             return new WalkContext(enclosingTypeNode, callerIds, viaLambda);
         }
@@ -161,7 +169,7 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof MethodDeclaration md) {
-            if (md.containsData(BytecodeMemberAstInjector.INJECTED)) {
+            if (InjectedDeclarations.isInjected(md)) {
                 // 注入宣言を source 宣言として emit すると、生成 member が source 由来の
                 // methodSymbol (位置付き) を偽装する。caller として扱わず、呼び出し側の
                 // bytecode-only member 出力契約 (下の injected 分岐) だけに載せる。
@@ -178,7 +186,7 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof ConstructorDeclaration cd) {
-            if (cd.containsData(BytecodeMemberAstInjector.INJECTED)) {
+            if (InjectedDeclarations.isInjected(cd)) {
                 // 注入 constructor は解決専用の標識 (method 側の walk skip と同じ理由)。
                 return;
             }
@@ -317,15 +325,16 @@ public final class CallGraphBuilder {
     // ------------------------------------------------------------------
 
     private void processMethodCall(MethodCallExpr mce, WalkContext ctx) {
-        // Event edges are additional to the normal outcome of this call site: the
-        // publishEvent call itself typically terminates as an excluded external target,
-        // while the listener edges below are emitted outside the outcome ledger.
-        emitEventEdges(mce, ctx);
-        emitCallableInvocationEdges(mce, ctx);
+        // event edge はこの call site の通常の終端への追加分: publishEvent 呼び出し自体は
+        // 通常 external target として excluded 終端し、listener への edge は outcome
+        // ledger の外で emit される。
+        eventEdges.emit(mce, ctx);
         ResolvedMethodDeclaration resolved;
         try {
             resolved = mce.resolve();
         } catch (RuntimeException e) {
+            // resolve に失敗した call は callable invocation 追跡の対象外
+            // (emitCallableInvocationEdges は解決済み宣言を前提とする)。
             rethrowUnlessIsolableResolutionFailure(e);
             BytecodeRescue.Rescue rescue = bytecodeRescue.methodRescue(mce, ctx.enclosingTypeNode());
             if (rescue != null) {
@@ -384,6 +393,7 @@ public final class CallGraphBuilder {
                     "unresolved-method-call", mce.getNameAsString(), metadata);
             return;
         }
+        emitCallableInvocationEdges(mce, ctx, resolved);
 
         // AST へ注入した bytecode-only member と solver が合成した bytecode-only member は、
         // 既存の bytecode-only member と同じ出力契約 (sourceLocation 省略 + owner metadata
@@ -402,7 +412,8 @@ public final class CallGraphBuilder {
                         "unresolved-method-call", mce.getNameAsString(), guardMetadata);
                 return;
             }
-            BytecodeRescue.Rescue rescue = bytecodeOnlyRescue(bytecodeOnly);
+            BytecodeRescue.Rescue rescue =
+                    bytecodeOnlyRescue(bytecodeOnly, bytecodeOnly.methodName(), "method");
             if (rescue == null) {
                 // owner が scope (include/exclude 適用後) の外にある場合、解決は solver
                 // 越しに成功していても callee は scope 外であり、fatal でなく external
@@ -508,7 +519,8 @@ public final class CallGraphBuilder {
         // AST 注入の bytecode-only constructor は method 側と同じ出力契約で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolved);
         if (injectedCtor != null) {
-            BytecodeRescue.Rescue rescue = injectedConstructorRescue(injectedCtor);
+            BytecodeRescue.Rescue rescue =
+                    bytecodeOnlyRescue(injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
             if (rescue == null) {
                 commitExcludedExternal(callNode, kind, ctx);
                 return;
@@ -576,7 +588,8 @@ public final class CallGraphBuilder {
         // この出力契約から漏れていた)。
         SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
         if (bytecodeOnly != null) {
-            BytecodeRescue.Rescue rescue = bytecodeOnlyRescue(bytecodeOnly);
+            BytecodeRescue.Rescue rescue =
+                    bytecodeOnlyRescue(bytecodeOnly, bytecodeOnly.methodName(), "method");
             if (rescue == null) {
                 // method call 側と同じ扱い: scope 外 owner の合成 / 注入 member への
                 // 参照は external 分類にする。
@@ -683,7 +696,8 @@ public final class CallGraphBuilder {
         // 選択結果が AST 注入の bytecode-only constructor なら、call 側と同じ出力契約で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolvedCtor);
         if (injectedCtor != null) {
-            BytecodeRescue.Rescue rescue = injectedConstructorRescue(injectedCtor);
+            BytecodeRescue.Rescue rescue =
+                    bytecodeOnlyRescue(injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
             if (rescue == null) {
                 commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
                 return;
@@ -845,8 +859,13 @@ public final class CallGraphBuilder {
      * owner が scope 外 (include/exclude で除外された file の型など、solver からは
      * 見えるが宣言索引に載らない型) の場合は null を返し、呼び出し側で external
      * 分類へ落とす (fatal にしない)。
+     *
+     * @param nameToken method は candidate の method 名、constructor は
+     *     {@link MethodIds#CONSTRUCTOR_TOKEN}
+     * @param symbolKind {@code "method"} または {@code "constructor"}
      */
-    private BytecodeRescue.Rescue bytecodeOnlyRescue(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+    private BytecodeRescue.Rescue bytecodeOnlyRescue(
+            SootUpTypeHierarchyIndex.MethodCandidate candidate, String nameToken, String symbolKind) {
         WorkspaceSourceDeclarationIndex.TypeLocation owner =
                 bytecodeRescue.reachableOwner(candidate).orElse(null);
         if (owner == null) {
@@ -855,34 +874,19 @@ public final class CallGraphBuilder {
         return new BytecodeRescue.Rescue(
                 owner,
                 candidate.declaringType(),
-                candidate.methodName(),
+                nameToken,
                 candidate.parameterTypes(),
-                "method");
+                symbolKind);
     }
 
     /** 解決結果が AST 注入の bytecode-only constructor ならその candidate。 */
     private static SootUpTypeHierarchyIndex.MethodCandidate injectedConstructorCandidate(
             ResolvedConstructorDeclaration resolved) {
         if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
-                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
-            return declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
+                && InjectedDeclarations.isInjected(declaration.getWrappedNode())) {
+            return declaration.getWrappedNode().getData(InjectedDeclarations.KEY);
         }
         return null;
-    }
-
-    /** AST 注入の bytecode-only constructor を、救済経路と同じ出力契約へ載せる。 */
-    private BytecodeRescue.Rescue injectedConstructorRescue(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
-        WorkspaceSourceDeclarationIndex.TypeLocation owner =
-                bytecodeRescue.reachableOwner(candidate).orElse(null);
-        if (owner == null) {
-            return null;
-        }
-        return new BytecodeRescue.Rescue(
-                owner,
-                candidate.declaringType(),
-                MethodIds.CONSTRUCTOR_TOKEN,
-                candidate.parameterTypes(),
-                "constructor");
     }
 
     /** 解決結果が solver 合成または AST 注入の bytecode-only member ならその candidate。 */
@@ -892,8 +896,8 @@ public final class CallGraphBuilder {
             return synthesized.candidate();
         }
         if (resolved instanceof JavaParserMethodDeclaration declaration
-                && declaration.getWrappedNode().containsData(BytecodeMemberAstInjector.INJECTED)) {
-            return declaration.getWrappedNode().getData(BytecodeMemberAstInjector.INJECTED);
+                && InjectedDeclarations.isInjected(declaration.getWrappedNode())) {
+            return declaration.getWrappedNode().getData(InjectedDeclarations.KEY);
         }
         return null;
     }
@@ -974,7 +978,7 @@ public final class CallGraphBuilder {
             // 注入 constructor は caller 帰属に数えない (source 宣言の帰属集合を
             // 注入で変えない。inventory は注入前 AST を数えるため対称になる)。
             if (member instanceof ConstructorDeclaration cd
-                    && !cd.containsData(BytecodeMemberAstInjector.INJECTED)) {
+                    && !InjectedDeclarations.isInjected(cd)) {
                 constructors.add(cd);
             }
         }
@@ -1099,89 +1103,6 @@ public final class CallGraphBuilder {
         }
     }
 
-    private static final String EVENT_PUBLISHER_TYPE = "org.springframework.context.ApplicationEventPublisher";
-
-    /**
-     * publish → listener の candidate edge を生成する (broadcast 意味論、ADR-0012)。
-     * caller は call site の囲みメソッド、callee は引数の静的型とその型階層 (raw 近似)
-     * に合致する listener。無条件 listener は複数でも各々 unique とし、実行時条件
-     * (条件アノテーション / condition 属性 / transactional phase) を持つ listener と
-     * raw 近似が過剰一致しうる listener (型変数・型引数付き param) は ambiguous とする。
-     * 突合は candidate 再対応付けと同じく publisher context から到達可能な listener に
-     * 限る。receiver が publisher と確認できない場合は対象外 (edge も診断も出さない保守側)。
-     */
-    private void emitEventEdges(MethodCallExpr mce, WalkContext ctx) {
-        if (!"publishEvent".equals(mce.getNameAsString()) || mce.getArguments().size() != 1) {
-            return;
-        }
-        Expression scope = mce.getScope().orElse(null);
-        boolean publisherReceiver = scope != null
-                ? isEventPublisher(scope)
-                : enclosingTypeIsEventPublisher(ctx.enclosingTypeNode());
-        if (!publisherReceiver) {
-            return;
-        }
-        boolean argumentUnresolved = false;
-        List<String> eventTypes = List.of();
-        try {
-            ResolvedType argType = mce.getArgument(0).calculateResolvedType();
-            if (argType.isReferenceType()) {
-                eventTypes = typeAndAncestors(argType.asReferenceType());
-            }
-            // Resolvable non-reference arguments (null literal, primitives) are not
-            // events; they are skipped silently because nothing failed to resolve.
-        } catch (RuntimeException | LinkageError e) {
-            argumentUnresolved = true;
-        }
-        if (argumentUnresolved) {
-            // Advisory diagnostic outside the outcome ledger: the call site itself is
-            // still classified by the normal path.
-            diagnostics.reportEventUnresolved(mce, ctx.callerMethodIds());
-            return;
-        }
-        if (eventTypes.isEmpty() || eventListenerIndex.isEmpty()) {
-            return;
-        }
-
-        Map<String, EventListenerIndex.Listener> matched = new LinkedHashMap<>();
-        for (String eventType : eventTypes) {
-            for (EventListenerIndex.Listener listener : eventListenerIndex.listenersFor(eventType)) {
-                if (reachableOwners.find(listener.declaringType()).isEmpty()) {
-                    // Same restriction as candidate remapping: listeners outside the
-                    // reachable contexts are not matched (no synthetic fallback nodes).
-                    continue;
-                }
-                matched.putIfAbsent(
-                        listener.declaringType() + "#" + listener.methodName()
-                                + "(" + String.join(",", listener.parameterTypes()) + ")",
-                        listener);
-            }
-        }
-        List<String> callers = edgeCallers(mce, ctx);
-        if (matched.isEmpty() || callers.isEmpty()) {
-            return;
-        }
-        SourceLocation callSite = sourceLocations.sourceLocationOf(mce);
-        for (EventListenerIndex.Listener listener : matched.values()) {
-            MethodSymbol listenerSymbol = methodSymbols.buildCandidateMethodSymbol(
-                    new SootUpTypeHierarchyIndex.MethodCandidate(
-                            listener.declaringType(), listener.methodName(), listener.parameterTypes()));
-            accumulator.addNode(listenerSymbol);
-            boolean conditional = !listener.conditionTypes().isEmpty();
-            boolean ambiguous = conditional || listener.rawApproximation();
-            Map<String, Object> metadata = new LinkedHashMap<>();
-            metadata.put("resolution", ambiguous ? "ambiguous" : "unique");
-            metadata.put("provenance", List.of("spring-event"));
-            if (conditional) {
-                metadata.put("conditional", true);
-                metadata.put("conditionTypes", listener.conditionTypes());
-            }
-            for (String callerId : callers) {
-                accumulator.addEdge(callerId, listenerSymbol.methodId(), callSite, metadata);
-            }
-        }
-    }
-
     /**
      * functional interface の invocation site から、渡された callable 実体への edge を
      * 生成する (ADR-0012)。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
@@ -1190,23 +1111,20 @@ public final class CallGraphBuilder {
      * advisory 診断に残す。callee は method reference → 参照先、lambda → 定義側の
      * 囲みメソッドで、`viaCallableInvocation: true` を標識する。到達可能 context の
      * callee のみ対象 (external / 非依存 context へは張らない)。
+     *
+     * @param invoked {@code mce} の解決結果。resolve は processMethodCall が 1 回だけ
+     *     行い、ここでは再 resolve しない
      */
-    private void emitCallableInvocationEdges(MethodCallExpr mce, WalkContext ctx) {
+    private void emitCallableInvocationEdges(
+            MethodCallExpr mce, WalkContext ctx, ResolvedMethodDeclaration invoked) {
         Expression scope = mce.getScope().orElse(null);
         if (!(scope instanceof com.github.javaparser.ast.expr.NameExpr receiver)) {
             return;
         }
-        ResolvedMethodDeclaration invoked;
-        try {
-            invoked = mce.resolve();
-        } catch (RuntimeException | LinkageError e) {
-            return;
-        }
-        // Only the single abstract method of a functional interface qualifies as a
-        // SAM invocation. Plain interface calls (e.g. injected Spring beans) must not
-        // reach the tracking or the advisory diagnostic below. Synthetic declarations
-        // (e.g. an enum's values()) may throw from isAbstract(), which simply means
-        // "not a SAM" here.
+        // SAM invocation として扱うのは functional interface の単一 abstract method の
+        // 呼び出しだけ。普通の interface 呼び出し (注入された Spring bean 等) を追跡や
+        // 下の advisory 診断へ流さない。合成宣言 (enum の values() 等) は isAbstract()
+        // が throw することがあり、その場合は「SAM でない」とみなす。
         try {
             if (!invoked.isAbstract() || !isFunctionalInterfaceSam(invoked)) {
                 return;
@@ -1229,16 +1147,16 @@ public final class CallGraphBuilder {
         } else {
             callables = callablesForLocal(receiver.getNameAsString(), mce);
         }
-        // Constructor-bodied callables are out of scope (their symbol shape differs);
-        // dropping them here keeps the first-wins node content invariant intact.
+        // constructor body の callable は対象外 (symbol の形が method と異なる)。
+        // ここで落とすことで first-wins の node 内容不変条件を保つ。
         callables = callables.stream()
                 .filter(callable -> !MethodIds.CONSTRUCTOR_TOKEN.equals(callable.methodName()))
                 .filter(callable -> reachableOwners.find(callable.declaringType()).isPresent())
                 .toList();
         if (callables.isEmpty()) {
-            // Every untracked SAM invocation is surfaced symmetrically (field stores,
-            // unmapped parameters, untrackable locals) so the tracking gap stays
-            // observable. Advisory only: the ledger is untouched.
+            // 追跡できなかった SAM invocation (field 格納・対応付かない parameter・追跡
+            // 不能な local) は対称に advisory 診断として可視化し、追跡の穴を観測可能に
+            // 保つ。advisory のみで ledger には触れない。
             diagnostics.reportCallableUnresolved(mce, ctx.callerMethodIds());
             return;
         }
@@ -1266,7 +1184,11 @@ public final class CallGraphBuilder {
         }
     }
 
-    /** declaring interface が functional interface (抽象メソッドがちょうど 1 個) かを判定する。 */
+    /**
+     * declaring interface が functional interface (抽象メソッドがちょうど 1 個) かを判定する。
+     * Object の public method と同 signature の abstract 再宣言 (Comparator の equals 等) は
+     * JLS の functional interface 判定と同じく数から除外する。
+     */
     private static boolean isFunctionalInterfaceSam(ResolvedMethodDeclaration invoked) {
         try {
             var declaringType = invoked.declaringType();
@@ -1275,11 +1197,24 @@ public final class CallGraphBuilder {
             }
             long abstractCount = declaringType.getDeclaredMethods().stream()
                     .filter(method -> method.isAbstract())
+                    .filter(method -> !redeclaresObjectMethod(method))
                     .count();
+            // SAM を親 interface から継承して自身の宣言 abstract が 0 の interface は
+            // 引き続き対象外 (自身の宣言だけで判定する制約)。
             return abstractCount == 1;
         } catch (RuntimeException | LinkageError e) {
             return false;
         }
+    }
+
+    /** Object の public method (equals(Object) / hashCode() / toString()) と同 signature か。 */
+    private static boolean redeclaresObjectMethod(ResolvedMethodDeclaration method) {
+        return switch (method.getName()) {
+            case "hashCode", "toString" -> method.getNumberOfParams() == 0;
+            case "equals" -> method.getNumberOfParams() == 1
+                    && "java.lang.Object".equals(BinaryNames.erasureOf(method.getParam(0).getType()));
+            default -> false;
+        };
     }
 
     /** 引数渡し 1 段: 囲みメソッドの parameter へ渡された callable を索引から引く。 */
@@ -1320,9 +1255,8 @@ public final class CallGraphBuilder {
         if (reassigned) {
             return List.of();
         }
-        // Only declarators that lexically precede the invocation and whose enclosing
-        // block contains it are candidates; several matches mean the tracking cannot
-        // pick one without guessing, so it gives up.
+        // invocation より字句的に前に宣言され、囲み block が invocation を含む declarator
+        // だけを候補にする。複数一致は推測なしに 1 つへ絞れないため追跡を諦める。
         List<com.github.javaparser.ast.body.VariableDeclarator> candidates = new ArrayList<>();
         for (com.github.javaparser.ast.body.VariableDeclarator declarator
                 : enclosing.findAll(com.github.javaparser.ast.body.VariableDeclarator.class)) {
@@ -1365,67 +1299,6 @@ public final class CallGraphBuilder {
             }
         }
         return false;
-    }
-
-    /** receiver の静的型が {@code ApplicationEventPublisher} またはその subtype かを判定する。 */
-    private static boolean isEventPublisher(Expression scope) {
-        try {
-            return isEventPublisherType(scope.calculateResolvedType());
-        } catch (RuntimeException | LinkageError e) {
-            return false;
-        }
-    }
-
-    /** 暗黙 this receiver: 囲み型が publisher subtype なら対象とする。 */
-    private static boolean enclosingTypeIsEventPublisher(Node enclosingTypeNode) {
-        if (!(enclosingTypeNode instanceof TypeDeclaration<?> td)) {
-            return false;
-        }
-        try {
-            ResolvedReferenceTypeDeclaration resolved = td.resolve();
-            for (ResolvedReferenceType ancestor : resolved.getAllAncestors()) {
-                if (EVENT_PUBLISHER_TYPE.equals(ancestor.getQualifiedName())) {
-                    return true;
-                }
-            }
-            return false;
-        } catch (RuntimeException | LinkageError e) {
-            return false;
-        }
-    }
-
-    private static boolean isEventPublisherType(ResolvedType type) {
-        if (!type.isReferenceType()) {
-            return false;
-        }
-        ResolvedReferenceType reference = type.asReferenceType();
-        if (EVENT_PUBLISHER_TYPE.equals(reference.getQualifiedName())) {
-            return true;
-        }
-        try {
-            for (ResolvedReferenceType ancestor : reference.getAllAncestors()) {
-                if (EVENT_PUBLISHER_TYPE.equals(ancestor.getQualifiedName())) {
-                    return true;
-                }
-            }
-        } catch (RuntimeException | LinkageError e) {
-            return false;
-        }
-        return false;
-    }
-
-    /** 引数の静的型とその型階層の raw binary name 列 (解決できた ancestor のみの best effort)。 */
-    private static List<String> typeAndAncestors(ResolvedReferenceType reference) {
-        Set<String> types = new LinkedHashSet<>();
-        types.add(BinaryNames.erasureOf(reference));
-        try {
-            for (ResolvedReferenceType ancestor : reference.getAllAncestors()) {
-                types.add(BinaryNames.erasureOf(ancestor));
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // Partially resolvable hierarchies keep the resolvable prefix (raw approximation).
-        }
-        return List.copyOf(types);
     }
 
     private static void addSootCandidates(

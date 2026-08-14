@@ -103,9 +103,9 @@ class EntryPointIndexTest {
 
     @Test
     void ambiguousWildcardImportsAcrossJavaxAndJakartaDetectNothing() {
-        // Wildcard import recovery refuses ambiguous candidates: with both javax and
-        // jakarta star imports the simple name maps to two known FQNs, so no marker
-        // (and no diagnostic) is produced. This pins the conservative behavior.
+        // wildcard import の復元は曖昧な候補を拒否する: javax と jakarta の star
+        // import が両方あると simple name が既知 FQN 2 つに対応するため、標識も
+        // 診断も出さない。この保守的な挙動を固定する。
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;
 

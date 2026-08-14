@@ -1,28 +1,26 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.tools.ToolProvider;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Spring DI candidate resolution keeps resolvable ancestors even when another
- * ancestor of the implementation cannot be resolved (best-effort collection,
- * ADR-0012): an impl extending an unresolvable external base must still be a
- * bean candidate of its workspace interface, including across modules.
+ * Spring DI 候補解決の ancestor 収集が best-effort
+ * (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) であることの検証。
+ * 実装 class の ancestor に解決できないものが混ざっても、解決できた ancestor は
+ * 生き残る: 解決不能な外部基底を extends する impl も、workspace の interface の
+ * bean 候補になる (module を跨ぐ場合を含む)。
  */
+@DisplayName("Spring DI 候補の ancestor 収集 (best-effort)")
 class DiCandidateAncestorTest {
-
-    private static final String RELEASE = "17";
 
     @TempDir
     Path temp;
@@ -48,19 +46,22 @@ class DiCandidateAncestorTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("解決不能な外部基底を extends する別 module の impl でも、workspace interface の bean 候補のままになる")
     void crossModuleImplWithUnresolvableAncestorBecomesBeanCandidate() throws Exception {
-        write(domainSrc, "com/example/domain/Repo.java", """
+        AnalysisTestSupport.writeSource(domainSrc, "com/example/domain/Repo.java", """
                 package com.example.domain;
                 public interface Repo {
                     String find();
                 }
                 """);
-        compile(domainClasses, List.of(), "domain-full", "com/example/domain/Repo.java",
-                Files.readString(domainSrc.resolve("com/example/domain/Repo.java")));
+        AnalysisTestSupport.compileFixture(
+                temp.resolve("domain-full"), domainClasses, AnalysisTestSupport.FIXTURE_RELEASE, List.of(),
+                Map.of("com/example/domain/Repo.java",
+                        Files.readString(domainSrc.resolve("com/example/domain/Repo.java"))));
 
-        // The source declares an unresolvable external base; the classes are compiled
-        // from a cleaned shape so SootUp can index the implementation method.
-        write(infraSrc, "com/example/infra/RepoImpl.java", """
+        // source は解決不能な外部基底を宣言する。classes は基底を除いた形から compile し、
+        // SootUp が実装メソッドを index できる状態にする。
+        AnalysisTestSupport.writeSource(infraSrc, "com/example/infra/RepoImpl.java", """
                 package com.example.infra;
                 import com.example.domain.Repo;
                 import org.springframework.stereotype.Component;
@@ -69,20 +70,23 @@ class DiCandidateAncestorTest {
                     public String find() { return "x"; }
                 }
                 """);
-        write(infraSrc, "org/springframework/stereotype/Component.java", """
+        AnalysisTestSupport.writeSource(infraSrc, "org/springframework/stereotype/Component.java", """
                 package org.springframework.stereotype;
                 public @interface Component {
                 }
                 """);
-        compile(infraClasses, List.of(domainClasses), "infra-clean", "com/example/infra/RepoImpl.java", """
-                package com.example.infra;
-                import com.example.domain.Repo;
-                public class RepoImpl implements Repo {
-                    public String find() { return "x"; }
-                }
-                """);
+        AnalysisTestSupport.compileFixture(
+                temp.resolve("infra-clean"), infraClasses, AnalysisTestSupport.FIXTURE_RELEASE,
+                List.of(domainClasses),
+                Map.of("com/example/infra/RepoImpl.java", """
+                        package com.example.infra;
+                        import com.example.domain.Repo;
+                        public class RepoImpl implements Repo {
+                            public String find() { return "x"; }
+                        }
+                        """));
 
-        write(appSrc, "com/example/app/Finder.java", """
+        AnalysisTestSupport.writeSource(appSrc, "com/example/app/Finder.java", """
                 package com.example.app;
                 import com.example.domain.Repo;
                 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,12 +98,12 @@ class DiCandidateAncestorTest {
                     String use() { return repo.find(); }
                 }
                 """);
-        write(appSrc, "org/springframework/beans/factory/annotation/Autowired.java", """
+        AnalysisTestSupport.writeSource(appSrc, "org/springframework/beans/factory/annotation/Autowired.java", """
                 package org.springframework.beans.factory.annotation;
                 public @interface Autowired {
                 }
                 """);
-        write(appSrc, "org/springframework/stereotype/Service.java", """
+        AnalysisTestSupport.writeSource(appSrc, "org/springframework/stereotype/Service.java", """
                 package org.springframework.stereotype;
                 public @interface Service {
                 }
@@ -133,25 +137,5 @@ class DiCandidateAncestorTest {
                 List.of(appSrc), List.of(domainClasses, infraClasses), List.of(appClasses),
                 List.of(":domain", ":infra"));
         return List.of(domain, infra, app);
-    }
-
-    private void compile(Path classesDir, List<Path> classpath, String srcDirName, String relative, String source)
-            throws Exception {
-        Path build = temp.resolve(srcDirName);
-        write(build, relative, source);
-        List<String> args = new ArrayList<>(List.of("--release", RELEASE, "-d", classesDir.toString()));
-        if (!classpath.isEmpty()) {
-            args.add("-cp");
-            args.add(String.join(java.io.File.pathSeparator, classpath.stream().map(Path::toString).toList()));
-        }
-        args.add(build.resolve(relative).toString());
-        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
-        assertEquals(0, rc, "fixture compile failed");
-    }
-
-    private void write(Path root, String relative, String source) throws Exception {
-        Path file = root.resolve(relative);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, source);
     }
 }

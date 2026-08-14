@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
 
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("gradle-compat")
 class GradleCompatibilityMatrixTest {
 
+    @DisplayName("各 anchor (Gradle × daemon JDK) で実行しても、同一 fixture から同じ model が discover される")
     @ParameterizedTest(name = "Gradle {0} / daemon JDK {1} (gradleJavaHome={2})")
     @CsvSource({
             // 7.6.5 anchor は request metadata 相当の gradleJavaHome 経路で daemon JVM を

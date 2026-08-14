@@ -257,11 +257,10 @@ public final class CallSiteInventory {
             List<ConstructorDeclaration> constructors = new ArrayList<>();
             if (enclosingType instanceof TypeDeclaration<?> td) {
                 for (BodyDeclaration<?> member : td.getMembers()) {
-                    // Range を持たない constructor は parse 後に注入された解決専用の標識
-                    // (bytecode-only member 注入)。inventory は注入前の AST を数えるため
-                    // 通常ここには現れないが、caller 帰属の規則 (source 宣言のみ数える) を
-                    // graph builder 側と対称に保つための防御である。
-                    if (member instanceof ConstructorDeclaration cd && cd.getRange().isPresent()) {
+                    // 注入宣言は caller 帰属に数えない。inventory は注入前の AST を数える
+                    // ため通常ここには現れないが、graph builder 側と同じ基準
+                    // (InjectedDeclarations) で守っておく。
+                    if (member instanceof ConstructorDeclaration cd && !InjectedDeclarations.isInjected(cd)) {
                         constructors.add(cd);
                     }
                 }

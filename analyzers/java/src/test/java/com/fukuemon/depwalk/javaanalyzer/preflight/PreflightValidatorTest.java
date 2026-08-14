@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.preflight;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -198,19 +200,21 @@ class PreflightValidatorTest {
     }
 
     @Test
+    @DisplayName("明示 sourceRoots 経路のとき、gradleJavaHome は解釈も検証もされないままになる")
     void gradleJavaHomeIsIgnoredOnExplicitSourceRoots() {
-        // Explicit roots bypass the Gradle runtime entirely, so the key is not
-        // interpreted (and not validated) on this path.
+        // 明示 root は Gradle runtime を一切通らないため、この経路では key を
+        // 解釈しない (検証もしない)。
         AnalysisRequest request = requestWithLanguageAndMetadata("java", Map.of(
                 "classpath", List.of(),
                 "gradleJavaHome", List.of("/no/such/home")));
 
         PreflightValidator.Validated validated =
                 assertDoesNotThrow(() -> PreflightValidator.validate(request));
-        assertEquals(null, validated.gradleJavaHome());
+        assertNull(validated.gradleJavaHome());
     }
 
     @Test
+    @DisplayName("discovery 経路で起動可能な java home を渡すとき、gradleJavaHome として受理される")
     void gradleJavaHomeAcceptsLaunchableJavaHomeOnDiscovery() throws IOException {
         Path javaHome = tempDir.resolve("jdk");
         Files.createDirectories(javaHome.resolve("bin"));
@@ -227,6 +231,7 @@ class PreflightValidatorTest {
     }
 
     @Test
+    @DisplayName("discovery 経路で起動不能な path を渡すとき、JAVA_INVALID_REQUEST で拒否される")
     void gradleJavaHomeRejectsNonLaunchablePathOnDiscovery() {
         AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
                 "gradleJavaHome", List.of(tempDir.resolve("missing").toString())));
@@ -237,6 +242,7 @@ class PreflightValidatorTest {
     }
 
     @Test
+    @DisplayName("discovery 経路で空白・非文字列・空配列の gradleJavaHome を渡すとき、いずれも拒否される")
     void gradleJavaHomeRejectsBlankAndNonStringAndEmptyOnDiscovery() {
         for (Object value : List.of(List.of(" "), List.of(42), List.of())) {
             AnalysisRequest request = discoveryRequestWithMetadata(Map.of("gradleJavaHome", value));
@@ -247,6 +253,7 @@ class PreflightValidatorTest {
     }
 
     @Test
+    @DisplayName("discovery 経路で gradleJavaHome の要素数が 1 でないとき、拒否される")
     void gradleJavaHomeRejectsWrongElementCountOnDiscovery() {
         AnalysisRequest request = discoveryRequestWithMetadata(Map.of(
                 "gradleJavaHome", List.of("/a", "/b")));

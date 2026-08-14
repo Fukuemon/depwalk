@@ -74,7 +74,7 @@ func (a *Adapter) Run(
 	})
 	if err != nil {
 		if heapExhausted(runResult) {
-			err = fmt.Errorf("%w (the analyzer ran out of heap: java.lang.OutOfMemoryError on stderr)", err)
+			err = fmt.Errorf("%w (%s)", err, analyze.HeapExhaustedHint)
 		}
 		return analyze.Outcome{}, err
 	}

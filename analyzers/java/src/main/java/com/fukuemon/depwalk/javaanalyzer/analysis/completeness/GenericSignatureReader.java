@@ -1,4 +1,4 @@
-package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
+package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
