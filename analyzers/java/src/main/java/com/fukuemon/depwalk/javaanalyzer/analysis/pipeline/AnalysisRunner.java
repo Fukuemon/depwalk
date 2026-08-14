@@ -62,10 +62,6 @@ import java.util.TreeMap;
  * <p>source file の列挙、AST 解析、型解決、Spring DI 索引化、呼び出し先候補の統合、帰属型決定、
  * 到達可能性フィルタ、{@link RecordWriter} への出力を1回の実行として調停する。
  *
- * <p>本クラスが実装する契約の正本は java-analyzer feature doc: call site の完全性 gate と
- * {@code allowIncompleteAnalysis} は「Parse・resolution・call 完全性」、context 分離と solver への
- * root / classpath 登録は「Source root discovery と解析 context」。
- *
  * <p>逐次破棄されるのは AST のみで (ファイル単位で parse し、処理後は参照を手放す)、
  * SymbolSolver の型解決キャッシュと {@link GraphAccumulator} が持つ node / edge / diagnostic は
  * 実行終了まで保持される。したがってモードを問わずグラフ本体はメモリ上に残り、モードによって
@@ -97,7 +93,7 @@ public final class AnalysisRunner {
      * @param unresolvedCount call edge または DI 候補を解決できなかった件数
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
      * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間
-     *     (java-analyzer feature doc「性能方針」の段階別計測として通常解析と分離する)
+     *     (段階別計測として通常解析と分離する)
      * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
      */
     public record RunStats(
@@ -193,8 +189,7 @@ public final class AnalysisRunner {
         CallablePassIndex callablePassIndex = new CallablePassIndex();
         SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot, entryPointIndex);
         GraphAccumulator accumulator = new GraphAccumulator();
-        // resolver とは独立した call-site inventory と source 宣言索引
-        // (adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+        // resolver とは独立した call-site inventory と source 宣言索引。
         CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
         WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
@@ -323,8 +318,8 @@ public final class AnalysisRunner {
     /**
      * context ごとの SootUp 型階層索引と project bytecode member 索引を構築する。
      *
-     * <p>SootUp index は lazy のため全 context 分を先に用意し、solver の bytecode member 合成
-     * (feature doc「solver 層の bytecode member 合成」) と builder の候補解決で同一 instance を共有する。
+     * <p>SootUp index は lazy のため全 context 分を先に用意し、solver の bytecode member 合成と
+     * builder の候補解決で同一 instance を共有する。
      * 合成は「呼出元 context の classpath 視点」で行う (依存 project の型も自 context の classpath に
      * 含まれる classes output から引く)。emit 時に declIndex + 到達可能 context の検査で owner を制約する。
      */
@@ -536,8 +531,7 @@ public final class AnalysisRunner {
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
             }
-            // 診断項目の正本は feature doc「diagnostic / error code 体系」。primary
-            // diagnostic として終端した call だけが、sanitize 済み
+            // primary diagnostic として終端した call だけが、sanitize 済み
             // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
             // receiverTypeResolved) を details へ載せる。
             if (outcome.diagnosticMetadata() != null) {

@@ -89,8 +89,7 @@ func (a *Adapter) Run(
 
 // heapExhausted は異常終了時の stderr から OutOfMemoryError の痕跡を検知する。
 // stderr を protocol record として parse しない契約は維持したまま、valid error
-// record なしの異常終了時に限り診断ヒントとして照合する (analyzer-protocol
-// feature doc「異常終了時の stderr の扱い」)。解析結果の解釈には一切使わない。
+// record なしの異常終了時に限り診断ヒントとして照合する。解析結果の解釈には一切使わない。
 func heapExhausted(result RunResult) bool {
 	return result.ExitCode != 0 &&
 		result.AnalyzerError == nil &&

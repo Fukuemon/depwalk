@@ -42,7 +42,7 @@ class GradleVersionSupportTest {
     @DisplayName("Gradle version と daemon JVM major の組の互換が、公式 matrix の境界どおりに判定される")
     @ParameterizedTest
     @CsvSource({
-            // context/toolchain.md の CI anchor 3 組は必ず互換。
+            // CI anchor の 3 組は必ず互換。
             "7.6.5, 8, true",
             "8.14.5, 17, true",
             "9.6.1, 25, true",

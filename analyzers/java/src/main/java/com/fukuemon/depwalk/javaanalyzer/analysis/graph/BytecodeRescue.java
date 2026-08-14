@@ -46,8 +46,7 @@ import java.util.function.IntSupplier;
  * 一意 member へ救済できるかを判定し、採用する member を返す。あわせて receiver の owner 型復元と、
  * 救済不能な site を external-target と分類できるかの根拠付き判定を担う。
  *
- * <p>本クラスの契約の正本は java-analyzer feature doc「solver 層の bytecode member 合成」。
- * 判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。
+ * <p>判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。
  */
 final class BytecodeRescue {
 
@@ -79,7 +78,7 @@ final class BytecodeRescue {
     }
 
     /**
-     * generic 前進導出 (手段②③) による receiver の owner 型。erasure だけの
+     * generic 前進導出による receiver の owner 型。erasure だけの
      * {@link #chainForwardOwner} で辿れない JDK stream / collection 連鎖と
      * lambda parameter を、宣言型・classfile Signature・JDK の宣言済み generic
      * 意味論の固定表で導出する。導出できなければ null。
@@ -120,7 +119,7 @@ final class BytecodeRescue {
 
     /**
      * 解決失敗した method call を、scope 内 source type の到達可能な project
-     * bytecode の一意 member へ generator 非依存で救済する (ADR-0005)。
+     * bytecode の一意 member へ generator 非依存で救済する。
      */
     Rescue methodRescue(MethodCallExpr mce, Node enclosingTypeNode) {
         String ownerBinaryName = bytecodeRescueOwner(mce, enclosingTypeNode);

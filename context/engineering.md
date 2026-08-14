@@ -57,8 +57,7 @@ Core 実装基盤を定めるのは [ADR-0002](../adr/0002-core-implementation-f
 
 ### 参照の張り方
 
-- **コメントから spec / issue を引用しない** (`spec #32 D6` / `P2_01` / `D21` 等)。spec は issue close 時に削除される作業文書であり、コードから参照すると宙に浮いたリンクが残る。決定の経緯は git history と PR で辿る
-- 理由をコメントに残すときのリンク先は **ADR と、長く残る決まりのドキュメント** (`adr/*.md`、`context/*.md`、`design/features/*/DesignDoc_*.md`) に限る
+- **コメントから他文書への参照を書かない** (spec / issue / ADR / design / context のいずれも)。理由はコメント自身に平易な日本語で完結させ、リンクで説明を代替しない。どの doc がそのコードを統べるかは design doc の `governs:` で、決定の経緯は git history と PR で辿る
 - `(S5)` のような符号だけの参照はしない。読み手に伝わる言葉で書き、必要なら決まりへのリンクを添える
 
 ## Error Boundary

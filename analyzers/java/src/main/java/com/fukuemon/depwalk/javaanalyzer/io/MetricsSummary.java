@@ -1,7 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.io;
 
 /**
- * stderr へ出力する計測サマリ。protocol record ではない (analyzer-protocol の対象外)。
+ * stderr へ出力する計測サマリ。protocol record ではない。
  * 解析 runner が実行中に集計したファイル数、所要時間、未解決件数を process 終了時に報告する。
  *
  * @param analyzedFileCount    解析したファイル数

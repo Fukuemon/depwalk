@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * java-analyzer feature doc「Parse・resolution・call 完全性」: receiver 型が取れない
- * call の external-target 分類。(i) chain 起点遡及 — 起点の静的型が scope 外なら後続 call を external
+ * receiver 型が取れない call の external-target 分類を検証する。
+ * (i) chain 起点遡及 — 起点の静的型が scope 外なら後続 call を external
  * へ、scope 内型が現れたら diagnostic のまま。(ii) lambda parameter — 引数先
  * functional interface が scope 外型なら external へ。
  */
@@ -33,8 +33,7 @@ class ExternalChainClassificationTest {
         // (実測パターンと同型: メソッド自体は classfile 上に実在する)。chain 起点
         // e (Ext = scope 外 classes-only 型) から、forwardVerifyExternalChain が
         // make() を classfile 上で一意に確認できるため、両 call とも
-        // external-target 除外になる (multi-agent review 指摘反映: 2026-07-22。
-        // 存在しないメソッド名で解決失敗を模擬すると forward 検証が前進できず
+        // external-target 除外になる (存在しないメソッド名で解決失敗を模擬すると forward 検証が前進できず
         // 別の分類になるため、実在するメソッドで解決だけが失敗する形にした)。
         Path classes = compile("ext-src", "ext-classes",
                 Map.of("com/example/ext/Ext.java", """
@@ -71,7 +70,7 @@ class ExternalChainClassificationTest {
     @Test
     @DisplayName("chain の起点が scope 外型でも、途中の呼び出しを classfile 上で確認できないとき、後続は診断のまま残る")
     void chainWithExternalRootStaysDiagnosticWhenIntermediateLinkNotOnClasspath() throws Exception {
-        // multi-agent review 指摘反映 (2026-07-22): root が external というだけで
+        // root が external というだけで
         // 中間 link を無条件に external とみなさない。intermediate link
         // (missingLink) が Ext の classfile に存在しない場合、forward 検証が前進
         // できず diagnostic を維持することを確認する (false exclusion の回帰ガード)。

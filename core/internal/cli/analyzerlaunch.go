@@ -6,15 +6,14 @@ import (
 	"strings"
 )
 
-// analyzerCmdEnv is the environment variable fallback for the Analyzer
-// 起動コマンドを指定する環境変数。DEPWALK_ 名前空間に置く
-// (adr/0003-analyzer-command-resolution.md)。
+// analyzerCmdEnv は Analyzer 起動コマンドを指定する環境変数。
+// DEPWALK_ 名前空間に置く。
 const analyzerCmdEnv = "DEPWALK_ANALYZER_CMD"
 
 // resolveAnalyzerCommand は Analyzer の起動コマンド文字列を解決する。
 //
-// 優先順位は flag 値、次に DEPWALK_ANALYZER_CMD 環境変数 (getenv 経由)
-// (adr/0003-analyzer-command-resolution.md)。どちらも無ければ失敗させる。
+// 優先順位は flag 値、次に DEPWALK_ANALYZER_CMD 環境変数 (getenv 経由)。
+// どちらも無ければ失敗させる。
 // Analyzer process を起動する前に要求を弾けるようにするためである。
 func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (string, error) {
 	if flagValue != "" {
@@ -43,7 +42,7 @@ func isEscapableRune(r rune) bool {
 }
 
 // splitAnalyzerCommand は解決済みのコマンド文字列を argv へ分解する。shell は
-// 起動しない (adr/0003-analyzer-command-resolution.md が injection リスクを退けている)。
+// 起動しない (shell 経由の injection リスクを避けるため)。
 // 単引用符と二重引用符に対応し、depwalk が要る範囲で一般的な shell の語分割に合わせる。
 //
 // 引用符の外では、backslash は次の文字が特殊 (空白・tab・改行・引用符・backslash) な

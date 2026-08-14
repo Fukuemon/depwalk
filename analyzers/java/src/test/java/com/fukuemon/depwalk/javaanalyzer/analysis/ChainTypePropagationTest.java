@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * stream chain の generic 推論が JavaParser 側で壊れる形状 (`Collectors.toMap` の
  * 結果 Map への bound method reference 適用と、その下流の lambda parameter 経由の
- * 生成 getter 呼び出し) が、型伝播救済層の generic 前進導出 (ADR-0012 の手段②③)
+ * 生成 getter 呼び出し) が、型伝播救済層の generic 前進導出
  * で edge になることを検証する。導出の根拠は AST の宣言型・classes output の
  * Signature・JDK コレクション API の宣言済み generic 意味論に限る。
  */

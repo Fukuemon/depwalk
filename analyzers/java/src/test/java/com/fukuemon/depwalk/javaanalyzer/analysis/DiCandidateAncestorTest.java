@@ -13,8 +13,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Spring DI 候補解決の ancestor 収集が best-effort
- * (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) であることの検証。
+ * Spring DI 候補解決の ancestor 収集が best-effort であることの検証。
  * 実装 class の ancestor に解決できないものが混ざっても、解決できた ancestor は
  * 生き残る: 解決不能な外部基底を extends する impl も、workspace の interface の
  * bean 候補になる (module を跨ぐ場合を含む)。

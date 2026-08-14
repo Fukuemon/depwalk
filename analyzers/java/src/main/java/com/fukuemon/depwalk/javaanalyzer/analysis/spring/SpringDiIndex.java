@@ -676,7 +676,7 @@ public final class SpringDiIndex {
      * 収集する。直接 ancestor を許容モードで辿る BFS とし、解決できない枝は skip
      * する。かつては getAllAncestors の一括取得だったため、外部基底 1 つの解決
      * 失敗で workspace interface への代入可能性ごと失われ、「Bean 候補なし」の誤
-     * 診断になっていた (判断の正本は ADR-0012)。
+     * 診断になっていた。
      */
     private static void addAncestorTypes(ResolvedReferenceTypeDeclaration declaration, Set<String> types) {
         java.util.ArrayDeque<ResolvedReferenceTypeDeclaration> queue = new java.util.ArrayDeque<>();

@@ -27,8 +27,7 @@ type Outcome struct {
 	ExitCode        int
 	// HeapExhausted は、Analyzer が valid error record なしで異常終了し、stderr に
 	// OutOfMemoryError の痕跡があったことを表す診断ヒント。判定は port 実装 (ACL)
-	// が行い、domain は raw stderr を持たない (契約は analyzer-protocol feature doc
-	// 「異常終了時の stderr の扱い」、判断の正本は ADR-0012)。
+	// が行い、domain は raw stderr を持たない。
 	HeapExhausted bool
 }
 

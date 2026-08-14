@@ -36,13 +36,11 @@ import java.util.regex.Pattern;
  * 宣言は TypeSolver を経由しないため、{@link MemberAugmentingTypeSolver} の合成が
  * 届かない。member 宣言を AST 自体へ注入すると、JavaParser の context 解決が
  * どの位置 (引数・chain receiver・switch selector・method reference 先) でも
- * 生成 member を見られる。契約の正本は java-analyzer feature doc
- * 「solver 層の bytecode member 合成」の AST 注入節。
+ * 生成 member を見られる。
  *
  * <p>注入宣言は解決専用の標識であり source 宣言として扱わない: 由来の bytecode
  * candidate を {@link InjectedDeclarations#KEY} で保持し、graph builder は注入 member への呼び出しを
- * bytecode-only member の出力契約 (adr/0005-adopt-sootup-and-spring-di-resolution.md)
- * で emit し、caller としては walk しない。
+ * bytecode-only member の出力契約で emit し、caller としては walk しない。
  *
  * <p>注入時に型解決は行わない (型は classfile 上の名前をテキストとして書き下す)。
  * solver 内部 parser の post-processor として動かしても solver に再入しないための
@@ -111,7 +109,7 @@ public final class BytecodeMemberAstInjector {
             sourceKeys.add(method.getNameAsString() + "/" + method.getParameters().size());
         }
         // 同名・同 arity が bytecode 上に複数ある member は注入しない (曖昧なら
-        // 救済しない一意性規則。adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+        // 救済しない一意性規則)。
         Map<String, Integer> arityCounts = new HashMap<>();
         for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
             arityCounts.merge(candidateKey(candidate), 1, Integer::sum);

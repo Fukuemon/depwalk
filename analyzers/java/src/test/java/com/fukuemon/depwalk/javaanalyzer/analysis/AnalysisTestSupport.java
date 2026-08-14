@@ -60,8 +60,7 @@ final class AnalysisTestSupport {
         request.put("recordType", "analysisRequest");
         request.put("requestId", "test-request");
         request.put("workspaceRoot", workspaceRoot.toAbsolutePath().toString());
-        // 確定 schema (java-analyzer feature doc「metadata 契約」) への移行:
-        // unit test は明示 root 経路を使う。
+        // unit test は明示 root 経路 (sourceRoots) を使う。
         request.put("sourceRoots", List.of("."));
         request.put("language", "java");
         if (include != null) {

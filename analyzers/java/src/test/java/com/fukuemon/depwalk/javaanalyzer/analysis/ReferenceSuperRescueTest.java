@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * java-analyzer feature doc「Parse・resolution・call 完全性」:
  * method reference / explicit constructor invocation の resolve
  * 失敗時に、method call と同等の bytecode 救済と external-target 分類を
  * 試みてから diagnostic 化する。BytecodeOnlyMemberTest と同じく generator

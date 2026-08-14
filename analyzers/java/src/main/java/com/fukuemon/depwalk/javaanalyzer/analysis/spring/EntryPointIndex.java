@@ -15,7 +15,7 @@ import java.util.TreeSet;
  * Spring を classpath に置かずに framework entry point アノテーションを検出する。
  *
  * <p>entry point は framework が直接起動しうる method であり、標識は caller edge の有無と
- * 独立している (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。
+ * 独立している。
  * first pass で、既知の entry point アノテーションを担持する workspace のアノテーション宣言を
  * 記録し、ユーザー定義の合成アノテーションをメタ 1 段まで検出する。より深い入れ子は設計上
  * 検出対象外であり、診断も出さない。
@@ -30,14 +30,12 @@ public final class EntryPointIndex {
      * first pass: entry point アノテーションを直接 (メタ 1 段のみ) 担持するユーザー定義
      * アノテーションを記録する。重複宣言は最初の entry を保持する (他の first-pass 索引と
      * 揃えた first-wins)。nested / local に宣言した合成アノテーションと、修飾名を解決
-     * できない宣言は対象外として読み飛ばす (design/features/java-analyzer/analysis.md
-     * の検出制約)。
+     * できない宣言は対象外として読み飛ばす。
      */
     public void accept(CompilationUnit unit) {
         for (AnnotationDeclaration declaration : unit.findAll(AnnotationDeclaration.class)) {
             if (!declaration.isTopLevelType()) {
-                // nested / local に宣言した合成アノテーションは検出対象外
-                // (design/features/java-analyzer/analysis.md の制約)。
+                // nested / local に宣言した合成アノテーションは検出対象外。
                 continue;
             }
             Set<String> carried = new TreeSet<>();

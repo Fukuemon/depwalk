@@ -111,8 +111,7 @@ func (c *recordCollector) finalize(readErr error) RunResult {
 		c.setValidationError(readErr)
 	}
 	// fatal な stream では Core が先行 record をすべて破棄する。そのため参照の
-	// 宙づりを別の検証失敗として報告しない
-	// (design/features/graph/DesignDoc_graph.md の fatal 契約)。
+	// 宙づりを別の検証失敗として報告しない。
 	if c.result.AnalyzerError == nil {
 		if err := c.references.validate(); err != nil {
 			c.setValidationError(err)

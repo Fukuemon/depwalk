@@ -29,8 +29,7 @@ type Node struct {
 //
 // Analyzer の wire 形式とは独立した graph 固有の値型である。wire record は
 // protocol 境界で本型へ変換する。domain 層から wire 表現への import を
-// ゼロにするためであり、型の重複は境界隔離のコストとして受け入れる
-// (判断の正本は adr/0007-layered-architecture-refactor.md)。
+// ゼロにするためであり、型の重複は境界隔離のコストとして受け入れる。
 //
 // StartColumn / EndLine / EndColumn は optional で、Analyzer が省いた場合は nil。
 type SourceLocation struct {

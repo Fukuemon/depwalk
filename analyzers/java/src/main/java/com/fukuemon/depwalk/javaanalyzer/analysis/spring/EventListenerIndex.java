@@ -17,8 +17,7 @@ import java.util.TreeSet;
 /**
  * Spring event listener method を (raw の) event parameter 型で索引する。
  *
- * <p>publish → listener の edge 生成 (broadcast 意味論、
- * adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) に使う。合致した
+ * <p>publish → listener の edge 生成 (broadcast 意味論) に使う。合致した
  * listener はいずれも callee になり、実行時条件を持つ listener と raw type 近似が
  * 過剰一致しうる listener が ambiguous になる。listener アノテーションを直接付けた
  * 単一 parameter の method だけを索引し、{@code classes} 属性形と合成 listener

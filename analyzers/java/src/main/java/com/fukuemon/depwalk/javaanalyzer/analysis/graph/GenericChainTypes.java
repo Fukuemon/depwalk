@@ -27,9 +27,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * JavaParser の generic 推論が失敗した式の型を、確定した根拠だけで前進導出する
- * (java-analyzer feature doc「型伝播救済層」/ adr/0012-implicit-call-resolution-and-type-propagation-rescue.md の手段 2 / 手段 3)。根拠は次の 3 つに
- * 限定し、推測による型付けは行わない。
+ * JavaParser の generic 推論が失敗した式の型を、確定した根拠だけで前進導出する。
+ * 根拠は次の 3 つに限定し、推測による型付けは行わない。
  *
  * <ul>
  * <li>AST に書かれた宣言型 (local / parameter の明示型、`var` は initializer を辿る)</li>
@@ -38,8 +37,8 @@ import java.util.Set;
  *     (classfile Signature と等価な情報の固定表)</li>
  * </ul>
  *
- * <p>lambda parameter の型は、lambda を受ける呼び出しの receiver 要素型から導出する
- * (手段③)。導出できない式は null を返し、呼び出し側が従来の分類 (diagnostic) に残す。
+ * <p>lambda parameter の型は、lambda を受ける呼び出しの receiver 要素型から導出する。
+ * 導出できない式は null を返し、呼び出し側が従来の分類 (diagnostic) に残す。
  */
 final class GenericChainTypes {
 
@@ -513,7 +512,7 @@ final class GenericChainTypes {
         return null;
     }
 
-    /** lambda parameter の型を、lambda を受ける呼び出しの receiver 要素型から導出する (手段③)。 */
+    /** lambda parameter の型を、lambda を受ける呼び出しの receiver 要素型から導出する。 */
     private Model lambdaParamModel(
             LambdaExpr lambda, String paramName, Map<String, Model> lambdaBindings, int depth) {
         if (lambda.getParameters().size() != 1

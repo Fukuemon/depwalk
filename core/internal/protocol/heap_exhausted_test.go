@@ -3,7 +3,7 @@ package protocol
 import "testing"
 
 // heapExhausted は「valid error record なしの異常終了 + stderr に OutOfMemoryError」
-// のときだけ真になる (analyzer-protocol feature doc「異常終了時の stderr の扱い」)。
+// のときだけ真になる。
 func TestHeapExhausted(t *testing.T) {
 	oomStderr := "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space\n\tat X.y(X.java:1)"
 	tests := []struct {

@@ -27,8 +27,6 @@ import java.util.Set;
 /**
  * source の class 宣言を継承し、source で解決できない method 呼び出しだけを
  * 同一 context の classes output の一意 member へ fallback する宣言。
- * 本クラスの契約 (合成条件・generic Signature の扱い) の正本は java-analyzer feature doc
- * 「solver 層の bytecode member 合成」。
  * {@code instanceof JavaParserClassDeclaration} に依存する
  * solver 内部経路を壊さないため、wrapper でなく subclass にする。
  */
@@ -56,8 +54,7 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         }
         // source AST に無い member を同一 context の classes output から合成する。
         // 一意な name + arity の場合だけ採用し、曖昧なら合成しない
-        // (adr/0005-adopt-sootup-and-spring-di-resolution.md の
-        //  project bytecode member index と同じ規則)。
+        // (project bytecode member index と同じ規則)。
         // static context の解決 (staticOnly) では instance member を採用しない。
         return synthesizedInHierarchy(name, argumentsTypes.size())
                 .filter(synthesized -> !staticOnly || synthesized.isStatic())

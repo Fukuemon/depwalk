@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 同一 compilation unit 内から bytecode-only member (Lombok 生成 getter 相当) を
  * 参照する形状が診断なしで解決されることを検証する。同一 unit 内参照は TypeSolver
  * を経由しないため solver 側合成では救済できず、AST 注入が担う。注入 member への
- * 呼び出しは bytecode-only member の出力契約
- * (adr/0005-adopt-sootup-and-spring-di-resolution.md) で emit される。
+ * 呼び出しは bytecode-only member の出力契約で emit される。
  * 検証する位置: builder 風 chain の引数、暗黙 this 呼び出し、switch selector と
  * その case 本体 (selector の解決失敗が本体を巻き込まないこと)。
  */

@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * stdin から {@code analysisRequest} JSONL 1 件を読み取る。
- * process contract (analyzer-protocol 正本): stdin は {@code analysisRequest} 1 件を受けて close される。
+ * process contract: stdin は {@code analysisRequest} 1 件を受けて close される。
  */
 public final class RequestReader {
 

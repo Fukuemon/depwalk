@@ -67,8 +67,8 @@ import java.util.function.Supplier;
  * 突合と edge 生成は {@link EventEdgeEmitter}、診断は {@link UnresolvedDiagnostics} が担い、
  * 本クラスは走査と各経路の調停に専念する。
  *
- * <p>本クラスの契約の正本は java-analyzer feature doc「Parse・resolution・call 完全性」
- * (call site の終端記録と完全性 gate)。以下の各経路はこれに従う。
+ * <p>以下の各経路は、call site 1 件につき必ず 1 つの終端 (emitted / excluded / diagnostic)
+ * を ledger へ記録し、完全性 gate から漏らさない。
  */
 public final class CallGraphBuilder {
 
@@ -344,7 +344,7 @@ public final class CallGraphBuilder {
             }
             // receiver 型を (bytecode field 補完込みで) 特定できて、その型が
             // scope 内 source に存在しない場合、callee は scope 外であり
-            // 理由付き external-target として分類する (ADR-0005)。
+            // 理由付き external-target として分類する。
             // 例: Lombok @Slf4j の log field 経由の Logger#info 呼び出し。
             String receiverOwner = bytecodeRescue.bytecodeRescueOwner(mce, ctx.enclosingTypeNode());
             if (receiverOwner != null && declIndex.find(receiverOwner).isEmpty()) {
@@ -359,8 +359,7 @@ public final class CallGraphBuilder {
                         bytecodeRescue.chainForwardOwner(mce.getScope().get(), ctx.enclosingTypeNode());
                 if (forwardOwner == null) {
                     // erasure の前進解決で辿れない JDK stream / collection 連鎖と
-                    // lambda parameter は、generic 前進導出 (型伝播救済層の手段 2 /
-                    // 手段 3) で owner を復元する。
+                    // lambda parameter は、generic 前進導出で owner を復元する。
                     forwardOwner = bytecodeRescue.genericChainOwner(mce.getScope().get());
                 }
                 if (forwardOwner != null) {
@@ -397,7 +396,7 @@ public final class CallGraphBuilder {
 
         // AST へ注入した bytecode-only member と solver が合成した bytecode-only member は、
         // 既存の bytecode-only member と同じ出力契約 (sourceLocation 省略 + owner metadata
-        // + calleeOrigin edge、ADR-0005) で emit する。
+        // + calleeOrigin edge) で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
         if (bytecodeOnly != null) {
             // 型名 scope の static call を instance の合成 / 注入 member で解決しない
@@ -417,7 +416,7 @@ public final class CallGraphBuilder {
             if (rescue == null) {
                 // owner が scope (include/exclude 適用後) の外にある場合、解決は solver
                 // 越しに成功していても callee は scope 外であり、fatal でなく external
-                // 分類にする (ADR-0005 の帰属規則)。
+                // 分類にする (帰属規則)。
                 commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
                 return;
             }
@@ -583,8 +582,8 @@ public final class CallGraphBuilder {
         }
 
         // solver が合成した bytecode-only member への reference は、method call の synthesized 経路と
-        // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge、
-        // ADR-0005) で emit する (従来この経路は通常 symbol として emit され、
+        // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge)
+        // で emit する (従来この経路は通常 symbol として emit され、
         // この出力契約から漏れていた)。
         SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
         if (bytecodeOnly != null) {
@@ -827,7 +826,7 @@ public final class CallGraphBuilder {
         }
     }
 
-    /** attribution を経ない external-target の明示除外 commit (ADR-0005 の field 補完経路)。 */
+    /** attribution を経ない external-target の明示除外 commit (field 補完経路)。 */
     private void commitExcludedExternal(Node callNode, CallSiteId.CallKind kind, WalkContext ctx) {
         for (String caller : ledgerCallers(callNode, ctx)) {
             ledger.commitExcluded(
@@ -902,7 +901,7 @@ public final class CallGraphBuilder {
         return null;
     }
 
-    /** 救済で採用した bytecode-only member を node + edge として出力する (ADR-0005 の出力契約)。 */
+    /** 救済で採用した bytecode-only member を node + edge として出力する (出力契約)。 */
     private void emitBytecodeOnlyCall(
             Node callNode, WalkContext ctx, BytecodeRescue.Rescue rescue, boolean viaMethodReference) {
         String signature = MethodIds.signature(
@@ -921,7 +920,7 @@ public final class CallGraphBuilder {
         ownerLocation.put("path", owner.path());
         ownerLocation.put("startLine", owner.beginLine());
         symbolMetadata.put("ownerSourceLocation", ownerLocation);
-        // 定義位置を偽装しない: sourceLocation は省略し、owner 位置は metadata へ分離する (ADR-0005)。
+        // 定義位置を偽装しない: sourceLocation は省略し、owner 位置は metadata へ分離する。
         accumulator.addNode(MethodSymbol.of(
                 methodId, "java", rescue.symbolKind(), qualifiedName, signature, null, symbolMetadata));
 
@@ -1105,7 +1104,7 @@ public final class CallGraphBuilder {
 
     /**
      * functional interface の invocation site から、渡された callable 実体への edge を
-     * 生成する (ADR-0012)。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
+     * 生成する。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
      * lambda / method reference の直接 initializer) と (2) workspace メソッドの
      * parameter への引数渡し 1 段。field 経由は JAVA_CALLABLE_UNRESOLVED (info) の
      * advisory 診断に残す。callee は method reference → 参照先、lambda → 定義側の

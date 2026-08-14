@@ -7,7 +7,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
  */
 public class DiscoveryFailure extends Exception {
 
-    /** 安定 failure category。文字列は Protocol 観測面の契約 (toolchain.md)。 */
+    /** 安定 failure category。文字列は Protocol 観測面の契約として変えない。 */
     public enum Category {
         /** target Gradle version が対応範囲外、または安定判定できない。 */
         UNSUPPORTED_GRADLE_VERSION("unsupported-gradle-version"),

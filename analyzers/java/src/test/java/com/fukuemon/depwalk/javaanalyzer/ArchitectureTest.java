@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * 外部ライブラリ隔離 (ADR-0007 / DesignDoc_java-analyzer.md 「内部 package 構成と依存境界」) の機械検査。
+ * 外部ライブラリの隔離境界の機械検査。
  *
  * <p>隔離は 3 段階で、適用レベルはライブラリごとに異なる。SootUp は adapter package へ完全封じ込め、
  * Gradle Tooling API は discovery へ完全隔離、JavaParser / SymbolSolver は解析エンジンの中核として

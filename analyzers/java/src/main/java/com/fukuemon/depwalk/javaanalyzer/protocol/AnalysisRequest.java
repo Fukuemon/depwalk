@@ -7,8 +7,7 @@ import java.util.Map;
 
 /**
  * Core から Analyzer process の stdin へ 1 件だけ送信される解析要求。
- * protocol の正本は analyzer-protocol feature doc / ADR-0001 であり、本 record はそれに準拠する
- * 受信側 DTO である (schema はここで定義・変更しない)。
+ * 本 record は protocol schema に準拠する受信側 DTO であり、schema はここで定義・変更しない。
  *
  * @param schemaVersion Analyzer Protocol の schema version。現在は {@code "1"}
  * @param recordType    {@code analysisRequest}

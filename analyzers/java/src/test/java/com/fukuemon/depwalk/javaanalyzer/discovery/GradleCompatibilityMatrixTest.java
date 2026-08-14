@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Gradle discovery compatibility matrix (context/toolchain.md の CI anchor)。
+ * Gradle discovery compatibility matrix の検証。
  * 同一 custom model fixture を固定 anchor (target Gradle × daemon JDK) で実行し、
  * provider load、model fields、task 非実行、output 隔離を検証する。
  * Analyzer client は全 run で現行 test JVM (JDK 25) に固定される。

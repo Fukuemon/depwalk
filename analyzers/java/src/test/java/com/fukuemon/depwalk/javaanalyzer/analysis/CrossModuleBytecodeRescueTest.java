@@ -15,8 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * java-analyzer feature doc「solver 層の bytecode member 合成」の cross-module
- * 救済: 依存 project の classes output にしか存在しない生成 member への
+ * cross-module 救済の検証: 依存 project の classes output にしか存在しない生成 member への
  * cross-module 呼び出しが、bytecode-only member の出力契約で edge になる。
  * BytecodeOnlyMemberTest と同じく generator 非依存 (完全 source を compile した
  * classes + member を削った解析対象 source) で、Lombok 等の生成 member を模擬する。

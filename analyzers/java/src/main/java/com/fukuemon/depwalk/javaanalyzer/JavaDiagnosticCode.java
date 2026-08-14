@@ -2,7 +2,6 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 /**
  * Java Analyzer 固有の {@code diagnostic} code (解析継続)。
- * 正本: design/features/java-analyzer/DesignDoc_java-analyzer.md 「diagnostic / error code 体系」。
  * fatal な {@code error} code は {@link JavaErrorCode} を使う。
  */
 public enum JavaDiagnosticCode {

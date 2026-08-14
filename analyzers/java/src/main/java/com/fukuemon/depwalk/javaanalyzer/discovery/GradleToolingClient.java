@@ -27,7 +27,7 @@ public final class GradleToolingClient implements ToolingClient {
      *
      * @param daemonJavaHome Gradle daemon に使う JVM の java home (明示 override)。
      *     null なら選択を Gradle に委ねる (従来挙動)。request の
-     *     {@code metadata.gradleJavaHome} に対応する (ADR-0012)
+     *     {@code metadata.gradleJavaHome} に対応する
      */
     public GradleToolingClient(Path daemonJavaHome) {
         this(null, daemonJavaHome);

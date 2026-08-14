@@ -208,7 +208,7 @@ class MultiModuleFixtureEquivalenceTest {
 
     @SuppressWarnings("unchecked")
     private void assertExpectedGraph(Run run) throws Exception {
-        // 固定期待集合の正本は testdata の expected/graph.json (P6 の実 CLI E2E も参照可能)。
+        // 固定期待集合は testdata の expected/graph.json に置く。
         Map<String, Object> expected = new ObjectMapper()
                 .readValue(fixture.resolve("expected/graph.json").toFile(), Map.class);
         Map<String, Map<String, Object>> methodsById = methodSet(run).stream()

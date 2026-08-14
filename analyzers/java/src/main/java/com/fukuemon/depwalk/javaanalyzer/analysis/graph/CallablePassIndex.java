@@ -22,16 +22,14 @@ import java.util.Map;
 /**
  * workspace method の parameter から、そこへ渡された callable への 1 hop の対応表。
  *
- * <p>callable invocation edge の生成
- * (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) に使う: lambda /
+ * <p>callable invocation edge の生成に使う: lambda /
  * method reference を workspace method の引数に渡した場合、その method 内で該当 parameter を
  * invoke する箇所を callable 本体へ結び付ける。索引するのは直接の引数渡し 1 hop のみで、
  * field への格納と多段の流れは設計上対象外。解決失敗は黙って読み飛ばす (渡している call
  * site 自体の終端は通常の second pass 処理が分類する)。
  *
  * <p>複数の call site から渡された callable は同一の parameter キーへ集約される。これは
- * invocation 側で候補を全列挙する設計 (design/features/java-analyzer/analysis.md の
- * callable 追跡) のためであり、call site ごとに分離しない。
+ * invocation 側で候補を全列挙する設計のためであり、call site ごとに分離しない。
  */
 public final class CallablePassIndex {
 

@@ -324,8 +324,7 @@ public final class SootUpTypeHierarchyIndex {
 
     /**
      * 宣言 class 自身の指定名 callable method を bytecode から列挙する
-     * (bridge / synthetic を除外)。bytecode-only member 救済
-     * (adr/0005-adopt-sootup-and-spring-di-resolution.md) の
+     * (bridge / synthetic を除外)。bytecode-only member 救済の
      * 照会用で、型階層は辿らない。
      */
     public Resolution resolveDeclaredCallableMethods(String declaringType, String methodName) {

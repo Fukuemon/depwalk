@@ -2,7 +2,6 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 /**
  * Java Analyzer 固有の {@code error} code (fatal / 非ゼロ exit)。
- * 正本: design/features/java-analyzer/DesignDoc_java-analyzer.md 「diagnostic / error code 体系」。
  * {@code JAVA_UNRESOLVED_SYMBOL} / {@code JAVA_PARSE_ERROR} / {@code JAVA_ENTRYPOINT_NOT_FOUND} は
  * 解析を継続できる diagnostic であるため、fatal error を表す本 enum には含めない。
  */
@@ -39,8 +38,7 @@ public enum JavaErrorCode {
 
     /**
      * 全 resolver と bytecode 救済の完了後も scope 内 call が edge / 明示除外へ
-     * 確定せず primary diagnostic に残った
-     * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+     * 確定せず primary diagnostic に残った。
      * 全未解決 call は {@code error.details} で観測可能にする。
      */
     JAVA_INCOMPLETE_ANALYSIS,

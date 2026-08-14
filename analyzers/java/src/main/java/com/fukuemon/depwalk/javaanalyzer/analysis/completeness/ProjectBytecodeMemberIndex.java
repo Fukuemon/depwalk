@@ -12,8 +12,7 @@ import java.util.Optional;
 
 /**
  * scope 内 source type の bytecode-only callable member を、source call site
- * からの照会に対して generator 非依存に解決する索引
- * (adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+ * からの照会に対して generator 非依存に解決する索引。
  * 所有 context の {@link SootUpTypeHierarchyIndex} (lazy) へ委譲し、annotation
  * 名や generator 名では一切分岐しない。JVM 内部 member (bridge / synthetic /
  * {@code lambda$...} / {@code access$...} / {@code <clinit>}) は候補にしない。
@@ -28,8 +27,7 @@ public final class ProjectBytecodeMemberIndex {
 
     /**
      * @param classesOutputDirs この context から見える project 所有の classes
-     *     output。member 救済の origin 検証と generic Signature 属性の読み取り
-     *     (java-analyzer feature doc「solver 層の bytecode member 合成」) に使う
+     *     output。member 救済の origin 検証と generic Signature 属性の読み取りに使う
      */
     public ProjectBytecodeMemberIndex(
             SootUpTypeHierarchyIndex sootUpIndex, List<Path> classesOutputDirs) {
@@ -40,7 +38,7 @@ public final class ProjectBytecodeMemberIndex {
 
     /**
      * owner class の classfile が project 所有の classes output に存在するかを
-     * 検証する (feature doc「solver 層の bytecode member 合成」)。
+     * 検証する。
      * external artifact だけに存在する同名 class の member を
      * project bytecode として救済しない。
      */

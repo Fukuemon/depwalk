@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * callable invocation edge (adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の検証。
+ * callable invocation edge の検証。
  * functional interface の呼び出しは、静的追跡スコープ (同一メソッド内の local と、
  * workspace メソッドの parameter への 1 hop 引数渡し) の範囲で、渡された callable
  * へ edge を張る。スコープ外の SAM invocation は全般に、edge を推測せず advisory の

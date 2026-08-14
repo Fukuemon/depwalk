@@ -152,9 +152,8 @@ func formatNode(node NodeView, location *graph.SourceLocation) string {
 }
 
 // formatEntryPoint は framework 由来 entry point の標識を描画する。Console が意味
-// 解釈する metadata key は "entryPoint" だけ (opaque metadata 契約の唯一の例外。
-// adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。値はアノテー
-// ションの FQN で、FQN の辞書順に並べてから "@" + 単純名へ変換し、変換後に重複を
+// 解釈する metadata key は "entryPoint" だけ (opaque metadata 契約の唯一の例外)。
+// 値はアノテーションの FQN で、FQN の辞書順に並べてから "@" + 単純名へ変換し、変換後に重複を
 // 除く (analyzer によらず出力を決定的にするため)。配列でない値・string でない要素
 // は読み飛ばし、有効な FQN が残らなければ標識自体を出さない。
 func formatEntryPoint(node NodeView) string {

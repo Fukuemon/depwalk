@@ -22,8 +22,7 @@ import java.util.Set;
 import java.util.function.BiFunction;
 
 /**
- * publish → listener の candidate edge を生成する (broadcast 意味論、
- * adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)。
+ * publish → listener の candidate edge を生成する (broadcast 意味論)。
  *
  * <p>Spring イベントの突合規則 (publisher 判定・event 型階層の収集・listener 突合・
  * ambiguous 判定・イベント metadata の組み立て) をここへ集約する。graph package に
