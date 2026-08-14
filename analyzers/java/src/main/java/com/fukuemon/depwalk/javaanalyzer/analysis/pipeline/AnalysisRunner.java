@@ -209,8 +209,8 @@ public final class AnalysisRunner {
             // アノテーション解決の失敗は SpringAnnotations.fqn の内部で握られるため、
             // この accept は新しい fatal 経路を作らない (try/catch 不要)。
             entryPointIndex.accept(unit);
-            // 解決できない listener 宣言は accept 内で索引から漏れる (登録漏れは
-            // publish 側の JAVA_EVENT_UNRESOLVED warning として観測される)。
+            // 解決できない listener 宣言は accept 内で索引から漏れる (宣言自身の解決
+            // 失敗は second pass の通常診断として現れる)。
             eventListenerIndex.accept(unit);
             callablePassIndex.accept(unit);
             try {

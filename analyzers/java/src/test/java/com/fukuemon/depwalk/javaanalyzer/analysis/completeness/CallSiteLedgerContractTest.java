@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@DisplayName("call site 台帳 (CallSiteInventory / CallSiteOutcomeL呼び出し関係 (edge)r) の網羅性契約")
+@DisplayName("call site 台帳 (CallSiteInventory / CallSiteOutcomeLedger) の網羅性契約")
 class CallSiteLedgerContractTest {
 
     @TempDir
@@ -42,7 +42,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
-    @DisplayName("メソッド呼び出し・オブジェクト生成・明示的コンストラクタ呼び出し・メソッド参照の全種類の call site が、path と行番号と呼び出し元メソッド ID を持つ決定的な ID で登録される")
+    @DisplayName("メソッド呼び出し・オブジェクト生成・明示的コンストラクタ呼び出し・メソッド参照の全種類の call site が、path と正の行番号と呼び出し元メソッド ID を持つ ID で登録される")
     void registersAllCallKindsWithDeterministicIds() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/App.java", """
                 package com.example;

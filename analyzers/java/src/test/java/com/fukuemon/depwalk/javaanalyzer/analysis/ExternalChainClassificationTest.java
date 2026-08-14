@@ -316,7 +316,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("lambda 引数が同名の field を隠しているとき、field の型を採用して除外せず診断のまま残る")
+    @DisplayName("lambda 引数が同名の field を隠しているとき、field の型を owner として採用せず、除外もせずに診断のまま残る")
     void shadowedFieldNameStaysDiagnosticInsteadOfAdoptingFieldType() throws Exception {
         // 囲み型に external 型の field value があり、external method へ渡した
         // lambda の parameter (型推論不能) が同名で field を shadowing している。

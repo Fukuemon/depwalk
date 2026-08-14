@@ -78,8 +78,9 @@ public final class EventListenerIndex {
                                 List.copyOf(conditions),
                                 rawApproximation));
             } catch (RuntimeException | LinkageError ignored) {
-                // 解決できない listener はここで診断せず索引から漏らす。登録漏れは
-                // publish 側の JAVA_EVENT_UNRESOLVED warning として観測される。
+                // 解決できない listener はここで診断せず索引から漏らす。listener 宣言
+                // 自身の解決失敗は second pass の通常診断 (JAVA_UNRESOLVED_SYMBOL)
+                // として現れる (JAVA_EVENT_UNRESOLVED は publish 引数型の解決失敗専用)。
             }
         }
     }

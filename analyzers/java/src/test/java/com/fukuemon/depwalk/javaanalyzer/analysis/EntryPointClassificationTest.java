@@ -62,6 +62,9 @@ class EntryPointClassificationTest {
                 entryPointOf(ran, "java:com.example.Uses#composedEntry()"));
         // meta 2 段は設計上検出不能: 標識も診断も出ない。
         assertNull(entryPointOf(ran, "java:com.example.Uses#twoLevels()"));
+        assertTrue(ran.byType("diagnostic").stream().noneMatch(diagnostic ->
+                        "java:com.example.Uses#twoLevels()".equals(diagnostic.get("relatedMethodId"))),
+                () -> "two-level composed annotations must not surface diagnostics: " + ran.byType("diagnostic"));
     }
 
     @Test
@@ -93,7 +96,10 @@ class EntryPointClassificationTest {
         // source 上の実呼び出しだけが edge になる。fixture の呼び出し式と edge の
         // (caller, callee) 集合が完全一致することで、アノテーション由来の edge が
         // 1 本も増えていないことを固定する。
-        Set<String> edgePairs = ran.byType("callEdge").stream()
+        List<Map<String, Object>> callEdges = ran.byType("callEdge");
+        // 同一 (caller, callee) pair の重複 edge 退行を検出するため、raw 件数も固定する。
+        assertEquals(3, callEdges.size(), () -> "raw callEdge count must stay 3: " + callEdges);
+        Set<String> edgePairs = callEdges.stream()
                 .map(edge -> edge.get("callerMethodId") + " -> " + edge.get("calleeMethodId"))
                 .collect(Collectors.toSet());
         assertEquals(

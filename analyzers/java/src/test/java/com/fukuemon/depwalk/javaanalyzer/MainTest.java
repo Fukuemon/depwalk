@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class MainTest {
 
     @Test
-    @DisplayName("空 classpath の空 workspace を解析するとき、source-only warning 以外の record を出さずに exit code 0 で終わる")
-    void preflightPassWithEmptyClasspathProducesZeroRecordsAndExitZero(@TempDir Path emptyWorkspace) {
+    @DisplayName("空 classpath の空 workspace を解析するとき、stdout は source-only warning (JAVA_SOOTUP_UNAVAILABLE) を含む行だけになり exit code 0 で終わる")
+    void preflightPassWithEmptyClasspathAllowsOnlySourceOnlyWarningAndExitsZero(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
                 + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
@@ -63,7 +63,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("language が java 以外のとき、JAVA_INVALID_REQUEST の error record を出して exit code 1 で終わる")
+    @DisplayName("language が java 以外のとき、stdout に JAVA_INVALID_REQUEST を含む出力を出して exit code 1 で終わる")
     void unsupportedLanguageProducesInvalidRequestErrorAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -97,7 +97,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("request に未知のフィールドが含まれる場合でも、無視されて余分な record は出ないままになる")
+    @DisplayName("request に未知のフィールドが含まれる場合でも、exit code 0 のままで stdout は diagnostic record だけになる")
     void unknownFieldsInRequestAreIgnored(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
@@ -168,7 +168,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("stdout への書き込みが失敗するとき、黙って終わらずに失敗内容を stderr へ書いて exit code 1 で終わる")
+    @DisplayName("stdout への書き込みが失敗するとき、黙って終わらずに stderr へ出力を残して exit code 1 で終わる")
     void ioExceptionDuringOutputWriteIsReportedOnStderrAndReturnsNonZeroExit() {
         // 明示 sourceRoots + metadata なし -> JAVA_MISSING_CLASSPATH の error record 書込を誘発する。
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","

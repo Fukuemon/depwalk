@@ -70,9 +70,13 @@ final class GenericChainTypes {
     // 固定表の意味論を適用する Map 型の明示列挙。名前 pattern (java.util.* かつ *Map) の
     // 判定は、意味論を確認していない型まで意図せず対象へ含めるため採らない。
     private static final Set<String> MAP_LIKE = Set.of(
-            "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap", "java.util.TreeMap",
-            "java.util.SortedMap", "java.util.NavigableMap",
-            "java.util.concurrent.ConcurrentHashMap", "java.util.concurrent.ConcurrentMap");
+            "java.util.Map", "java.util.SortedMap", "java.util.NavigableMap",
+            "java.util.HashMap", "java.util.LinkedHashMap", "java.util.TreeMap",
+            "java.util.EnumMap", "java.util.WeakHashMap", "java.util.IdentityHashMap",
+            "java.util.Hashtable", "java.util.concurrent.ConcurrentMap",
+            "java.util.concurrent.ConcurrentHashMap",
+            "java.util.concurrent.ConcurrentNavigableMap",
+            "java.util.concurrent.ConcurrentSkipListMap");
 
     private static final Set<String> STREAM_ELEMENT_PRESERVING = Set.of(
             "filter", "peek", "distinct", "sorted", "limit", "skip", "takeWhile", "dropWhile",

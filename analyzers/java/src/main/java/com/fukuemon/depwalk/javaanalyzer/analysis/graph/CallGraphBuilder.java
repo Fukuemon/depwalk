@@ -4,8 +4,8 @@ import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
-import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDeclarationIndex;
@@ -1126,7 +1126,9 @@ public final class CallGraphBuilder {
         // 下の advisory 診断へ流さない。合成宣言 (enum の values() 等) は isAbstract()
         // が throw することがあり、その場合は「SAM でない」とみなす。
         try {
-            if (!invoked.isAbstract() || !isFunctionalInterfaceSam(invoked)) {
+            // equals などの Object 再宣言は SAM ではないため、その呼び出し自体も
+            // callable invocation として扱わない。
+            if (!invoked.isAbstract() || redeclaresObjectMethod(invoked) || !isFunctionalInterfaceSam(invoked)) {
                 return;
             }
         } catch (RuntimeException | LinkageError e) {
@@ -1199,8 +1201,10 @@ public final class CallGraphBuilder {
                     .filter(method -> method.isAbstract())
                     .filter(method -> !redeclaresObjectMethod(method))
                     .count();
-            // SAM を親 interface から継承して自身の宣言 abstract が 0 の interface は
-            // 引き続き対象外 (自身の宣言だけで判定する制約)。
+            // 自身の宣言だけで判定する制約: SAM を親から継承した interface (宣言 0 件)
+            // は対象外になり、逆に親にも abstract がある非 functional interface を
+            // 1 件と数えて対象にしうる。継承まで辿る判定は解決コストが大きいため
+            // 採らない。
             return abstractCount == 1;
         } catch (RuntimeException | LinkageError e) {
             return false;

@@ -113,7 +113,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("event 引数型が解決できないとき、l呼び出し関係 (edge)r の外側で advisory 診断 JAVA_EVENT_UNRESOLVED を出す")
+    @DisplayName("event 引数型が解決できないとき、台帳 (ledger) の外側で advisory 診断 JAVA_EVENT_UNRESOLVED を出す")
     void unresolvableEventArgumentEmitsAdvisoryDiagnosticOutsideTheLedger() throws Exception {
         // 解決できない event 引数は publishEvent の call site 自体も未解決にするため、
         // publish には allowIncompleteAnalysis が要る。advisory であることは構造で示す:

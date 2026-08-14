@@ -116,6 +116,10 @@ class CallableInvocationTest {
                                 && "java:com.example.NonFunctional#first()".equals(edge.get("calleeMethodId"))
                                 && !Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation"))),
                 "the plain interface call must stay a normal edge: " + ran.byType("callEdge"));
+        assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
+                        "java:com.example.PlainInterfaceUse#call()".equals(edge.get("callerMethodId"))
+                                && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation"))),
+                "plain interface calls must not produce callable invocation edges: " + ran.byType("callEdge"));
         assertTrue(ran.byType("diagnostic").stream().noneMatch(diagnostic ->
                         "JAVA_CALLABLE_UNRESOLVED".equals(diagnostic.get("code"))
                                 && "java:com.example.PlainInterfaceUse#call()".equals(

@@ -140,6 +140,20 @@ class ChainTypePropagationTest {
         assertTrue(ran.byType("methodSymbol").stream().anyMatch(node ->
                         "java:com.example.GroupingUseCase#run(java.util.List)".equals(node.get("methodId"))),
                 () -> "GroupingUseCase#run must be analyzed: " + ran.byType("methodSymbol"));
+        // 救済層が動いた正の証拠: groupingBy の key extractor (Item::getUlid) は
+        // 通常どおり救済されて edge になる。
+        assertTrue(ran.byType("callEdge").stream().anyMatch(edge ->
+                        "java:com.example.Item#getUlid()".equals(edge.get("calleeMethodId"))
+                                && "java:com.example.GroupingUseCase#run(java.util.List)"
+                                        .equals(edge.get("callerMethodId"))),
+                () -> "key extractor must still be rescued: " + ran.byType("callEdge"));
+        // count.getCode() は導出せず、未解決 diagnostic として表面化する
+        // (解析が空振りしても通る穴を塞ぐ)。
+        assertTrue(ran.byType("diagnostic").stream().anyMatch(diagnostic ->
+                        "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))
+                                && "java:com.example.GroupingUseCase#run(java.util.List)"
+                                        .equals(diagnostic.get("relatedMethodId"))),
+                () -> "count.getCode() must surface as an unresolved diagnostic: " + ran.byType("diagnostic"));
         // count は実際には Long であり、Item の member を callee にしてはならない。
         assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
                         String.valueOf(edge.get("calleeMethodId")).startsWith("java:com.example.Item#getCode")),

@@ -29,7 +29,9 @@ public final class EntryPointIndex {
     /**
      * first pass: entry point アノテーションを直接 (メタ 1 段のみ) 担持するユーザー定義
      * アノテーションを記録する。重複宣言は最初の entry を保持する (他の first-pass 索引と
-     * 揃えた first-wins)。修飾名を解決できない local アノテーション宣言は読み飛ばす。
+     * 揃えた first-wins)。nested / local に宣言した合成アノテーションと、修飾名を解決
+     * できない宣言は対象外として読み飛ばす (design/features/java-analyzer/analysis.md
+     * の検出制約)。
      */
     public void accept(CompilationUnit unit) {
         for (AnnotationDeclaration declaration : unit.findAll(AnnotationDeclaration.class)) {

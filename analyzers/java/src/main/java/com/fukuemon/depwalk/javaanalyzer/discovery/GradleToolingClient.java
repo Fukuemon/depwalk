@@ -22,15 +22,8 @@ public final class GradleToolingClient implements ToolingClient {
     private final String forcedGradleVersion;
     private final File daemonJavaHome;
 
-    /** 通常経路の既定形。daemon JVM の選択は Gradle に委ねる。 */
-    public GradleToolingClient() {
-        this(null, (Path) null);
-    }
-
     /**
      * 通常経路: wrapper があれば build distribution、なければ同梱 version。
-     * {@code new GradleToolingClient(null)} は overload が曖昧になるため、既定は
-     * no-arg 形を使う。
      *
      * @param daemonJavaHome Gradle daemon に使う JVM の java home (明示 override)。
      *     null なら選択を Gradle に委ねる (従来挙動)。request の

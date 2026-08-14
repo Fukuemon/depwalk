@@ -141,6 +141,8 @@ public final class ProjectBytecodeMemberIndex {
         return methodName.startsWith("lambda$")
                 || methodName.startsWith("access$")
                 || methodName.equals("$values")
+                || methodName.startsWith("$SwitchMap$")
+                || methodName.startsWith("$SWITCH_TABLE$")
                 || methodName.startsWith("$jacoco")
                 || methodName.startsWith("$deserializeLambda$")
                 || methodName.equals(MethodIds.STATIC_INITIALIZER_TOKEN);

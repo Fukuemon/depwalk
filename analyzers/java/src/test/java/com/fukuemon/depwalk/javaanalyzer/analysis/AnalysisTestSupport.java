@@ -17,8 +17,16 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * unit test 用の {@link Main#run} 実行ヘルパー。{@code analysisRequest} を組み立てて実行し、
- * stdout の JSONL を {@code Map} のリストとして返す (record 種別の判定は {@code recordType} フィールド)。
+ * unit test 用の支援 class。次の 3 役を担う。
+ * <ol>
+ *   <li>実行: {@code analysisRequest} を組み立てて {@link Main#run} を実行する
+ *       ({@link #run})。</li>
+ *   <li>fixture compile: fixture source を javac で compile して classes output を
+ *       作る ({@link #compileFixture} / {@link #writeSource})。</li>
+ *   <li>record 参照: stdout の JSONL を {@code Map} のリストとして返し
+ *       ({@link Ran#byType} の判定は {@code recordType} フィールド)、record の
+ *       {@code metadata} 取り出し ({@link #metadataOf}) を提供する。</li>
+ * </ol>
  */
 final class AnalysisTestSupport {
 
@@ -120,8 +128,15 @@ final class AnalysisTestSupport {
             writeSource(buildDir, source.getKey(), source.getValue());
             args.add(buildDir.resolve(source.getKey()).toString());
         }
-        int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
-        assertEquals(0, rc, "fixture compile failed");
+        // javac の診断出力を capture し、失敗時に原因 (compile error の本文) が
+        // 見えるようにする (rc だけでは何が壊れたか分からない)。
+        ByteArrayOutputStream compilerOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream compilerErr = new ByteArrayOutputStream();
+        int rc = ToolProvider.getSystemJavaCompiler()
+                .run(null, compilerOut, compilerErr, args.toArray(String[]::new));
+        assertEquals(0, rc, () -> "fixture compile failed (rc=" + rc + ")\nstdout:\n"
+                + compilerOut.toString(StandardCharsets.UTF_8)
+                + "\nstderr:\n" + compilerErr.toString(StandardCharsets.UTF_8));
     }
 
     /** source を {@code root} 配下の相対 path へ書き込む (親 directory は作成する)。 */

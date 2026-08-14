@@ -75,7 +75,7 @@ solver 経由の合成は、TypeSolver を通らない解決経路には効か�
 - caller として walk しない。呼び出された場合は bytecode-only member と同じ出力契約 (定義位置省略 + owner metadata + calleeOrigin) で emit する
 - owner の型が scope (include/exclude 適用後) の外なら external-target として除外する (fatal にしない)
 - field initializer の caller 帰属 (帰属先 constructor の集合) は注入前の source 宣言で数え、注入で変えない
-- walk する AST の first-pass 索引 (inventory / 宣言索引 / entry point / Spring DI) は注入前の AST で作る。ただし索引が行う型解決は solver 内部の注入済み AST を参照しうるため、「注入の影響が first pass に一切現れない」ことまでは保証しない
+- walk する AST の first-pass 索引 (inventory / 宣言索引 / entry point / event listener / callable / source method / Spring DI) は、いずれも注入前の AST で作る。ただし索引が行う型解決は solver 内部の注入済み AST を参照しうるため、「注入の影響が first pass に一切現れない」ことまでは保証しない
 
 external artifact だけに存在する同名 class の member は、project bytecode として救済しない (「solver 層の bytecode member 合成」節の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
 
@@ -142,6 +142,7 @@ SAM arity を推論できない method reference は救済しない。候補列�
 手段 2 の固定表の適用範囲:
 
 - `Collectors.toMap` と 1 引数 `groupingBy` の結果 Map、bound method reference の適用を含む
+- Map の意味論は明示列挙した JDK の Map 型に限って適用する (名前 pattern では判定しない。列挙に無い型は導出しないだけで、誤導出はしない)
 - downstream collector 付き `groupingBy` の値型は導出しない (値型が downstream に依存し、固定表では確定できないため)
 - project bytecode に無い型への unbound method reference は導出しない
 - `java.lang.Object` は owner の根拠にしない。型変数・raw・欠落の erasure と見分けが付かないため、既存の前進解決と同じ規則で打ち切る

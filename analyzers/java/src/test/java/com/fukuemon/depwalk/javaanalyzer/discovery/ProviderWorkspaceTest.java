@@ -55,7 +55,7 @@ class ProviderWorkspaceTest {
     }
 
     @Test
-    @DisplayName("生成される init script は plugin の適用だけを行い、task の実行や依存を参照しないままになる")
+    @DisplayName("生成される init script は project の task 実行や project の依存 (dependsOn) を参照せず、plugin の適用 (plugins.apply) を含む")
     void initScriptDoesNotRunTasksOrGenerateSources() {
         String script = ProviderWorkspace.initScriptContent(Path.of("/tmp/provider.jar"));
         assertFalse(script.contains("tasks."), "the init script must not reference task execution");

@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("固定 anchor (Gradle × daemon JDK) での Gradle discovery の互換性検証")
 class GradleCompatibilityMatrixTest {
 
-    @DisplayName("どの anchor (Gradle × daemon JDK) で実行しても、同一 fixture から同じ model が取得され、task は実行されず、stderr は固定行だけになる")
+    @DisplayName("どの anchor (Gradle × daemon JDK) で実行しても、同一 fixture の model の主要 field (project 数・source root・言語レベル・project 依存) が一致し、build 出力は現れず、stderr は depwalk prefix の行だけで discovery 終了行を含む")
     @ParameterizedTest(name = "Gradle {0} / daemon JDK {1} (gradleJavaHome={2})")
     @CsvSource({
             // 7.6.5 anchor は request metadata 相当の gradleJavaHome 経路で daemon JVM を
