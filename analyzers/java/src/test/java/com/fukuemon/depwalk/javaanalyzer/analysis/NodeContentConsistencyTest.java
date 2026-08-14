@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -19,11 +20,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * synthetic default constructor ({@code toAst()} 空) が sourceLocation 無しで先に登録され、
  * B.java 由来の sourceLocation 付き node が first-wins で捨てられていた。
  */
+@DisplayName("同一 methodId の node 内容の一貫性 (first-wins 登録)")
 class NodeContentConsistencyTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/nodemerge");
 
     @Test
+    @DisplayName("call site 由来で先に生成された default constructor の node でも、宣言 class の sourceLocation を持って 1 件だけ出力される")
     void callSiteEmittedSyntheticDefaultConstructorCarriesDeclaringTypeSourceLocation() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);

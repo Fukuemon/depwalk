@@ -4,6 +4,7 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,9 +12,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("メソッド annotation からの入口 (entry point) 検出")
 class EntryPointIndexTest {
 
     @Test
+    @DisplayName("明示 import された既知の入口 annotation を FQN として検出し、annotation の無いメソッドは入口にしない")
     void detectsKnownEntryPointAnnotationsFromExplicitImports() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;
@@ -57,6 +60,7 @@ class EntryPointIndexTest {
     }
 
     @Test
+    @DisplayName("event listener 系と残りの web mapping 系の annotation も、入口として検出する")
     void detectsListenerAndRemainingWebAnnotations() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;
@@ -102,6 +106,7 @@ class EntryPointIndexTest {
     }
 
     @Test
+    @DisplayName("javax と jakarta の wildcard import が両方あり simple name の FQN を 1 つに確定できないとき、保守的に何も検出しない")
     void ambiguousWildcardImportsAcrossJavaxAndJakartaDetectNothing() {
         // wildcard import の復元は曖昧な候補を拒否する: javax と jakarta の star
         // import が両方あると simple name が既知 FQN 2 つに対応するため、標識も
@@ -124,6 +129,7 @@ class EntryPointIndexTest {
     }
 
     @Test
+    @DisplayName("wildcard import 経由の場合でも、既知の入口 annotation を FQN へ復元して検出する")
     void detectsEntryPointAnnotationsFromWildcardImports() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;
@@ -144,6 +150,7 @@ class EntryPointIndexTest {
     }
 
     @Test
+    @DisplayName("複数の入口 annotation が付いたメソッドでは、検出結果が sort され重複なく返る")
     void sortsAndDeduplicatesMultipleMarkers() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;

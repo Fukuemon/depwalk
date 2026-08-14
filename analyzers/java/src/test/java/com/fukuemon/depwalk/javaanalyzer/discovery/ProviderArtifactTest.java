@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.discovery;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.DataInputStream;
@@ -17,9 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Java 8 で load できる classfile major 52 のみで構成され、Analyzer 本体の
  * JDK 25 class を含まない。
  */
+@DisplayName("同梱 provider jar の binary 境界")
 class ProviderArtifactTest {
 
     @Test
+    @DisplayName("同梱 provider jar は Java 8 で load できる classfile (major 52) の provider package だけで構成され、analyzer 本体のクラスを含まないままになる")
     void bundledProviderContainsOnlyJava8ProviderClasses() throws Exception {
         List<String> classEntries = new ArrayList<>();
         InputStream resource =

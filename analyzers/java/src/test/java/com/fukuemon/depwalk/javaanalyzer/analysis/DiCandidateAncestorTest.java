@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 生き残る: 解決不能な外部基底を extends する impl も、workspace の interface の
  * bean 候補になる (module を跨ぐ場合を含む)。
  */
-@DisplayName("Spring DI 候補の ancestor 収集 (best-effort)")
+@DisplayName("Spring DI 候補解決における祖先型 (ancestor) 収集の best-effort 動作")
 class DiCandidateAncestorTest {
 
     @TempDir
@@ -46,7 +46,7 @@ class DiCandidateAncestorTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("解決不能な外部基底を extends する別 module の impl でも、workspace interface の bean 候補のままになる")
+    @DisplayName("解決できない外部基底を extends する別 module の実装 class でも、workspace の interface の bean 候補のままになる")
     void crossModuleImplWithUnresolvableAncestorBecomesBeanCandidate() throws Exception {
         AnalysisTestSupport.writeSource(domainSrc, "com/example/domain/Repo.java", """
                 package com.example.domain;

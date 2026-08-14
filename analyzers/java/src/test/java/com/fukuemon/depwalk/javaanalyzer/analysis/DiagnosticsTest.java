@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -14,11 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 「Parse・resolution・call 完全性」により request 全体の fatal
  * ({@code JAVA_PARSE_ERROR})。未解決 symbol は解析を継続する。
  */
+@DisplayName("diagnostic の code / severity の契約")
 class DiagnosticsTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/diagnostics");
 
     @Test
+    @DisplayName("parse できない file があるとき、graph record を 1 件も出力せずに request 全体が失敗 (JAVA_PARSE_ERROR) になる")
     void parseErrorFailsWholeRequestBeforeAnyGraphRecord() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
@@ -38,6 +41,7 @@ class DiagnosticsTest {
     }
 
     @Test
+    @DisplayName("未解決の symbol は warning (JAVA_UNRESOLVED_SYMBOL) として報告され、呼び出し関係 (edge) を作らずに解析は継続する")
     void unresolvedSymbolIsReportedAsWarningAndAnalysisContinues() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null,
@@ -59,6 +63,7 @@ class DiagnosticsTest {
     }
 
     @Test
+    @DisplayName("指定した入口 (entry point) が見つからないとき、warning (JAVA_ENTRYPOINT_NOT_FOUND) として報告される")
     void entrypointNotFoundIsReportedAsWarning() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null,

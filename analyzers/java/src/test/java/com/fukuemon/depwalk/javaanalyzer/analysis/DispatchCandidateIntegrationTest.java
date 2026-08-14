@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis;
 
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("SootUp 候補と Spring DI 解決を統合した dispatch 候補の呼び出し関係 (edge) の生成")
 class DispatchCandidateIntegrationTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/dispatch-candidates");
@@ -40,6 +42,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("interface 宣言への呼び出し関係 (edge) を残したまま、@Primary / @Qualifier で確定した実装だけへ候補の edge を追加する")
     void keepsDeclarationEdgeAndAddsPrimaryAndQualifierImplementationEdges() {
         assertEdge(
                 "java:com.example.PrimaryConsumer#checkout()",
@@ -68,6 +71,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("候補を 1 つに確定できないとき、全候補へ曖昧 (ambiguous) な呼び出し関係 (edge) を重複なく出し、診断 JAVA_AMBIGUOUS_CANDIDATE を出す")
     void emitsAllAmbiguousCandidatesAndDeduplicatesEachCallerCalleeEdge() {
         String caller = "java:com.example.AmbiguousConsumer#runAudit()";
         for (String callee : List.of(
@@ -81,6 +85,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("呼び出しの receiver が DI の注入点でないとき、SootUp が絞り込んだ型階層の候補だけで呼び出し関係 (edge) を決める")
     void usesSootUpCandidatesWhenCallReceiverIsNotAnInjectionPoint() {
         String caller = "java:com.example.DispatchOnlyConsumer#run(com.example.AuditService)";
         for (String callee : List.of(
@@ -143,6 +148,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("constructor 引数の名前が field と異なる場合でも、代入先 field を receiver として注入解決で候補を確定する")
     void mapsConstructorParameterToItsAssignedFieldReceiver() {
         Map<String, Object> edge = assertEdge(
                 "java:com.example.RenamedConstructorConsumer#checkout()",
@@ -155,6 +161,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("setter 引数の名前が field と異なる場合でも、代入先 field を receiver として注入解決で候補を確定する")
     void mapsSetterParameterToItsAssignedFieldReceiver() {
         Map<String, Object> edge = assertEdge(
                 "java:com.example.RenamedSetterConsumer#checkout()",
@@ -167,6 +174,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("同名の引数が別々の setter にあるとき、宣言ごとに区別して各々の注入解決を適用する")
     void distinguishesSameNamedParametersByTheirDeclarations() {
         String paymentCaller = "java:com.example.SameNamedSetterParametersConsumer#setPayment(com.example.PaymentService)";
         Map<String, Object> payment = assertEdge(
@@ -186,6 +194,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("@Profile 付き bean が候補のとき、条件付きの曖昧 (ambiguous) として記録し、診断 JAVA_CONDITIONAL_BEAN を出す")
     void marksConditionalCandidateAndEmitsConditionalDiagnostic() {
         Map<String, Object> edge = assertEdge(
                 "java:com.example.ConditionalConsumer#notifyCustomer()",
@@ -201,6 +210,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("super を明示した呼び出しは親 class の宣言に固定され、override 実装への候補の呼び出し関係 (edge) を追加しない")
     void keepsExplicitSuperDispatchBoundToTheSuperclassDeclaration() {
         String declaration = "java:com.example.BaseProcessor#process()";
         String override = "java:com.example.OverridingProcessor#process()";
@@ -214,6 +224,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("Lombok 生成 constructor の注入を解決し、実行時に提供される型は JAVA_RUNTIME_PROVIDED / JAVA_UNRESOLVED_SYMBOL の診断で区別する")
     void resolvesLombokConstructorInjectionAndDistinguishesRuntimeDiagnostics() {
         Map<String, Object> lombok = assertEdge(
                 "java:com.example.LombokConsumer#checkout()",
@@ -234,6 +245,7 @@ class DispatchCandidateIntegrationTest {
     }
 
     @Test
+    @DisplayName("Spring の注入先 bean が見つからないとき、SootUp の候補へ代替して曖昧 (ambiguous) な呼び出し関係 (edge) を出す")
     void fallsBackToSootCandidatesForUnresolvedSpringInjection() {
         String caller = "java:com.example.UnresolvedBeanConsumer#execute()";
         for (String callee : List.of(

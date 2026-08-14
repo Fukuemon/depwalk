@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * へ edge を張る。スコープ外の SAM invocation は全般に、edge を推測せず advisory の
  * {@code JAVA_CALLABLE_UNRESOLVED} (info) で表面化する。
  */
-@DisplayName("callable invocation edge の生成")
+@DisplayName("渡された callable への呼び出し関係 (edge) の生成")
 class CallableInvocationTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/callable");
@@ -33,7 +33,7 @@ class CallableInvocationTest {
     private static final String STATIC_HELPER = "java:com.example.LocalUse#staticHelper()";
 
     @Test
-    @DisplayName("parameter へ 1 hop で渡された callable は、渡した全ての callable が invocation site を anchor に edge になる")
+    @DisplayName("parameter へ 1 hop で渡された callable を呼び出すとき、渡された全ての callable への呼び出し関係 (edge) が、受け取り側メソッド内の呼び出し位置を位置情報 (anchor) として生成される")
     void oneHopParameterPassLinksEveryPassedCallable() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());
@@ -58,7 +58,7 @@ class CallableInvocationTest {
     }
 
     @Test
-    @DisplayName("同一メソッド内 local の callable を invoke するとき、lambda は自己 edge、method reference は参照先への edge になる")
+    @DisplayName("同一メソッド内の local に入れた callable を呼び出すとき、lambda は自分自身への、method reference は参照先メソッドへの呼び出し関係 (edge) になる")
     void sameMethodLocalsLinkLambdaToSelfAndReferenceToTarget() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
 
@@ -71,7 +71,7 @@ class CallableInvocationTest {
     }
 
     @Test
-    @DisplayName("再代入された local の invoke は追跡せず、advisory 診断で表面化する")
+    @DisplayName("再代入された local の呼び出しは追跡せず、呼び出し先を推測しないまま補助的な (advisory) 診断で表面化する")
     void reassignedLocalIsNotTrackedAndSurfacesTheAdvisory() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
@@ -86,7 +86,7 @@ class CallableInvocationTest {
     }
 
     @Test
-    @DisplayName("field に保持された callable の invoke は edge を作らず、advisory info 診断だけを出す")
+    @DisplayName("field に保持された callable の呼び出しは呼び出し関係 (edge) を作らず、補助的な info 診断 (JAVA_CALLABLE_UNRESOLVED) だけを出す")
     void fieldStoredCallableSurfacesAdvisoryInfoDiagnosticWithoutEdges() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());
@@ -104,7 +104,7 @@ class CallableInvocationTest {
     }
 
     @Test
-    @DisplayName("functional でない interface の呼び出しは、callable 追跡の対象にも advisory 診断の対象にもならず、通常 edge のままになる")
+    @DisplayName("functional でない interface の呼び出しは、callable 追跡の対象にも補助診断の対象にもならず、通常の呼び出し関係 (edge) のままになる")
     void plainInterfaceCallsAreNeitherTrackedNorDiagnosed() throws Exception {
         // functional でない interface (注入された service 等) の呼び出しは、追跡と
         // advisory 診断のどちらにも入れない (ノイズ回帰の防止)。

@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code fullGraph} / {@code reachableFromEntrypoints} の node 母集合 (宣言列挙 ∪ call site 由来、
  * entrypoints 空は analysisMode によらず全体扱い)。
  */
+@DisplayName("analysisMode ごとの出力対象メソッドの母集合")
 class AnalysisModeTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/analysismode");
@@ -24,6 +26,7 @@ class AnalysisModeTest {
     }
 
     @Test
+    @DisplayName("fullGraph のとき、どこからも呼ばれない宣言済みメソッドも列挙される")
     void fullGraphIncludesDeclaredMethodsWithNoCallers() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, "fullGraph");
@@ -35,6 +38,7 @@ class AnalysisModeTest {
     }
 
     @Test
+    @DisplayName("reachableFromEntrypoints のとき、入口 (entry point) から推移的に到達できるメソッドだけに絞られる")
     void reachableFromEntrypointsLimitsToTransitiveCallees() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null,
@@ -55,6 +59,7 @@ class AnalysisModeTest {
     }
 
     @Test
+    @DisplayName("entrypoints が空のとき、analysisMode の指定に関わらず全体解析として扱われる")
     void emptyEntrypointsIsTreatedAsWholeScopeRegardlessOfAnalysisMode() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, List.of(), "reachableFromEntrypoints");

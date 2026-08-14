@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 試みてから diagnostic 化する。BytecodeOnlyMemberTest と同じく generator
  * 非依存 (完全 source の classes + member を削った解析対象 source) で検証する。
  */
+@DisplayName("method reference / 明示 constructor 呼び出しの bytecode 救済")
 class ReferenceSuperRescueTest {
 
     @TempDir
@@ -26,6 +28,7 @@ class ReferenceSuperRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("bytecode にしか無い member へのメソッド参照は、救済されて calleeOrigin が \"project-bytecode-member\" の呼び出し関係 (edge) になる")
     void rescuesMethodReferenceToBytecodeOnlyMember() throws Exception {
         Path classes = compileFixture("owner-src", "owner-classes", "com/example/Owner.java", """
                 package com.example;
@@ -61,6 +64,7 @@ class ReferenceSuperRescueTest {
     }
 
     @Test
+    @DisplayName("scope 外型へのメソッド参照で member も見つからないとき、診断ではなく external として除外される")
     void classifiesMethodReferenceToOutOfScopeOwnerAsExternal() throws Exception {
         // 参照先型が scope 外 (source 宣言索引に無い classes-only 型) で member も
         // 見つからない場合、diagnostic ではなく external-target 除外へ分類する。
@@ -90,6 +94,7 @@ class ReferenceSuperRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("代入先の functional interface 型が解決できず引数の個数を検証できないとき、メソッド参照は救済せず診断のまま fatal になる")
     void doesNotRescueMethodReferenceWhenSamArityIsUnknown() throws Exception {
         Path classes = compileFixture("arity-src", "arity-classes", "com/example/Owner.java", """
                 package com.example;
@@ -130,6 +135,7 @@ class ReferenceSuperRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("bytecode にしか無い親 constructor への super(...) 呼び出しは、救済されて calleeOrigin が \"project-bytecode-member\" の呼び出し関係 (edge) になる")
     void rescuesExplicitSuperToBytecodeOnlyConstructor() throws Exception {
         Path classes = compileFixture("base-src", "base-classes", "com/example/Base.java", """
                 package com.example;
@@ -164,6 +170,7 @@ class ReferenceSuperRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("bytecode にしか無い自 class constructor への this(...) 呼び出しは、救済されて呼び出し関係 (edge) になる")
     void rescuesExplicitThisToBytecodeOnlyConstructor() throws Exception {
         Path classes = compileFixture("self-src", "self-classes", "com/example/Self.java", """
                 package com.example;

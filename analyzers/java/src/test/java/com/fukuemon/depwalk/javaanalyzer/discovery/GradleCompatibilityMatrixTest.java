@@ -35,9 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 未解決の anchor は skip 成功にせず fail する。
  */
 @Tag("gradle-compat")
+@DisplayName("固定 anchor (Gradle × daemon JDK) での Gradle discovery の互換性検証")
 class GradleCompatibilityMatrixTest {
 
-    @DisplayName("各 anchor (Gradle × daemon JDK) で実行しても、同一 fixture から同じ model が discover される")
+    @DisplayName("どの anchor (Gradle × daemon JDK) で実行しても、同一 fixture から同じ model が取得され、task は実行されず、stderr は固定行だけになる")
     @ParameterizedTest(name = "Gradle {0} / daemon JDK {1} (gradleJavaHome={2})")
     @CsvSource({
             // 7.6.5 anchor は request metadata 相当の gradleJavaHome 経路で daemon JVM を
@@ -110,6 +111,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("実 daemon でサポート外の Gradle version を使うとき、安定した理由 (unsupported-gradle-version) と明示 override の案内付きで失敗する")
     void unsupportedGradleVersionFailsWithStableReasonOnRealDaemon() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         org.junit.jupiter.api.Assertions.assertNotNull(jdkHome,
@@ -138,6 +140,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("included build を含む workspace のとき、その project は model に含めず、root directory だけが警告用に報告される")
     void reportsIncludedBuildRootsForExclusionWarnings() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");
@@ -175,6 +178,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("sourceCompatibility が旧表記 \"1.8\" の project のとき、言語レベルは正規の major 表記 \"8\" へ正規化される")
     void normalizesLegacySourceCompatibilityToCanonicalMajor() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");

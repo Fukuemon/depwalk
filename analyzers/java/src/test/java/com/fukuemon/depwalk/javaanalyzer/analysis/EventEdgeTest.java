@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * listener だけが ambiguous になる。event 引数型が解決できない場合は完全性 gate の
  * 外側で advisory の {@code JAVA_EVENT_UNRESOLVED} 診断を出す。
  */
-@DisplayName("event publish から listener への edge 生成")
+@DisplayName("event publish から listener への呼び出し関係 (edge) の生成")
 class EventEdgeTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/event");
@@ -39,7 +39,7 @@ class EventEdgeTest {
     private static final String ON_SPECIAL = "java:com.example.Listeners#onSpecial(com.example.SpecialOrderEvent)";
 
     @Test
-    @DisplayName("event を publish するとき、無条件 listener への edge は各々確定 (resolution=unique) になる")
+    @DisplayName("event を publish するとき、無条件 listener への呼び出し関係 (edge) は各々確定 (resolution=unique) になる")
     void broadcastEmitsOneCertainEdgePerUnconditionalListener() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());
@@ -54,7 +54,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("@TransactionalEventListener への edge は transaction phase 依存として ambiguous になる")
+    @DisplayName("@TransactionalEventListener への呼び出し関係 (edge) は、transaction phase に依存するため曖昧 (ambiguous) になる")
     void transactionalListenerIsConditionalOnTheTransactionPhase() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         // @TransactionalEventListener は transaction が設定 phase へ達したときだけ
@@ -68,7 +68,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("条件アノテーション付き listener への edge は conditionTypes 付きで ambiguous になる")
+    @DisplayName("条件アノテーション付き listener への呼び出し関係 (edge) は、条件の出所を conditionTypes に載せて曖昧 (ambiguous) になる")
     void conditionalListenerIsAmbiguousWithConditionTypes() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, ON_ORDER_COND).orElseThrow());
@@ -78,7 +78,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("@EventListener の condition (SpEL) 属性付き listener への edge は、実行時条件として ambiguous になる")
+    @DisplayName("@EventListener の condition (SpEL) 属性付き listener への呼び出し関係 (edge) は、実行時にしか評価できない条件のため曖昧 (ambiguous) になる")
     void conditionAttributeListenerIsAmbiguous() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         // condition 属性は実行時に評価される SpEL であり、静的解析は真偽を決められない。
@@ -92,7 +92,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("subtype の event を publish するとき、supertype を受ける listener にも edge が届く")
+    @DisplayName("subtype の event を publish するとき、supertype を受ける listener にも呼び出し関係 (edge) が届く")
     void subtypeEventReachesSupertypeListeners() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         // SpecialOrderEvent は自身の listener と OrderEvent の listener の両方に合致する。
@@ -101,7 +101,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("publisher の subtype receiver は edge を生み、publisher でない型の publishEvent は edge を生まない")
+    @DisplayName("publisher の subtype receiver は呼び出し関係 (edge) を生み、publisher でない型の publishEvent は edge を生まない")
     void publisherSubtypeReceiverEmitsEdgesAndForeignPublishEventDoesNot() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertTrue(eventEdge(ran, PUBLISH_VIA_CONTEXT, ON_ORDER).isPresent(),
@@ -113,7 +113,7 @@ class EventEdgeTest {
     }
 
     @Test
-    @DisplayName("event 引数型が解決できないとき、ledger の外側で advisory 診断 JAVA_EVENT_UNRESOLVED を出す")
+    @DisplayName("event 引数型が解決できないとき、l呼び出し関係 (edge)r の外側で advisory 診断 JAVA_EVENT_UNRESOLVED を出す")
     void unresolvableEventArgumentEmitsAdvisoryDiagnosticOutsideTheLedger() throws Exception {
         // 解決できない event 引数は publishEvent の call site 自体も未解決にするため、
         // publish には allowIncompleteAnalysis が要る。advisory であることは構造で示す:

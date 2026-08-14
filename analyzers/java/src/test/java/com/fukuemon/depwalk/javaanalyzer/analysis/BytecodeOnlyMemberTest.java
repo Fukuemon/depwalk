@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 「完全な source を compile した classes output」と「member を削った解析対象
  * source」の組で generator 非依存の経路を検証する。
  */
+@DisplayName("bytecode にしか存在しないメンバ (bytecode-only member) の救済")
 class BytecodeOnlyMemberTest {
 
     @TempDir
@@ -27,6 +29,7 @@ class BytecodeOnlyMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("bytecode にだけ残るメソッドを救済するとき、定義位置は偽装せず省略し、owner の位置を metadata へ分離して出力する")
     void rescuesUniqueBytecodeOnlyMethodWithOwnerMetadata() throws Exception {
         // 1) 完全な source (generator が生成した member に相当する getName あり) を compile。
         Path build = temp.resolve("build-src");
@@ -87,6 +90,7 @@ class BytecodeOnlyMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("合成したメンバの戻り値型が伝播するため、その先に連鎖する呼び出しも分類済みのまま解析が成功する")
     void resolvesChainedCallsThroughSynthesizedMembers() throws Exception {
         // java-analyzer feature doc「solver 層の bytecode member 合成」:
         // bytecode-only member の戻り値型が solver へ伝播し、連鎖呼び出し
@@ -131,6 +135,7 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    @DisplayName("親クラスの bytecode にだけ存在するメンバでも、継承階層の走査を通じて解決される")
     void resolvesInheritedSynthesizedMembersThroughHierarchyWalk() throws Exception {
         // java-analyzer feature doc「solver 層の bytecode member 合成」:
         // 親 class の bytecode-only member (継承した生成 getter) は
@@ -184,6 +189,7 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    @DisplayName("合成メンバの generic 戻り値は Signature 属性から実型引数を復元するため、要素型上の連鎖呼び出しも呼び出し関係 (edge) として解決される")
     void genericElementTypeIsRecoveredFromSignatureAttribute() throws Exception {
         // java-analyzer feature doc「solver 層の bytecode member 合成」:
         // 合成 member の generic 戻り値は Signature 属性から実型引数を
@@ -245,6 +251,7 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    @DisplayName("owner の型が scope 内の source に存在しないとき、救済せず解析全体を失敗 (JAVA_INCOMPLETE_ANALYSIS) にする")
     void doesNotRescueAmbiguousOrForeignMembers() throws Exception {
         // owner type が scope 内 source に存在しない場合は救済せず fatal に残す。
         Path workspace = temp.resolve("workspace2");
@@ -264,6 +271,7 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    @DisplayName("外部 jar にしか存在しないメンバは project の bytecode として救済せず、解析全体を失敗にする")
     void doesNotRescueMembersThatExistOnlyInExternalArtifacts() throws Exception {
         // 同じ binary name の class が external jar にだけ存在する場合、その
         // member を project bytecode として救済しない (origin 検証。java-analyzer
@@ -313,6 +321,7 @@ class BytecodeOnlyMemberTest {
     }
 
     @Test
+    @DisplayName("型名経由の static 呼び出しに対して instance メンバを合成せず、偽の呼び出し関係 (edge) を作らずに解析全体を失敗にする")
     void doesNotSynthesizeInstanceMembersForStaticContextResolution() throws Exception {
         // static 修飾の型名経由 call は、bytecode に同名・同 arity の instance
         // member しか無い場合に合成せず、偽 edge でなく完全性 gate に残す。

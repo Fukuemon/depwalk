@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </ul>
  * javac が実際に生成する class ファイル名と突合して互換性を確認する。
  */
+@DisplayName("匿名クラス / ローカルクラスの binary name 採番の JVM 互換性")
 class BinaryNameNumberingTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/binarynames");
@@ -48,6 +50,7 @@ class BinaryNameNumberingTest {
     }
 
     @Test
+    @DisplayName("入れ子クラス内の匿名クラスは、直近の囲みクラスごとに 1 から採番される")
     void anonymousClassInNestedTypeIsNumberedPerImmediateEnclosingClass() throws Exception {
         Set<String> ids = methodIds(run());
         // Nested 内の匿名クラスは、Outer 直下に先行する匿名クラス (first() 内) があっても $Nested$1。
@@ -55,6 +58,7 @@ class BinaryNameNumberingTest {
     }
 
     @Test
+    @DisplayName("外側クラス直下の匿名クラスは、入れ子クラス内の匿名クラスを数えずに独立して採番される")
     void anonymousClassesInOuterAreNumberedIndependentlyOfNestedOnes() throws Exception {
         Set<String> ids = methodIds(run());
         assertTrue(ids.contains("java:com.example.Outer$1#run()"), ids.toString());
@@ -63,6 +67,7 @@ class BinaryNameNumberingTest {
     }
 
     @Test
+    @DisplayName("同名のローカルクラスは、JVM 互換の Outer$<n><Name> 形式で出現順に採番される")
     void localClassesUseJvmCompatibleNumberedNameForm() throws Exception {
         Set<String> ids = methodIds(run());
         assertTrue(ids.contains("java:com.example.Outer$1Local#go()"), ids.toString());
@@ -70,6 +75,7 @@ class BinaryNameNumberingTest {
     }
 
     @Test
+    @DisplayName("ローカルクラス内からの呼び出しは、そのローカルクラスの binary name が呼び出し元として記録される")
     void callInsideLocalClassIsAttributedToTheLocalClassBinaryName() throws Exception {
         AnalysisTestSupport.Ran ran = run();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -80,6 +86,7 @@ class BinaryNameNumberingTest {
     }
 
     @Test
+    @DisplayName("出力される全ての binary name が、javac が実際に生成する class ファイル名のいずれかと一致する")
     void everyEmittedBinaryNameMatchesAClassFileGeneratedByJavac(@TempDir Path classesDir) throws Exception {
         Set<String> javacBinaryNames = compileFixtureWithJavac(classesDir);
 

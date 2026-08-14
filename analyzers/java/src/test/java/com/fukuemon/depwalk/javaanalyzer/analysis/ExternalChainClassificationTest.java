@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,12 +19,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * へ、scope 内型が現れたら diagnostic のまま。(ii) lambda parameter — 引数先
  * functional interface が scope 外型なら external へ。
  */
+@DisplayName("receiver 型が取れない呼び出しの external 分類 (chain 起点の遡及と lambda 引数)")
 class ExternalChainClassificationTest {
 
     @TempDir
     Path temp;
 
     @Test
+    @DisplayName("chain の起点が scope 外型のとき、解決に失敗した後続の呼び出しも external として除外され、診断は出ない")
     void chainWithExternalRootIsClassifiedExternal() throws Exception {
         // Ext.make() は自己境界 generic 戻り値型 (<T extends Ext> T) で、target-type
         // context が無い chain 途中の呼び出しでは JavaParser が解決に失敗する
@@ -66,6 +69,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("chain の起点が scope 外型でも、途中の呼び出しを classfile 上で確認できないとき、後続は診断のまま残る")
     void chainWithExternalRootStaysDiagnosticWhenIntermediateLinkNotOnClasspath() throws Exception {
         // multi-agent review 指摘反映 (2026-07-22): root が external というだけで
         // 中間 link を無条件に external とみなさない。intermediate link
@@ -102,6 +106,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("chain の起点が scope 内型で前進解決の候補を 1 つに確定できないとき、external へ倒さず診断のまま残る")
     void chainWithInScopeRootStaysDiagnosticWhenForwardResolutionIsAmbiguous() throws Exception {
         // Holder は scope 内 source 型。make(String) / make(Integer) の同名同
         // arity overload により bytecode 候補が一意に決まらず、chain の前進解決
@@ -151,6 +156,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("scope 外メソッドへ渡した lambda の引数への呼び出しは、受け手の型が scope 外の場合でも診断のまま残る")
     void lambdaPassedToExternalMethodStaysDiagnosticEvenWhenReceiverIsExternal() throws Exception {
         // PR review 指摘反映 (2026-07-22, 規則 (ii) 撤回の回帰ガード): 受け手
         // method (ExtApi.each) の receiver 型が external (classes-only) でも、
@@ -192,6 +198,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("scope 外の functional interface 型変数へ代入した lambda の引数への呼び出しは、external として除外される")
     void lambdaAssignedToExternalFunctionalInterfaceIsClassifiedExternal() throws Exception {
         // 規則 (ii) の維持範囲: lambda 自体が代入される変数の宣言型
         // (functional interface 型そのもの) が external なら、lambda parameter
@@ -227,6 +234,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("scope 内 functional interface の lambda 引数の型が解決できないとき、診断のまま残る")
     void lambdaParamOfInScopeFunctionalInterfaceStaysDiagnostic() throws Exception {
         // scope 内 functional interface (引数型が classpath に無く param 型不明) の
         // lambda は、受け手が暗黙 this (scope 内) のため diagnostic に残す。
@@ -258,6 +266,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("scope 内 chain の各呼び出しを classfile の戻り値型で前進解決し、bytecode にしか無い member への呼び出しを呼び出し関係 (edge) として救済する")
     void forwardResolvesChainThroughBytecodeReturnTypes() throws Exception {
         // scope 内 chain の各 link を classfile の戻り値型で前進
         // 解決する。Holder.make() / Dep.text() とも source に無い bytecode-only
@@ -307,6 +316,7 @@ class ExternalChainClassificationTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("lambda 引数が同名の field を隠しているとき、field の型を採用して除外せず診断のまま残る")
     void shadowedFieldNameStaysDiagnosticInsteadOfAdoptingFieldType() throws Exception {
         // 囲み型に external 型の field value があり、external method へ渡した
         // lambda の parameter (型推論不能) が同名で field を shadowing している。

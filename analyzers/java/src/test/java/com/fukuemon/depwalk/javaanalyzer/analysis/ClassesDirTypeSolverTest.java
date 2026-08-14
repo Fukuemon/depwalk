@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,11 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * classes dir へコンパイルし、{@link com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory}
  * がそれを解決できることを確認する。
  */
+@DisplayName("classpath entry としての classes directory の型解決")
 class ClassesDirTypeSolverTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/classesdirtypesolver");
 
     @Test
+    @DisplayName("classes directory 内の宣言が別の classpath entry の依存型を必要とする場合でも、型を解決して継承メソッドを scope 内の派生型へ引き上げられる")
     void declarationInClassesDirectoryCanLoadDependencyFromAnotherClasspathEntry(@TempDir Path tempDir) throws Exception {
         Path dependencyClasses = tempDir.resolve("dependency-classes");
         Path libraryClasses = tempDir.resolve("library-classes");
@@ -65,6 +68,7 @@ class ClassesDirTypeSolverTest {
     }
 
     @Test
+    @DisplayName("推移的に必要な依存 classes が欠けているとき、request 全体が失敗 (JAVA_INCOMPLETE_ANALYSIS) になる")
     void missingTransitiveDependencyFailsTheWholeRequest(@TempDir Path tempDir) throws Exception {
         Path dependencyClasses = tempDir.resolve("dependency-classes");
         Path libraryClasses = tempDir.resolve("library-classes");

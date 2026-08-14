@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
 import com.fukuemon.depwalk.javaanalyzer.Main;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -23,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * C の {@code methodSymbol} より先に書き出される。バッチ実装 (全 node → 全 edge → 全 diagnostic の順)
  * ではこの関係が逆転する (diagnostic は常に最後) ため、この順序で streaming か batch かを判別できる。
  */
+@DisplayName("fullGraph のファイル単位 streaming 出力")
 class StreamingOutputTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/streamingorder");
 
     @Test
+    @DisplayName("各ファイルの record は、後続ファイルの解析完了を待たずにファイル単位で flush される (末尾一括の batch 出力にならない)")
     void fullGraphFlushesEachFilesRecordsBeforeLaterFilesAreFullyProcessed() throws IOException {
         String requestJson = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(FIXTURE) + "\","

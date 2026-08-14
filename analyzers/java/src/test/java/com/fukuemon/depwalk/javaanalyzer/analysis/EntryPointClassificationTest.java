@@ -65,7 +65,7 @@ class EntryPointClassificationTest {
     }
 
     @Test
-    @DisplayName("caller edge を持つ listener でも、entry point 標識は保たれたままになる")
+    @DisplayName("呼び出し元からの呼び出し関係 (edge) を持つ listener でも、entry point 標識は保たれたままになる")
     void listenerKeepsMarkerEvenWithCallerEdges() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());
@@ -82,7 +82,7 @@ class EntryPointClassificationTest {
     }
 
     @Test
-    @DisplayName("分類は edge を追加せず、アノテーションのないメソッドは標識なしのままになる")
+    @DisplayName("分類は呼び出し関係 (edge) を追加せず、アノテーションのないメソッドは標識なしのままになる")
     void classificationAddsNoEdgesAndKeepsPlainMethodsUnmarked() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());

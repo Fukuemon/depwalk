@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,9 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+@DisplayName("Main.run の入出力契約 (exit code / stdout の record / stderr の分離)")
 class MainTest {
 
     @Test
+    @DisplayName("空 classpath の空 workspace を解析するとき、source-only warning 以外の record を出さずに exit code 0 で終わる")
     void preflightPassWithEmptyClasspathProducesZeroRecordsAndExitZero(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
@@ -42,6 +45,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("metadata に classpath key が無いとき、JAVA_MISSING_CLASSPATH の error record を出して exit code 1 で終わる")
     void missingClasspathKeyProducesErrorRecordAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -59,6 +63,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("language が java 以外のとき、JAVA_INVALID_REQUEST の error record を出して exit code 1 で終わる")
     void unsupportedLanguageProducesInvalidRequestErrorAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -75,6 +80,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("classpath に存在しない jar が含まれるとき、JAVA_MISSING_JAR の error record を出して exit code 1 で終わる")
     void missingJarProducesMissingJarErrorAndNonZeroExit() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -91,6 +97,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("request に未知のフィールドが含まれる場合でも、無視されて余分な record は出ないままになる")
     void unknownFieldsInRequestAreIgnored(@TempDir Path emptyWorkspace) {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(emptyWorkspace) + "\","
@@ -114,6 +121,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("error record を出す場合でも、stderr には protocol の record が一切書かれないままになる")
     void stderrNeverContainsProtocolRecords() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -128,6 +136,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("明示した source root が読み取れないとき、解析へ入る前に JAVA_INVALID_SOURCE_ROOTS で拒否される")
     void unreadableSourceRootIsRejectedBeforeAnalysis(@TempDir Path workspace) throws IOException {
         // 読取不能な明示 source root は、解析へ入る前の root 正規化
         // (AnalysisContextFactory) が JAVA_INVALID_SOURCE_ROOTS で決定的に拒否する。
@@ -159,6 +168,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("stdout への書き込みが失敗するとき、黙って終わらずに失敗内容を stderr へ書いて exit code 1 で終わる")
     void ioExceptionDuringOutputWriteIsReportedOnStderrAndReturnsNonZeroExit() {
         // 明示 sourceRoots + metadata なし -> JAVA_MISSING_CLASSPATH の error record 書込を誘発する。
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
@@ -181,6 +191,7 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("解析準備中に壊れた jar で例外が起きるとき、JAVA_INTERNAL_ERROR の error record を出して exit code 1 で終わる")
     void ioExceptionDuringAnalysisSetupProducesInternalErrorRecordAndNonZeroExit(
             @TempDir Path workspace, @TempDir Path classpathDir) throws IOException {
         // pre-flight は存在と読み取り可否しか見ない (zip として妥当かは見ない)。

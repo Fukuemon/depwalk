@@ -31,7 +31,7 @@ class SameUnitBytecodeMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("同一 unit 内から bytecode-only getter を呼ぶとき、chain 引数・暗黙 this・switch selector のどこでも edge になる")
+    @DisplayName("同一 unit 内から bytecode-only getter を呼ぶとき、chain 引数・暗黙 this・switch selector のどこでも呼び出し関係 (edge) になる")
     void sameUnitCallsToBytecodeOnlyGettersResolveEverywhere() throws Exception {
         Path workspace = Files.createDirectories(temp.resolve("workspace"));
         write(workspace, "com/example/AssignType.java", """
@@ -155,7 +155,7 @@ class SameUnitBytecodeMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("enum の bytecode-only getter と生成 constructor を呼ぶとき、AST 注入で edge になる")
+    @DisplayName("enum の bytecode-only getter と生成 constructor を呼ぶとき、AST 注入で呼び出し関係 (edge) になる")
     void enumGetterAndGeneratedConstructorResolve() throws Exception {
         // enum の @Getter 相当 (bytecode のみの getter) と、@AllArgsConstructor 相当
         // (bytecode のみの constructor) が、AST 注入で edge になることを検証する。
@@ -234,7 +234,7 @@ class SameUnitBytecodeMemberTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("暗黙 default constructor と内部 class constructor の呼び出しは、bytecode-only member として注入されず通常 edge のままになる")
+    @DisplayName("暗黙 default constructor と内部 class constructor の呼び出しは、bytecode-only member として注入されず通常の呼び出し関係 (edge) のままになる")
     void implicitConstructorsAreNotInjectedAsBytecodeMembers() throws Exception {
         // javac の暗黙 default constructor と非 static 内部 class の constructor
         // (enclosing instance 引数で source と arity がずれる) は注入しない。

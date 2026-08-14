@@ -26,7 +26,7 @@ class ChainTypePropagationTest {
     Path temp;
 
     @Test
-    @DisplayName("generic 推論が壊れる stream chain の中でも、lambda parameter 経由の生成 getter 呼び出しが edge になる")
+    @DisplayName("generic 推論が壊れる stream chain の中でも、lambda parameter 経由の生成 getter 呼び出しが呼び出し関係 (edge) になる")
     void lambdaParamGetterInsideBrokenInferenceChainBecomesEdge() throws Exception {
         Path workspace = Files.createDirectories(temp.resolve("workspace"));
         // walk する source の Item は getter を持たない (bytecode のみ = Lombok 相当)。
@@ -88,7 +88,7 @@ class ChainTypePropagationTest {
     }
 
     @Test
-    @DisplayName("downstream collector 付き groupingBy の値型は導出せず、誤った Item への edge を作らない")
+    @DisplayName("downstream collector 付き groupingBy の値型は導出せず、誤った要素型への呼び出し関係 (edge) を作らない")
     void groupingByWithDownstreamCollectorIsNotDerived() throws Exception {
         // downstream collector 付き groupingBy の値型は downstream 依存 (counting なら
         // Long)。固定表が List<E> と誤導出すると偽 edge になるため、導出しないことを

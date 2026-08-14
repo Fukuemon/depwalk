@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 標識する。constructor reference は通常の object creation と同じ帰属規則を適用し、scope 外参照を
  * 出力しないことも確認する。
  */
+@DisplayName("method reference の call graph 化 (viaMethodReference 標識)")
 class MethodReferenceTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/methodreference");
@@ -32,6 +34,7 @@ class MethodReferenceTest {
     }
 
     @Test
+    @DisplayName("インスタンスメソッドの参照は、viaMethodReference: true と dispatch \"virtual\" が付いた呼び出し関係 (edge) になる")
     void instanceMethodReferenceProducesEdgeTaggedViaMethodReference() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         Map<String, Object> edge = edgeFrom(edges,
@@ -43,6 +46,7 @@ class MethodReferenceTest {
     }
 
     @Test
+    @DisplayName("static メソッドの参照は、viaMethodReference: true と dispatch \"static\" が付いた呼び出し関係 (edge) になる")
     void staticMethodReferenceProducesEdgeTaggedStaticAndViaMethodReference() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         Map<String, Object> edge = edgeFrom(edges,
@@ -54,12 +58,14 @@ class MethodReferenceTest {
     }
 
     @Test
+    @DisplayName("this:: 形式の参照は、囲みメソッドから自 class のメソッドへの呼び出し関係 (edge) になる")
     void thisMethodReferenceProducesEdge() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         edgeFrom(edges, "java:com.example.Widgets#invokeThisReference()", "java:com.example.Widgets#toDto()");
     }
 
     @Test
+    @DisplayName("引数なし constructor の参照は、<init>() への呼び出し関係 (edge) になり viaMethodReference: true が付く")
     void noArgConstructorReferenceProducesInitEdge() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         Map<String, Object> edge = edgeFrom(edges,
@@ -70,6 +76,7 @@ class MethodReferenceTest {
     }
 
     @Test
+    @DisplayName("引数 1 個の constructor の参照は、引数が合致する overload の <init> を選んで呼び出し関係 (edge) になる")
     void oneArgConstructorReferenceSelectsMatchingOverload() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         edgeFrom(edges,
@@ -78,6 +85,7 @@ class MethodReferenceTest {
     }
 
     @Test
+    @DisplayName("scope 外メソッドへの参照は、診断を出さずに出力から省かれる")
     void scopeExternalMethodReferenceIsOmittedWithoutDiagnostic() throws Exception {
         AnalysisTestSupport.Ran ran = run();
         List<Map<String, Object>> edges = ran.byType("callEdge");

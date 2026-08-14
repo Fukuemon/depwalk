@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * java-analyzer feature doc「Parse・resolution・call 完全性」: 未解決 in-scope call の
  * 全件 details 付き fatal 化。
  */
+@DisplayName("未解決の scope 内呼び出しの fatal 化 (JAVA_INCOMPLETE_ANALYSIS)")
 class IncompleteAnalysisTest {
 
     @TempDir
@@ -23,6 +25,7 @@ class IncompleteAnalysisTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("未解決の呼び出しがあるとき、全件を決定順・自己完結の details に載せて解析を fatal にする")
     void unresolvedCallsFailTheRequestWithOrderedSelfContainedDetails() throws Exception {
         write("com/example/A.java", """
                 package com.example;
@@ -99,6 +102,7 @@ class IncompleteAnalysisTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("caller の宣言自体が解決できないとき、その配下の呼び出しも完全性 gate に残って fatal になる")
     void callsUnderUnresolvableCallerDeclarationsRemainInTheCompletenessGate() throws Exception {
         // caller 宣言 (parameter 型が未解決) が placeholder へ落ちる場合、その配下の
         // call site は edge を出せないため emitted でなく primary diagnostic として
@@ -126,6 +130,7 @@ class IncompleteAnalysisTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("callKind ごとに、失敗した解決段階と receiver の情報が診断 metadata に載る")
     void diagnosticMetadataIdentifiesFailedStagePerCallKind() throws Exception {
         // java-analyzer feature doc「diagnostic / error code 体系」: callKind ごとに
         // 失敗段階・receiver 情報が details へ載る。
@@ -189,6 +194,7 @@ class IncompleteAnalysisTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("allowIncompleteAnalysis を有効にしたとき、fatal にせず解決済みの graph と残った診断を公開する")
     void allowIncompleteAnalysisPublishesPartialGraphInsteadOfFatal() throws Exception {
         // java-analyzer feature doc「metadata 契約」:
         // metadata.allowIncompleteAnalysis=["true"] のとき、primary
@@ -239,6 +245,7 @@ class IncompleteAnalysisTest {
     }
 
     @Test
+    @DisplayName("allowIncompleteAnalysis の値が不正のとき、JAVA_INVALID_REQUEST として要求を拒否する")
     void allowIncompleteAnalysisRejectsMalformedValue() throws Exception {
         write("com/example/Ok.java", """
                 package com.example;
@@ -259,6 +266,7 @@ class IncompleteAnalysisTest {
     }
 
     @Test
+    @DisplayName("未解決の呼び出しが無いとき、silentOmission=0 の集計とともに解析が成功する")
     void cleanWorkspaceSucceedsWithZeroSilentOmission() throws Exception {
         write("com/example/Ok.java", """
                 package com.example;
