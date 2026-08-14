@@ -6,10 +6,9 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Request は [Source] port へ渡す 1 回の解析を表す。すべて
-// field is passed through to the Analyzer request without interpretation;
-// the port implementation owns the wire form (request id, schema version,
-// validation).
+// Request は [Source] port へ渡す 1 回の解析を表す。全 field は解釈せずに
+// Analyzer への要求へそのまま渡す。wire 表現 (request id / schema version /
+// 検証) は port の実装側が持つ。
 type Request struct {
 	WorkspaceRoot string
 	SourceRoots   []string
@@ -19,8 +18,7 @@ type Request struct {
 	Metadata      map[string]any
 }
 
-// Outcome は stream の終了後に [Source] port が報告する process 単位の結果。以下は
-// record stream ends.
+// Outcome は record stream の終了後に [Source] port が報告する process 単位の結果。
 type Outcome struct {
 	// Diagnostics は Analyzer が報告した致命的でない診断 (domain 値へ変換済み)。
 	Diagnostics     []Diagnostic

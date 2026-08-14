@@ -57,7 +57,25 @@ scope 内 source 型を solver が解決するとき、同一 context の classe
 
 合成・救済の選択境界: 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は、owner class の classfile が project 所有の classes output に存在する場合だけ採用する。対象は自 context と、**model の project 依存関係で到達可能な依存 project の output** である。
 
-AST への member 注入: solver 経由の合成だけでは、TypeSolver を経由しない解決経路 (同一 compilation unit 内の参照 = 自 class の getter を `this`/暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector、および solver 内部で parse した AST から直接構築される宣言) に生成 member が見えない。このため、解析対象の parse 結果と solver 内部の parse 結果の両方へ、classes output にしか無い callable member の宣言を parse 後に注入する (実環境の未解決の支配形状が entity 自身のメソッド内から自 class の生成 getter を参照する形だったため。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。対象は class 宣言と enum 宣言 (interface は生成 member が付かず、record は accessor が言語仕様で暗黙宣言されるため対象外。enum の values / valueOf も暗黙宣言のため注入しない)。class には bytecode-only constructor (@AllArgsConstructor 等の生成 constructor) も注入する (同 arity の source 宣言が無い一意なものだけ。caller 帰属 — field initializer の帰属先 constructor 集合 — は注入前の source 宣言で数え、注入で変えない)。同名・同 arity が bytecode 上に複数ある member は曖昧として注入しない (合成と同じ一意性規則)。注入宣言は解決専用の標識であり、source 宣言としては扱わない: caller として walk せず、注入 member への呼び出しは bytecode-only member と同じ出力契約 (定義位置省略 + owner metadata + calleeOrigin) で emit する。owner の型が scope (include/exclude 適用後) の外にある場合は external-target として除外する (fatal にしない)。注入時に型解決は行わず (solver 再入の禁止)、classfile の descriptor / Signature を型名として書き下す。source に書けない匿名・local class 名 (`$` + 数字) は、owner・member の型のいずれに現れても注入しない。walk する AST の first-pass 索引 (inventory / 宣言索引 / entry point / Spring DI) は注入前の AST で構築する。ただし索引が行う型解決は solver 内部の注入済み AST を参照しうるため、「注入の影響が first pass に一切現れない」ことまでは保証しない。
+### AST への member 注入
+
+solver 経由の合成は、TypeSolver を通らない解決経路には効かない。具体的には、同一 compilation unit 内の参照 (自 class の getter を `this` / 暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector) と、solver 内部で parse した AST から直接作られる宣言である。実環境の未解決の支配形状が「entity 自身のメソッド内から自 class の生成 getter を呼ぶ」形だったため、生成 member の宣言そのものを parse 後の AST へ注入して補う (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。注入先は、解析対象の parse 結果と solver 内部の parse 結果の両方である。
+
+注入の対象と除外:
+
+- 対象は class 宣言と enum 宣言。interface は生成 member が付かず、record は accessor が言語仕様で暗黙宣言されるため対象外
+- 言語仕様が暗黙に宣言する member は注入しない (enum の values / valueOf、javac の暗黙 default constructor と同じ形のもの)
+- class には bytecode-only constructor (@AllArgsConstructor 等) も注入する。ただし同 arity の source 宣言が無い一意なものだけ
+- 同名・同 arity が bytecode 上に複数ある member は、曖昧なので注入しない (合成と同じ一意性規則)
+- source に書けない匿名・local class 名 (`$` + 数字) が owner か member の型に現れる場合は注入しない
+- 注入時に型解決は行わない (solver への再入を防ぐ)。型は classfile の descriptor / Signature の名前をそのまま書き下す
+
+注入した宣言は「解決のための標識」であり、source 宣言としては扱わない:
+
+- caller として walk しない。呼び出された場合は bytecode-only member と同じ出力契約 (定義位置省略 + owner metadata + calleeOrigin) で emit する
+- owner の型が scope (include/exclude 適用後) の外なら external-target として除外する (fatal にしない)
+- field initializer の caller 帰属 (帰属先 constructor の集合) は注入前の source 宣言で数え、注入で変えない
+- walk する AST の first-pass 索引 (inventory / 宣言索引 / entry point / Spring DI) は注入前の AST で作る。ただし索引が行う型解決は solver 内部の注入済み AST を参照しうるため、「注入の影響が first pass に一切現れない」ことまでは保証しない
 
 external artifact だけに存在する同名 class の member は、project bytecode として救済しない (「solver 層の bytecode member 合成」節の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
 
@@ -118,10 +136,17 @@ SAM arity を推論できない method reference は救済しない。候補列�
 上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
 
 1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
-2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する (`Collectors.toMap` と 1 引数 `groupingBy` の結果 Map、bound method reference の適用を含む。downstream collector 付き `groupingBy` の値型と、project bytecode に無い型への unbound method reference は導出しない)。型変数・raw・欠落の erasure である `java.lang.Object` は owner の根拠にしない (既存の前進解決と同じ打ち切り規則)
+2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する
 3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の receiver の要素型 (手段 2 で復元した型引数) から導出する
 
-JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う (解決済みの erasure と導出の erasure が食い違う場合は解決結果を正とする)。
+手段 2 の固定表の適用範囲:
+
+- `Collectors.toMap` と 1 引数 `groupingBy` の結果 Map、bound method reference の適用を含む
+- downstream collector 付き `groupingBy` の値型は導出しない (値型が downstream に依存し、固定表では確定できないため)
+- project bytecode に無い型への unbound method reference は導出しない
+- `java.lang.Object` は owner の根拠にしない。型変数・raw・欠落の erasure と見分けが付かないため、既存の前進解決と同じ規則で打ち切る
+
+JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う。解決済みの erasure と導出の erasure が食い違う場合は、解決結果を正とする。
 
 SAM arity も functional interface の bytecode から導出する (例: `java.util.function.Function#apply` = arity 1)。これにより arity 推論失敗による救済スキップを減らすが、「宣言上の名前一意を根拠にする救済はしない」保守側の原則は変更しない。
 
