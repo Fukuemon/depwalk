@@ -8,7 +8,7 @@ governs:
   - .github/workflows
   - scripts
   - hooks
-verified_commit: 0dc95e6
+verified_commit: 4cae142
 ---
 
 # Engineering Conventions

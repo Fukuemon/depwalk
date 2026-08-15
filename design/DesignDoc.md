@@ -6,7 +6,7 @@ status: Draft
 keywords: [landscape, モジュール責務, 設計原則, Phase]
 governs:
   - design/features
-verified_commit: 2d82ed3
+verified_commit: 4cae142
 ---
 
 # depwalk Design Doc
@@ -247,13 +247,13 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は [
 
 **次にやること**
 
-1. **解析精度の強化** — framework 由来の暗黙の呼び出し (アノテーション駆動 / Mapper interface / lambda / method reference) を拾う。edge が 1 本欠けると答えが間違うため、出力や速度より先に効く
-2. **グラフの永続化 (commit SHA 単位)** — 再解析を避け、2 時点の差分 (= その PR で影響範囲がどう変わったか) に答えられるようにする。[ADR-0002](../adr/0002-core-implementation-foundation.md) の「永続ストアを持たない」を変えるため着手時に ADR が要る
-3. **CI 連携** — SHA ごとのグラフを Artifact 化し、PR へ影響範囲をコメントする。2 の上に乗る (2 なしでは毎回フル解析になり実用に耐えない)
+1. **グラフの永続化 (commit SHA 単位)** — 再解析を避け、2 時点の差分 (= その PR で影響範囲がどう変わったか) に答えられるようにする。[ADR-0002](../adr/0002-core-implementation-foundation.md) の「永続ストアを持たない」を変えるため着手時に ADR が要る
+2. **CI 連携** — SHA ごとのグラフを Artifact 化し、PR へ影響範囲をコメントする。1 の上に乗る (1 なしでは毎回フル解析になり実用に耐えない)
 
 **その先**
 
-- CLI の使い勝手 (解析中の進捗表示 / method selector が曖昧なときの候補選択 / 結果の絞り込み)
+- CLI の使い勝手 (解析中の進捗表示 / method selector が曖昧なときの候補選択 / 結果の絞り込み / 診断の要約表示)
+- 解析精度の残り — 外部ライブラリの型を根拠にする chain と、一意に絞れない overload が未解決のまま残る (実環境の実測で全 call site の約 1.3%)。いずれも診断として観測でき、推測で埋めると誤った edge を作るため、取りにいくかは費用対効果で判断する
 - 可視化の再導入 — 形式は決めない。DOT / Mermaid は外部レンダラへの依存を利用者に負わせるため、自己完結した単一 HTML を含めて選び直す (判断を定めるのは [ADR-0010](../adr/0010-defer-graph-visualization.md))
 - Multi Language (Kotlin / TypeScript / Vue / Go)
 

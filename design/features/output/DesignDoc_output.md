@@ -6,7 +6,7 @@ status: 完了
 keywords: [output, Console, JSON, NodeView, EdgeView, formatter]
 governs:
   - core/internal/output
-verified_commit: dcb2a35
+verified_commit: 4cae142
 ---
 
 # Feature 設計: Output (Console / JSON 出力)

@@ -7,7 +7,7 @@ keywords: [CLI, Cobra, flag, analyze, exit code]
 governs:
   - core/internal/cli
   - core/cmd/depwalk
-verified_commit: 9b9d79d
+verified_commit: 4cae142
 ---
 
 # Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)

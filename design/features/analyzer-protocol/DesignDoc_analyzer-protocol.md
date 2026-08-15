@@ -9,7 +9,7 @@ governs:
   - core/internal/analyze
   - core/internal/analyzer
   - testdata
-verified_commit: dcb2a35
+verified_commit: 4cae142
 ---
 
 # Feature 設計: Analyzer Protocol / SPI
