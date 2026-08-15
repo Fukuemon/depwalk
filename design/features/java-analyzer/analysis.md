@@ -59,7 +59,12 @@ scope 内 source 型を solver が解決するとき、同一 context の classe
 
 ### AST への member 注入
 
-solver 経由の合成は、TypeSolver を通らない解決経路には効かない。具体的には、同一 compilation unit 内の参照 (自 class の getter を `this` / 暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector) と、solver 内部で parse した AST から直接作られる宣言である。実環境の未解決の支配形状が「entity 自身のメソッド内から自 class の生成 getter を呼ぶ」形だったため、生成 member の宣言そのものを parse 後の AST へ注入して補う (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。注入先は、解析対象の parse 結果と solver 内部の parse 結果の両方である。
+solver 経由の合成は、TypeSolver を通らない解決経路には効かない。効かないのは次の 2 つである。
+
+- 同一 compilation unit 内の参照 (自 class の getter を `this` / 暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector)
+- solver 内部で parse した AST から直接作られる宣言
+
+実環境の未解決の支配形状は「entity 自身のメソッド内から自 class の生成 getter を呼ぶ」形だった。そこで、生成 member の宣言そのものを parse 後の AST へ注入して補う。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) とする。注入先は、解析対象の parse 結果と solver 内部の parse 結果の両方である。
 
 注入の対象と除外:
 
@@ -151,7 +156,12 @@ JavaParser が「型引数を Object へ落とした部分成功」の解決結�
 
 SAM arity も functional interface の bytecode から導出する (例: `java.util.function.Function#apply` = arity 1)。これにより arity 推論失敗による救済スキップを減らすが、「宣言上の名前一意を根拠にする救済はしない」保守側の原則は変更しない。
 
-適用順序: 本救済層は「呼び出し元の型が分からないとき」の既存規則群と同じ分類段階に統合する。手段 2 (chain link の generic signature) は既存規則 1 (chain の前進解決) の適用拡大、手段 3 (lambda parameter の型引数) は既存規則 3 (lambda parameter 規則) の前段の型導出であり、順序は「手段 1 (local 宣言・初期化子) → 規則 1 + 手段 2 → 手段 3 → 規則 2 (起点遡及の external 判定) → 規則 3 → diagnostic」とする。導出できた型は既存 bytecode 救済 / external 分類にそのまま渡す。
+適用順序: 本救済層は「呼び出し元の型が分からないとき」の既存規則群と同じ分類段階に統合する。各手段の位置づけは次のとおり。
+
+- 手段 2 (chain link の generic signature) は、既存規則 1 (chain の前進解決) の適用拡大
+- 手段 3 (lambda parameter の型引数) は、既存規則 3 (lambda parameter 規則) の前段の型導出
+
+順序は「手段 1 (local 宣言・初期化子) → 規則 1 + 手段 2 → 手段 3 → 規則 2 (起点遡及の external 判定) → 規則 3 → diagnostic」とする。導出できた型は既存 bytecode 救済 / external 分類にそのまま渡す。
 
 ## framework 由来の暗黙呼び出しの解決
 
@@ -159,18 +169,49 @@ framework が実行時に起動する呼び出しを、ソース上の根拠 (�
 
 ### entry point 分類
 
-対象アノテーションを付与されたメソッドを framework entry point として分類し、`methodSymbol.metadata.entryPoint` (検出アノテーション FQN の配列) で標識する。entry point の意味は「framework が直接起動し得るメソッド」であり、caller edge の有無とは独立している (例: `@EventListener` メソッドはイベント edge で caller edge を持ち得るが、framework 起動でもあるため標識する)。edge は作らず、caller 探索の終端根拠のみ付与する (擬似 caller node を合成しない)。対象集合は次の FQN を既知集合として明示列挙する。
+対象アノテーションを付与されたメソッドを framework entry point として分類し、`methodSymbol.metadata.entryPoint` (検出アノテーション FQN の配列) で標識する。entry point の意味は「framework が直接起動し得るメソッド」であり、caller edge の有無とは独立している。例えば `@EventListener` メソッドはイベント edge で caller edge を持ち得るが、framework 起動でもあるため標識する。edge は作らず、caller 探索の終端根拠のみ付与する (擬似 caller node を合成しない)。対象集合は次の FQN を既知集合として明示列挙する。
 
 - ライフサイクル: `org.springframework.scheduling.annotation.Scheduled` / `javax.annotation.PostConstruct` / `jakarta.annotation.PostConstruct` / `javax.annotation.PreDestroy` / `jakarta.annotation.PreDestroy`
 - イベント: `org.springframework.context.event.EventListener` / `org.springframework.transaction.event.TransactionalEventListener`
 - Web (すべて `org.springframework.web.bind.annotation` 配下): `RequestMapping` + Spring 提供 composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
 
-利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。次はいずれも検出対象外で、診断も出さない制約とする: 2 段以上の入れ子 / 型 level の mapping アノテーション (メソッド level のみ対象) / nested・local に宣言された合成アノテーション / 合成アノテーションの利用側 FQN が型解決・import 復元のいずれでも得られない場合。
+利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。次はいずれも検出対象外とし、診断も出さない (制約)。
+
+- 2 段以上の入れ子
+- 型 level の mapping アノテーション (メソッド level のみ対象)
+- nested・local に宣言された合成アノテーション
+- 合成アノテーションの利用側 FQN が、型解決・import 復元のいずれでも得られない場合
 
 ### イベント edge
 
-receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) である `publishEvent` 呼び出し (receiver 省略の暗黙 this は囲み型が subtype の場合に対象) の call site を起点に、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッド、`provenance` には `spring-event` を積む。イベントは合致 listener が全て実行される broadcast 意味論のため、無条件 listener への edge は複数でも各々確定 (`resolution: unique`) とし、条件付き listener のみ既存規則 (`conditional` / `conditionTypes`) で `ambiguous` とする。generics を使ったイベント型の突合は raw type 一致で近似する (制約)。この近似が過剰一致しうる listener (型変数・型引数付き parameter) への edge は `unique` とせず `ambiguous` に落とす。条件アノテーションに加え、listener annotation の `condition` (SpEL) 属性と `@TransactionalEventListener` の transaction phase 依存も実行時条件として扱い、`conditional: true` + `conditionTypes` 付きの `ambiguous` とする (broadcast の確定性が成立しないため)。突合対象の listener は candidate 再対応付けと同じく publisher context から Gradle 依存で到達可能な context に限る。対象は単一引数のメソッド形式のみで、`classes` 属性・引数 0 の形式は対象外 (制約、診断なし)。
+起点は `publishEvent` 呼び出しの call site とする。対象は、receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) の場合とする。receiver 省略の暗黙 this は、囲み型が subtype のときに含める。この call site から、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッドとし、`provenance` には `spring-event` を積む。
+
+確度は broadcast 意味論 (合致 listener が全て実行される) を前提に決める。無条件 listener への edge は、複数でも各々確定 (`resolution: unique`) とする。次の場合は `ambiguous` に落とす。
+
+- 条件アノテーション付きの listener (既存規則の `conditional` / `conditionTypes` で表す)
+- generics を使ったイベント型の突合で過剰一致しうる listener (型変数・型引数付き parameter)。突合は raw type 一致で近似するため (制約)
+- listener annotation の `condition` (SpEL) 属性を持つ listener と、`@TransactionalEventListener` の transaction phase 依存。実行時条件として扱い `conditional: true` + `conditionTypes` を付ける (broadcast の確定性が成立しないため)
+
+突合対象の listener は、candidate 再対応付けと同じく publisher context から Gradle 依存で到達可能な context に限る。対象は単一引数のメソッド形式のみとし、`classes` 属性・引数 0 の形式は対象外とする (制約、診断なし)。
 
 ### callable invocation
 
-functional interface の invocation site から、渡された callable の実体への edge を生成する。method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ張り、`viaCallableInvocation: true` で通常呼び出しと区別する (lambda 本体は独立 node にしない既存決定を維持。囲みメソッドへの edge は「invoker はそのメソッド内で定義されたコードを実行する」の意味)。静的追跡範囲は (1) 同一メソッド内の local 変数経由 (lambda / method reference を直接 initializer に持ち、再代入がない場合のみ)、(2) workspace メソッドの functional interface parameter への引数渡し 1 段、に限定する。invocation は receiver が単純名 (parameter / local) で、functional interface (抽象メソッドがちょうど 1 個の interface) の SAM 呼び出しのみ対象とし、chain 途中の receiver は対象外。callee は到達可能 context の workspace メソッドに限り (external への method reference は張らない)、constructor を実体とする callable (constructor reference / constructor 内 lambda) は対象外。受け渡しの写像は静的な宣言メソッド単位で行うため、interface / 抽象宣言越しに渡された callable は実装メソッド内の invocation と突合しない (対象外)。可変長引数位置へ渡した callable と constructor 引数 (`new X(...)`) 経由も対象外。追跡できなかった SAM invocation は経路 (field / 写像なし / 追跡不能 local) によらず `JAVA_CALLABLE_UNRESOLVED` (info、advisory) で観測可能にする。複数 call site から異なる callable が渡る場合は、各 callable への edge を invocation site を根拠 (callSite) として全列挙する。同一メソッド内 local の lambda では caller = callee の self edge になる (`viaCallableInvocation` 標識で通常の再帰と識別できる)。field 経由・多段の受け渡しは対象外で diagnostic に残す。invocation site が外部ライブラリ内にあるケース (`stream.map(...)` 等) は workspace 内に call site が存在しないため outcome ledger の対象外であり、診断も出さない (silent omission に該当しない — lambda 本体内の呼び出し自体は既存の `viaLambda` 帰属で edge 化済み)。
+functional interface の invocation site から、渡された callable の実体への edge を生成する。method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ張り、`viaCallableInvocation: true` で通常呼び出しと区別する。lambda 本体は独立 node にしない既存決定を維持する。囲みメソッドへの edge は「invoker はそのメソッド内で定義されたコードを実行する」の意味である。
+
+静的追跡範囲は次の 2 つに限定する。
+
+- 同一メソッド内の local 変数経由 (lambda / method reference を直接 initializer に持ち、再代入がない場合のみ)
+- workspace メソッドの functional interface parameter への引数渡し 1 段
+
+invocation の対象は、receiver が単純名 (parameter / local) の SAM 呼び出しに限る。functional interface は抽象メソッドがちょうど 1 個の interface とし、chain 途中の receiver は対象外とする。callee は到達可能 context の workspace メソッドに限る (external への method reference は張らない)。
+
+次はいずれも対象外とする。
+
+- constructor を実体とする callable (constructor reference / constructor 内 lambda)
+- interface / 抽象宣言越しに渡された callable。写像は静的な宣言メソッド単位で行うため、実装メソッド内の invocation と突合しない
+- 可変長引数位置へ渡した callable と、constructor 引数 (`new X(...)`) 経由の受け渡し
+- field 経由・多段の受け渡し (diagnostic に残す)
+
+追跡できなかった SAM invocation は、経路 (field / 写像なし / 追跡不能 local) によらず `JAVA_CALLABLE_UNRESOLVED` (info、advisory) で観測可能にする。複数 call site から異なる callable が渡る場合は、各 callable への edge を invocation site を根拠 (callSite) として全列挙する。同一メソッド内 local の lambda では caller = callee の self edge になる (`viaCallableInvocation` 標識で通常の再帰と識別できる)。
+
+invocation site が外部ライブラリ内にあるケース (`stream.map(...)` 等) は、workspace 内に call site が存在しないため outcome ledger の対象外であり、診断も出さない。silent omission には該当しない (lambda 本体内の呼び出し自体は、既存の `viaLambda` 帰属で edge 化済み)。

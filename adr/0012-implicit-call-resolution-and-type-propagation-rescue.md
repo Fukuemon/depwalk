@@ -10,7 +10,13 @@
 
 ## 背景
 
-変更影響調査の網羅性 (edge が 1 本欠けると答えが間違う) に対し、framework が実行時に起動する暗黙の呼び出しが edge にならない欠落が残っていた。実環境検証プロジェクト (Gradle multi-project、7 project / call site 52,411) の実測で、(1) アノテーション駆動 entry point が未解決と区別できない、(2) イベント publish → listener の伝播が途切れる、(3) 値渡しされた callable の invocation が繋がらない、(4) 未解決診断の約 91% が stream / builder 連鎖と generics 局所変数の receiver 型導出失敗、(5) 既定 heap での OutOfMemoryError と Gradle daemon JVM 非互換が解析実行を阻害する、と判明した。
+変更影響調査の網羅性は、edge が 1 本欠けると答えが間違う。そこに対し、framework が実行時に起動する暗黙の呼び出しが edge にならない欠落が残っていた。実環境検証プロジェクト (Gradle multi-project、7 project / call site 52,411) の実測で、次の 5 点が判明した。
+
+1. アノテーション駆動 entry point が未解決と区別できない
+2. イベント publish → listener の伝播が途切れる
+3. 値渡しされた callable の invocation が繋がらない
+4. 未解決診断の約 91% が、stream / builder 連鎖と generics 局所変数の receiver 型導出失敗である
+5. 既定 heap での OutOfMemoryError と Gradle daemon JVM 非互換が、解析実行を阻害する
 
 本 ADR は、この解決のために比較検討して決めた判断群を 1 本に集約して記録する (関連判断を個別 ADR に分けない前例: ADR-0005 / ADR-0007)。
 
