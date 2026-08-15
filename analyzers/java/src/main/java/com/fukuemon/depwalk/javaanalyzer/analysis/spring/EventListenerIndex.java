@@ -32,7 +32,7 @@ public final class EventListenerIndex {
     /**
      * 索引した listener method 1 件。{@code parameterTypes} は常に 1 要素。
      * {@code conditionTypes} は条件の根拠となったアノテーション FQN を持つ
-     * (条件アノテーションの FQN と、空でない {@code condition} SpEL 属性や transactional
+     * (条件アノテーションの FQN と、空文字列と証明できない {@code condition} 属性や transactional
      * phase 依存の根拠として listener アノテーション自身の FQN が混在する)。空でなければ
      * edge は ambiguous になる。{@code rawApproximation} は parameter 型が型変数または
      * 型引数付きで、raw type 突合が過剰一致しうる場合に true。
@@ -94,7 +94,8 @@ public final class EventListenerIndex {
     }
 
     /**
-     * listener アノテーション自身が運ぶ実行時条件: 空でない {@code condition} SpEL 属性と、
+     * listener アノテーション自身が運ぶ実行時条件: 空文字列と証明できない {@code condition}
+     * 属性 (定数参照や連結など値を確定できない式を含む) と、
      * {@code @TransactionalEventListener} の transaction phase 依存 (囲む transaction が
      * 設定 phase に到達したときだけ発火する)。いずれも実行を条件付きにするため broadcast の
      * 確実性が成り立たず、edge は ambiguous にする。返すのは条件の根拠となった listener
@@ -109,7 +110,7 @@ public final class EventListenerIndex {
                 continue;
             }
             if ("org.springframework.transaction.event.TransactionalEventListener".equals(fqn)
-                    || !SpringAnnotations.stringValues(annotation, "condition").isEmpty()) {
+                    || SpringAnnotations.hasNonEmptyAttribute(annotation, "condition")) {
                 conditions.add(fqn);
             }
         }

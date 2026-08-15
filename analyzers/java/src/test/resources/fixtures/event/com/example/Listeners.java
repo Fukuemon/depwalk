@@ -6,6 +6,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 public class Listeners {
 
+    static final String ACTIVE_CONDITION = "#event != null";
+
     @EventListener
     void onOrder(OrderEvent event) {
     }
@@ -21,6 +23,10 @@ public class Listeners {
 
     @EventListener(condition = "#event != null")
     void onOrderWhenExpression(OrderEvent event) {
+    }
+
+    @EventListener(condition = Listeners.ACTIVE_CONDITION)
+    void onOrderWhenConstantCondition(OrderEvent event) {
     }
 
     @EventListener

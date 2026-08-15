@@ -36,7 +36,9 @@ class EventEdgeTest {
             "java:com.example.Listeners#onOrderConditionally(com.example.OrderEvent)";
     private static final String ON_ORDER_EXPR =
             "java:com.example.Listeners#onOrderWhenExpression(com.example.OrderEvent)";
-    private static final String ON_SPECIAL = "java:com.example.Listeners#onSpecial(com.example.SpecialOrderEvent)";
+    private static final String ON_ORDER_CONST_EXPR =
+            "java:com.example.Listeners#onOrderWhenConstantCondition(com.example.OrderEvent)";
+    private static final String ON_SPECIAL ="java:com.example.Listeners#onSpecial(com.example.SpecialOrderEvent)";
 
     @Test
     @DisplayName("event を publish するとき、無条件 listener への呼び出し関係 (edge) は各々確定 (resolution=unique) になる")
@@ -84,6 +86,19 @@ class EventEdgeTest {
         // condition 属性は実行時に評価される SpEL であり、静的解析は真偽を決められない。
         // 条件の出所として listener annotation 自身の FQN を conditionTypes に積む。
         Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, ON_ORDER_EXPR).orElseThrow());
+        assertEquals("ambiguous", metadata.get("resolution"));
+        assertEquals(true, metadata.get("conditional"));
+        assertEquals(
+                List.of("org.springframework.context.event.EventListener"),
+                metadata.get("conditionTypes"));
+    }
+
+    @Test
+    @DisplayName("condition 属性が定数参照の listener への呼び出し関係 (edge) も、条件の値を確定できないため曖昧 (ambiguous) になる")
+    void constantReferenceConditionListenerIsAmbiguous() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
+        // 定数参照の condition は値を読まないので空に見えるが、条件なしと断定はできない。
+        Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, ON_ORDER_CONST_EXPR).orElseThrow());
         assertEquals("ambiguous", metadata.get("resolution"));
         assertEquals(true, metadata.get("conditional"));
         assertEquals(

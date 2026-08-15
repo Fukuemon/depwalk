@@ -7,4 +7,8 @@ class FieldUse {
     void invokeStored() {
         stored.run();
     }
+
+    void invokeStoredViaThis() {
+        this.stored.run();
+    }
 }

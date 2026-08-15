@@ -104,6 +104,24 @@ class CallableInvocationTest {
     }
 
     @Test
+    @DisplayName("this. で修飾した field の callable の呼び出しも、無修飾のときと同じく補助的な info 診断 (JAVA_CALLABLE_UNRESOLVED) を出す")
+    void thisQualifiedFieldStoredCallableSurfacesTheSameAdvisory() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
+        assertEquals(0, ran.exitCode(), ran.stderr());
+        String invokeStoredViaThis = "java:com.example.FieldUse#invokeStoredViaThis()";
+        assertTrue(ran.byType("callEdge").stream().noneMatch(edge ->
+                        invokeStoredViaThis.equals(edge.get("callerMethodId"))
+                                && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation"))),
+                "this-qualified field callables must not produce guessed edges");
+        assertTrue(ran.byType("diagnostic").stream().anyMatch(diagnostic ->
+                        "JAVA_CALLABLE_UNRESOLVED".equals(diagnostic.get("code"))
+                                && "info".equals(diagnostic.get("severity"))
+                                && invokeStoredViaThis.equals(diagnostic.get("relatedMethodId"))),
+                "this-qualified field callable invocation must surface the advisory info: "
+                        + ran.byType("diagnostic"));
+    }
+
+    @Test
     @DisplayName("functional でない interface の呼び出しは、callable 追跡の対象にも補助診断の対象にもならず、通常の呼び出し関係 (edge) のままになる")
     void plainInterfaceCallsAreNeitherTrackedNorDiagnosed() throws Exception {
         // functional でない interface (注入された service 等) の呼び出しは、追跡と

@@ -99,6 +99,32 @@ final class SpringAnnotations {
     }
 
     static List<String> stringValues(AnnotationExpr annotation, String... attributeNames) {
+        List<String> values = new ArrayList<>();
+        for (Expression expression : attributeExpressions(annotation, attributeNames)) {
+            addStrings(expression, values);
+        }
+        return values.stream().filter(value -> !value.isEmpty()).distinct().toList();
+    }
+
+    /**
+     * 指定属性が明示されていて、かつ空文字列であると証明できない値を持つかを返す。
+     *
+     * <p>定数参照 ({@code Conditions.ACTIVE}) や連結 ({@code PREFIX + "x"}) は、
+     * この解析器が値を読まないため {@link #stringValues} では空に見える。空と扱うと
+     * 「属性なし」と区別が付かず、実行時条件を無条件と誤って断定する。値を確定できない
+     * 式は「値あり」に倒し、空文字列リテラルが明示された場合だけ値なしとする
+     * (Spring の既定値と同じ意味になるため)。
+     */
+    static boolean hasNonEmptyAttribute(AnnotationExpr annotation, String... attributeNames) {
+        for (Expression expression : attributeExpressions(annotation, attributeNames)) {
+            if (!isProvablyEmpty(expression)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Expression> attributeExpressions(AnnotationExpr annotation, String... attributeNames) {
         List<Expression> expressions = new ArrayList<>();
         if (annotation.isSingleMemberAnnotationExpr()) {
             for (String attributeName : attributeNames) {
@@ -115,12 +141,17 @@ final class SpringAnnotations {
                         .forEach(expressions::add);
             }
         }
+        return expressions;
+    }
 
-        List<String> values = new ArrayList<>();
-        for (Expression expression : expressions) {
-            addStrings(expression, values);
+    private static boolean isProvablyEmpty(Expression expression) {
+        if (expression instanceof StringLiteralExpr stringLiteral) {
+            return stringLiteral.asString().isEmpty();
         }
-        return values.stream().filter(value -> !value.isEmpty()).distinct().toList();
+        if (expression instanceof ArrayInitializerExpr array) {
+            return array.getValues().stream().allMatch(SpringAnnotations::isProvablyEmpty);
+        }
+        return false;
     }
 
     static String fqn(AnnotationExpr annotation) {

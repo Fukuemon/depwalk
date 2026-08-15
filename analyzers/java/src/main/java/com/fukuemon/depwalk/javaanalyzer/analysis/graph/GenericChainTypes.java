@@ -53,6 +53,8 @@ final class GenericChainTypes {
 
     private static final int MAX_DEPTH = 24;
 
+    private static final String COLLECTORS = "java.util.stream.Collectors";
+
     private static final Set<String> COLLECTION_LIKE = Set.of(
             "java.lang.Iterable", "java.util.Collection", "java.util.List", "java.util.Set",
             "java.util.SortedSet", "java.util.NavigableSet", "java.util.Queue", "java.util.Deque",
@@ -265,10 +267,13 @@ final class GenericChainTypes {
         return new Model(erasure, List.of());
     }
 
-    private static Model toModel(
-            GenericSignatureReader.BytecodeType model) {
+    private static Model toModel(GenericSignatureReader.BytecodeType model) {
         if (model.typeVariable() || model.arrayDims() > 0) {
             return null;
+        }
+        if (model.wildcard()) {
+            // 変位のある型引数は要素型の根拠にしない (`? super X` の要素は X とは限らない)。
+            return Model.OBJECT;
         }
         List<Model> args = new ArrayList<>();
         for (var argument : model.typeArguments()) {
@@ -375,10 +380,10 @@ final class GenericChainTypes {
         if (!(collector instanceof MethodCallExpr factory)) {
             return null;
         }
-        // 固定表は java.util.stream.Collectors の意味論であり、同名の自作 factory へ
-        // 適用しない。static import 形 (scope なし) は出所を確定できないため対象外。
-        String factoryScope = factory.getScope().map(Object::toString).orElse("");
-        if (!factoryScope.equals("Collectors") && !factoryScope.equals("java.util.stream.Collectors")) {
+        // 固定表は java.util.stream.Collectors の意味論なので、宣言型を解決して
+        // 出所を確かめる。名前が一致するだけの自作 factory へ適用すると、戻り値を
+        // 誤った型として扱い誤った edge を作る。解決できない場合は適用しない。
+        if (!isJdkCollectorsFactory(factory)) {
             return null;
         }
         String name = factory.getNameAsString();
@@ -409,6 +414,15 @@ final class GenericChainTypes {
             }
             default -> null;
         };
+    }
+
+    /** factory 呼び出しが java.util.stream.Collectors の member かを宣言型で確かめる。 */
+    private static boolean isJdkCollectorsFactory(MethodCallExpr factory) {
+        try {
+            return COLLECTORS.equals(BinaryNames.forResolvedDeclaration(factory.resolve().declaringType()));
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
     }
 
     /**

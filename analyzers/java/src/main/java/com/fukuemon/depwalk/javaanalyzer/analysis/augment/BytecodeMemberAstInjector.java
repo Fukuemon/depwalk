@@ -260,6 +260,12 @@ public final class BytecodeMemberAstInjector {
     }
 
     private Optional<String> genericModelText(GenericSignatureReader.BytecodeType model) {
+        if (model.wildcard()) {
+            // wildcard を境界の型として書き下すと変位が消え、不変な型として overload が
+            // 選ばれる (`List<? super Foo>` を `List<Foo>` と書くと get(0) の型が変わる)。
+            // generic を諦めて erasure へ degrade する。
+            return Optional.empty();
+        }
         if (model.typeVariable()) {
             // 型変数は erasure へ写像する (solver 側合成と同じ)。
             return Optional.of("java.lang.Object");

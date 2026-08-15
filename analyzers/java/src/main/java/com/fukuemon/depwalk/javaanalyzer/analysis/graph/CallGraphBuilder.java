@@ -1117,7 +1117,18 @@ public final class CallGraphBuilder {
     private void emitCallableInvocationEdges(
             MethodCallExpr mce, WalkContext ctx, ResolvedMethodDeclaration invoked) {
         Expression scope = mce.getScope().orElse(null);
-        if (!(scope instanceof com.github.javaparser.ast.expr.NameExpr receiver)) {
+        // 無修飾の `stored.run()` と `this.stored.run()` は同じ呼び出しなので、
+        // 片方だけ advisory 診断から漏らさない。`this` 以外を挟む多段 scope
+        // (`other.field.run()` 等) は receiver の実体を name だけで決められないため
+        // 対象にしない。
+        com.github.javaparser.ast.expr.NameExpr receiver = null;
+        boolean thisQualifiedField = false;
+        if (scope instanceof com.github.javaparser.ast.expr.NameExpr nameScope) {
+            receiver = nameScope;
+        } else if (scope instanceof com.github.javaparser.ast.expr.FieldAccessExpr fieldScope
+                && fieldScope.getScope() instanceof com.github.javaparser.ast.expr.ThisExpr) {
+            thisQualifiedField = true;
+        } else {
             return;
         }
         // SAM invocation として扱うのは functional interface の単一 abstract method の
@@ -1133,20 +1144,25 @@ public final class CallGraphBuilder {
         } catch (RuntimeException | LinkageError e) {
             return;
         }
-        Object receiverDecl;
-        try {
-            receiverDecl = receiver.resolve();
-        } catch (RuntimeException | LinkageError e) {
-            return;
-        }
-
         List<CallablePassIndex.CallableTarget> callables;
-        if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration) {
-            callables = callablesForParameter(receiver.getNameAsString(), mce, ctx);
-        } else if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration) {
+        if (thisQualifiedField) {
+            // `this.` 修飾は必ず field を指すので、追跡範囲外として空にする。
             callables = List.of();
         } else {
-            callables = callablesForLocal(receiver.getNameAsString(), mce);
+            Object receiverDecl;
+            try {
+                receiverDecl = receiver.resolve();
+            } catch (RuntimeException | LinkageError e) {
+                return;
+            }
+            if (receiverDecl instanceof com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration) {
+                callables = callablesForParameter(receiver.getNameAsString(), mce, ctx);
+            } else if (receiverDecl
+                    instanceof com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration) {
+                callables = List.of();
+            } else {
+                callables = callablesForLocal(receiver.getNameAsString(), mce);
+            }
         }
         // constructor body の callable は対象外 (symbol の形が method と異なる)。
         // ここで落とすことで first-wins の node 内容不変条件を保つ。

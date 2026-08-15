@@ -35,16 +35,24 @@ public final class GenericSignatureReader {
      * @param typeArguments 実型引数 (raw なら空)
      * @param arrayDims 配列次元
      * @param typeVariable 型変数かどうか
+     * @param wildcard 型引数として現れた wildcard (`?` / `? extends X` / `? super X`) かどうか。
+     *     境界の型だけを見ると変位を失い、`List&lt;? super Foo&gt;` を `List&lt;Foo&gt;` と誤読するため、
+     *     利用側が安全側へ倒せるように印だけ残す
      */
     public record BytecodeType(
-            String binaryName, List<BytecodeType> typeArguments, int arrayDims, boolean typeVariable) {
+            String binaryName, List<BytecodeType> typeArguments, int arrayDims, boolean typeVariable,
+            boolean wildcard) {
 
         static BytecodeType reference(String binaryName, List<BytecodeType> args, int dims) {
-            return new BytecodeType(binaryName, List.copyOf(args), dims, false);
+            return new BytecodeType(binaryName, List.copyOf(args), dims, false, false);
         }
 
         static BytecodeType variable(String name) {
-            return new BytecodeType(name, List.of(), 0, true);
+            return new BytecodeType(name, List.of(), 0, true, false);
+        }
+
+        BytecodeType asWildcard() {
+            return new BytecodeType(binaryName, typeArguments, arrayDims, typeVariable, true);
         }
     }
 
@@ -174,14 +182,22 @@ public final class GenericSignatureReader {
 
         @Override
         public void visitTypeArgument() {
-            // unbounded wildcard (?): erasure と同じく Object へ写像する。
-            argumentSources.add(() -> BytecodeType.reference("java.lang.Object", List.of(), 0));
+            // unbounded wildcard (?): 境界が無いので Object 相当。変位を持つので印を付ける。
+            argumentSources.add(() -> BytecodeType.reference("java.lang.Object", List.of(), 0).asWildcard());
         }
 
         @Override
         public SignatureVisitor visitTypeArgument(char wildcard) {
             TypeBuilder argument = new TypeBuilder();
-            argumentSources.add(argument::build);
+            if (wildcard == SignatureVisitor.INSTANCEOF) {
+                argumentSources.add(argument::build);
+            } else {
+                // `? extends X` / `? super X` は境界 X だけを残すと変位が消える。
+                argumentSources.add(() -> {
+                    BytecodeType built = argument.build();
+                    return built == null ? null : built.asWildcard();
+                });
+            }
             return argument;
         }
 

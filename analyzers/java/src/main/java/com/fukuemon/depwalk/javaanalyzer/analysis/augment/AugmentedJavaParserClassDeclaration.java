@@ -154,6 +154,10 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
 
     /** {@link GenericSignatureReader.BytecodeType} を ResolvedType へ解決する。 */
     ResolvedType resolveGenericModel(GenericSignatureReader.BytecodeType model) {
+        if (model.wildcard()) {
+            // 変位を落として境界の型をそのまま使うと、あり得ない型として解決される。
+            return referenceType("java.lang.Object");
+        }
         if (model.typeVariable()) {
             // 型変数は erasure (Object) へ写像し、自己写像の無限再帰を避ける。
             return referenceType("java.lang.Object");
