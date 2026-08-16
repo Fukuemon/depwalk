@@ -7,7 +7,7 @@ import java.util.Set;
 
 /**
  * 型が workspace source 宣言を持ち、かつ呼び出し元 context から依存到達可能かを判定する。
- * bytecode 救済と候補の source 再対応付けはすべてこの判定を通す (ADR-0005)。
+ * bytecode 救済と候補の source 再対応付けはすべてこの判定を通す。
  */
 final class ReachableOwners {
 

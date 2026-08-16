@@ -34,8 +34,7 @@ type Options struct {
 
 // Result は depwalk analyze が成功したときの結果。
 type Result struct {
-	// Graph は Analyzer の methodSymbol と
-	// callEdge records.
+	// Graph は Analyzer の methodSymbol と callEdge record から構築した呼び出しグラフ。
 	Graph         *graph.Graph
 	Diagnostics   []Diagnostic
 	MethodCount   int

@@ -55,6 +55,14 @@ final class MethodSymbolFactory {
         if (attribution.outcome() == AttributionResult.Outcome.SCOPE_INTERNAL) {
             Node ast = resolved.toAst().orElse(null);
             sourceLocation = ast != null ? sourceLocations.sourceLocationOf(ast) : null;
+            // entry point 標識は AST でなく methodId で引く。どの生成経路 (宣言 walk /
+            // toAst() が空の call-site callee / SourceMethodIndex.find 経由の candidate
+            // 再対応付け) でも同じ metadata になり、first-wins の node 重複排除で標識が
+            // 落ちない。
+            List<String> entryPoints = sourceMethodIndex.entryPointsFor(methodId);
+            if (!entryPoints.isEmpty()) {
+                metadata = Map.of("entryPoint", entryPoints);
+            }
         } else if (attribution.outcome() == AttributionResult.Outcome.LIFTED) {
             metadata = Map.of(
                     "declaringType", attribution.declaringTypeBinaryName(),

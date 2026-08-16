@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("解析 context の組み立て (明示 source root / Gradle discovery) と入力検証")
 class AnalysisContextFactoryTest {
 
     @TempDir
@@ -24,6 +26,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("明示指定した複数の source root から 1 つの合成 context を組み立て、SootUp を利用不可として warning (JAVA_SOOTUP_UNAVAILABLE) を付ける")
     void buildsSyntheticContextFromExplicitRoots() throws Exception {
         Files.createDirectories(workspace.resolve("module-a/src/main/java"));
         Files.createDirectories(workspace.resolve("module-b/src/main/java"));
@@ -44,6 +47,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("同一の source root を重複して明示指定した場合でも、最初の 1 つだけが残る")
     void deduplicatesIdenticalExplicitRootsKeepingTheFirst() throws Exception {
         Files.createDirectories(workspace.resolve("src/main/java"));
 
@@ -57,6 +61,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("ある source root が別の root に包含されているとき、致命的エラー (JAVA_INVALID_SOURCE_ROOTS) として拒否する")
     void rejectsContainedExplicitRoots() throws Exception {
         Files.createDirectories(workspace.resolve("module/src/main/java"));
 
@@ -67,6 +72,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("symlink 経由で workspace の外へ解決される source root は、致命的エラー (JAVA_INVALID_SOURCE_ROOTS) として拒否する")
     void rejectsRootResolvingOutsideWorkspaceViaSymlink() throws Exception {
         Path outside = Files.createTempDirectory("depwalk-outside");
         Path link = workspace.resolve("linked");
@@ -83,6 +89,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("空文字・バックスラッシュ区切り・絶対 path・上方向参照の source root は、不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsInvalidExplicitRootShapes() {
         for (String bad : List.of("", "a\\b", "/abs", "../up")) {
             AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
@@ -94,6 +101,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("NUL 文字を含み path として解釈できない source root は、InvalidPathException を漏らさず不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsUnparseableSourceRootAsInvalidRequest() {
         // NUL を含む値は InvalidPathException を漏らさず invalid request にする。
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
@@ -103,6 +111,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("明示指定の source root が空のとき、不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsExplicitEmptySourceRoots() {
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
                 () -> AnalysisContextFactory.explicitContext(
@@ -111,6 +120,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("正規形でない、または未対応の Java language level は、不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsNonCanonicalOrUnsupportedLanguageLevels() {
         for (String bad : List.of("1.8", "", "08", "banana", "999")) {
             AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
@@ -122,6 +132,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("javaPreview に真偽値として解釈できない値が来たとき、不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsInvalidPreviewValues() {
         Map<String, Object> metadata = Map.of(
                 "classpath", List.of(),
@@ -133,6 +144,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("Gradle discovery 経路で language metadata が指定されたとき、不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsLanguageMetadataOnDiscoveryRoute() {
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
                 () -> AnalysisContextFactory.rejectLanguageMetadataOnDiscovery(
@@ -141,6 +153,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("language level の解決は正規形 (\"17\" / \"8\") だけを受け付け、\"1.8\" や null は解決しない")
     void resolvesCanonicalLevelsOnly() {
         assertTrue(LanguageLevels.resolve("17", false).isPresent());
         assertTrue(LanguageLevels.resolve("8", false).isPresent());
@@ -149,6 +162,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("workspace 内の未 build な classpath entry は、致命的エラーにせず warning (JAVA_SOOTUP_UNAVAILABLE) 付きで除外する")
     void skipsUnbuiltWorkspaceClasspathEntriesWithAWarning() throws Exception {
         // model 取得は task を実行しないため、workspace 内の project 依存 build
         // output は fresh checkout で存在しない。fatal でなく warning で除外する。
@@ -169,6 +183,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("workspace 外の classpath artifact が存在しないとき、致命的エラー (JAVA_MISSING_JAR) として失敗する")
     void failsOnMissingExternalClasspathArtifacts() throws Exception {
         Files.createDirectories(workspace.resolve("app/src/main/java"));
         Path external = workspace.getParent().resolve("depwalk-missing-external.jar");
@@ -183,6 +198,7 @@ class AnalysisContextFactoryTest {
     }
 
     @Test
+    @DisplayName("解析対象から除外した included build ごとに、--source-root への誘導を含む warning (JAVA_SOURCE_ROOT_EXCLUDED) を出す")
     void warnsForEachExcludedIncludedBuild() throws Exception {
         Files.createDirectories(workspace.resolve("app/src/main/java"));
         Path includedBuild = workspace.resolve("tooling-build");

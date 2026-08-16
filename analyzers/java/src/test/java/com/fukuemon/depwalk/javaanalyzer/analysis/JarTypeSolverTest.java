@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.net.URISyntaxException;
@@ -18,11 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * jackson-databind は本プロジェクトの既存依存であり、test classpath 上の実 jar path を
  * リフレクション経由で取得して {@code analysisRequest.metadata.classpath} に渡す。
  */
+@DisplayName("依存 jar (JarTypeSolver) を経由した型解決")
 class JarTypeSolverTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/jartypesolver");
 
     @Test
+    @DisplayName("依存 jar で宣言された継承メソッドの呼び出しは、scope 内の subtype 側 methodId へ持ち上げられ、宣言元は declaringType に記録される")
     void declarationInDependencyJarIsLiftedToScopeInternalSubtype() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE,

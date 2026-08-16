@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
@@ -85,6 +86,91 @@ func TestConsoleWriteIsDeterministicForMapInput(t *testing.T) {
 		}
 		if got.String() != want {
 			t.Errorf("Write(console) run %d = %q, want %q", i, got.String(), want)
+		}
+	}
+}
+
+func TestConsoleRendersEntryPointMarker(t *testing.T) {
+	view := consoleView("method:a",
+		[]NodeView{node("method:a", "A"), node("method:b", "B"), node("method:c", "C")},
+		[]EdgeView{
+			edge("edge:ab", "method:a", "method:b"),
+			edge("edge:bc", "method:b", "method:c"),
+			edge("edge:ca", "method:c", "method:a"),
+		}, nil)
+	view.Start.Metadata = map[string]any{"entryPoint": []any{
+		"org.springframework.scheduling.annotation.Scheduled",
+	}}
+	view.Nodes = append([]NodeView(nil), view.Nodes...)
+	view.Nodes[0].Metadata = view.Start.Metadata
+	// javax/jakarta variants collapse to one label after the simple-name conversion.
+	view.Nodes[1].Metadata = map[string]any{"entryPoint": []any{
+		"jakarta.annotation.PostConstruct",
+		"javax.annotation.PostConstruct",
+	}}
+
+	var got bytes.Buffer
+	if err := (consoleFormatter{}).Format(&got, view); err != nil {
+		t.Fatalf("Format() returned error: %v", err)
+	}
+	want := "A()  (entry point: @Scheduled)\n" +
+		"└─ B()  (entry point: @PostConstruct)\n" +
+		"   └─ C()\n" +
+		"      └─ A()  (cycle)  (entry point: @Scheduled)\n"
+	if got.String() != want {
+		t.Errorf("Format() output:\n%s\nwant:\n%s", got.String(), want)
+	}
+}
+
+func TestConsoleEntryPointMarkerJoinsSortedLabelsAndCoexistsWithRevisited(t *testing.T) {
+	// Diamond: a -> b, a -> c, b -> d, c -> d. The second reach of d renders (既出).
+	view := consoleView("method:a",
+		[]NodeView{node("method:a", "A"), node("method:b", "B"), node("method:c", "C"), node("method:d", "D")},
+		[]EdgeView{
+			edge("edge:ab", "method:a", "method:b"),
+			edge("edge:ac", "method:a", "method:c"),
+			edge("edge:bd", "method:b", "method:d"),
+			edge("edge:cd", "method:c", "method:d"),
+		}, nil)
+	view.Nodes = append([]NodeView(nil), view.Nodes...)
+	// Unsorted input: the marker sorts by FQN before converting to simple names.
+	view.Nodes[3].Metadata = map[string]any{"entryPoint": []any{
+		"org.springframework.web.bind.annotation.GetMapping",
+		"jakarta.annotation.PostConstruct",
+	}}
+
+	var got bytes.Buffer
+	if err := (consoleFormatter{}).Format(&got, view); err != nil {
+		t.Fatalf("Format() returned error: %v", err)
+	}
+	want := "A()\n" +
+		"├─ B()\n" +
+		"│  └─ D()  (entry point: @PostConstruct, @GetMapping)\n" +
+		"└─ C()\n" +
+		"   └─ D()  (既出)  (entry point: @PostConstruct, @GetMapping)\n"
+	if got.String() != want {
+		t.Errorf("Format() output:\n%s\nwant:\n%s", got.String(), want)
+	}
+}
+
+func TestConsoleEntryPointMarkerSkipsMalformedValues(t *testing.T) {
+	for name, metadata := range map[string]map[string]any{
+		"non-array":      {"entryPoint": "org.example.NotAnArray"},
+		"number-element": {"entryPoint": []any{42}},
+		"empty-array":    {"entryPoint": []any{}},
+		"empty-string":   {"entryPoint": []any{""}},
+	} {
+		view := consoleView("method:a",
+			[]NodeView{node("method:a", "A"), node("method:b", "B")},
+			[]EdgeView{edge("edge:ab", "method:a", "method:b")}, nil)
+		view.Start.Metadata = metadata
+
+		var got bytes.Buffer
+		if err := (consoleFormatter{}).Format(&got, view); err != nil {
+			t.Fatalf("Format(%s) returned error: %v", name, err)
+		}
+		if strings.Contains(got.String(), "entry point") {
+			t.Errorf("Format(%s) rendered a marker for malformed metadata:\n%s", name, got.String())
 		}
 	}
 }

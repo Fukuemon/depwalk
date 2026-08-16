@@ -4,6 +4,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.BinaryNames;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.MethodIds;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
 import com.github.javaparser.ast.CompilationUnit;
@@ -23,18 +24,27 @@ import java.util.Optional;
  * <p>呼び出し先候補が宣言ファイルより先に処理されても定義位置を付与できるよう、グラフ生成前の
  * 走査で {@link MethodSymbol} を収集する。メモリ使用量を抑えるため、保持するのは protocol 出力に
  * 必要なシンボル情報だけであり、{@link CompilationUnit} やその他の AST node は保持しない。
+ *
+ * <p>{@link EntryPointIndex} を保持しており、合成アノテーションの対応表が完成する全 unit の
+ * {@link #accept} 完了後でないと entry point 標識を正しく引けない (順序依存)。
  */
 public final class SourceMethodIndex {
 
     private final Path workspaceRoot;
+    private final EntryPointIndex entryPointIndex;
     private final Map<String, MethodSymbol> symbolsByMethodId = new LinkedHashMap<>();
+    private final Map<String, List<String>> annotationFqnsByMethodId = new LinkedHashMap<>();
 
     /**
      * @param workspaceRoot source location を相対化する基準。絶対・正規化済みであること
      *     (未正規化だと relativize が失敗する)
+     * @param entryPointIndex entry point 標識の解決に使う。{@link #find} 経由の candidate
+     *     再対応付けでも宣言 walk と同じ metadata を返し、GraphAccumulator の first-wins
+     *     重複排除で標識が走査順に依存して落ちないようにする
      */
-    public SourceMethodIndex(Path workspaceRoot) {
+    public SourceMethodIndex(Path workspaceRoot, EntryPointIndex entryPointIndex) {
         this.workspaceRoot = workspaceRoot;
+        this.entryPointIndex = entryPointIndex;
     }
 
     /**
@@ -71,6 +81,13 @@ public final class SourceMethodIndex {
                         signature,
                         sourceLocation,
                         null));
+                // アノテーション FQN はこの時点で解決する (この pass の後 AST は破棄される) が、
+                // entry point への対応付けは find() まで遅延する。合成アノテーションの宣言が
+                // 未 accept の file にありうるため。
+                List<String> annotationFqns = entryPointIndex.annotationFqnsOf(method);
+                if (!annotationFqns.isEmpty()) {
+                    annotationFqnsByMethodId.putIfAbsent(methodId, annotationFqns);
+                }
             } catch (RuntimeException | LinkageError ignored) {
                 // CallGraphBuilder の既存 unresolved declaration 経路が second pass で診断する。
             }
@@ -86,6 +103,37 @@ public final class SourceMethodIndex {
                 candidate.declaringType(),
                 candidate.methodName(),
                 candidate.parameterTypes());
-        return Optional.ofNullable(symbolsByMethodId.get(MethodIds.methodId(signature)));
+        String methodId = MethodIds.methodId(signature);
+        MethodSymbol symbol = symbolsByMethodId.get(methodId);
+        if (symbol == null) {
+            return Optional.empty();
+        }
+        List<String> entryPoints = entryPointsFor(methodId);
+        if (!entryPoints.isEmpty()) {
+            symbol = MethodSymbol.of(
+                    symbol.methodId(),
+                    symbol.language(),
+                    symbol.symbolKind(),
+                    symbol.qualifiedName(),
+                    symbol.signature(),
+                    symbol.sourceLocation(),
+                    Map.of("entryPoint", entryPoints));
+        }
+        return Optional.of(symbol);
+    }
+
+    /**
+     * methodId に対応する entry point 標識 (辞書順 FQN)。標識なしは空リスト。
+     *
+     * <p>標識の解決を AST 可用性に依存させないための methodId 引きの正本 lookup。
+     * 宣言 walk / call site 由来 / candidate 再対応付けのどの経路から同一 methodId の
+     * symbol が生成されても、同じ標識が付く (first-wins 重複排除で標識が落ちない)。
+     */
+    public List<String> entryPointsFor(String methodId) {
+        List<String> annotationFqns = annotationFqnsByMethodId.get(methodId);
+        if (annotationFqns == null) {
+            return List.of();
+        }
+        return entryPointIndex.entryPointsOfAnnotationFqns(annotationFqns);
     }
 }

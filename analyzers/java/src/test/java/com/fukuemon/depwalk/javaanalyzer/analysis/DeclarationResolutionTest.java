@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -15,11 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 解決失敗は、その宣言だけを skip して {@code JAVA_UNRESOLVED_SYMBOL} (warning) を出し、解析全体は
  * 継続する (exit 0、他の宣言 / edge は出力される)。
  */
+@DisplayName("宣言列挙側の解決失敗からの回復")
 class DeclarationResolutionTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/declrecovery");
 
     @Test
+    @DisplayName("解決できないメソッド / constructor 宣言があるとき、その宣言だけを飛ばして warning (JAVA_UNRESOLVED_SYMBOL) を出し、解析全体は継続する")
     void unresolvableMethodAndConstructorDeclarationsAreSkippedWithWarningAndAnalysisContinues() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);

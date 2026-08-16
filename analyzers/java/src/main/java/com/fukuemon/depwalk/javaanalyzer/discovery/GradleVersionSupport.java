@@ -3,8 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
 import java.util.Optional;
 
 /**
- * 自動 discovery の Gradle / daemon JVM 互換性判定。正本は
- * {@code context/toolchain.md} の Gradle discovery compatibility matrix:
+ * 自動 discovery の Gradle / daemon JVM 互換性判定。
  * target Gradle は {@code 7.6.5 <= version < 9.7.0}、daemon JVM は Gradle
  * 公式 Java compatibility matrix に従う。
  */

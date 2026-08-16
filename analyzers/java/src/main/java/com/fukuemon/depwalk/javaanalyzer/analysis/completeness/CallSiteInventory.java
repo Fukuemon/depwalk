@@ -35,8 +35,7 @@ import java.util.Set;
 
 /**
  * resolver とは独立した AST 走査で、解析対象 call kind の全 lexical site を
- * semantic caller ごとに登録する inventory
- * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+ * semantic caller ごとに登録する inventory。
  * caller 導出は {@link CallerIdentities} を介して CallGraphBuilder と同じ規則を
  * 共有する。callee の型解決は一切行わない。
  */
@@ -257,7 +256,10 @@ public final class CallSiteInventory {
             List<ConstructorDeclaration> constructors = new ArrayList<>();
             if (enclosingType instanceof TypeDeclaration<?> td) {
                 for (BodyDeclaration<?> member : td.getMembers()) {
-                    if (member instanceof ConstructorDeclaration cd) {
+                    // 注入宣言は caller 帰属に数えない。inventory は注入前の AST を数える
+                    // ため通常ここには現れないが、graph builder 側と同じ基準
+                    // (InjectedDeclarations) で守っておく。
+                    if (member instanceof ConstructorDeclaration cd && !InjectedDeclarations.isInjected(cd)) {
                         constructors.add(cd);
                     }
                 }

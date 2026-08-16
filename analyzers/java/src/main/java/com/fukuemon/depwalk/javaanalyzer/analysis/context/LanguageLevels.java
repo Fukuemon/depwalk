@@ -8,7 +8,7 @@ import java.util.Optional;
  * source language level 文字列を {@link ParserConfiguration.LanguageLevel} へ
  * 解決する。値は canonical な 10 進 major version ("8", "17", "25" 等) だけを
  * 受理し、"1.8" などの legacy 表記、空、非数値は解決しない。
- * toolchain 4 軸分離 (context/toolchain.md) に従い、他の軸からの推測や
+ * toolchain の各軸は独立に扱い、他の軸からの推測や
  * 別 level への fallback は行わない。
  */
 public final class LanguageLevels {

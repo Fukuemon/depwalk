@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.discovery;
 
 import com.fukuemon.depwalk.javaanalyzer.Main;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -18,14 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * credential 非漏洩と副作用境界の negative test
- * (java-analyzer feature doc「Gradle runtime と安全境界」/
- * adr/0006-adopt-gradle-tooling-api-discovery.md)。
+ * credential 非漏洩と副作用境界の negative test。
  * 高 entropy dummy marker を run ごとに生成して build logic から意図的に出力させ、
  * depwalk が生成・転送する output へ byte 一致で現れないことを検証する。
  * marker を含む test 入力 (fixture copy / gradle.properties) 自体は検査対象外。
  * arbitrary build logic の外部副作用の sandbox 保証はしない。
  */
+@DisplayName("discovery が build logic 由来の秘密情報を出力へ漏らさない境界")
 class CredentialIsolationTest {
 
     private static String newMarker() {
@@ -102,6 +102,7 @@ class CredentialIsolationTest {
     }
 
     @Test
+    @DisplayName("build logic が秘密情報相当の marker を出力する場合でも、stdout / stderr と生成物には marker が現れないままになる")
     void discoveryNeverForwardsInjectedMarkerBytes() throws Exception {
         String marker = newMarker();
         Path workspace = markerWorkspace(marker, false);
@@ -122,6 +123,7 @@ class CredentialIsolationTest {
     }
 
     @Test
+    @DisplayName("build が marker 入りの例外で失敗するとき、error 出力から marker が除去され、安定した分類と代替案内だけが残る")
     void discoveryFailureSanitizesMarkerFromErrorOutput() throws Exception {
         String marker = newMarker();
         Path workspace = markerWorkspace(marker, true);
@@ -143,6 +145,7 @@ class CredentialIsolationTest {
     }
 
     @Test
+    @DisplayName("sourceRoots を明示するとき、Gradle を一切評価しないため build が失敗する fixture でも解析が成功し、marker も出力に現れない")
     void explicitOverrideNeverTouchesGradleRuntime() throws Exception {
         String marker = newMarker();
         Path workspace = markerWorkspace(marker, true);

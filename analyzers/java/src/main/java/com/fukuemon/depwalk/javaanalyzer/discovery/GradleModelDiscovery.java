@@ -11,8 +11,7 @@ import java.util.Optional;
 
 /**
  * {@code sourceRoots} 省略時だけ実行される Gradle build model の自動 discovery。
- * 1 件以上の明示 root がある request では呼び出し側が本 class へ一切入らない
- * (完全 bypass、ADR-0006)。
+ * 1 件以上の明示 root がある request では呼び出し側が本 class へ一切入らない (完全 bypass)。
  */
 public final class GradleModelDiscovery {
 

@@ -7,6 +7,7 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("call site 台帳 (CallSiteInventory / CallSiteOutcomeLedger) の網羅性契約")
 class CallSiteLedgerContractTest {
 
     @TempDir
@@ -40,6 +42,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("メソッド呼び出し・オブジェクト生成・明示的コンストラクタ呼び出し・メソッド参照の全種類の call site が、path と正の行番号と呼び出し元メソッド ID を持つ ID で登録される")
     void registersAllCallKindsWithDeterministicIds() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/App.java", """
                 package com.example;
@@ -67,6 +70,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("qualified super (`expr.super(...)`) の outer 式に含まれるメソッド呼び出しも、脱落せずに inventory へ登録される")
     void registersCallsInsideQualifiedSuperOuterExpression() throws Exception {
         // qualified super (`expr.super(...)`) の outer 式内の method call も
         // inventory へ登録される (walk が式を辿らないと黙示の脱落になる)。
@@ -92,6 +96,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("インスタンス field 初期化子の呼び出しは、字面上の位置を共有したまま、コンストラクタごとに 1 entry ずつ展開して登録される")
     void expandsInstanceFieldInitializerToEachConstructor() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/Init.java", """
                 package com.example;
@@ -114,6 +119,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("static field 初期化子の呼び出しは、呼び出し元として <clinit> を記録する")
     void staticFieldInitializerUsesClinitCaller() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/S.java", """
                 package com.example;
@@ -126,6 +132,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("台帳は 1 entry につき結果を 1 つに限定し、補助 diagnostic の後に呼び出し関係 (edge) が出た entry は EMITTED へ昇格し、確定済み entry の再分類と未登録 entry の記録は例外になる")
     void ledgerEnforcesOneOutcomePerEntry() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/L.java", """
                 package com.example;
@@ -147,6 +154,7 @@ class CallSiteLedgerContractTest {
     }
 
     @Test
+    @DisplayName("結果が未分類の entry が残っているとき、完了検証 (validateComplete) は例外で失敗する")
     void unclassifiedEntriesFailValidation() throws Exception {
         CallSiteInventory inventory = inventoryOf("com/example/U.java", """
                 package com.example;

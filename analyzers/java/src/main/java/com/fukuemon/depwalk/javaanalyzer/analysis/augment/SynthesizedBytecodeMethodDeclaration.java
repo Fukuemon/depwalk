@@ -14,7 +14,6 @@ import java.util.Optional;
 
 /**
  * scope 内 source 型の宣言に合成される bytecode-only method。
- * 本クラスの契約の正本は java-analyzer feature doc「solver 層の bytecode member 合成」。
  * SootUp が classes output から読んだ {@code MethodCandidate} を JavaParser の
  * 解決結果として振る舞わせ、Lombok 等の生成 member を含む式の型伝播
  * (chained call / stream 連鎖) を solver 層で成立させる。

@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>「出力しない」条 (IF) は「出力する」条 (WHEN/WHERE) に優先する例外であるため、
  * テスト名で明示する ({@code ...IsOmitted...} / {@code doesNotEmit...} 系)。
  */
+@DisplayName("呼び出し先メソッドの帰属型の決定規則")
 class AttributionTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/attribution");
@@ -33,6 +35,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("宣言型が scope 内で override があるとき、呼び出し先は override した型へ帰属する")
     void declarationSiteInScopeWithOverrideAttributesToTheOverridingType() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -41,6 +44,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("宣言型が scope 内で override がないとき、呼び出し先は宣言している親型へ帰属する")
     void declarationSiteInScopeWithoutOverrideAttributesToTheDeclaringSupertype() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -49,6 +53,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("super 経由の呼び出しは、override されている場合でも宣言している親型へ解決される")
     void superCallResolvesToTheDeclaringSupertypeEvenWhenOverridden() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -57,6 +62,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("this を省略した呼び出しでも、明示的な this と同じ override 解決に従う")
     void implicitThisCallFollowsOverrideResolutionLikeExplicitThis() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -65,6 +71,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("宣言型が scope 外でも受け手の型が scope 内のとき、呼び出し先は受け手の型へ引き上げられ、元の宣言型は metadata に残る")
     void declarationSiteOutOfScopeWithScopeInternalReceiverLiftsToReceiverType() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -81,6 +88,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("宣言型が既定の除外 package に入るとき、呼び出し関係 (edge) も未解決診断も出力されない")
     void declarationSiteOutOfScopeInDefaultExcludedPackageIsOmittedWithoutDiagnostic() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -90,6 +98,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("宣言型と受け手の型がどちらも scope 外のとき、呼び出し関係 (edge) も未解決診断も出力されない")
     void bothDeclarationSiteAndReceiverOutOfScopeIsOmittedWithoutDiagnostic() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -99,6 +108,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("liftExcludePackages を指定すると既定の除外一覧が置き換わり、一致する宣言型の引き上げが行われない")
     void liftExcludePackagesReplacesDefaultsAndOmitsMatchingDeclaration() throws Exception {
         Map<String, Object> metadata = AnalysisTestSupport.classpathMetadata();
         metadata.put("liftExcludePackages", List.of("com.example.lib"));
@@ -114,6 +124,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("liftExcludePackages の一致は package の区切り単位で判定され、単純な文字列の前方一致では判定されない")
     void liftExcludePackagesMatchesOnDotSeparatedSegmentsNotRawStringPrefix() throws Exception {
         Map<String, Object> metadata = AnalysisTestSupport.classpathMetadata();
         metadata.put("liftExcludePackages", List.of("com.example.lib"));
@@ -130,6 +141,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("scope 内の型への new 式は、constructor への呼び出し関係 (edge) として出力される")
     void newExpressionOnScopeInternalTypeIsEmitted() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -138,6 +150,7 @@ class AttributionTest {
     }
 
     @Test
+    @DisplayName("scope 外の型への new 式は、引き上げも未解決診断もなく出力されない")
     void newExpressionOnScopeExternalTypeIsOmittedWithoutLiftOrDiagnostic() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -152,6 +165,7 @@ class AttributionTest {
      * 引き上げない。宣言型・参照型ともに scope 外のため出力しない (diagnostic も出さない)。
      */
     @Test
+    @DisplayName("scope 外の static import を無修飾で呼ぶとき、囲んでいる class へは引き上げず、呼び出し関係 (edge) も未解決診断も出力されない")
     void unqualifiedStaticImportOutOfScopeIsOmittedWithoutLiftToEnclosingOrDiagnostic() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -170,6 +184,7 @@ class AttributionTest {
      * 発生しない、そもそも発生させる必要がない)。
      */
     @Test
+    @DisplayName("scope 内の static import を無修飾で呼ぶとき、呼び出し先は宣言している型へそのまま帰属する")
     void unqualifiedStaticImportInScopeAttributesToTheDeclaringType() throws Exception {
         List<Map<String, Object>> edges = runDefault().byType("callEdge");
         assertTrue(hasEdge(edges,
@@ -188,6 +203,7 @@ class AttributionTest {
      * ではなく、通常の継承メンバ参照であるため)。
      */
     @Test
+    @DisplayName("継承した static メンバを無修飾で呼ぶとき、従来どおり囲んでいる派生型へ引き上げられる")
     void unqualifiedInheritedStaticCallStillLiftsToEnclosingSubtype() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");

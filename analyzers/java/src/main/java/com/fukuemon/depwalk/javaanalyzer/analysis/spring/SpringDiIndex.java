@@ -671,13 +671,42 @@ public final class SpringDiIndex {
         return Set.copyOf(types);
     }
 
-    /** 解決済み宣言の全 ancestor のうち、宣言を引ける型の binary name を収集する。 */
+    /**
+     * 解決済み宣言の ancestor のうち、宣言を引ける型の binary name を best-effort で
+     * 収集する。直接 ancestor を許容モードで辿る BFS とし、解決できない枝は skip
+     * する。かつては getAllAncestors の一括取得だったため、外部基底 1 つの解決
+     * 失敗で workspace interface への代入可能性ごと失われ、「Bean 候補なし」の誤
+     * 診断になっていた。
+     */
     private static void addAncestorTypes(ResolvedReferenceTypeDeclaration declaration, Set<String> types) {
-        declaration.getAllAncestors().stream()
-                .map(ancestor -> ancestor.getTypeDeclaration().orElse(null))
-                .filter(Objects::nonNull)
-                .map(BinaryNames::forResolvedDeclaration)
-                .forEach(types::add);
+        java.util.ArrayDeque<ResolvedReferenceTypeDeclaration> queue = new java.util.ArrayDeque<>();
+        queue.add(declaration);
+        Set<String> visited = new LinkedHashSet<>();
+        while (!queue.isEmpty()) {
+            ResolvedReferenceTypeDeclaration current = queue.poll();
+            List<com.github.javaparser.resolution.types.ResolvedReferenceType> direct;
+            try {
+                direct = current.getAncestors(true);
+            } catch (RuntimeException | LinkageError e) {
+                continue;
+            }
+            for (var ancestor : direct) {
+                ResolvedReferenceTypeDeclaration ancestorDeclaration;
+                try {
+                    ancestorDeclaration = ancestor.getTypeDeclaration().orElse(null);
+                } catch (RuntimeException | LinkageError e) {
+                    continue;
+                }
+                if (ancestorDeclaration == null) {
+                    continue;
+                }
+                String binaryName = BinaryNames.forResolvedDeclaration(ancestorDeclaration);
+                if (visited.add(binaryName)) {
+                    types.add(binaryName);
+                    queue.add(ancestorDeclaration);
+                }
+            }
+        }
     }
 
     private static Set<String> annotationTypesOf(ClassOrInterfaceDeclaration type) {

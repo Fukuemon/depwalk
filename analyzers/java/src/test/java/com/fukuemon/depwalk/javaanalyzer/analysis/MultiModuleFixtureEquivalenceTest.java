@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.ProjectConnection;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 固定期待集合 (testdata の expected/graph.json) と graph を照合する。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisplayName("複数 module fixture での自動 discovery と明示指定の同値性")
 class MultiModuleFixtureEquivalenceTest {
 
     private static final List<String> EXPLICIT_ROOTS = List.of(
@@ -144,6 +146,7 @@ class MultiModuleFixtureEquivalenceTest {
     }
 
     @Test
+    @DisplayName("自動 discovery と明示指定のどちらの経路で解析した場合でも、同じ graph (method / edge / 診断 / 集計) が得られる")
     void autoDiscoveryAndExplicitOverrideProduceTheSameGraph() throws Exception {
         Run auto = runAuto();
         Run explicit = runExplicit();
@@ -170,6 +173,7 @@ class MultiModuleFixtureEquivalenceTest {
     }
 
     @Test
+    @DisplayName("include の glob は workspace 相対 path で判定され、指定した module の中だけが解析対象になる")
     void moduleScopedIncludeExcludeAppliesToWorkspaceRelativePaths() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         String roots = mapper.writeValueAsString(EXPLICIT_ROOTS);
@@ -204,7 +208,7 @@ class MultiModuleFixtureEquivalenceTest {
 
     @SuppressWarnings("unchecked")
     private void assertExpectedGraph(Run run) throws Exception {
-        // 固定期待集合の正本は testdata の expected/graph.json (P6 の実 CLI E2E も参照可能)。
+        // 固定期待集合は testdata の expected/graph.json に置く。
         Map<String, Object> expected = new ObjectMapper()
                 .readValue(fixture.resolve("expected/graph.json").toFile(), Map.class);
         Map<String, Map<String, Object>> methodsById = methodSet(run).stream()

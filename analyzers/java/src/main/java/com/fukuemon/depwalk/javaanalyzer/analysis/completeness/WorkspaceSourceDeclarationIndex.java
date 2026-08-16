@@ -14,9 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * include / exclude 後の全 source から作る軽量な型宣言索引
- * (java-analyzer feature doc「solver 層の bytecode member 合成」/
- * adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+ * include / exclude 後の全 source から作る軽量な型宣言索引。
  * binary name → (所有 context, workspace 相対 location) を保持し、AST は保持しない。
  * 正規化 method signature の索引は既存 {@code SourceMethodIndex} (methodId =
  * 正規化 signature) が正本で、本 index は型の所有 context / 到達性の制約と
@@ -49,8 +47,7 @@ public final class WorkspaceSourceDeclarationIndex {
      *
      * <p>ContextScope の root 相対 path 検査は package 宣言と配置が一致しない
      * source や複数 top-level type を検出できないため、parse 後の実 binary name
-     * で cross-context の重複を検証する
-     * (feature doc「Source root discovery と解析 context」)。
+     * で cross-context の重複を検証する。
      *
      * @param cu parse 済み compilation unit (storage path が無ければ何もしない)
      * @param contextId この CU を所有する解析 context の id

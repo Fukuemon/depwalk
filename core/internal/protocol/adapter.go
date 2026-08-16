@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/Fukuemon/depwalk/core/internal/analyze"
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
@@ -72,6 +73,9 @@ func (a *Adapter) Run(
 		}
 	})
 	if err != nil {
+		if heapExhausted(runResult) {
+			err = fmt.Errorf("%w (%s)", err, analyze.HeapExhaustedHint)
+		}
 		return analyze.Outcome{}, err
 	}
 	return analyze.Outcome{
@@ -79,7 +83,17 @@ func (a *Adapter) Run(
 		Failure:         failureToDomain(runResult.AnalyzerError),
 		ValidationError: runResult.ValidationError,
 		ExitCode:        runResult.ExitCode,
+		HeapExhausted:   heapExhausted(runResult),
 	}, nil
+}
+
+// heapExhausted は異常終了時の stderr から OutOfMemoryError の痕跡を検知する。
+// stderr を protocol record として parse しない契約は維持したまま、valid error
+// record なしの異常終了時に限り診断ヒントとして照合する。解析結果の解釈には一切使わない。
+func heapExhausted(result RunResult) bool {
+	return result.ExitCode != 0 &&
+		result.AnalyzerError == nil &&
+		strings.Contains(result.Stderr, "java.lang.OutOfMemoryError")
 }
 
 func diagnosticsToDomain(records []Diagnostic) []analyze.Diagnostic {

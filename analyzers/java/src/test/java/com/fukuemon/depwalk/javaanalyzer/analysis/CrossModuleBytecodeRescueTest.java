@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,12 +15,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * java-analyzer feature doc「solver 層の bytecode member 合成」の cross-module
- * 救済: 依存 project の classes output にしか存在しない生成 member への
+ * cross-module 救済の検証: 依存 project の classes output にしか存在しない生成 member への
  * cross-module 呼び出しが、bytecode-only member の出力契約で edge になる。
  * BytecodeOnlyMemberTest と同じく generator 非依存 (完全 source を compile した
  * classes + member を削った解析対象 source) で、Lombok 等の生成 member を模擬する。
  */
+@DisplayName("module を跨いだ bytecode-only member の救済")
 class CrossModuleBytecodeRescueTest {
 
     /** SootUp 2.0 が読める classfile 範囲に合わせる (BytecodeOnlyMemberTest と同じ)。 */
@@ -45,6 +46,7 @@ class CrossModuleBytecodeRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("依存 module の bytecode にしか存在しない getter への module 跨ぎ呼び出しが、救済されて呼び出し関係 (edge) になる")
     void rescuesCrossModuleCallToBytecodeOnlyGetter() throws Exception {
         compile(libClasses, List.of(), "lib-full", "com/example/lib/LibModel.java", """
                 package com.example.lib;
@@ -79,6 +81,7 @@ class CrossModuleBytecodeRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("依存 module の bytecode にしか存在しない constructor への module 跨ぎ呼び出しも、同じ出力契約で救済される")
     void rescuesCrossModuleCallToBytecodeOnlyConstructor() throws Exception {
         compile(libClasses, List.of(), "lib-full", "com/example/lib/LibModel.java", """
                 package com.example.lib;
@@ -112,6 +115,7 @@ class CrossModuleBytecodeRescueTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("依存 module が jar として classpath に載る場合でも、model の project 依存関係を根拠にして救済される")
     void rescuesCrossModuleCallWhenDependencyAppearsAsJarOnClasspath() throws Exception {
         // Gradle model は依存 project を jar として classpath へ返すことがある。
         // その場合 classpath 照合では :lib の output と分からず、model の

@@ -6,7 +6,7 @@ status: 完了
 keywords: [output, Console, JSON, NodeView, EdgeView, formatter]
 governs:
   - core/internal/output
-verified_commit: dcb2a35
+verified_commit: 4cae142
 ---
 
 # Feature 設計: Output (Console / JSON 出力)
@@ -131,27 +131,27 @@ type formatter interface {
 
 Console / JSON 両 Formatter が出力する全項目と、対応する `View` field の一覧。Formatter はこの一覧に載る field 以外から情報を得ない。
 
-| 出力項目                                                                   | View field                                                    |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| status                                                                     | `View.Status`                                                 |
-| direction (Console の子方向判定 / JSON の `direction`)                     | `View.Direction`                                              |
-| 起点の methodId / qualifiedName / signature / 宣言位置                     | `View.Start.ID` / `.QualifiedName` / `.Signature` / `.Source` |
-| start (JSON)                                                               | `View.Start.ID`                                               |
-| nodes[] の methodId / qualifiedName / signature                            | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`           |
-| nodes[].minDepth                                                           | `View.Nodes[].MinDepth`                                       |
-| nodes[].sourceLocation                                                     | `View.Nodes[].Source`                                         |
-| nodes[].metadata (JSON のみ、omitempty)                                    | `View.Nodes[].Metadata`                                       |
-| edge 両端 methodId (Console) / callerMethodId・calleeMethodId (JSON)       | `View.Edges[].CallerID` / `.CalleeID`                         |
-| edges[].edgeId                                                             | `View.Edges[].ID`                                             |
-| edge の callSite (Console 子行の位置 / JSON `callSite`)                    | `View.Edges[].CallSite`                                       |
-| cycle flag                                                                 | `View.Edges[].Cycle`                                          |
-| edges[].metadata (JSON のみ、omitempty)                                    | `View.Edges[].Metadata`                                       |
-| cutoff の到達側 endpoint (Console) / callerMethodId・calleeMethodId (JSON) | `View.Cutoffs[].CallerID` / `.CalleeID`                       |
-| cutoff 件数 (Console の `N edges cut`)                                     | `len(View.Cutoffs)` を対象 node 単位に集計                    |
-| depthCutoffs[].edgeId                                                      | `View.Cutoffs[].EdgeID`                                       |
-| depthCutoffs[].targetMethodId                                              | `View.Cutoffs[].TargetMethodID`                               |
-| depthCutoffs[].targetMinDepth                                              | `View.Cutoffs[].TargetMinDepth`                               |
-| depthCutoffs[].callSite                                                    | `View.Cutoffs[].CallSite`                                     |
+| 出力項目                                                                       | View field                                                                  |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| status                                                                         | `View.Status`                                                               |
+| direction (Console の子方向判定 / JSON の `direction`)                         | `View.Direction`                                                            |
+| 起点の methodId / qualifiedName / signature / 宣言位置 / entry point 標識      | `View.Start.ID` / `.QualifiedName` / `.Signature` / `.Source` / `.Metadata` |
+| start (JSON)                                                                   | `View.Start.ID`                                                             |
+| nodes[] の methodId / qualifiedName / signature                                | `View.Nodes[].ID` / `.QualifiedName` / `.Signature`                         |
+| nodes[].minDepth                                                               | `View.Nodes[].MinDepth`                                                     |
+| nodes[].sourceLocation                                                         | `View.Nodes[].Source`                                                       |
+| nodes[].metadata (JSON は omitempty で全 key、Console は entry point 標識のみ) | `View.Nodes[].Metadata`                                                     |
+| edge 両端 methodId (Console) / callerMethodId・calleeMethodId (JSON)           | `View.Edges[].CallerID` / `.CalleeID`                                       |
+| edges[].edgeId                                                                 | `View.Edges[].ID`                                                           |
+| edge の callSite (Console 子行の位置 / JSON `callSite`)                        | `View.Edges[].CallSite`                                                     |
+| cycle flag                                                                     | `View.Edges[].Cycle`                                                        |
+| edges[].metadata (JSON のみ、omitempty)                                        | `View.Edges[].Metadata`                                                     |
+| cutoff の到達側 endpoint (Console) / callerMethodId・calleeMethodId (JSON)     | `View.Cutoffs[].CallerID` / `.CalleeID`                                     |
+| cutoff 件数 (Console の `N edges cut`)                                         | `len(View.Cutoffs)` を対象 node 単位に集計                                  |
+| depthCutoffs[].edgeId                                                          | `View.Cutoffs[].EdgeID`                                                     |
+| depthCutoffs[].targetMethodId                                                  | `View.Cutoffs[].TargetMethodID`                                             |
+| depthCutoffs[].targetMinDepth                                                  | `View.Cutoffs[].TargetMinDepth`                                             |
+| depthCutoffs[].callSite                                                        | `View.Cutoffs[].CallSite`                                                   |
 
 ### エラー境界
 
@@ -191,6 +191,7 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 
 - node ラベル = `signature`。`signature` が欠落する場合だけ `qualifiedName`、さらに欠落する場合は `methodId` へ fallback する。Analyzer Protocol の `signature` は overload を区別する正規化済み表現であり、Core は言語固有の区切り文字や引数部分を解析しない。
 - 位置情報: 子行は `edge.CallSite` (呼び出し箇所)、root は宣言位置 (`Symbol.Source`)。欠落時は位置表記を省略する。メソッドの宣言位置は Console では出さない (JSON が両方持つ)。
+- **entry point 標識**: node の `Metadata` に `entryPoint` key (string 配列。値は検出アノテーションの FQN、Analyzer 側 feature doc が定める) が存在するとき、行末 (既存の `(cycle)` / `(既出)` 標識よりさらに後ろ) に `  (entry point: <simple 名をカンマ区切り>)` を付す (例: `  (entry point: @Scheduled)`)。simple 名変換 (`@` + FQN の最終 segment) 後に重複する場合は 1 つに除去し、変換前 FQN の辞書順を維持する。Output が意味解釈する metadata key はこの `entryPoint` のみで、配列の中身は FQN → simple 名の表示変換以外に解釈しない。key が無い node には何も出さない。root 行にも同じ規則で付す。表示順は Output 側で変換前 FQN を辞書順ソートして保証する (Analyzer の出力順に依存しない)。
 
 ```text
 com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
@@ -256,7 +257,7 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
-- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持を定める) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味を定めるのは Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は見送り (将来 phase で検討)。 で決定。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持を定める) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味を定めるのは Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は、`entryPoint` key に限り例外として表示する (「行の書式」の entry point 標識を参照。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。それ以外の key の Console 表現は引き続き見送り (将来 phase で検討)。 で決定。
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 

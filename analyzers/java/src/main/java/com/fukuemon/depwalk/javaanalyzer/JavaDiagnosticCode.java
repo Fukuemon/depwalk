@@ -2,7 +2,6 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 /**
  * Java Analyzer 固有の {@code diagnostic} code (解析継続)。
- * 正本: design/features/java-analyzer/DesignDoc_java-analyzer.md 「diagnostic / error code 体系」。
  * fatal な {@code error} code は {@link JavaErrorCode} を使う。
  */
 public enum JavaDiagnosticCode {
@@ -26,7 +25,13 @@ public enum JavaDiagnosticCode {
     JAVA_AMBIGUOUS_CANDIDATE("warning"),
 
     /** 条件付き Bean の実行時条件を評価せず候補として保持した。 */
-    JAVA_CONDITIONAL_BEAN("info");
+    JAVA_CONDITIONAL_BEAN("info"),
+
+    /** {@code publishEvent} の引数型が静的に解決できず、イベント edge を張れない。 */
+    JAVA_EVENT_UNRESOLVED("warning"),
+
+    /** callable が静的追跡範囲 (同一メソッド内 / 引数渡し 1 段) の外にあり、invocation edge を張れない。 */
+    JAVA_CALLABLE_UNRESOLVED("info");
 
     private final String severity;
 

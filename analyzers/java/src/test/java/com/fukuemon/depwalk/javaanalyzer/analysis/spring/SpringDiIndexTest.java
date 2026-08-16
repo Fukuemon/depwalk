@@ -8,6 +8,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("Spring DI index による bean 定義の収集と注入先の解決")
 class SpringDiIndexTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/spring-di");
@@ -38,7 +40,7 @@ class SpringDiIndexTest {
         Path classesDir = compileLombokFixture();
         ParserConfiguration.LanguageLevel languageLevel = ParserConfiguration.LanguageLevel.JAVA_25;
         var typeSolver = TypeSolverFactory.createForRoots(
-                List.of(FIXTURE), List.of(classesDir), languageLevel, null);
+                List.of(FIXTURE), List.of(classesDir), languageLevel, null, null);
         JavaParser parser = new JavaParser(new ParserConfiguration()
                 .setLanguageLevel(languageLevel)
                 .setSymbolResolver(new JavaSymbolSolver(typeSolver)));
@@ -55,6 +57,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("stereotype と @Bean factory メソッドから、bean 名・別名・qualifier・実装型・条件 annotation を収集する")
     void collectsStereotypeAndBeanMethodNamesAliasesAndQualifiers() {
         SpringDiIndex.BeanDefinition defaultNamed = bean("com.example.URLService");
         assertEquals(List.of("URLService"), defaultNamed.names());
@@ -111,6 +114,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("コンストラクタ・field・setter の各注入に加え、Lombok が bytecode に生成したコンストラクタ注入も検出する")
     void detectsConstructorFieldSetterAndLombokGeneratedConstructorInjection() {
         assertEquals(SpringDiIndex.InjectionKind.CONSTRUCTOR, injection("com.example.ConstructorConsumer", "service").kind());
         assertEquals(SpringDiIndex.InjectionKind.FIELD, injection("com.example.FieldConsumer", "service").kind());
@@ -133,6 +137,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("@Qualifier は bean の qualifier 値・bean 名・別名のいずれとも照合され、一致が無いときは未解決 (UNRESOLVED) になる")
     void appliesQualifierAgainstQualifierBeanNameAndAlias() {
         assertUnique("byQualifier", "com.example.ValueQualifiedService");
         assertUnique("byBeanName", "com.example.NameQualifiedService");
@@ -143,6 +148,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("@Primary が 1 つだけのときは候補をその bean に確定し、@Primary が複数または無指定で候補が複数のときは確定できないため曖昧 (AMBIGUOUS) のままにする")
     void appliesSinglePrimaryAndKeepsMultipleOrUnspecifiedCandidatesAmbiguous() {
         assertUnique("primarySelected", "com.example.PrimarySelected");
 
@@ -156,6 +162,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("条件付き bean は条件を評価せず、候補が 1 つに絞れても曖昧 (AMBIGUOUS) のまま残し、無条件の @Primary があるときだけ確定する")
     void keepsSelectedConditionalCandidateAmbiguousWithoutEvaluatingCondition() {
         SpringDiIndex.InjectionResolution conditional = resolution("conditionalOnly");
 
@@ -173,6 +180,7 @@ class SpringDiIndexTest {
     }
 
     @Test
+    @DisplayName("Spring Data と MyBatis の repository interface は実行時提供 (RUNTIME_PROVIDED) として扱い、実装の無い通常 interface の未解決 (UNRESOLVED) と区別する")
     void distinguishesRuntimeProvidedSpringDataAndMyBatisFromUnresolvedInterface() {
         assertEquals(SpringDiIndex.ResolutionStatus.RUNTIME_PROVIDED, resolution("springDataRepo").status());
         assertEquals(SpringDiIndex.ResolutionStatus.RUNTIME_PROVIDED, resolution("myBatisRepo").status());

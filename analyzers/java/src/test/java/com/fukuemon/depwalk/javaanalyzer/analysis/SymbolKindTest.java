@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -14,11 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * symbolKind の割り当て (インスタンス初期化子 / フィールド初期化子の constructor への畳み込み、
  * lambda 内呼び出しの囲みメソッド帰属 + viaLambda: true)。
  */
+@DisplayName("symbolKind の割り当てと初期化子・lambda の帰属")
 class SymbolKindTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/symbolkind");
 
     @Test
+    @DisplayName("インスタンス初期化子とフィールド初期化子の呼び出しは、独立の node にならず全 constructor へ畳み込まれる")
     void instanceInitializerAndFieldInitializerFoldIntoEveryConstructor() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
@@ -45,6 +48,7 @@ class SymbolKindTest {
     }
 
     @Test
+    @DisplayName("lambda 本体の中の呼び出しは、囲みメソッドを caller とし viaLambda: true が付いた呼び出し関係 (edge) になり、lambda 自体は node にならない")
     void lambdaBodyCallsAttributeToEnclosingMethodWithViaLambdaFlag() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);

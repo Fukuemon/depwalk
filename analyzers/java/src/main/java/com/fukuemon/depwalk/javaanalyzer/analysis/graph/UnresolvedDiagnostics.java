@@ -13,10 +13,7 @@ import java.util.Map;
 
 /**
  * 解決に失敗した call site / 宣言と、SootUp が使えない解決要求を {@code diagnostic} として積む。
- * 添える診断 metadata は sanitize 済みの安定値だけで構成する。
- *
- * <p>診断 metadata の内容と sanitize 制約の正本は java-analyzer feature doc
- * 「diagnostic / error code 体系」。
+ * 添える診断 metadata は sanitize 済みの安定値だけで構成し、source 本文を含めない。
  */
 final class UnresolvedDiagnostics {
 
@@ -68,10 +65,10 @@ final class UnresolvedDiagnostics {
     }
 
     /**
-     * 診断 4 項目を streaming される {@code diagnostic} record へも付与するオーバーロード (multi-agent review 指摘反映: 2026-07-22)。従来は
-     * ledger 経由の {@code error.details} (fatal 経路) にしか乗らず、
+     * 診断 4 項目を streaming される {@code diagnostic} record へも付与するオーバーロード。
+     * ledger 経由の {@code error.details} (fatal 経路) だけに付与すると、
      * {@code metadata.allowIncompleteAnalysis=true} で成功時に残る diagnostic
-     * には 4 項目が欠落していた。
+     * から 4 項目が欠落するため。
      */
     void reportUnresolved(Node callNode, List<String> callerMethodIds, Map<String, Object> metadata) {
         accumulator.incrementUnresolved();
@@ -79,11 +76,10 @@ final class UnresolvedDiagnostics {
         accumulator.addDiagnostic(Diagnostic.of(
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
                 JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
-                // PR review 指摘反映 (2026-07-22): callNode.toString() は JavaParser が
-                // 再構築した source 断片 (literal を含む) であり、sanitize 制約
-                // (error.details と同様に diagnostic record にも source 本文を含めない)
-                // に違反しうる。安定な AST ノード種別名だけを使い、位置は既存の
-                // sourceLocation フィールドに委ねる。
+                // callNode.toString() は JavaParser が再構築した source 断片
+                // (literal を含む) であり、diagnostic record に source 本文を
+                // 含めない sanitize 制約に違反しうる。安定な AST ノード種別名
+                // だけを使い、位置は既存の sourceLocation フィールドに委ねる。
                 "failed to resolve " + callNode.getClass().getSimpleName(),
                 sourceLocations.sourceLocationOf(callNode),
                 relatedMethodId,
@@ -103,6 +99,37 @@ final class UnresolvedDiagnostics {
                 message,
                 sourceLocations.sourceLocationOf(declNode),
                 null,
+                null));
+    }
+
+    /**
+     * publishEvent の引数型が解決できずイベント edge を張れなかった advisory 診断。
+     * outcome ledger には触れない (call site 自体の分類は通常経路が行う)。
+     */
+    void reportEventUnresolved(Node callNode, List<String> callerMethodIds) {
+        String relatedMethodId = callerMethodIds.isEmpty() ? null : callerMethodIds.get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.severity(),
+                JavaDiagnosticCode.JAVA_EVENT_UNRESOLVED.code(),
+                "failed to resolve the event argument type of publishEvent",
+                sourceLocations.sourceLocationOf(callNode),
+                relatedMethodId,
+                null));
+    }
+
+    /**
+     * functional interface の invocation だが callable が静的追跡範囲 (同一メソッド内 /
+     * 引数渡し 1 段) の外にあり invocation edge を張れなかった advisory 診断 (info)。
+     * 設計上の制約による対象外を表し、outcome ledger には触れない。
+     */
+    void reportCallableUnresolved(Node callNode, List<String> callerMethodIds) {
+        String relatedMethodId = callerMethodIds.isEmpty() ? null : callerMethodIds.get(0);
+        accumulator.addDiagnostic(Diagnostic.of(
+                JavaDiagnosticCode.JAVA_CALLABLE_UNRESOLVED.severity(),
+                JavaDiagnosticCode.JAVA_CALLABLE_UNRESOLVED.code(),
+                "the invoked callable is outside the static tracking scope",
+                sourceLocations.sourceLocationOf(callNode),
+                relatedMethodId,
                 null));
     }
 

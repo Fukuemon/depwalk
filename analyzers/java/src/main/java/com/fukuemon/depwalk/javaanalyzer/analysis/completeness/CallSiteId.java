@@ -3,8 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 import java.util.Comparator;
 
 /**
- * 解析対象 call site の決定的な内部識別子
- * (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+ * 解析対象 call site の決定的な内部識別子。
  * lexical site (workspace 相対 path + source range + AST call kind) と
  * semantic caller method ID の組で一意になる。initializer 内の 1 lexical call は
  * caller (constructor) ごとに別 ID へ展開される。Protocol へは出力しない。

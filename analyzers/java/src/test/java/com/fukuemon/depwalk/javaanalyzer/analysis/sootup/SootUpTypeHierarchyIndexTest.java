@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.sootup;
 
 import lombok.RequiredArgsConstructor;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,12 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("bytecode 型階層 index (SootUp) によるメソッド実装候補の解決")
 class SootUpTypeHierarchyIndexTest {
 
     @TempDir
     Path tempDir;
 
     @Test
+    @DisplayName("view は最初の問い合わせまで初期化されず、interface メソッドの解決で具象実装 (override) の候補を列挙する")
     void buildsViewLazilyAndIndexesConcreteOverrideCandidates() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -44,6 +47,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("Lombok が生成したコンストラクタを、bytecode から引数型込みで読み取れる")
     void readsConstructorGeneratedByLombokFromBytecode() throws Exception {
         Path classesDir = compileFixture("sootup-lombok", true);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -58,6 +62,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("classpath が依存 jar の場合でも、interface の実装を読み取れる")
     void readsInterfaceImplementationsFromDependencyJar() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         Path jar = createJar(classesDir);
@@ -71,6 +76,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("interface の default メソッドは、宣言した interface 自身も呼び出し先の候補として index される")
     void indexesInterfaceDefaultMethodAsItsDeclaredTarget() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -89,6 +95,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("receiver が子 interface のとき、親から継承した default メソッドが候補として残る")
     void keepsInheritedDefaultMethodWhenReceiverIsAChildInterface() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -107,6 +114,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("子 interface が親の default メソッドを abstract として再宣言したとき、親の default は候補から除外される")
     void excludesParentDefaultWhenChildInterfaceRedeclaresItAsAbstract() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -122,6 +130,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("子 interface が default メソッドを abstract として再宣言した後でも、具象実装の override を候補として解決する")
     void resolvesConcreteOverrideAfterChildInterfaceRedeclaresDefaultAsAbstract() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -140,6 +149,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("複数の receiver 型を指定したとき、その全てを実装する具象型へ絞り込んでから継承メソッドを解決する")
     void intersectsConcreteReceiversBeforeResolvingInheritedMethods() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -158,6 +168,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("絞り込みの境界となる型が classpath に無いとき、推測で候補を返さず利用不可 (unavailable) として返す")
     void failsClosedWhenAnIntersectionBoundaryIsMissingFromClasspath() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -173,6 +184,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("具象基底クラスのメソッドを子クラスが override しているとき、その override が候補として index される")
     void indexesOverrideOfConcreteBaseMethod() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -188,6 +200,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("静的な receiver 型を指定したとき、候補はその型の実装だけに限定される")
     void limitsCandidatesToImplementationsOfTheStaticReceiverType() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -206,6 +219,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("具象型の実効メソッドを解決するとき、自身の override は自身を、未 override のメソッドは継承元の interface default を候補として返す")
     void resolvesEffectiveMethodForConcreteSpringBeanIncludingInterfaceDefault() throws Exception {
         Path classesDir = compileFixture("sootup-dispatch", false);
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of(classesDir.toString()));
@@ -226,6 +240,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("問い合わせた class が classpath に無いとき、例外を投げずに利用不可 (unavailable) として返す")
     void returnsUnavailableInsteadOfThrowingWhenProjectClassIsAbsent() {
         SootUpTypeHierarchyIndex index = SootUpTypeHierarchyIndex.fromClasspath(List.of());
 
@@ -237,6 +252,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("class file を bytecode として読み取れない場合でも、例外を投げずに利用不可 (unavailable) として返す")
     void returnsUnavailableInsteadOfThrowingForUnreadableClassFile() throws Exception {
         Path classFile = tempDir.resolve("broken/com/example/Broken.class");
         Files.createDirectories(classFile.getParent());
@@ -251,6 +267,7 @@ class SootUpTypeHierarchyIndexTest {
     }
 
     @Test
+    @DisplayName("classpath の linkage error (NoClassDefFoundError) は伝播させず、欠けた依存名を理由に含めて利用不可 (unavailable) として返す")
     void returnsUnavailableInsteadOfPropagatingClasspathLinkageError() {
         SootUpTypeHierarchyIndex.Resolution resolution = SootUpTypeHierarchyIndex.guardQuery(
                 "com.example.Dependent",

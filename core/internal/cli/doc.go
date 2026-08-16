@@ -2,7 +2,7 @@
 // コンポジションルートとして働く。
 //
 // flag 定義・入力検証・stderr へのエラー描画・exit code の契約を持つ。
-// 最外層として Analyzer 起動コマンドの解決 (adr/0003-analyzer-command-resolution.md)、
+// 最外層として Analyzer 起動コマンドの解決、
 // protocol の ACL adapter を analyze use case の port へ配線すること、
 // 探索結果を output package で描画することも担う。
 //

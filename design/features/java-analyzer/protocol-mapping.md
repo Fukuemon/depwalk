@@ -11,7 +11,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io
-verified_commit: 6292e9a
+verified_commit: 4cae142
 ---
 
 # Java Analyzer: Protocol への写像
@@ -136,6 +136,16 @@ DI 解決を行わない経路では、interface / 抽象メソッド呼び出�
 
 edge の重複判定は caller / callee / call site から生成する既存 `edgeId` 単位で行う。同一 edge を複数解析器が報告した場合は edge を 1 件に統合し、`provenance` を和集合にする。
 
+### 暗黙呼び出しの標識
+
+framework 由来の暗黙呼び出し ([analysis.md](analysis.md) の解決規則) は次の opaque metadata で標識する。Protocol schema は変更しない (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。
+
+| key                     | 載る record             | 型       | 意味                                                                                         |
+| ----------------------- | ----------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `entryPoint`            | `methodSymbol.metadata` | string[] | framework entry point として検出したアノテーションの FQN (重複なし・辞書順)。edge は作らない |
+| `viaCallableInvocation` | `callEdge.metadata`     | boolean  | functional interface の invocation site から callable 実体へ張った edge。`true` のみ設定     |
+| `provenance` の値追加   | `callEdge.metadata`     | string[] | イベント edge は `spring-event` を積む (既存の `sootup` / `spring-di` と同列)                |
+
 ## metadata 契約
 
 `--analyzer-meta key=value` の合成規則 (Core が metadata の JSON を組み立てる規則):
@@ -148,13 +158,14 @@ edge の重複判定は caller / callee / call site から生成する既存 `ed
 
 Java 固有の `metadata` key:
 
-| key                       | 型          | 必須/任意                                                                               | 意味                                                                                                                                                                                                                                |
-| ------------------------- | ----------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `classpath`               | string 配列 | 明示 `sourceRoots` 時は **必須** (空配列可)。自動 discovery 時は任意の共通 extra        | 依存 jar / classes dir の path。自動 discovery では model の compile classpath / classes output を使用する                                                                                                                          |
-| `javaLanguageLevel`       | string 配列 | 明示 `sourceRoots` 時は **必須** (要素 1)。自動 discovery 時は指定禁止                  | parser に渡す canonical source language level。Analyzer / daemon JVM から推測しない                                                                                                                                                 |
-| `javaPreview`             | string 配列 | 明示 `sourceRoots` 時のみ任意 (要素 1 の `true` / `false`)。自動 discovery 時は指定禁止 | preview 構文の有効化。parser が対応する language level のみ許可                                                                                                                                                                     |
-| `liftExcludePackages`     | string 配列 | 任意                                                                                    | 引き上げ除外 package (帰属型決定規則)。指定時は既定値 (`java` / `javax` / `jakarta`) を置き換える。segment 単位 prefix 一致                                                                                                         |
-| `allowIncompleteAnalysis` | string 配列 | 任意 (要素 1 の `true` / `false`、既定 `false`)                                         | `true` のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、解決済み graph (edge / 明示除外) と診断を公開する。完全性 gate 自体・診断の可視性・`silentOmission == 0` は変更しない (詳細は完全性 gate の節) |
+| key                       | 型          | 必須/任意                                                                                                                                                                                                     | 意味                                                                                                                                                                                                                                                    |
+| ------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `classpath`               | string 配列 | 明示 `sourceRoots` 時は **必須** (空配列可)。自動 discovery 時は任意の共通 extra                                                                                                                              | 依存 jar / classes dir の path。自動 discovery では model の compile classpath / classes output を使用する                                                                                                                                              |
+| `javaLanguageLevel`       | string 配列 | 明示 `sourceRoots` 時は **必須** (要素 1)。自動 discovery 時は指定禁止                                                                                                                                        | parser に渡す canonical source language level。Analyzer / daemon JVM から推測しない                                                                                                                                                                     |
+| `javaPreview`             | string 配列 | 明示 `sourceRoots` 時のみ任意 (要素 1 の `true` / `false`)。自動 discovery 時は指定禁止                                                                                                                       | preview 構文の有効化。parser が対応する language level のみ許可                                                                                                                                                                                         |
+| `liftExcludePackages`     | string 配列 | 任意                                                                                                                                                                                                          | 引き上げ除外 package (帰属型決定規則)。指定時は既定値 (`java` / `javax` / `jakarta`) を置き換える。segment 単位 prefix 一致                                                                                                                             |
+| `allowIncompleteAnalysis` | string 配列 | 任意 (要素 1 の `true` / `false`、既定 `false`)                                                                                                                                                               | `true` のとき、全救済後も残る primary diagnostic があっても request を fatal にせず、解決済み graph (edge / 明示除外) と診断を公開する。完全性 gate 自体・診断の可視性・`silentOmission == 0` は変更しない (詳細は完全性 gate の節)                     |
+| `gradleJavaHome`          | string 配列 | 自動 discovery 時のみ任意 (要素 1 の path)。明示 `sourceRoots` 時は使用しない。要素数違反・空値・非実在、または `bin/java` (Windows は `bin/java.exe`) が実行可能でない path は `JAVA_INVALID_REQUEST` で拒否 | 自動 discovery の Gradle daemon JVM を明示指定する。daemon JVM が対象 Gradle の互換範囲外になる場合の回避手段 (規則は [discovery.md](discovery.md)、判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md)) |
 
 未知 key は protocol の規則どおり無視する。Core は本表を知らない (Analyzer 側のみが解釈する)。
 
@@ -173,6 +184,8 @@ Java 固有の `metadata` key:
 | `JAVA_AMBIGUOUS_CANDIDATE`  | `warning` | `@Qualifier` / `@Primary` 適用後も候補が複数残る                                                                                                                                          |
 | `JAVA_CONDITIONAL_BEAN`     | `info`    | 条件付き Bean を評価せず候補として保持する                                                                                                                                                |
 | `JAVA_SOURCE_ROOT_EXCLUDED` | `warning` | 未作成のdiscovery source directory、external included buildのproject、またはcomposite / included buildを除外した                                                                          |
+| `JAVA_EVENT_UNRESOLVED`     | `warning` | `publishEvent()` の引数型が静的に解決できず、イベント edge を張れない                                                                                                                     |
+| `JAVA_CALLABLE_UNRESOLVED`  | `info`    | callable が静的追跡範囲 (同一メソッド内 / 引数渡し 1 段) の外にあり、invocation edge を張れない。設計上の制約による対象外を表す                                                           |
 
 `error` (fatal / 非ゼロ exit):
 

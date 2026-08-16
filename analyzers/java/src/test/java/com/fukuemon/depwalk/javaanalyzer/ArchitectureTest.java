@@ -5,12 +5,13 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * 外部ライブラリ隔離 (ADR-0007 / DesignDoc_java-analyzer.md 「内部 package 構成と依存境界」) の機械検査。
+ * 外部ライブラリの隔離境界の機械検査。
  *
  * <p>隔離は 3 段階で、適用レベルはライブラリごとに異なる。SootUp は adapter package へ完全封じ込め、
  * Gradle Tooling API は discovery へ完全隔離、JavaParser / SymbolSolver は解析エンジンの中核として
@@ -19,6 +20,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * <p>ArchUnit の JUnit5 TestEngine ではなく core API を Jupiter の {@code @Test} から呼ぶ。
  * 本 project は JUnit Platform 6 系を使うため、engine のバージョン整合を持ち込まない。
  */
+@DisplayName("外部ライブラリの隔離境界 (ADR-0007) の機械検査")
 class ArchitectureTest {
 
     private static final String ROOT_PACKAGE = "com.fukuemon.depwalk.javaanalyzer";
@@ -28,6 +30,7 @@ class ArchitectureTest {
             .importPackages(ROOT_PACKAGE);
 
     @Test
+    @DisplayName("analysis/sootup package の外のクラスは、SootUp のクラスに依存しないままになる")
     void sootUpIsConfinedToTheSootUpAdapterPackage() {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("..javaanalyzer.analysis.sootup..")
@@ -38,6 +41,7 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("discovery package の外のクラスは、org.gradle 配下のクラスに依存しないままになる")
     void gradleApiIsConfinedToDiscovery() {
         // gradle-tooling-api の jar は org.gradle.tooling 以外に org.gradle.api / util /
         // internal も同梱するため、tooling 配下だけでなく org.gradle 全体を禁止する。
@@ -50,6 +54,7 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("analysis package の外のクラスは、JavaParser / SymbolSolver のクラスに依存しないままになる")
     void javaParserDoesNotLeakOutsideAnalysis() {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("..javaanalyzer.analysis..")

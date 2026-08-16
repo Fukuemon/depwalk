@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
 
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -24,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Gradle discovery compatibility matrix (context/toolchain.md の CI anchor)。
+ * Gradle discovery compatibility matrix の検証。
  * 同一 custom model fixture を固定 anchor (target Gradle × daemon JDK) で実行し、
  * provider load、model fields、task 非実行、output 隔離を検証する。
  * Analyzer client は全 run で現行 test JVM (JDK 25) に固定される。
@@ -34,32 +35,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 未解決の anchor は skip 成功にせず fail する。
  */
 @Tag("gradle-compat")
+@DisplayName("固定 anchor (Gradle × daemon JDK) での Gradle discovery の互換性検証")
 class GradleCompatibilityMatrixTest {
 
-    @ParameterizedTest(name = "Gradle {0} / daemon JDK {1}")
+    @DisplayName("どの anchor (Gradle × daemon JDK) で実行しても、同一 fixture の model の主要 field (project 数・source root・言語レベル・project 依存) が一致し、build 出力は現れず、stderr は depwalk prefix の行だけで discovery 終了行を含む")
+    @ParameterizedTest(name = "Gradle {0} / daemon JDK {1} (gradleJavaHome={2})")
     @CsvSource({
-            "7.6.5, 8",
-            "8.14.5, 17",
-            "9.6.1, 25",
+            // 7.6.5 anchor は request metadata 相当の gradleJavaHome 経路で daemon JVM を
+            // 固定し、override が gradle.properties と等価に機能することを検証する。
+            "7.6.5, 8, true",
+            "8.14.5, 17, false",
+            "9.6.1, 25, false",
     })
-    void discoversTheSameModelOnEachAnchor(String gradleVersion, int daemonJavaMajor) throws Exception {
+    void discoversTheSameModelOnEachAnchor(
+            String gradleVersion, int daemonJavaMajor, boolean viaGradleJavaHome) throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk" + daemonJavaMajor);
         assertNotNull(jdkHome, "daemon JDK " + daemonJavaMajor
                 + " was not provisioned; run via ./gradlew gradleCompatibilityTest");
 
-        // fixture を一時 copy し、daemon JVM を gradle.properties で固定する。
+        // fixture を一時 copy し、daemon JVM を gradle.properties または
+        // gradleJavaHome override で固定する。
         Path source = Path.of("..", "..", "testdata", "fixtures", "java", "multi-module-spring-project")
                 .toAbsolutePath().normalize();
         Path workspace = Files.createTempDirectory("depwalk-matrix-" + gradleVersion + "-").toRealPath();
         try {
             copyFixture(source, workspace);
-            Files.writeString(workspace.resolve("gradle.properties"),
-                    "org.gradle.java.home=" + jdkHome + "\n");
+            GradleToolingClient client;
+            if (viaGradleJavaHome) {
+                client = new GradleToolingClient(gradleVersion, Path.of(jdkHome));
+            } else {
+                Files.writeString(workspace.resolve("gradle.properties"),
+                        "org.gradle.java.home=" + jdkHome + "\n");
+                client = new GradleToolingClient(gradleVersion);
+            }
 
             ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
             PrintStream stderr = new PrintStream(stderrBuffer, true, StandardCharsets.UTF_8);
-            GradleModelDiscovery discovery =
-                    new GradleModelDiscovery(new GradleToolingClient(gradleVersion), stderr);
+            GradleModelDiscovery discovery = new GradleModelDiscovery(client, stderr);
 
             DepwalkGradleModel model = discovery.discover(workspace);
 
@@ -99,6 +111,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("実 daemon でサポート外の Gradle version を使うとき、安定した理由 (unsupported-gradle-version) と明示 override の案内付きで失敗する")
     void unsupportedGradleVersionFailsWithStableReasonOnRealDaemon() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         org.junit.jupiter.api.Assertions.assertNotNull(jdkHome,
@@ -127,6 +140,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("included build を含む workspace のとき、その project は model に含めず、root directory だけが警告用に報告される")
     void reportsIncludedBuildRootsForExclusionWarnings() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");
@@ -164,6 +178,7 @@ class GradleCompatibilityMatrixTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("sourceCompatibility が旧表記 \"1.8\" の project のとき、言語レベルは正規の major 表記 \"8\" へ正規化される")
     void normalizesLegacySourceCompatibilityToCanonicalMajor() throws Exception {
         String jdkHome = System.getProperty("depwalk.matrix.jdk17");
         assertNotNull(jdkHome, "daemon JDK 17 was not provisioned; run via ./gradlew gradleCompatibilityTest");

@@ -14,9 +14,7 @@ import java.util.Map;
 /**
  * scope 内 source root の {@link JavaParserTypeSolver} を包み、source 解決した
  * class 宣言へ同一 context の classes output にしかない callable member を
- * 解決時に合成する。本クラスの契約の正本は java-analyzer feature doc
- * 「solver 層の bytecode member 合成」(context の対応づけは「Source root discovery と解析 context」、
- * 帰属規則は「Parse・resolution・call 完全性」)。
+ * 解決時に合成する。
  * source 宣言と帰属規則は変更せず、source AST に無い member の解決だけを bytecode で補う。
  * 合成は {@link AugmentedJavaParserClassDeclaration#solveMethod} の fallback で
  * 行い、source で解決できる member には一切影響しない。

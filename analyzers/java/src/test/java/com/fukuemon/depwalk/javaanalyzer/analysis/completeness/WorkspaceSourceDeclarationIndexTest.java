@@ -4,6 +4,7 @@ import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,12 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("workspace 全体の source 型宣言 index による重複宣言の検出")
 class WorkspaceSourceDeclarationIndexTest {
 
     @TempDir
     Path workspace;
 
     @Test
+    @DisplayName("配置 path が異なっても package 宣言から得た binary name が同じ 2 file が別 context にあるとき、致命的エラー (JAVA_INVALID_SOURCE_ROOTS) として拒否する")
     void rejectsCrossContextDuplicatesByParsedBinaryName() throws Exception {
         // 配置 (root 相対 path) は異なるが package 宣言が同じ 2 file。
         // ContextScope の path 近似では検出できず、実 binary name で検出する。
@@ -36,6 +39,7 @@ class WorkspaceSourceDeclarationIndexTest {
     }
 
     @Test
+    @DisplayName("同じ context 内で同じ宣言を重ねて登録した場合でも、最初の登録が保持される")
     void keepsTheFirstDeclarationWithinTheSameContext() throws Exception {
         CompilationUnit first = parse(write("src/main/java/com/example/Same.java",
                 "package com.example; public class Same {}"));

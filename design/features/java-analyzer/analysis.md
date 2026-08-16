@@ -10,7 +10,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: 6292e9a
+verified_commit: 4cae142
 ---
 
 # Java Analyzer: 解析エンジン
@@ -57,6 +57,31 @@ scope 内 source 型を solver が解決するとき、同一 context の classe
 
 合成・救済の選択境界: 型名 scope の static call は instance member を合成・救済せず、未解決として完全性 gate に残す (偽 edge 防止)。member 候補は、owner class の classfile が project 所有の classes output に存在する場合だけ採用する。対象は自 context と、**model の project 依存関係で到達可能な依存 project の output** である。
 
+### AST への member 注入
+
+solver 経由の合成は、TypeSolver を通らない解決経路には効かない。効かないのは次の 2 つである。
+
+- 同一 compilation unit 内の参照 (自 class の getter を `this` / 暗黙 scope で呼ぶ、同一 file の local 変数 receiver、switch selector)
+- solver 内部で parse した AST から直接作られる宣言
+
+実環境の未解決の支配形状は「entity 自身のメソッド内から自 class の生成 getter を呼ぶ」形だった。そこで、生成 member の宣言そのものを parse 後の AST へ注入して補う。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) とする。注入先は、解析対象の parse 結果と solver 内部の parse 結果の両方である。
+
+注入の対象と除外:
+
+- 対象は class 宣言と enum 宣言。interface は生成 member が付かず、record は accessor が言語仕様で暗黙宣言されるため対象外
+- 言語仕様が暗黙に宣言する member は注入しない (enum の values / valueOf、javac の暗黙 default constructor と同じ形のもの)
+- class には bytecode-only constructor (@AllArgsConstructor 等) も注入する。ただし同 arity の source 宣言が無い一意なものだけ
+- 同名・同 arity が bytecode 上に複数ある member は、曖昧なので注入しない (合成と同じ一意性規則)
+- source に書けない匿名・local class 名 (`$` + 数字) が owner か member の型に現れる場合は注入しない
+- 注入時に型解決は行わない (solver への再入を防ぐ)。型は classfile の descriptor / Signature の名前をそのまま書き下す
+
+注入した宣言は「解決のための標識」であり、source 宣言としては扱わない:
+
+- caller として walk しない。呼び出された場合は bytecode-only member と同じ出力契約 (定義位置省略 + owner metadata + calleeOrigin) で emit する
+- owner の型が scope (include/exclude 適用後) の外なら external-target として除外する (fatal にしない)
+- field initializer の caller 帰属 (帰属先 constructor の集合) は注入前の source 宣言で数え、注入で変えない
+- walk する AST の first-pass 索引 (inventory / 宣言索引 / entry point / event listener / callable / source method / Spring DI) は、いずれも注入前の AST で作る。ただし索引が行う型解決は solver 内部の注入済み AST を参照しうるため、「注入の影響が first pass に一切現れない」ことまでは保証しない
+
 external artifact だけに存在する同名 class の member は、project bytecode として救済しない (「solver 層の bytecode member 合成」節の origin 検証)。依存 project output は classpath の形 (Gradle model は依存 project を jar として返すことがある) に依存せず model の依存関係から解決する。SootUp の入力は project 所有 output を external jar より先に登録し、同名 class は project bytecode を優先する。
 
 cross-module 救済: 依存 context の source 型が持つ生成 member (Lombok constructor / getter 等) の cross-module 呼び出しも救済の対象とする。採用境界は依存 project の output を含む。
@@ -69,7 +94,7 @@ Spring ApplicationContext は起動せず、次の静的規則だけを実装す
 2. 注入点に直接の `@Qualifier("value")` がある場合は、Bean 側の qualifier value、Bean 名、alias のいずれかが `value` と一致する候補だけを残す。custom qualifier meta-annotation、generics qualifier、`@Resource` は対象外とする。
 3. 残った候補が 1 件なら `unique` とする。ただし条件アノテーション付き候補は `ambiguous` とする。
 4. 候補が複数件なら、条件アノテーションがない `@Primary` 候補がちょうど 1 件の場合だけその候補を `unique` とする。唯一の `@Primary` が条件付きの場合は、条件が偽のときに他候補が選ばれる可能性を残すため、全候補を保持して `ambiguous` とする。`@Primary` が 0 件または複数件の場合も全候補を保持して `ambiguous` とする。
-5. 候補が 0 件なら unresolved とする。既知の runtime-provided マーカーに該当する場合だけ理由を `runtime-provided` に置き換える。
+5. 候補が 0 件なら unresolved とする。既知の runtime-provided マーカーに該当する場合だけ理由を `runtime-provided` に置き換える。代入可能性の判定に使う ancestor 収集は best-effort とし、解決できない ancestor があっても解決済みの ancestor を捨てない (1 つの未解決 external 基底で workspace interface への代入可能性が失われないようにする。判断の正本は ADR-0012)。
 
 Bean 名は次の規則で導出する。
 
@@ -110,3 +135,83 @@ receiver 型が取得できない call は、次の順で分類を試みてか�
 3. **lambda parameter 規則**: receiver が lambda parameter の場合、lambda が代入される変数の宣言型 (= functional interface 型そのもの) が scope 外なら `external-target` へ分類する。lambda を直接 method 引数に渡す形 (unqualified static import 経由を含む) は external 判定の根拠にしない — 受け手 method の receiver 型や static import 元の class は、lambda parameter が実際に instantiate される型と独立した情報であり、external でも in-scope 型の parameter を取り得るため diagnostic に残す。
 
 SAM arity を推論できない method reference は救済しない。候補列挙は owner classfile の宣言 member に限られ継承 overload を検証できないため、宣言上の名前一意を参照先の一意の根拠にできない (diagnostic に残す保守側)。
+
+### 型伝播救済層
+
+上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して既存 bytecode 救済へ接続する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
+
+1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
+2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する
+3. **lambda parameter の functional interface 型引数**: lambda parameter の型を、lambda が渡された先の receiver の要素型 (手段 2 で復元した型引数) から導出する
+
+手段 2 の固定表の適用範囲:
+
+- `Collectors.toMap` と 1 引数 `groupingBy` の結果 Map、bound method reference の適用を含む
+- Map の意味論は明示列挙した JDK の Map 型に限って適用する (名前 pattern では判定しない。列挙に無い型は導出しないだけで、誤導出はしない)
+- downstream collector 付き `groupingBy` の値型は導出しない (値型が downstream に依存し、固定表では確定できないため)
+- project bytecode に無い型への unbound method reference は導出しない
+- `java.lang.Object` は owner の根拠にしない。型変数・raw・欠落の erasure と見分けが付かないため、既存の前進解決と同じ規則で打ち切る
+
+JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う。解決済みの erasure と導出の erasure が食い違う場合は、解決結果を正とする。
+
+SAM arity も functional interface の bytecode から導出する (例: `java.util.function.Function#apply` = arity 1)。これにより arity 推論失敗による救済スキップを減らすが、「宣言上の名前一意を根拠にする救済はしない」保守側の原則は変更しない。
+
+適用順序: 本救済層は「呼び出し元の型が分からないとき」の既存規則群と同じ分類段階に統合する。各手段の位置づけは次のとおり。
+
+- 手段 2 (chain link の generic signature) は、既存規則 1 (chain の前進解決) の適用拡大
+- 手段 3 (lambda parameter の型引数) は、既存規則 3 (lambda parameter 規則) の前段の型導出
+
+順序は「手段 1 (local 宣言・初期化子) → 規則 1 + 手段 2 → 手段 3 → 規則 2 (起点遡及の external 判定) → 規則 3 → diagnostic」とする。導出できた型は既存 bytecode 救済 / external 分類にそのまま渡す。
+
+## framework 由来の暗黙呼び出しの解決
+
+framework が実行時に起動する呼び出しを、ソース上の根拠 (アノテーション / 型 / AST) を伴う範囲で解決する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。解決不能は diagnostic に残し、`silentOmission == 0` を維持する。
+
+### entry point 分類
+
+対象アノテーションを付与されたメソッドを framework entry point として分類し、`methodSymbol.metadata.entryPoint` (検出アノテーション FQN の配列) で標識する。entry point の意味は「framework が直接起動し得るメソッド」であり、caller edge の有無とは独立している。例えば `@EventListener` メソッドはイベント edge で caller edge を持ち得るが、framework 起動でもあるため標識する。edge は作らず、caller 探索の終端根拠のみ付与する (擬似 caller node を合成しない)。対象集合は次の FQN を既知集合として明示列挙する。
+
+- ライフサイクル: `org.springframework.scheduling.annotation.Scheduled` / `javax.annotation.PostConstruct` / `jakarta.annotation.PostConstruct` / `javax.annotation.PreDestroy` / `jakarta.annotation.PreDestroy`
+- イベント: `org.springframework.context.event.EventListener` / `org.springframework.transaction.event.TransactionalEventListener`
+- Web (すべて `org.springframework.web.bind.annotation` 配下): `RequestMapping` + Spring 提供 composed (`GetMapping` / `PostMapping` / `PutMapping` / `DeleteMapping` / `PatchMapping`) / `ExceptionHandler` / `ModelAttribute`
+
+利用者定義の合成アノテーション (meta-annotation) は 1 段だけ辿って検出する。次はいずれも検出対象外とし、診断も出さない (制約)。
+
+- 2 段以上の入れ子
+- 型 level の mapping アノテーション (メソッド level のみ対象)
+- nested・local に宣言された合成アノテーション
+- 合成アノテーションの利用側 FQN が、型解決・import 復元のいずれでも得られない場合
+
+### イベント edge
+
+起点は `publishEvent` 呼び出しの call site とする。対象は、receiver の静的型が `org.springframework.context.ApplicationEventPublisher` またはその subtype (`ApplicationContext` 等) の場合とする。receiver 省略の暗黙 this は、囲み型が subtype のときに含める。この call site から、引数の静的型とその型階層に合致する `@EventListener` / `@TransactionalEventListener` メソッドへの edge を生成する。caller は call site の囲みメソッドとし、`provenance` には `spring-event` を積む。
+
+確度は broadcast 意味論 (合致 listener が全て実行される) を前提に決める。無条件 listener への edge は、複数でも各々確定 (`resolution: unique`) とする。次の場合は `ambiguous` に落とす。
+
+- 条件アノテーション付きの listener (既存規則の `conditional` / `conditionTypes` で表す)
+- generics を使ったイベント型の突合で過剰一致しうる listener (型変数・型引数付き parameter)。突合は raw type 一致で近似するため (制約)
+- listener annotation の `condition` (SpEL) 属性を持つ listener と、`@TransactionalEventListener` の transaction phase 依存。実行時条件として扱い `conditional: true` + `conditionTypes` を付ける (broadcast の確定性が成立しないため)
+
+突合対象の listener は、candidate 再対応付けと同じく publisher context から Gradle 依存で到達可能な context に限る。対象は単一引数のメソッド形式のみとし、`classes` 属性・引数 0 の形式は対象外とする (制約、診断なし)。
+
+### callable invocation
+
+functional interface の invocation site から、渡された callable の実体への edge を生成する。method reference は参照先メソッドへ、lambda は定義側の囲みメソッドへ張り、`viaCallableInvocation: true` で通常呼び出しと区別する。lambda 本体は独立 node にしない既存決定を維持する。囲みメソッドへの edge は「invoker はそのメソッド内で定義されたコードを実行する」の意味である。
+
+静的追跡範囲は次の 2 つに限定する。
+
+- 同一メソッド内の local 変数経由 (lambda / method reference を直接 initializer に持ち、再代入がない場合のみ)
+- workspace メソッドの functional interface parameter への引数渡し 1 段
+
+invocation の対象は、receiver が単純名 (parameter / local) の SAM 呼び出しに限る。functional interface は抽象メソッドがちょうど 1 個の interface とし、chain 途中の receiver は対象外とする。callee は到達可能 context の workspace メソッドに限る (external への method reference は張らない)。
+
+次はいずれも対象外とする。
+
+- constructor を実体とする callable (constructor reference / constructor 内 lambda)
+- interface / 抽象宣言越しに渡された callable。写像は静的な宣言メソッド単位で行うため、実装メソッド内の invocation と突合しない
+- 可変長引数位置へ渡した callable と、constructor 引数 (`new X(...)`) 経由の受け渡し
+- field 経由・多段の受け渡し (diagnostic に残す)
+
+追跡できなかった SAM invocation は、経路 (field / 写像なし / 追跡不能 local) によらず `JAVA_CALLABLE_UNRESOLVED` (info、advisory) で観測可能にする。複数 call site から異なる callable が渡る場合は、各 callable への edge を invocation site を根拠 (callSite) として全列挙する。同一メソッド内 local の lambda では caller = callee の self edge になる (`viaCallableInvocation` 標識で通常の再帰と識別できる)。
+
+invocation site が外部ライブラリ内にあるケース (`stream.map(...)` 等) は、workspace 内に call site が存在しないため outcome ledger の対象外であり、診断も出さない。silent omission には該当しない (lambda 本体内の呼び出し自体は、既存の `viaLambda` 帰属で edge 化済み)。

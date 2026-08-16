@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.context;
 
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.MemberAugmentingTypeSolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.ProjectBytecodeMemberIndex;
 
@@ -20,7 +21,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * 型解決 (design/features/java-analyzer/DesignDoc_java-analyzer.md 「型解決」) の 4 種類の TypeSolver
+ * 型解決の 4 種類の TypeSolver
  * ({@link ReflectionTypeSolver} / source root ごとの {@link JavaParserTypeSolver} / jar ごとの
  * {@link JarTypeSolver} / classes directory 用の {@link ClassLoaderTypeSolver}) を構成する。
  * classpath は解析開始前に検証済みであり、jar / classes dir の存在・読み取り可否はここでは再検査
@@ -36,11 +37,9 @@ public final class TypeSolverFactory {
     }
 
     /**
-     * 複数 source root と classpath entry から、bytecode member 合成付きの合成 TypeSolver を生成する
-     * (feature doc「solver 層の bytecode member 合成」)。
+     * 複数 source root と classpath entry から、bytecode member 合成付きの合成 TypeSolver を生成する。
      * source root は classpath (project classes output を含む) より先に登録し、
-     * source 宣言を bytecode より優先する
-     * (java-analyzer feature doc「Source root discovery と解析 context」)。
+     * source 宣言を bytecode より優先する。
      * {@code bytecodeIndex} が非 null のとき、source root の解決結果の class 宣言へ
      * 同一 context classes output の bytecode-only member を fallback 合成する。
      *
@@ -48,6 +47,9 @@ public final class TypeSolverFactory {
      * @param classpathEntries 検証済み jar / classes dir
      * @param languageLevel 内部 parser の language level (メインパーサと一致させる)
      * @param bytecodeIndex bytecode-only member の fallback 合成に使う索引 (不要なら null)
+     * @param memberInjector solver 内部 parser の parse 結果へ bytecode-only member を
+     *     注入する injector (不要なら null)。walk 対象 AST への注入と同一 instance を
+     *     渡し、注入の生成点を呼び出し側 1 箇所に保つ
      * @return 合成 TypeSolver
      * @throws IOException jar / classes dir の読み込みに失敗した場合
      */
@@ -55,11 +57,18 @@ public final class TypeSolverFactory {
             List<Path> sourceRoots,
             List<Path> classpathEntries,
             ParserConfiguration.LanguageLevel languageLevel,
-            ProjectBytecodeMemberIndex bytecodeIndex)
+            ProjectBytecodeMemberIndex bytecodeIndex,
+            BytecodeMemberAstInjector memberInjector)
             throws IOException {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration typeSolverConfig = new ParserConfiguration().setLanguageLevel(languageLevel);
+        if (memberInjector != null) {
+            // solver 内部で parse した AST から直接構築される宣言 (同一 unit 内参照や
+            // method reference 先) は下の augmenting solver を通らないため、solver が
+            // parse する全 unit へも member を注入する。
+            memberInjector.installInto(typeSolverConfig);
+        }
         for (Path root : sourceRoots) {
             JavaParserTypeSolver sourceSolver = new JavaParserTypeSolver(root, typeSolverConfig);
             typeSolver.add(bytecodeIndex != null
@@ -70,7 +79,7 @@ public final class TypeSolverFactory {
         // record の canonical constructor 解決 (JavaParserRecordDeclaration) は
         // solver 内部 CU の Parameter#resolve() を呼ぶため、resolver 不在だと
         // "Symbol resolution not configured" の IllegalStateException になる
-        // (#24 実プロジェクト検証で検出)。config は parse 時に参照されるため
+        // (実プロジェクト検証で検出)。config は parse 時に参照されるため
         // 循環参照でも post-hoc 設定で機能する。
         typeSolverConfig.setSymbolResolver(new JavaSymbolSolver(typeSolver));
         List<Path> entries = classpathEntries.stream()

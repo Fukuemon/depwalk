@@ -1,6 +1,7 @@
 package com.fukuemon.depwalk.javaanalyzer.io;
 
 import com.fukuemon.depwalk.javaanalyzer.protocol.AnalysisRequest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -12,11 +13,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("stdin から読む analysisRequest の解釈の契約")
 class RequestReaderTest {
 
     private final RequestReader reader = new RequestReader(ProtocolObjectMapper.create());
 
     @Test
+    @DisplayName("妥当な analysisRequest JSON を読むとき、各フィールドがそのまま取り出される")
     void readsValidAnalysisRequest() throws IOException {
         String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -34,6 +37,7 @@ class RequestReaderTest {
     }
 
     @Test
+    @DisplayName("sourceRoots を読むとき、記載どおりの順序が保たれる")
     void readsSourceRootsPreservingOrder() throws IOException {
         String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -49,6 +53,7 @@ class RequestReaderTest {
     }
 
     @Test
+    @DisplayName("sourceRoots が省略されているとき、空 list へ補完せずに null のままになる")
     void leavesOmittedSourceRootsNull() throws IOException {
         String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
@@ -60,6 +65,7 @@ class RequestReaderTest {
     }
 
     @Test
+    @DisplayName("JSON として壊れた入力のとき、IOException として失敗する")
     void throwsOnMalformedJson() {
         String malformed = "{\"schemaVersion\":\"1\", this is not valid json";
 
@@ -67,11 +73,13 @@ class RequestReaderTest {
     }
 
     @Test
+    @DisplayName("stdin が空のとき、IOException として失敗する")
     void throwsOnEmptyStdin() {
         assertThrows(IOException.class, () -> reader.read(inputStream("")));
     }
 
     @Test
+    @DisplayName("未知のフィールドが含まれる場合でも、失敗せずに既知のフィールドだけが読み取られる")
     void ignoresUnknownFields() throws IOException {
         String json = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","

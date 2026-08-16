@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -12,11 +13,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * ステップ 1: 3 TypeSolver 構成での型解決 + AST 逐次走査の疎通確認。
  */
+@DisplayName("型解決と AST 走査の基本的な疎通")
 class BasicAnalysisTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/basic");
 
     @Test
+    @DisplayName("scope 内の 2 つの class 間の単純な呼び出しを解決し、宣言メソッド・暗黙の constructor・呼び出し関係 (edge) をすべて出力する")
     void resolvesSimpleCallBetweenTwoScopeInternalClasses() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);

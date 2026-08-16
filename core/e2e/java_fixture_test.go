@@ -60,12 +60,11 @@ func fixtureRoot(t *testing.T) string {
 	return root
 }
 
-// findJava25 locates a JDK 25 java executable, first under the Gradle
-// toolchain provisioning directory (~/.gradle/jdks, where
-// analyzers/java's Gradle build auto-provisions JDK 25 even though the
-// system java may be older), then on PATH. It skips the test when none is
-// found so a plain `go test ./...` does not fail in environments without
-// JDK 25 が無い環境 (Go だけの CI job など)。
+// findJava25 は JDK 25 の java 実行ファイルを探す。まず Gradle の toolchain
+// 提供ディレクトリ (~/.gradle/jdks。system の java が古くても analyzers/java の
+// build が JDK 25 を自動取得する場所)、次に PATH を見る。見つからなければ
+// テストを skip し、JDK 25 が無い環境 (Go だけの CI job など) でも素の
+// `go test ./...` が失敗しないようにする。
 func findJava25(t *testing.T) string {
 	t.Helper()
 
@@ -93,8 +92,8 @@ func findJava25(t *testing.T) string {
 	return ""
 }
 
-// javaVersionPattern extracts the major version number from `java -version`
-// output, e.g. `openjdk version "25"` or `openjdk version "25.0.1" 2025-...`.
+// javaVersionPattern は `java -version` の出力 (例: `openjdk version "25"` /
+// `openjdk version "25.0.1" 2025-...`) から major version 番号を取り出す。
 // "." または閉じ引用符の手前の数字に一致させる。`version "25` の部分文字列
 // 一致より、ベンダーや書式の違いに強い。部分文字列だと接頭辞が変わるだけで
 // 壊れ、25 と 250 も区別できない。
@@ -122,10 +121,10 @@ func javaMajorVersion(out string) int {
 	return major
 }
 
-// findAnalyzerJar locates the Java Analyzer fat jar built by `cd
-// analyzers/java && ./gradlew shadowJar`. It skips the test when the jar is
-// missing rather than building it itself: producing the jar is an explicit
-// Gradle build の前提であり、Go のテストの暗黙の副作用にしてはならない。
+// findAnalyzerJar は `cd analyzers/java && ./gradlew shadowJar` で作られる
+// Java Analyzer の fat jar を探す。jar が無ければ自分で build せずテストを
+// skip する。jar の生成は明示的な Gradle build の前提であり、Go のテストの
+// 暗黙の副作用にしてはならない。
 func findAnalyzerJar(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "analyzers", "java", "build", "libs", "java-analyzer.jar"))

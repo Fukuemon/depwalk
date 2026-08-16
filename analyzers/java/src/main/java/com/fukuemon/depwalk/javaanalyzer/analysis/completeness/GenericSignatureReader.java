@@ -1,4 +1,4 @@
-package com.fukuemon.depwalk.javaanalyzer.analysis.augment;
+package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -21,8 +21,7 @@ import java.util.Optional;
 
 /**
  * project classes output の class file から method の generic Signature 属性を
- * 読み取り、合成 member の実型引数を復元する
- * (java-analyzer feature doc「solver 層の bytecode member 合成」)。読み取りは
+ * 読み取り、合成 member の実型引数を復元する。読み取りは
  * class 単位で lazy に行い、失敗した class は「generic 情報なし」として扱う
  * (erasure へ degrade し、解析を失敗させない)。
  */
@@ -36,16 +35,24 @@ public final class GenericSignatureReader {
      * @param typeArguments 実型引数 (raw なら空)
      * @param arrayDims 配列次元
      * @param typeVariable 型変数かどうか
+     * @param wildcard 型引数として現れた wildcard (`?` / `? extends X` / `? super X`) かどうか。
+     *     境界の型だけを見ると変位を失い、`List&lt;? super Foo&gt;` を `List&lt;Foo&gt;` と誤読するため、
+     *     利用側が安全側へ倒せるように印だけ残す
      */
     public record BytecodeType(
-            String binaryName, List<BytecodeType> typeArguments, int arrayDims, boolean typeVariable) {
+            String binaryName, List<BytecodeType> typeArguments, int arrayDims, boolean typeVariable,
+            boolean wildcard) {
 
         static BytecodeType reference(String binaryName, List<BytecodeType> args, int dims) {
-            return new BytecodeType(binaryName, List.copyOf(args), dims, false);
+            return new BytecodeType(binaryName, List.copyOf(args), dims, false, false);
         }
 
         static BytecodeType variable(String name) {
-            return new BytecodeType(name, List.of(), 0, true);
+            return new BytecodeType(name, List.of(), 0, true, false);
+        }
+
+        BytecodeType asWildcard() {
+            return new BytecodeType(binaryName, typeArguments, arrayDims, typeVariable, true);
         }
     }
 
@@ -175,14 +182,22 @@ public final class GenericSignatureReader {
 
         @Override
         public void visitTypeArgument() {
-            // unbounded wildcard (?): erasure と同じく Object へ写像する。
-            argumentSources.add(() -> BytecodeType.reference("java.lang.Object", List.of(), 0));
+            // unbounded wildcard (?): 境界が無いので Object 相当。変位を持つので印を付ける。
+            argumentSources.add(() -> BytecodeType.reference("java.lang.Object", List.of(), 0).asWildcard());
         }
 
         @Override
         public SignatureVisitor visitTypeArgument(char wildcard) {
             TypeBuilder argument = new TypeBuilder();
-            argumentSources.add(argument::build);
+            if (wildcard == SignatureVisitor.INSTANCEOF) {
+                argumentSources.add(argument::build);
+            } else {
+                // `? extends X` / `? super X` は境界 X だけを残すと変位が消える。
+                argumentSources.add(() -> {
+                    BytecodeType built = argument.build();
+                    return built == null ? null : built.asWildcard();
+                });
+            }
             return argument;
         }
 

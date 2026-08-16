@@ -31,7 +31,7 @@ import java.util.Map;
 
 /**
  * Java Analyzer process の entry point。
- * process contract (analyzer-protocol 正本): stdin から {@code analysisRequest} を 1 件受け取り、
+ * process contract: stdin から {@code analysisRequest} を 1 件受け取り、
  * stdout へ JSONL record を逐次出力し、stderr へ計測ログを出す。exit code 0 = 成功、非ゼロ = fatal。
  *
  * <p>AST 解析 / 型解決 / {@code methodSymbol} ・ {@code callEdge} の生成は {@link AnalysisRunner} が担う。
@@ -117,11 +117,9 @@ public final class Main {
                 // 継続不能な内部エラーとして扱う。他の Error は catch しない。
                 return reportInternalError(writer, errStream, e);
             } catch (IOException e) {
-                // 解析 setup / 実行中の IOException (壊れた classpath jar を JarTypeSolver が開けない等、
-                // pre-flight をすり抜けた読み取り失敗) も RuntimeException と同様に継続不能な内部エラーと
-                // して扱い、best-effort で JAVA_INTERNAL_ERROR record を書く。writer.write 自体が失敗する
-                // ケース (stdout が壊れている等) は reportInternalError 内で個別に catch し、その場合は
-                // stderr のメッセージのみが残る。
+                // pre-flight をすり抜けた読み取り失敗 (壊れた classpath jar 等) も RuntimeException と
+                // 同様に継続不能な内部エラーとして扱う。record 書き出し自体の失敗は reportInternalError
+                // 内で個別に catch し、その場合は stderr のメッセージのみが残る。
                 return reportInternalError(writer, errStream, e);
             }
         } catch (IOException e) {
@@ -140,8 +138,7 @@ public final class Main {
 
     /**
      * 明示 {@code sourceRoots} なら synthetic context、省略なら Gradle build model
-     * discovery から解析 context を構築する
-     * (java-analyzer feature doc「Source root discovery と解析 context」)。
+     * discovery から解析 context を構築する。
      * 明示 root は Tooling API runtime を完全 bypass する。
      */
     private static AnalysisContextFactory.Result buildContexts(
@@ -161,8 +158,8 @@ public final class Main {
                     workspaceRoot, request.sourceRoots(), validated.classpath(), request.metadata());
         }
         AnalysisContextFactory.rejectLanguageMetadataOnDiscovery(request.metadata());
-        DepwalkGradleModel model =
-                new GradleModelDiscovery(new GradleToolingClient(), errStream).discover(workspaceRoot);
+        DepwalkGradleModel model = new GradleModelDiscovery(
+                new GradleToolingClient(validated.gradleJavaHome()), errStream).discover(workspaceRoot);
         return AnalysisContextFactory.discoveredContexts(workspaceRoot, model, validated.classpath());
     }
 

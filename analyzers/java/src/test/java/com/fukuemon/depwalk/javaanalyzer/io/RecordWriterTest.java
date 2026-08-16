@@ -9,6 +9,7 @@ import com.fukuemon.depwalk.javaanalyzer.protocol.FailureDetail;
 import com.fukuemon.depwalk.javaanalyzer.protocol.MethodSymbol;
 import com.fukuemon.depwalk.javaanalyzer.protocol.ProtocolSchema;
 import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -22,11 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("RecordWriter が stdout へ書く record の形の契約")
 class RecordWriterTest {
 
     private final ObjectMapper mapper = ProtocolObjectMapper.create();
 
     @Test
+    @DisplayName("どの種類の record を書いても、schemaVersion と空でない recordType が必ず含まれる")
     void everyRecordIncludesSchemaVersionAndRecordType() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         RecordWriter writer = new RecordWriter(out, mapper);
@@ -47,6 +50,7 @@ class RecordWriterTest {
     }
 
     @Test
+    @DisplayName("record を書いたとき、close を待たずに即座に出力へ書き出される")
     void recordsAreFlushedImmediately() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         RecordWriter writer = new RecordWriter(out, mapper);
@@ -58,6 +62,7 @@ class RecordWriterTest {
     }
 
     @Test
+    @DisplayName("error record の details を書くとき、順序が保たれ、metadata は null 値も含めてそのまま書き出され、無い項目は省略される")
     void writesErrorDetailsPreservingOrderAndOpaqueMetadata() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         RecordWriter writer = new RecordWriter(out, mapper);
@@ -94,6 +99,7 @@ class RecordWriterTest {
     }
 
     @Test
+    @DisplayName("source の位置を持たない bytecode 由来の symbol を書くとき、sourceLocation は省略され、metadata の位置情報はそのまま残る")
     void writesBytecodeOnlySymbolWithoutSourceLocation() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         RecordWriter writer = new RecordWriter(out, mapper);

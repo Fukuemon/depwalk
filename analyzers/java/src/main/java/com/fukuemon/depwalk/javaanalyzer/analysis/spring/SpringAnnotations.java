@@ -33,6 +33,28 @@ final class SpringAnnotations {
             "org.springframework.web.bind.annotation.RestController",
             CONFIGURATION);
 
+    /**
+     * Framework entry point annotations: methods the framework may invoke directly.
+     * The marker semantics and the composed-annotation detection live in
+     * {@link EntryPointIndex}; this set is the single source of the FQNs.
+     */
+    static final Set<String> ENTRY_POINT_ANNOTATIONS = Set.of(
+            "org.springframework.scheduling.annotation.Scheduled",
+            "javax.annotation.PostConstruct",
+            "jakarta.annotation.PostConstruct",
+            "javax.annotation.PreDestroy",
+            "jakarta.annotation.PreDestroy",
+            "org.springframework.context.event.EventListener",
+            "org.springframework.transaction.event.TransactionalEventListener",
+            "org.springframework.web.bind.annotation.RequestMapping",
+            "org.springframework.web.bind.annotation.GetMapping",
+            "org.springframework.web.bind.annotation.PostMapping",
+            "org.springframework.web.bind.annotation.PutMapping",
+            "org.springframework.web.bind.annotation.DeleteMapping",
+            "org.springframework.web.bind.annotation.PatchMapping",
+            "org.springframework.web.bind.annotation.ExceptionHandler",
+            "org.springframework.web.bind.annotation.ModelAttribute");
+
     private SpringAnnotations() {
     }
 
@@ -77,6 +99,32 @@ final class SpringAnnotations {
     }
 
     static List<String> stringValues(AnnotationExpr annotation, String... attributeNames) {
+        List<String> values = new ArrayList<>();
+        for (Expression expression : attributeExpressions(annotation, attributeNames)) {
+            addStrings(expression, values);
+        }
+        return values.stream().filter(value -> !value.isEmpty()).distinct().toList();
+    }
+
+    /**
+     * 指定属性が明示されていて、かつ空文字列であると証明できない値を持つかを返す。
+     *
+     * <p>定数参照 ({@code Conditions.ACTIVE}) や連結 ({@code PREFIX + "x"}) は、
+     * この解析器が値を読まないため {@link #stringValues} では空に見える。空と扱うと
+     * 「属性なし」と区別が付かず、実行時条件を無条件と誤って断定する。値を確定できない
+     * 式は「値あり」に倒し、空文字列リテラルが明示された場合だけ値なしとする
+     * (Spring の既定値と同じ意味になるため)。
+     */
+    static boolean hasNonEmptyAttribute(AnnotationExpr annotation, String... attributeNames) {
+        for (Expression expression : attributeExpressions(annotation, attributeNames)) {
+            if (!isProvablyEmpty(expression)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Expression> attributeExpressions(AnnotationExpr annotation, String... attributeNames) {
         List<Expression> expressions = new ArrayList<>();
         if (annotation.isSingleMemberAnnotationExpr()) {
             for (String attributeName : attributeNames) {
@@ -93,12 +141,17 @@ final class SpringAnnotations {
                         .forEach(expressions::add);
             }
         }
+        return expressions;
+    }
 
-        List<String> values = new ArrayList<>();
-        for (Expression expression : expressions) {
-            addStrings(expression, values);
+    private static boolean isProvablyEmpty(Expression expression) {
+        if (expression instanceof StringLiteralExpr stringLiteral) {
+            return stringLiteral.asString().isEmpty();
         }
-        return values.stream().filter(value -> !value.isEmpty()).distinct().toList();
+        if (expression instanceof ArrayInitializerExpr array) {
+            return array.getValues().stream().allMatch(SpringAnnotations::isProvablyEmpty);
+        }
+        return false;
     }
 
     static String fqn(AnnotationExpr annotation) {
@@ -152,6 +205,7 @@ final class SpringAnnotations {
                 || QUALIFIER.equals(fqn)
                 || SPRING_CONDITIONAL.equals(fqn)
                 || STEREOTYPES.contains(fqn)
+                || ENTRY_POINT_ANNOTATIONS.contains(fqn)
                 || fqn.startsWith("org.springframework.boot.autoconfigure.condition.Conditional");
     }
 

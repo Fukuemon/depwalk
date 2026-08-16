@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Set;
 
 /**
- * 帰属型の決定規則 (design/features/java-analyzer/DesignDoc_java-analyzer.md 「帰属型の決定規則」) の実装。
+ * 帰属型の決定規則の実装。
  *
  * <table>
  * <caption>4 分岐</caption>

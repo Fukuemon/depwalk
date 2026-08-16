@@ -7,7 +7,7 @@ import java.util.TreeMap;
 
 /**
  * inventory の各 {@link CallSiteId} へ primary 終端種別をちょうど 1 件対応付ける
- * 内部台帳 (java-analyzer feature doc「Parse・resolution・call 完全性」)。
+ * 内部台帳。
  * ID の欠落・重複・未分類・二重分類は
  * {@link IllegalStateException} とし、Analyzer が {@code JAVA_INTERNAL_ERROR} の
  * fatal に変換する。Protocol へは出力しない。
@@ -37,8 +37,7 @@ public final class CallSiteOutcomeLedger {
      * @param reason EXCLUDED / DIAGNOSTIC の安定 reason
      * @param target 判明している場合のみ: 呼出先の自己完結な表現
      * @param candidates 判明している場合のみ: 候補の自己完結な表現 (決定順)
-     * @param diagnosticMetadata DIAGNOSTIC のみ: sanitize 済み診断項目
-     *     (java-analyzer feature doc「diagnostic / error code 体系」)。
+     * @param diagnosticMetadata DIAGNOSTIC のみ: sanitize 済み診断項目。
      *     primary diagnostic として終端した場合だけ {@code error.details.metadata} へ
      *     合流し、救済成功 (EMITTED) 時は Protocol へ出力されない
      */
@@ -114,8 +113,7 @@ public final class CallSiteOutcomeLedger {
     }
 
     /**
-     * sanitize 済み診断項目付きで primary diagnostic を確定する
-     * (feature doc「diagnostic / error code 体系」)。
+     * sanitize 済み診断項目付きで primary diagnostic を確定する。
      * {@code diagnosticMetadata} には source 本文・絶対 path・raw exception message を
      * 含めてはならない (呼び出し側が安定値だけを渡す)。
      *
@@ -141,8 +139,7 @@ public final class CallSiteOutcomeLedger {
             outcomes.put(id, outcome);
             return;
         }
-        // edge と補助 diagnostic が併存する entry は primary EMITTED とする
-        // (feature doc「Parse・resolution・call 完全性」)。
+        // edge と補助 diagnostic が併存する entry は primary EMITTED とする。
         if (existing.kind() == OutcomeKind.DIAGNOSTIC && outcome.kind() == OutcomeKind.EMITTED) {
             outcomes.put(id, outcome);
             return;

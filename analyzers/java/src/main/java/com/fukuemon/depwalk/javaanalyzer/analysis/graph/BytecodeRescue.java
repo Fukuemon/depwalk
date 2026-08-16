@@ -38,6 +38,7 @@ import com.github.javaparser.resolution.types.ResolvedType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.IntSupplier;
 
 /**
@@ -45,8 +46,7 @@ import java.util.function.IntSupplier;
  * 一意 member へ救済できるかを判定し、採用する member を返す。あわせて receiver の owner 型復元と、
  * 救済不能な site を external-target と分類できるかの根拠付き判定を担う。
  *
- * <p>本クラスの契約の正本は java-analyzer feature doc「solver 層の bytecode member 合成」。
- * 判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。
+ * <p>判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。
  */
 final class BytecodeRescue {
 
@@ -57,6 +57,7 @@ final class BytecodeRescue {
     private final WorkspaceSourceDeclarationIndex declIndex;
     private final ProjectBytecodeMemberIndex bytecodeIndex;
     private final ReachableOwners reachableOwners;
+    private final GenericChainTypes genericChainTypes;
 
     /**
      * @param sootUpIndex full classpath 視点の型階層・宣言 member 索引 (external chain の前進検証に使う)
@@ -73,6 +74,23 @@ final class BytecodeRescue {
         this.declIndex = declIndex;
         this.bytecodeIndex = bytecodeIndex;
         this.reachableOwners = reachableOwners;
+        this.genericChainTypes = new GenericChainTypes(bytecodeIndex);
+    }
+
+    /**
+     * generic 前進導出による receiver の owner 型。erasure だけの
+     * {@link #chainForwardOwner} で辿れない JDK stream / collection 連鎖と
+     * lambda parameter を、宣言型・classfile Signature・JDK の宣言済み generic
+     * 意味論の固定表で導出する。導出できなければ null。
+     */
+    String genericChainOwner(Expression scope) {
+        GenericChainTypes.Model model = genericChainTypes.typeOf(scope);
+        if (model == null || ERASED_TYPE_VARIABLE_BOUND.equals(model.binaryName())) {
+            // Object は「型変数 / raw / 欠落の erasure」の可能性があり owner の根拠に
+            // ならない (既存の chain 前進解決と同じ打ち切り規則。false exclusion 防止)。
+            return null;
+        }
+        return model.binaryName();
     }
 
     /**
@@ -89,20 +107,19 @@ final class BytecodeRescue {
     }
 
     /**
-     * solver が合成した bytecode-only member の owner。合成は到達可能な scope 内 owner を
-     * 前提に行われるため、ここで引けない場合は analyzer 側の不変条件違反として failfast する。
+     * 合成 / 注入の bytecode-only member の owner の所在。owner の型が scope
+     * (include/exclude 適用後の宣言索引) に無い場合は empty を返す。solver は
+     * scope 外の source も parse するため、empty は不変条件違反ではなく
+     * 「callee が scope 外」を意味する (呼び出し側が external 分類へ落とす)。
      */
-    WorkspaceSourceDeclarationIndex.TypeLocation requireReachableOwner(
-            SynthesizedBytecodeMethodDeclaration synthesized) {
-        return reachableOwners.find(synthesized.candidate().declaringType())
-                .orElseThrow(() -> new IllegalStateException(
-                        "synthesized bytecode member without a reachable in-scope owner: "
-                                + synthesized.candidate().declaringType() + "#" + synthesized.getName()));
+    Optional<WorkspaceSourceDeclarationIndex.TypeLocation> reachableOwner(
+            SootUpTypeHierarchyIndex.MethodCandidate candidate) {
+        return reachableOwners.find(candidate.declaringType());
     }
 
     /**
      * 解決失敗した method call を、scope 内 source type の到達可能な project
-     * bytecode の一意 member へ generator 非依存で救済する (ADR-0005)。
+     * bytecode の一意 member へ generator 非依存で救済する。
      */
     Rescue methodRescue(MethodCallExpr mce, Node enclosingTypeNode) {
         String ownerBinaryName = bytecodeRescueOwner(mce, enclosingTypeNode);

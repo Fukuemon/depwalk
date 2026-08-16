@@ -8,7 +8,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: 828e897
+verified_commit: 4cae142
 ---
 
 # Feature 設計: Java Analyzer
@@ -88,6 +88,8 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 - SootUp 型階層補完、Interface Dispatch / Override 解決、Spring Bean / DI 解決、候補 edge 統合の契約
 - single / multi-project を同じ request で扱う Gradle build model discovery と明示 source root override
 - parse・resolution・生成 member を含む call inventory の完全性 gate
+- framework 由来の暗黙呼び出しの解決 (entry point 分類、イベント edge、callable invocation)
+- 型伝播救済層 (generic signature の前進導出による receiver 型の復元と、既存 bytecode 救済への接続)
 
 ### やらないこと
 
@@ -107,6 +109,8 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 - [analysis.md](analysis.md) — ソースから呼び出し関係をどう解決するか (型解決 / Spring DI / 完全性)
 - [protocol-mapping.md](protocol-mapping.md) — 解析結果を Protocol の record へどう写すか (正規化 / 帰属型 / metadata / diagnostic)
 
+pre-flight が検証する metadata の規則は [protocol-mapping.md](protocol-mapping.md) が持つ。そのうち `gradleJavaHome` が指す Gradle daemon JVM の規則は [discovery.md](discovery.md) が持つ。
+
 ### 実装基盤
 
 - **build tool**: Gradle (Kotlin DSL)。`gradlew` wrapper を同梱し、CI に Gradle 本体の事前インストールを要求しない。
@@ -119,7 +123,16 @@ SootUp は JVM の bytecode を読んで型階層や call graph を扱う静的�
 `javaanalyzer` 配下の内部構成を定める (判断を定めるのは [ADR-0007](../../../adr/0007-layered-architecture-refactor.md))。
 
 - 直下の `protocol` (wire DTO) / `io` (JSONL 入出力) / `preflight` (入力検証) / `discovery` (Gradle Tooling API 隔離) は入出力・起動系として維持する。
-- `analysis` 配下は解析パイプラインの段階別 package で構成し、**段階の実行順は `analysis/pipeline` (AnalysisRunner) だけが知る**。実行順: scope 列挙 → context 構築 (JavaParser + augment) → attribution 準備 → sootup 型階層 index → spring DI index → graph 構築 → completeness 検査 → io 出力。`normalize` は段階横断の naming util。
+- `analysis` 配下は解析パイプラインの段階別 package で構成し、**段階の実行順は `analysis/pipeline` (AnalysisRunner) だけが知る**。`normalize` は段階横断の naming util。実行順は次のとおり。
+  1. workspaceRoot の real path 化と scope 列挙
+  2. bytecode 索引の構築 (context ごとの SootUp 型階層と project bytecode member)
+  3. context 構築 (context 別の TypeSolver / parser / AST injector の生成)
+  4. parse pre-flight と、成功後の context warning 出力
+  5. attribution 準備 (`liftExcludePackages` の解決と帰属型 resolver の生成)
+  6. first pass (全 file を parse し、inventory / 宣言索引 / entry point / event listener / callable / source method / Spring DI を索引化)
+  7. builder 構築 (context ごとの CallGraphBuilder)
+  8. second pass (全 file を再 parse し、bytecode-only member を AST へ注入して CallGraphBuilder で呼び出しを解析)
+  9. completeness gate (`fullGraph` の io 出力は second pass の中で逐次起きるため、この検査より先に始まる)
 - 外部ライブラリの隔離は 3 段階: **SootUp** は `analysis/sootup` (adapter) に完全封じ込め (facade が自前型で公開し、他 package から `sootup.*` を import しない)。**Gradle Tooling API** は `discovery` に完全隔離。**JavaParser / SymbolSolver** は解析エンジンの中核として `analysis` 配下では自由に使い、`analysis` の外へは漏らさない。
 - 依存境界は ArchUnit の JUnit テストで機械検査する (quality gate は [engineering.md](../../../context/engineering.md))。
 
@@ -145,12 +158,14 @@ metadata passthrough も同様の言語非依存原則に従う。Core は `--an
 ### 性能方針
 
 - **モード別の streaming 方針**: `reachableFromEntrypoints` は entrypoints からの到達判定に解析完了までの adjacency 全体が必要であり、streaming と両立しない。このためモードごとに挙動を分ける。
-  - `fullGraph`: ファイル単位で `methodSymbol` / `callEdge` を逐次 stdout へ flush し、解析済みファイルの中間状態 (AST 等) を保持しない。出力済み `methodId` 集合の保持は許容する。
-  - `reachableFromEntrypoints`: 到達判定のため、解析完了まで adjacency (呼び出し関係) を保持したうえで到達集合を確定し、その後に出力する二段階処理を **モード別の例外** として許容する。
-  - `diagnostic` は両モードとも検出時に即時 flush する (中間保持しない)。
-- **AST の逐次破棄**: 解析済みファイルの AST を保持し続けない。保持するのは SymbolSolver の型解決キャッシュと、`callEdge` 出力に必要な最小限の情報 (`fullGraph` は逐次 flush 用、`reachableFromEntrypoints` は到達判定用の adjacency)。
+  - `fullGraph`: ファイル単位の解析が終わるごとに、新たに確定した `methodSymbol` / `callEdge` / `diagnostic` を stdout へ flush する。flush は出力済み index を進めるだけで、要素は破棄しない。
+  - `reachableFromEntrypoints`: 到達判定のため逐次 flush を行わず、解析完了後に到達集合を確定してから一括出力する二段階処理を **モード別の例外** として許容する。
+- **逐次破棄されるのは AST のみ**: ファイル単位で parse した AST は処理後に参照を手放す。それ以外はモードを問わず実行終了まで保持する。
+  - node / edge / diagnostic は両モードとも `GraphAccumulator` が追加のみの list で保持する。モードで変わるのは writer へ流す timing だけである。
+  - SymbolSolver の型解決キャッシュも実行終了まで残る。
+  - first pass で作る索引 (inventory / 宣言索引 / entry point / event listener / callable / source method / Spring DI) と call outcome ledger も、run 全体で保持する。
 - **計測の観測性**: 解析ファイル数 / 所要時間 / 未解決件数を stderr に出力する (protocol record としては出さない)。
-- **メモリ特性の扱い**: `fullGraph` と `reachableFromEntrypoints` は adjacency 保持の有無でメモリ特性が異なるため、数値目標はモード別に扱う。
+- **メモリ特性の扱い**: `fullGraph` と `reachableFromEntrypoints` は record の出力 timing が異なるため、数値目標はモード別に扱う。グラフ本体の保持量そのものはモードで変わらない。
 - **SootUp の view 構築は lazy に行う**。型階層解決に必要なクラスだけを読み込み、eager な全クラス読み込みをしない。
 
 #### 計測の手順
@@ -210,11 +225,16 @@ sequenceDiagram
         Note over Analyzer,Gradle: 対象の build logic が評価される<br/>(discovery.md の安全境界)
     end
 
+    Analyzer->>FS: .class を読む (型階層 / bytecode member の索引づくり)
     Analyzer->>FS: ソースを読む (read-only)
-    Analyzer->>Analyzer: 1. JavaParser で AST 化
-    Analyzer->>FS: .class を読む (型解決 / bytecode member)
-    Analyzer->>Analyzer: 2. SymbolSolver で型を解決
-    Analyzer->>Analyzer: 3. SootUp と Spring で実装候補を絞る
+
+    Note over Analyzer: 1 周目: 索引づくり
+    Analyzer->>Analyzer: 全 file を JavaParser で AST 化し<br/>宣言 / entry point / listener / Spring DI を索引化
+
+    Note over Analyzer: 2 周目: 呼び出しの解析
+    Analyzer->>Analyzer: 全 file を再 AST 化し<br/>生成 member を AST へ注入
+    Analyzer->>Analyzer: SymbolSolver で型を解決
+    Analyzer->>Analyzer: SootUp と Spring で実装候補を絞る
 
     loop 解析できたものから
         Analyzer-->>Core: stdout へ methodSymbol / callEdge を JSONL で逐次出力
@@ -229,6 +249,8 @@ sequenceDiagram
     end
 ```
 
+全 file を 2 周する構成は、同一 compilation unit 内の参照と framework 由来の呼び出しを解くために要る。1 周目の索引が揃わないと 2 周目の解決ができない。各周でやることの規則は [analysis.md](analysis.md) が持つ。
+
 出力は**逐次**である。解析が全部終わってからまとめて返すのではなく、確定したものから流す。ただし `reachableFromEntrypoints` だけは到達判定に全体が要るため例外で、詳細は「analysisMode の意味論」節に置く。
 
 ### 個別の規則
@@ -237,6 +259,8 @@ sequenceDiagram
 - 呼び出し先の型が解決できたとき、`methodSymbol` (caller / callee 双方) と、両者を参照する `callEdge` を出力する。
 - 呼び出し先が interface / 抽象メソッドであるとき、帰属型の決定規則で決まる帰属型のメソッドを callee として `callEdge` を出力し、`callEdge.metadata.dispatch` に dispatch 種別を標識する。
 - 呼び出し先メソッドの宣言サイトが scope 外で、その宣言型が引き上げ除外 package に属するとき、`methodSymbol` / `callEdge` を出力しない (解析失敗ではないため `diagnostic` も出さない)。
+- framework が実行時に起動する呼び出しも、ソース上の根拠がある範囲で edge にする。`publishEvent` から `@EventListener` メソッドへのイベント edge と、functional interface の invocation site から実体への callable invocation edge を出す。規則は [analysis.md](analysis.md) が定める。
+- framework が直接起動し得るメソッドは `methodSymbol.metadata.entryPoint` で標識する。edge は作らず、caller 探索の終端根拠だけを与える。対象アノテーションの集合は [analysis.md](analysis.md) が定める。
 - allowlist された resolution failure は call outcome ledger に候補・理由を記録して解析を継続するが、全救済後も primary diagnostic が残る request は `JAVA_INCOMPLETE_ANALYSIS` で fatal にする。
 - 個別ファイルがパース不能なときは graph record を1件も確定せず、決定順で最初の parse failure を `JAVA_PARSE_ERROR` の location / message として返して fatal にする。
 - 解析を継続できない致命的な問題が起きたとき、`error` record を出力し、非ゼロ exit code で終了する。
@@ -272,18 +296,29 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 
 横断規約は [context/testing.md](../../../context/testing.md)。本 feature は三層 (Java unit / Go fake analyzer / 実 jar E2E) で保証する。
 
-**観測責務の境界**: 曖昧性・解決根拠の観測は Analyzer JSONL (`callEdge.metadata` / `diagnostic`) までを本 feature の責務とする。CLI 出力への edge 単位 metadata 表出は [CLI feature doc](../cli/DesignDoc_cli.md) が管轄する。本 doc が定める。
+**観測責務の境界**: 曖昧性・解決根拠の観測は Analyzer JSONL (`callEdge.metadata` / `diagnostic`) までを本 feature の責務とする。CLI 出力への edge 単位 metadata 表出は [CLI feature doc](../cli/DesignDoc_cli.md) が管轄する。
 
 **Java unit test (JUnit / `analyzers/java/`)**
 
 - signature / `methodId` の正規化 (overload / generics erasure / varargs / nested class (`$`) / constructor (`<init>`) / static initializer (`<clinit>`) / 匿名クラス採番の決定性)
 - `symbolKind` の割り当て (インスタンス初期化子・フィールド初期化子が constructor に畳み込まれること、lambda 内の呼び出しが囲みメソッドに帰属し `viaLambda: true` が立つこと)
 - 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、除外 package (既定値と `liftExcludePackages` による置き換え、segment 単位 prefix 一致)、`this` / `super` / static / `new` の各形、`metadata.dispatch` の値)
-- `diagnostic` / `error` の code と severity の対応、pre-flight 検査 (classpath key 不在 / 明示 classpath entry 欠落・読取不能 / `language != "java"`) が解析開始前に fatal になること
+- `diagnostic` / `error` の code と severity の対応、および pre-flight 検査が解析開始前に fatal になること。検査対象は次のとおり。
+  - `language != "java"`、`workspaceRoot` の不在・非 directory
+  - 明示 `sourceRoots` 経路での classpath key 不在、classpath entry の欠落・読取不能
+  - `liftExcludePackages` が文字列配列であること (空配列は「除外なし」として正当)
+  - `allowIncompleteAnalysis` が要素 1 の `["true"]` / `["false"]` であること
+  - `gradleJavaHome` が要素 1 の非空 string で、実在する directory かつ `bin/java` が実行可能であること (自動 discovery 経路でのみ解釈する)
 - explicit / auto の排他 validation、root 正規化・重複・包含・realpath 境界、custom model、main source set、project dependency 到達性、context 別 language level / preview
 - parse pre-flight、allowlist 外 resolver fatal、atomic mutation、call inventory / outcome ledger、initializer caller 展開、`silentOmission == 0`、共通 failure details
 - call-site driven project bytecode member index、bytecode-only member の location 省略と owner metadata、Graph deep copy
 - `fullGraph` / `reachableFromEntrypoints` の出力範囲 (宣言列挙 ∪ call site 由来、entrypoints 空は全体扱い)
+- entry point 分類 (対象アノテーションの検出、1 段の合成アノテーション、対象外とする形での非検出、`metadata.entryPoint` の値)
+- イベント edge (publisher 判定、引数型と型階層による listener 突合、無条件 listener の `unique`、条件付き / generics / SpEL 属性での `ambiguous` 降格、突合できないときの diagnostic)
+- callable invocation (method reference と lambda の edge 先、`viaCallableInvocation` の標識、local 変数経由と parameter 1 段の追跡範囲、対象外の形で edge を張らないこと)
+- 同一 compilation unit 内での bytecode-only member の AST 注入と、暗黙宣言を注入しないこと
+- 型伝播救済層の generic 前進導出 (chain link の型引数伝播、固定表の適用範囲、`java.lang.Object` での打ち切り)
+- `gradleJavaHome` の受理と拒否 (要素 1 の非空 string、実在 directory かつ `bin/java` 実行可能なら受理。それ以外は `JAVA_INVALID_REQUEST`。明示 `sourceRoots` 経路では解釈しない)
 - **複数 context (依存 project 関係) を要する規則** — cross-module bytecode 救済など — は、in-memory の fake build model から production の context 構築 (`discoveredContexts`) を通して `AnalysisRunner` を直接駆動して検証する (`MultiContextAnalysisTestSupport`)。build model は Tooling API が構造的に adapt する interface のため、fake でも root 検証・依存 context id 導出は production コードが行う。unit test の検証範囲から外れるのは model 取得 (Tooling API / Gradle daemon / provider 配布) だけで、その部分は実 jar E2E (`TestGradleMultiProjectCLI` 等) が実 Gradle で担う
 
 **Go 側 process contract (fake analyzer / JVM 不要)**
@@ -306,4 +341,5 @@ SootUp は edge を直接生成せず候補索引だけを提供する。Spring 
 - **Spring Boot fixture**: `testdata/fixtures/java/spring-project/` に単一 source root の Spring fixture を配置した。DI (constructor / field / setter injection)、stereotype、`@Qualifier`、`@Primary`、条件付き Bean (`@Profile` / `@ConditionalOnProperty`)、Spring Data Repository を含む。
 - **Lombok / MyBatis Mapper 拡張**: 上記 fixture に、コンストラクタを明示せず Lombok (`@AllArgsConstructor` / `@RequiredArgsConstructor` 等) で生成するクラス と、MyBatis `@Mapper` インターフェース を含める。前者は自プロジェクトのコンパイル済み class を通じた constructor injection 解決を、後者は runtime-provided マーカー検出を検証する。
 - **未解決 call パターン fixture**: `testdata/fixtures/java/multi-module-spring-project/patterns/` に、実環境実測の上位未解決パターン (lambda / generic を含む fluent chain、`var` + generic メソッド戻り値、method reference、explicit `super(...)`、cross-module の Lombok 生成 member 呼び出し) の最小再現ケースを置く。全パターン救済済みのため、bytecode-only member の契約下で各パターンが edge になる成功期待を required E2E (`core/e2e/unresolved_patterns_cli_test.go`) が守る。`JAVA_INCOMPLETE_ANALYSIS` 時の診断 metadata 4 項目 (sanitize 制約含む) の期待値検証は Java unit test 側が担う。
+- **metadata 透過表出の CLI 照合**: Analyzer が付けた metadata が CLI 出力まで欠落せず届くことを、`core/e2e/event_edges_cli_test.go` / `core/e2e/callable_edges_cli_test.go` / `core/e2e/entrypoint_metadata_cli_test.go` の 3 本で照合する。この 3 本は `testdata/fixtures/java/` を使わず、必要最小の source を一時 workspace へ組み立てて実行する。検証したい表出だけを含む最小構成にし、共有 fixture の変更で壊れないようにするためである。
 - **fixture build / classpath 契約**: `testdata/fixtures/java/spring-project/` は独立した Gradle project とし、repository の `analyzers/java/gradlew -p` で build する。fixture の `build.gradle.kts` は Java toolchain 25、`options.release=21`、Spring Boot Autoconfigure 4.1.0、Spring Data Commons 4.1.0、MyBatis 3.5.19、Lombok 1.18.46 を固定する。`writeDepwalkClasspath` task が `build/classes/java/main` と `runtimeClasspath` の jar を絶対 path・辞書順・1 行 1 entry で `build/depwalk-classpath.txt` へ書き、Go E2E は全行を `analysisRequest.metadata.classpath` に渡す。Lombok の生成 constructor は `classes` task 後の `.class` で検証する。

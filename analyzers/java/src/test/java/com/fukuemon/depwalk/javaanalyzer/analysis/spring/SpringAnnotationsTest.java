@@ -3,13 +3,16 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.spring;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@DisplayName("既知の Spring 系 annotation の FQN 解決")
 class SpringAnnotationsTest {
 
     @Test
+    @DisplayName("外部 class を解決できない状態でも、wildcard import から既知 annotation の FQN を復元できる")
     void resolvesSupportedAnnotationsFromWildcardImportsWithoutExternalClasses() {
         CompilationUnit unit = StaticJavaParser.parse("""
                 package com.example;

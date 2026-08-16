@@ -2,6 +2,7 @@ package com.fukuemon.depwalk.javaanalyzer.discovery;
 
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkGradleModel;
 import com.fukuemon.depwalk.javaanalyzer.discovery.model.DepwalkProjectModel;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("GradleModelDiscovery の事前判定と失敗分類")
 class GradleModelDiscoveryTest {
 
     private final ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
@@ -29,6 +31,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("sourceRoots が明示されているとき、明示 override と判定されて discovery を通らない")
     void explicitSourceRootsBypassDiscoveryCompletely() {
         assertTrue(GradleModelDiscovery.isExplicitOverride(List.of("module-a/src/main/java")));
         assertTrue(GradleModelDiscovery.isExplicitOverride(List.of(".")));
@@ -36,6 +39,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("discovery を始めるとき、開始行より前に固定の安全通知を stderr へ出し、終了時に固定形式の要約行を出す")
     void printsFixedSafetyNoticeBeforeDiscovery() throws Exception {
         FakeToolingClient client = FakeToolingClient.healthy();
 
@@ -50,6 +54,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("サポート外の Gradle version のとき、model 要求へ進まずに安定した理由と明示 override の案内付きで拒否される")
     void rejectsUnsupportedGradleVersionWithStableReason() {
         FakeToolingClient client = FakeToolingClient.healthy();
         client.gradleVersion = "7.6.4";
@@ -64,6 +69,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("version を判別できない custom distribution のとき、サポート外として拒否される")
     void rejectsUndeterminableCustomDistribution() {
         FakeToolingClient client = FakeToolingClient.healthy();
         client.gradleVersion = "acme-custom";
@@ -75,6 +81,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("daemon JVM が非互換または判別不能のとき、いずれも DAEMON_JVM_INCOMPATIBLE として拒否される")
     void rejectsIncompatibleOrUnknownDaemonJvm() {
         FakeToolingClient incompatible = FakeToolingClient.healthy();
         incompatible.daemonJavaMajor = Optional.of(8);
@@ -91,6 +98,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("model 要求が失敗するとき、元の例外文や repository URL を漏らさずに固定 message へ置き換えられる")
     void sanitizesModelRequestFailuresToFixedMessages() {
         FakeToolingClient client = FakeToolingClient.healthy();
         client.modelFailure = new ToolingClient.ToolingRequestException(
@@ -108,6 +116,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("model に Java の source root が 1 つも無いとき、NO_JAVA_SOURCE_ROOTS として拒否される")
     void rejectsModelWithoutAnyJavaSourceRoot() {
         FakeToolingClient client = FakeToolingClient.healthy();
         client.model = FakeToolingClient.model(List.of(
@@ -120,6 +129,7 @@ class GradleModelDiscoveryTest {
     }
 
     @Test
+    @DisplayName("provider の model に必須項目 (projectPath) が欠けているとき、PROVIDER_INCOMPATIBLE として拒否される")
     void rejectsIncompleteProviderModel() {
         FakeToolingClient client = FakeToolingClient.healthy();
         client.model = FakeToolingClient.model(List.of(new DepwalkProjectModel() {

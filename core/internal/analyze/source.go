@@ -6,10 +6,9 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Request は [Source] port へ渡す 1 回の解析を表す。すべて
-// field is passed through to the Analyzer request without interpretation;
-// the port implementation owns the wire form (request id, schema version,
-// validation).
+// Request は [Source] port へ渡す 1 回の解析を表す。全 field は解釈せずに
+// Analyzer への要求へそのまま渡す。wire 表現 (request id / schema version /
+// 検証) は port の実装側が持つ。
 type Request struct {
 	WorkspaceRoot string
 	SourceRoots   []string
@@ -19,15 +18,23 @@ type Request struct {
 	Metadata      map[string]any
 }
 
-// Outcome は stream の終了後に [Source] port が報告する process 単位の結果。以下は
-// record stream ends.
+// Outcome は record stream の終了後に [Source] port が報告する process 単位の結果。
 type Outcome struct {
 	// Diagnostics は Analyzer が報告した致命的でない診断 (domain 値へ変換済み)。
 	Diagnostics     []Diagnostic
 	Failure         *AnalyzerFailure
 	ValidationError error
 	ExitCode        int
+	// HeapExhausted は、Analyzer が valid error record なしで異常終了し、stderr に
+	// OutOfMemoryError の痕跡があったことを表す診断ヒント。判定は port 実装 (ACL)
+	// が行い、domain は raw stderr を持たない。
+	HeapExhausted bool
 }
+
+// HeapExhaustedHint は analyzer の heap 不足を伝える定型文。protocol 層のエラー
+// wrap と本 package の Err で同じ文言を使う (説明の二重管理を避ける)。
+const HeapExhaustedHint = "the analyzer ran out of heap (OutOfMemoryError); " +
+	"add or increase -Xmx on the java command in --analyzer-cmd (or DEPWALK_ANALYZER_CMD)"
 
 // Err は run が終わった原因の失敗を返す。正常終了なら nil。
 //
@@ -40,6 +47,9 @@ func (o Outcome) Err() error {
 		return o.Failure
 	}
 	if o.ExitCode != 0 {
+		if o.HeapExhausted {
+			return fmt.Errorf("analyzer process exited with code %d: %s", o.ExitCode, HeapExhaustedHint)
+		}
 		return fmt.Errorf("analyzer process exited with code %d", o.ExitCode)
 	}
 	if o.ValidationError != nil {

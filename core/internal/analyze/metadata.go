@@ -6,8 +6,7 @@ import (
 )
 
 // BuildMetadata は繰り返し指定された --analyzer-meta key=value から
-// analysisRequest.metadata を組み立てる
-// (adr/0003-analyzer-command-resolution.md の metadata passthrough)。
+// analysisRequest.metadata を組み立てる。
 //
 // Core は key も value も解釈しない。Analyzer と共有する組み立て規則だけを適用する。
 //   - every value is appended to a JSON array under its key, in the order

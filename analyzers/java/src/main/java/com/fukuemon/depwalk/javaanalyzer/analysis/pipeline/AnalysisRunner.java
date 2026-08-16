@@ -3,8 +3,10 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.pipeline;
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.JavaErrorCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
+import com.fukuemon.depwalk.javaanalyzer.analysis.augment.BytecodeMemberAstInjector;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.LiftExcludePackages;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallGraphBuilder;
+import com.fukuemon.depwalk.javaanalyzer.analysis.graph.CallablePassIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
@@ -22,6 +24,8 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.normalize.RelativePaths;
 import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyIndex;
 import com.fukuemon.depwalk.javaanalyzer.preflight.AnalyzerFatalException;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EntryPointIndex;
+import com.fukuemon.depwalk.javaanalyzer.analysis.spring.EventListenerIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiagnosticEmitter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.spring.SpringDiIndex;
 import com.fukuemon.depwalk.javaanalyzer.io.RecordWriter;
@@ -58,10 +62,6 @@ import java.util.TreeMap;
  * <p>source file の列挙、AST 解析、型解決、Spring DI 索引化、呼び出し先候補の統合、帰属型決定、
  * 到達可能性フィルタ、{@link RecordWriter} への出力を1回の実行として調停する。
  *
- * <p>本クラスが実装する契約の正本は java-analyzer feature doc: call site の完全性 gate と
- * {@code allowIncompleteAnalysis} は「Parse・resolution・call 完全性」、context 分離と solver への
- * root / classpath 登録は「Source root discovery と解析 context」。
- *
  * <p>逐次破棄されるのは AST のみで (ファイル単位で parse し、処理後は参照を手放す)、
  * SymbolSolver の型解決キャッシュと {@link GraphAccumulator} が持つ node / edge / diagnostic は
  * 実行終了まで保持される。したがってモードを問わずグラフ本体はメモリ上に残り、モードによって
@@ -93,7 +93,7 @@ public final class AnalysisRunner {
      * @param unresolvedCount call edge または DI 候補を解決できなかった件数
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
      * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間
-     *     (java-analyzer feature doc「性能方針」の段階別計測として通常解析と分離する)
+     *     (段階別計測として通常解析と分離する)
      * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
      */
     public record RunStats(
@@ -166,8 +166,9 @@ public final class AnalysisRunner {
                 buildBytecodeIndexes(contexts, contextById, reachableDependencies, classesOutputOwners);
         Map<String, SootUpTypeHierarchyIndex> sootUpByContext = bytecodeIndexes.sootUpByContext();
         Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext = bytecodeIndexes.bytecodeIndexByContext();
-        Map<String, JavaParser> parserByContext =
-                buildParsers(contexts, contextById, reachableDependencies, bytecodeIndexByContext);
+        Map<String, BytecodeMemberAstInjector> injectorByContext = new LinkedHashMap<>();
+        Map<String, JavaParser> parserByContext = buildParsers(
+                contexts, contextById, reachableDependencies, bytecodeIndexByContext, injectorByContext);
         long contextBuildMillis = (System.nanoTime() - contextBuildStart) / 1_000_000;
 
         // graph record 出力前に全 file の parse を検証する。失敗は request 全体 fatal。
@@ -183,10 +184,12 @@ public final class AnalysisRunner {
         AttributionResolver attributionResolver = new AttributionResolver(scope.membership(), liftExcludePackages);
 
         SpringDiIndex springDiIndex = createSpringDiIndex(contexts, scope);
-        SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot);
+        EntryPointIndex entryPointIndex = new EntryPointIndex();
+        EventListenerIndex eventListenerIndex = new EventListenerIndex();
+        CallablePassIndex callablePassIndex = new CallablePassIndex();
+        SourceMethodIndex sourceMethodIndex = new SourceMethodIndex(workspaceRoot, entryPointIndex);
         GraphAccumulator accumulator = new GraphAccumulator();
-        // resolver とは独立した call-site inventory と source 宣言索引
-        // (adr/0005-adopt-sootup-and-spring-di-resolution.md)。
+        // resolver とは独立した call-site inventory と source 宣言索引。
         CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
         WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
@@ -198,6 +201,13 @@ public final class AnalysisRunner {
             // inventory / 宣言索引の不変条件違反は diagnostic へ降格せず internal fatal のまま伝播させる。
             inventory.accept(unit);
             declIndex.accept(unit, contextByFile.get(file).id());
+            // アノテーション解決の失敗は SpringAnnotations.fqn の内部で握られるため、
+            // この accept は新しい fatal 経路を作らない (try/catch 不要)。
+            entryPointIndex.accept(unit);
+            // 解決できない listener 宣言は accept 内で索引から漏れる (宣言自身の解決
+            // 失敗は second pass の通常診断として現れる)。
+            eventListenerIndex.accept(unit);
+            callablePassIndex.accept(unit);
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
@@ -239,7 +249,9 @@ public final class AnalysisRunner {
                     ledger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
-                    reachable));
+                    reachable,
+                    eventListenerIndex,
+                    callablePassIndex));
         }
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
@@ -251,6 +263,11 @@ public final class AnalysisRunner {
         for (Path file : scope.allFiles()) {
             SourceSetAnalysisContext context = contextByFile.get(file);
             CompilationUnit cu = parseOrFail(parserByContext.get(context.id()), file);
+            // 同一 unit 内参照は TypeSolver を経由しないため、walk する AST へ
+            // bytecode-only member をここで注入する。first pass (上のループ) は
+            // 注入前の AST を parse し直して索引化しており、source 宣言の意味論を
+            // 注入で変えない (main parser の構成には injector を入れない)。
+            injectorByContext.get(context.id()).inject(cu);
             builderByContext.get(context.id()).process(cu);
             analyzedFileCount++;
             // cu はここでスコープを抜け、以降 GC 対象になる (AST の逐次破棄)。
@@ -301,8 +318,8 @@ public final class AnalysisRunner {
     /**
      * context ごとの SootUp 型階層索引と project bytecode member 索引を構築する。
      *
-     * <p>SootUp index は lazy のため全 context 分を先に用意し、solver の bytecode member 合成
-     * (feature doc「solver 層の bytecode member 合成」) と builder の候補解決で同一 instance を共有する。
+     * <p>SootUp index は lazy のため全 context 分を先に用意し、solver の bytecode member 合成と
+     * builder の候補解決で同一 instance を共有する。
      * 合成は「呼出元 context の classpath 視点」で行う (依存 project の型も自 context の classpath に
      * 含まれる classes output から引く)。emit 時に declIndex + 到達可能 context の検査で owner を制約する。
      */
@@ -366,7 +383,8 @@ public final class AnalysisRunner {
             List<SourceSetAnalysisContext> contexts,
             Map<String, SourceSetAnalysisContext> contextById,
             Map<String, Set<String>> reachableDependencies,
-            Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext) throws IOException {
+            Map<String, ProjectBytecodeMemberIndex> bytecodeIndexByContext,
+            Map<String, BytecodeMemberAstInjector> injectorByContext) throws IOException {
         Map<String, JavaParser> parserByContext = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
             List<Path> solverRoots = new ArrayList<>(context.sourceRoots());
@@ -382,12 +400,16 @@ public final class AnalysisRunner {
                     solverEntries.add(output);
                 }
             }
+            BytecodeMemberAstInjector injector =
+                    new BytecodeMemberAstInjector(bytecodeIndexByContext.get(context.id()));
             CombinedTypeSolver typeSolver = TypeSolverFactory.createForRoots(
-                    solverRoots, solverEntries, context.languageLevel(), bytecodeIndexByContext.get(context.id()));
+                    solverRoots, solverEntries, context.languageLevel(),
+                    bytecodeIndexByContext.get(context.id()), injector);
             ParserConfiguration config = new ParserConfiguration()
                     .setSymbolResolver(new JavaSymbolSolver(typeSolver))
                     .setLanguageLevel(context.languageLevel());
             parserByContext.put(context.id(), new JavaParser(config));
+            injectorByContext.put(context.id(), injector);
         }
         return parserByContext;
     }
@@ -509,8 +531,7 @@ public final class AnalysisRunner {
             if (outcome.candidates() != null && !outcome.candidates().isEmpty()) {
                 metadata.put("candidates", outcome.candidates());
             }
-            // 診断項目の正本は feature doc「diagnostic / error code 体系」。primary
-            // diagnostic として終端した call だけが、sanitize 済み
+            // primary diagnostic として終端した call だけが、sanitize 済み
             // 診断項目 (resolutionPhase / exceptionClass / receiverKind /
             // receiverTypeResolved) を details へ載せる。
             if (outcome.diagnosticMetadata() != null) {

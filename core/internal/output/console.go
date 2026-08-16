@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 	"github.com/Fukuemon/depwalk/core/internal/traversal"
@@ -18,7 +19,7 @@ func (consoleFormatter) Format(w io.Writer, view View) error {
 	}
 
 	tree := newConsoleTree(view)
-	if _, err := fmt.Fprintln(w, formatNode(view.Start, view.Start.Source)); err != nil {
+	if _, err := fmt.Fprintln(w, formatNode(view.Start, view.Start.Source)+formatEntryPoint(view.Start)); err != nil {
 		return err
 	}
 	tree.expanded[view.Start.ID] = true
@@ -113,7 +114,9 @@ func (tree *consoleTree) writeChildren(w io.Writer, parentID, prefix string) err
 		case tree.expanded[child.node.ID]:
 			marker = "既出"
 		}
-		if _, err := fmt.Fprintf(w, "%s%s%s%s\n", prefix, connector, formatNode(child.node, child.callSite), formatMarker(marker)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s%s%s%s%s\n",
+			prefix, connector, formatNode(child.node, child.callSite),
+			formatMarker(marker), formatEntryPoint(child.node)); err != nil {
 			return err
 		}
 		if marker != "" {
@@ -146,6 +149,38 @@ func formatNode(node NodeView, location *graph.SourceLocation) string {
 		return label
 	}
 	return fmt.Sprintf("%s  [%s:%d]", label, location.Path, location.StartLine)
+}
+
+// formatEntryPoint は framework 由来 entry point の標識を描画する。Console が意味
+// 解釈する metadata key は "entryPoint" だけ (opaque metadata 契約の唯一の例外)。
+// 値はアノテーションの FQN で、FQN の辞書順に並べてから "@" + 単純名へ変換し、変換後に重複を
+// 除く (analyzer によらず出力を決定的にするため)。配列でない値・string でない要素
+// は読み飛ばし、有効な FQN が残らなければ標識自体を出さない。
+func formatEntryPoint(node NodeView) string {
+	values, ok := node.Metadata["entryPoint"].([]any)
+	if !ok {
+		return ""
+	}
+	var fqns []string
+	for _, value := range values {
+		if fqn, ok := value.(string); ok && fqn != "" {
+			fqns = append(fqns, fqn)
+		}
+	}
+	slices.Sort(fqns)
+	seen := map[string]bool{}
+	var labels []string
+	for _, fqn := range fqns {
+		label := "@" + fqn[strings.LastIndex(fqn, ".")+1:]
+		if !seen[label] {
+			seen[label] = true
+			labels = append(labels, label)
+		}
+	}
+	if len(labels) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("  (entry point: %s)", strings.Join(labels, ", "))
 }
 
 func formatMarker(marker string) string {

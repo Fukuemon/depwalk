@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 呼び出しはその {@code <init>} を caller とする。record の通常 ctor (compact constructor なし) /
  * component accessor との整合も確認する。
  */
+@DisplayName("record の compact constructor の canonical constructor としての扱い")
 class RecordConstructorTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/recordctor");
@@ -24,6 +26,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("compact constructor は、record component の型列を signature に持つ <init> node になる")
     void compactConstructorProducesInitNode() throws Exception {
         List<Map<String, Object>> nodes = run().byType("methodSymbol");
         String initId = "java:com.example.UserRecord$User#<init>(java.lang.String,int)";
@@ -32,6 +35,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("compact constructor 本体の中の呼び出しは、その <init> を caller とする呼び出し関係 (edge) になる")
     void callWithinCompactConstructorBodyHasInitAsCaller() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         String callerId = "java:com.example.UserRecord$User#<init>(java.lang.String,int)";
@@ -41,6 +45,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("compact constructor 付き record を new するとき、宣言由来と同じ <init> node へ解決され、node は 1 件に重複排除される")
     void newExpressionOnRecordWithCompactConstructorResolvesToTheSameInitNode() throws Exception {
         AnalysisTestSupport.Ran ran = run();
         List<Map<String, Object>> edges = ran.byType("callEdge");
@@ -57,6 +62,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("compact constructor の無い record を new する場合でも、合成された canonical <init> へ解決される")
     void newExpressionOnRecordWithoutCompactConstructorStillResolvesToSyntheticInit() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         assertTrue(edges.stream().anyMatch(e ->
@@ -66,6 +72,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("record component の accessor 呼び出しは、通常のメソッドとして解決される")
     void componentAccessorCallResolvesNormally() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         assertTrue(edges.stream().anyMatch(e ->
@@ -75,6 +82,7 @@ class RecordConstructorTest {
     }
 
     @Test
+    @DisplayName("record 内に宣言した通常のインスタンスメソッドの呼び出しは、通常どおり解決される")
     void instanceMethodInsideRecordResolvesNormally() throws Exception {
         List<Map<String, Object>> edges = run().byType("callEdge");
         assertTrue(edges.stream().anyMatch(e ->

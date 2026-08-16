@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.discovery;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -9,8 +10,10 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@DisplayName("サポートする Gradle version 範囲と daemon JVM 互換の判定表")
 class GradleVersionSupportTest {
 
+    @DisplayName("Gradle version がサポート範囲 (7.6.5 以上 9.6.x 以下) に入るかどうかが判定される")
     @ParameterizedTest
     @CsvSource({
             "7.6.4, false",
@@ -28,6 +31,7 @@ class GradleVersionSupportTest {
     }
 
     @Test
+    @DisplayName("null・空文字・非標準表記の version のとき、サポート可否を確定させずに empty を返す")
     void reportsUndeterminableVersionsAsEmpty() {
         assertTrue(GradleVersionSupport.isSupportedGradleVersion(null).isEmpty());
         assertTrue(GradleVersionSupport.isSupportedGradleVersion("").isEmpty());
@@ -35,9 +39,10 @@ class GradleVersionSupportTest {
         assertTrue(GradleVersionSupport.isSupportedGradleVersion("9.6.1-branch").isEmpty());
     }
 
+    @DisplayName("Gradle version と daemon JVM major の組の互換が、公式 matrix の境界どおりに判定される")
     @ParameterizedTest
     @CsvSource({
-            // context/toolchain.md の CI anchor 3 組は必ず互換。
+            // CI anchor の 3 組は必ず互換。
             "7.6.5, 8, true",
             "8.14.5, 17, true",
             "9.6.1, 25, true",
@@ -58,6 +63,7 @@ class GradleVersionSupportTest {
     }
 
     @Test
+    @DisplayName("Gradle version を判別できないとき、daemon JVM 互換も確定させずに empty を返す")
     void reportsDaemonCompatibilityEmptyForUndeterminableGradleVersion(){
         assertTrue(GradleVersionSupport.isDaemonJvmCompatible("mystery", 17).isEmpty());
     }
