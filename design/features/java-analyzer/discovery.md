@@ -7,7 +7,7 @@ keywords:
   [discovery, Gradle, Tooling API, source root, classpath, composite build]
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
-verified_commit: 4cae142
+verified_commit: 70e70c5
 ---
 
 # Java Analyzer: Source root discovery
