@@ -5,7 +5,7 @@
 # 「その文書が今も正しいか」は機械的に判定できず、governs 配下が変わっても文書が
 # 正しいままのケースは日常的にある。それを FAIL 扱いにすると「内容を読まずに
 # verified_commit だけ進めて通す」ことが唯一の現実的な運用になり、gate が形骸化する。
-# それは検査が存在しないのと同じである (ADR-0008 業務ルール 2)。
+# それは検査が存在しないのと同じである。
 #
 # frontmatter の設定ミス (governs / verified_commit の片欠け) だけは exit 1 にする。
 # こちらは機械的に判定できる誤りであり、放置すると文書が一覧から静かに消えるため。
@@ -65,7 +65,7 @@ fresh = 0
 
 for d in docs:
     if not d["governs"]:
-        continue  # 鮮度検査の対象外 (両方欠落。ADR-0008 決定 1)
+        continue  # 鮮度検査の対象外 (governs / verified_commit の両方が欠落)
     if d["verified_commit"] == "unverified":
         unverified.append(d)
         continue
@@ -121,7 +121,7 @@ if not stale and not unverified and not broken:
 
 out.append("")
 out.append("確認したら該当文書の `verified_commit` を現在の HEAD へ進めてください。")
-out.append("日付ではなく commit で表す理由と運用は [ADR-0008](../adr/0008-doc-freshness-and-reading-map.md) を参照。")
+out.append("日付ではなく commit で表す理由と運用は [context/README.md](../context/README.md) の 文書メタ情報と鮮度 を参照。")
 
 report = "\n".join(out)
 print(report)

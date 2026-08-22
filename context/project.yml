@@ -130,8 +130,7 @@ paths:
   spec_review: specs/<issue-id>-<slug>/review.md # 任意
 
 # 読み取りマップ (「何を読めば足りるか」のルーティング表)。
-# 各文書の frontmatter から生成する。判断を定めるのは
-# adr/0008-doc-freshness-and-reading-map.md。
+# 各文書の frontmatter から生成する。運用は context/README.md が定める。
 reading_index:
   path: context/reading-map.yaml
   generated: true # 手編集しない。skill は generate_command を実行する

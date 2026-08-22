@@ -168,7 +168,7 @@ jobs:
       - name: Link check
         run: python3 scripts/check-links.py
 
-      # 一文の長さの検査 (ADR-0011)。表・箇条書き・コードは対象外にする。
+      # 一文の長さの検査。表・箇条書き・コードは対象外にする。
       # prettier と同じく node_modules を作らず、pin した版を npx で実行する。
       - name: Sentence length check
         run: |
@@ -178,7 +178,8 @@ jobs:
             -p textlint-filter-rule-node-types@1.1.0 \
             textlint --format compact 'context/*.md' 'design/**/*.md' 'adr/*.md' README.md
 
-      # 鮮度は常に exit 0。stale を理由に CI を落とさない (ADR-0008 業務ルール 2)。
+      # 鮮度は常に exit 0。判定が不確実な検査を FAIL にすると、内容を読まずに
+      # verified_commit だけ進めて通す運用へ堕ちるため、stale で CI を落とさない。
       # 結果は job summary に出して PR から読めるようにする。
       - name: Doc freshness report
         run: scripts/doc-freshness.sh

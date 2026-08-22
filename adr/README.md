@@ -11,10 +11,32 @@
 
 ## ADR にする判断
 
+**本プロダクト (depwalk) の技術判断だけを置く。**
+
 - 技術選定や rendering / runtime 方針を固定した。
 - モジュール / package の責務境界を固定した。
 - 共有方針 (UI / config / 共通基盤) を固定した。
 - 将来拡張 (新 app / API / 認証など) の採否を決めた。
 - 代替案比較を経て、採用方針を明示的に残す必要がある。
+
+## ADR にしない判断
+
+SDD の仕組み・文書構造・表現に関する判断は、本リポジトリに置かない。開発プロセスの資産は sdd-template リポジトリが定めて全消費リポジトリへ配るため、判断を消費側に持つと配布元と食い違う。
+
+対象は次のようなものである。
+
+- 文書のメタ情報・鮮度・索引の仕組み (frontmatter / `governs` / `verified_commit` / 読み取りマップ)
+- 文書のレイアウトと分割の方針、文体・用語・参照の書き方
+- 文書に対する機械検査 (リンク検査 / 一文の長さ / 生成物の drift) を入れるかどうかの判断
+- skill / rule / subagent の設計
+
+これらは sdd-template の `decisions.md` へ書く。本リポジトリ側に残すのは、その決定を**この repo でどう運用するか**だけであり、置き場は `context/` である。
+
+- [context/README.md](../context/README.md) の 文書メタ情報と鮮度: frontmatter の schema と鮮度検査の運用
+- [context/engineering.md](../context/engineering.md) の Repository Quality Gate: 文書検査の実行点と強度
+
+## 欠番
+
+`0008` / `0009` / `0011` は欠番である。文書運用の判断を扱っていたため sdd-template 側へ移した。番号は詰めない。既存の ADR や PR が参照する番号がずれるためである。
 
 テンプレートは `templates/adr/template.md` を `adr/NNNN-<title>.md` にコピーして使う。`templates/` は sdd-template から symlink で繋がっており本 repo では追跡しない (未接続なら `bash scripts/doctor.sh`)。
