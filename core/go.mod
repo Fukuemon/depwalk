@@ -1,6 +1,6 @@
 module github.com/Fukuemon/depwalk/core
 
-go 1.26.4
+go 1.27.0
 
 require github.com/spf13/cobra v1.10.2
 
