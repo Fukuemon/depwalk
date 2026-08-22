@@ -12,7 +12,7 @@ governs:
   # Java release は model-provider 側、同梱 Gradle の版は wrapper が持つ。
   - analyzers/java/model-provider/build.gradle.kts
   - analyzers/java/gradle/wrapper/gradle-wrapper.properties
-verified_commit: 70e70c5
+verified_commit: 7a29a6b
 ---
 
 # Toolchain
