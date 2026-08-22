@@ -152,7 +152,7 @@ edge の重複判定は caller / callee / call site から生成する既存 `ed
 framework 由来の暗黙呼び出しは次の opaque metadata で標識する。Protocol schema は変えない。
 
 - [analysis.md](analysis.md) の framework 由来の暗黙呼び出しの解決 — どの呼び出しを暗黙呼び出しとして解決するかを定める
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — 暗黙呼び出し解決と型伝播救済の範囲を定めた決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — 暗黙呼び出し解決と型伝播救済の範囲を定めた決定
 
 | key                     | 載る record             | 型       | 意味                                                                                         |
 | ----------------------- | ----------------------- | -------- | -------------------------------------------------------------------------------------------- |
@@ -237,4 +237,4 @@ jar 欠落を fatal にするのは、jar が 1 つ欠けるだけで広範囲�
 - [discovery.md](discovery.md): source root と classpath の決め方、Gradle daemon JVM の指定
 - [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md): JSONL wire schema と SPI
 - [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md): SootUp と Spring DI 解決を段階導入した決定
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定

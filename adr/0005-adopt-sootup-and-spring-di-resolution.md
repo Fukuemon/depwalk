@@ -92,7 +92,7 @@ source に現れない生成 member は、call site から要求された signat
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): 段階導入、dispatch の既知の制約
 - [design/features/java-analyzer/analysis.md](../design/features/java-analyzer/analysis.md): 型解決・Spring DI 解決・解析完全性の判定規則
 - [ADR-0004](0004-defer-runtime-call-tracing.md): 動的呼び出しの完全追跡との境界
-- [ADR-0012](0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済
+- [ADR-0009](0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済
 - issue / PR:
   - [#9](https://github.com/Fukuemon/depwalk/issues/9): Phase 1 の設計と実装分割
   - [#21](https://github.com/Fukuemon/depwalk/issues/21): SootUp 統合範囲・dispatch 候補表現・Spring 条件評価・性能受け入れ基準の決定記録

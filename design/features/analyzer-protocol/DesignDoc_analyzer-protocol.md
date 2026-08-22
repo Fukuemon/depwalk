@@ -133,7 +133,7 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 
 `methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。唯一の例外は `methodSymbol.metadata` の `entryPoint` key で、Console が表示のためにのみ意味解釈する。表示規則と例外の範囲は output feature doc が定める。
 
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — framework 由来の暗黙呼び出しを opaque metadata で標識すると定めた決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — framework 由来の暗黙呼び出しを opaque metadata で標識すると定めた決定
 
 bytecode にだけ存在する symbol は `sourceLocation` を省略できる。source owner との対応が必要なら、Analyzer 固有 metadata に保持する。
 
@@ -266,4 +266,4 @@ Handshake / capability negotiation は採用しない。
 - [output feature doc](../output/DesignDoc_output.md): 出力形式ごとの表示規則と View への変換契約
 - [graph feature doc](../graph/DesignDoc_graph.md): node / edge が持つ属性と wire → 値型の変換契約
 - [context/testing.md](../../../context/testing.md): test の責務分担と test runtime contract
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定

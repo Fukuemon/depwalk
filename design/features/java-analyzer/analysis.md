@@ -75,7 +75,7 @@ solver 経由の合成は、TypeSolver を通らない解決経路には効か�
 
 実環境で最も多い未解決は「entity 自身のメソッド内から自 class の生成 getter を呼ぶ」形である。そこで、生成 member の宣言そのものを parse 後の AST へ注入して補う。
 
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — 暗黙呼び出し解決と型伝播救済の範囲を定める
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — 暗黙呼び出し解決と型伝播救済の範囲を定める
 
 注入先は、解析対象の parse 結果と solver 内部の parse 結果の両方である。
 
@@ -161,7 +161,7 @@ SAM arity を推論できない method reference は救済せず、diagnostic �
 
 ### 型伝播救済層
 
-上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して bytecode 救済へ接続する。この範囲は ADR-0012 が定める。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
+上記の分類規則を拡張し、solver 失敗時に receiver 式の型を段階導出して bytecode 救済へ接続する。この範囲は ADR-0009 が定める。導出手段は次の 3 つで、いずれも classfile / 確定 AST を根拠とし、推測による型付けは行わない。
 
 1. **local 変数の宣言・初期化子**: receiver が local 変数 (var 宣言含む) のとき、宣言型または初期化子式の解決型から receiver 型を導出する
 2. **chain link の generic signature**: 規則 1 (chain の前進解決) の適用を拡大し、bytecode の generic Signature が型引数を保持する場合は型引数を伝播して要素型を復元する。JDK コレクション / Stream / Optional / Map の link は、classfile Signature と等価な「宣言済み generic 意味論の固定表」で伝播する
@@ -204,7 +204,7 @@ flowchart TD
 
 ## framework 由来の暗黙呼び出しの解決
 
-framework が実行時に起動する呼び出しを、ソース上の根拠 (アノテーション / 型 / AST) を伴う範囲で解決する。この範囲は ADR-0012 が定める。解決不能は diagnostic に残し、`silentOmission == 0` を維持する。
+framework が実行時に起動する呼び出しを、ソース上の根拠 (アノテーション / 型 / AST) を伴う範囲で解決する。この範囲は ADR-0009 が定める。解決不能は diagnostic に残し、`silentOmission == 0` を維持する。
 
 ### entry point 分類
 
@@ -260,4 +260,4 @@ invocation site が外部ライブラリ内にあるケース (`stream.map(...)`
 - [DesignDoc_java-analyzer.md](DesignDoc_java-analyzer.md): Java Analyzer の骨格 (実装基盤・package 境界・起動契約・性能)
 - [protocol-mapping.md](protocol-mapping.md): 解析結果を Protocol の record へ写す規則
 - [ADR-0005](../../../adr/0005-adopt-sootup-and-spring-di-resolution.md): SootUp と Spring DI 解決を段階導入した決定
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定

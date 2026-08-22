@@ -22,7 +22,7 @@ Output Engine の設計を定める。
 
 グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す。
 
-- [ADR-0010](../../../adr/0010-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
+- [ADR-0008](../../../adr/0008-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
 ## 背景・要件解釈
 
@@ -269,7 +269,7 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
 - **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`) を意味解釈せずそのまま載せる。保持の規則は graph feature doc が定める。欠落時 (nil) は field ごと省略する (omitempty)。キーの意味を定めるのは Analyzer 側 feature doc であり、Output はそのスキーマに依存しない。キーの例は `resolution` / `provenance` / `declaringType` / `inherited` である。Console へ人間向けに表示するのは `entryPoint` key だけとし、書式は「行の書式」の entry point 標識に従う。それ以外の key は Console に出さない。
-  - [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — `entryPoint` を Console が表示する例外を定める
+  - [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — `entryPoint` を Console が表示する例外を定める
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
@@ -410,5 +410,5 @@ sequenceDiagram
 - [traversal feature doc](../traversal/DesignDoc_traversal.md): 探索の意味論と結果構造の契約
 - [CLI feature doc](../cli/DesignDoc_cli.md): flag 体系と exit code の判別
 - [context/testing.md](../../../context/testing.md): test の責務分担
-- [ADR-0010](../../../adr/0010-defer-graph-visualization.md): 可視化出力をスコープから外した決定
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定
+- [ADR-0008](../../../adr/0008-defer-graph-visualization.md): 可視化出力をスコープから外した決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定

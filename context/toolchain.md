@@ -117,7 +117,7 @@ CI では次の 3 つを anchor として固定し、いずれも provider load�
 
 - Analyzer heap: 既定の heap では、中規模の実環境 multi-project (目安: call site 5 万規模) で `OutOfMemoryError` になり得る。`--analyzer-cmd` (または `DEPWALK_ANALYZER_CMD`) の java 起動に `-Xmx` を明示する。実測では `-Xmx8g` で 7 project / call site 52,411 を解析できた。
   - [cli feature doc](../design/features/cli/DesignDoc_cli.md) の exit code 体系 — OOM 検知時に Core が返す対処付きエラーと exit code を定める
-  - [ADR-0012](../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) — 暗黙呼び出し解決と型伝播救済の設計判断
+  - [ADR-0009](../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) — 暗黙呼び出し解決と型伝播救済の設計判断
 - Gradle daemon JVM: Analyzer JVM (JDK 25) が daemon へ引き継がれると、対象 Gradle が古い場合に互換範囲外となり discovery が失敗する (`JAVA_GRADLE_MODEL_ERROR` / daemon-jvm-incompatible)。回避策は `--analyzer-meta gradleJavaHome=<互換 JDK の path>` の明示指定であり、規則は discovery.md が定める。
 
 ## Scaffold Policy
@@ -132,7 +132,7 @@ CI では次の 3 つを anchor として固定し、いずれも provider load�
 - [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md): Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とする決定
 - [ADR-0002](../adr/0002-core-implementation-foundation.md): Core 実装基盤に Go と Go modules を採用した決定
 - [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md): Gradle Tooling API による source root 自動 discovery を採用した決定
-- [ADR-0012](../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): 暗黙呼び出し解決と型伝播救済の設計判断
+- [ADR-0009](../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): 暗黙呼び出し解決と型伝播救済の設計判断
 - [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md): 解析ライブラリの役割分担と実装基盤
 - [discovery.md](../design/features/java-analyzer/discovery.md): source root discovery の経路と `gradleJavaHome` の規則
 - [Analyzer Protocol / SPI feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema

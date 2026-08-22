@@ -48,7 +48,7 @@ Gradle daemon JVM は対象 Gradle の互換条件に従って選び、project c
 
 - 値は要素 1 の path とし、CLI からは `--analyzer-meta gradleJavaHome=<path>` で渡す。
 - 互換 JDK の暗黙の自動探索は行わず、明示 override だけを受け付ける。
-  - [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — daemon JVM を明示 override だけで指定すると定めた決定
+  - [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — daemon JVM を明示 override だけで指定すると定めた決定
 - 指定 path が要素 1 の実在する java home (`bin/java`、Windows は `bin/java.exe` が実行可能な directory) でなければ `JAVA_INVALID_REQUEST` で拒否する。
 - 明示 `sourceRoots` 経路では解釈しない。
 
@@ -88,4 +88,4 @@ Gradle の stdout / stderr は Protocol / CLI 出力へ転送せず破棄する�
 - [context/toolchain.md](../../../context/toolchain.md): Gradle discovery の互換 matrix
 - [context/infrastructure.md](../../../context/infrastructure.md): Gradle daemon の実行境界と安全性の前提
 - [ADR-0006](../../../adr/0006-adopt-gradle-tooling-api-discovery.md): Gradle Tooling API による source root 自動 discovery を採用した決定
-- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): 暗黙呼び出し解決と型伝播救済、daemon JVM の明示 override の決定
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): 暗黙呼び出し解決と型伝播救済、daemon JVM の明示 override の決定

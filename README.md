@@ -29,7 +29,7 @@ Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / �
 
 グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す。
 
-- [ADR-0010](adr/0010-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
+- [ADR-0008](adr/0008-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
 ## 使い方
 

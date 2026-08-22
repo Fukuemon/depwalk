@@ -87,7 +87,7 @@ depwalk はこの調査を自動化することを目的とする。
 
 本ツールは **CLI に限定**する。グラフの可視化は現時点で対象外とし、形式を決めないまま将来の課題として残す。
 
-- [ADR-0010](../adr/0010-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
+- [ADR-0008](../adr/0008-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
 ## Background
 
@@ -243,7 +243,7 @@ feature 単位の設計 (データ構造・主要シナリオ / フロー) は f
 | [ADR-0002](../adr/0002-core-implementation-foundation.md)        | Core 実装基盤として Go / Go modules / Go 標準 command を採用                                                          | [context/toolchain.md](../context/toolchain.md), [context/architecture.md](../context/architecture.md)                                    |
 | [ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md) | Java Analyzer に SootUp と Spring DI 解決を段階導入                                                                   | [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md)                                                            |
 | [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md)    | Java Analyzer の自動 discovery に Gradle Tooling API と custom model provider を採用し、明示 override では完全 bypass | [Java Analyzer feature doc](features/java-analyzer/DesignDoc_java-analyzer.md), [context/infrastructure.md](../context/infrastructure.md) |
-| [ADR-0010](../adr/0010-defer-graph-visualization.md)             | 可視化出力をスコープから外し、解析精度と永続化を優先                                                                  | 本 doc「Non Goals」, [output feature doc](features/output/DesignDoc_output.md)                                                            |
+| [ADR-0008](../adr/0008-defer-graph-visualization.md)             | 可視化出力をスコープから外し、解析精度と永続化を優先                                                                  | 本 doc「Non Goals」, [output feature doc](features/output/DesignDoc_output.md)                                                            |
 
 ## Open Questions / Future Work
 
@@ -282,4 +282,4 @@ landscape 層に未決の論点はない。JSONL スキーマ定義、SootUp の
 - [ADR-0002](../adr/0002-core-implementation-foundation.md): Core 実装基盤に Go / Go modules / Go 標準 command を採用した決定
 - [ADR-0005](../adr/0005-adopt-sootup-and-spring-di-resolution.md): SootUp と Spring DI 解決を段階導入した決定
 - [ADR-0006](../adr/0006-adopt-gradle-tooling-api-discovery.md): Gradle Tooling API による source root 自動 discovery を採用した決定
-- [ADR-0010](../adr/0010-defer-graph-visualization.md): 可視化出力をスコープから外した決定
+- [ADR-0008](../adr/0008-defer-graph-visualization.md): 可視化出力をスコープから外した決定
