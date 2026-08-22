@@ -45,7 +45,7 @@ class GradleCompatibilityMatrixTest {
             // 固定し、override が gradle.properties と等価に機能することを検証する。
             "7.6.5, 8, true",
             "8.14.5, 17, false",
-            "9.6.1, 25, false",
+            "9.7.1, 25, false",
     })
     void discoversTheSameModelOnEachAnchor(
             String gradleVersion, int daemonJavaMajor, boolean viaGradleJavaHome) throws Exception {

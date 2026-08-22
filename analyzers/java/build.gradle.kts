@@ -1,7 +1,7 @@
 plugins {
     java
     application
-    id("com.gradleup.shadow") version "9.5.1"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "com.fukuemon.depwalk"
@@ -27,7 +27,7 @@ dependencies {
     implementation("org.soot-oss:sootup.core:2.0.0")
     implementation("org.soot-oss:sootup.java.core:2.0.0")
     implementation("org.soot-oss:sootup.java.bytecode.frontend:2.0.0")
-    implementation("org.gradle:gradle-tooling-api:9.6.1")
+    implementation("org.gradle:gradle-tooling-api:9.7.1")
     // Tooling API は slf4j 経由で log を出す。Analyzer の stdout は Protocol
     // 専用・stderr は固定文のみのため、binding を nop に固定して Gradle 由来
     // の log 出力を遮断する (ADR-0006 の output 隔離)。
@@ -73,7 +73,7 @@ tasks.test {
 // daemon JDK は toolchain 解決 (foojay) で供給し、未解決 anchor は fail させる (skip 成功にしない)。
 val matrixJdkMajors = listOf(8, 17, 25)
 tasks.register<Test>("gradleCompatibilityTest") {
-    description = "Gradle 7.6.5/8.14.5/9.6.1 × daemon JDK 8/17/25 の discovery 互換性 matrix"
+    description = "Gradle 7.6.5/8.14.5/9.7.1 × daemon JDK 8/17/25 の discovery 互換性 matrix"
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath

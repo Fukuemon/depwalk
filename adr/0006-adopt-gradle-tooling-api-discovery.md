@@ -16,7 +16,11 @@ Java project は single-root だけでなく multi-project、変更された `pr
 
 ## 決定
 
-Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling API `9.6.1` を使い、対象 build の実効 model から解析 context を discovery する。
+Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling API を使い、対象 build の実効 model から解析 context を discovery する。
+
+本 ADR に書く版は決定時点 (Tooling API `9.6.1` / 対象 Gradle `7.6.5 <= version < 9.7.0`) のものである。**現在どの版を対象にするかは context が定める。**
+
+- [context/toolchain.md](../context/toolchain.md) の Gradle discovery compatibility matrix — 現行の版と対応範囲を定める
 
 ```mermaid
 flowchart TD

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("サポートする Gradle version 範囲と daemon JVM 互換の判定表")
 class GradleVersionSupportTest {
 
-    @DisplayName("Gradle version がサポート範囲 (7.6.5 以上 9.6.x 以下) に入るかどうかが判定される")
+    @DisplayName("Gradle version がサポート範囲 (7.6.5 以上 9.7.x 以下) に入るかどうかが判定される")
     @ParameterizedTest
     @CsvSource({
             "7.6.4, false",
@@ -22,7 +22,9 @@ class GradleVersionSupportTest {
             "8.14.5, true",
             "9.6.1, true",
             "9.6.9, true",
-            "9.7.0, false",
+            "9.7.1, true",
+            "9.7.9, true",
+            "9.8.0, false",
             "10.0, false",
             "7.5, false",
     })
@@ -45,7 +47,7 @@ class GradleVersionSupportTest {
             // CI anchor の 3 組は必ず互換。
             "7.6.5, 8, true",
             "8.14.5, 17, true",
-            "9.6.1, 25, true",
+            "9.7.1, 25, true",
             // Gradle 公式 matrix の境界。
             "7.6.5, 19, true",
             "7.6.5, 20, false",
@@ -56,6 +58,10 @@ class GradleVersionSupportTest {
             "9.0.0, 16, false",
             "9.0.0, 17, true",
             "9.0.0, 25, false",
+            "9.3.0, 25, true",
+            "9.3.0, 26, false",
+            "9.4.0, 26, true",
+            "9.4.0, 27, false",
             "9.6.1, 16, false",
     })
     void judgesDaemonJvmCompatibility(String version, int javaMajor, boolean want) {
