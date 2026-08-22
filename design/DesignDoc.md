@@ -89,9 +89,7 @@ depwalk はこの調査を自動化することを目的とする。
 
 - [ADR-0008](../adr/0008-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
-## Background
-
-### 設計上の前提
+## 設計上の前提
 
 - 解析は **静的解析**で行う (実行時情報には依存しない)。
 - 対象は **JVM 言語を先行**し、まず Java/Spring Boot を扱う。Kotlin / TypeScript / Vue / Go は将来対象。
