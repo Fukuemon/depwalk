@@ -10,7 +10,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: 4cae142
+verified_commit: 4455e86
 ---
 
 # Java Analyzer: 解析エンジン
@@ -174,6 +174,7 @@ SAM arity を推論できない method reference は救済せず、diagnostic �
 - downstream collector 付き `groupingBy` の値型は導出しない (値型が downstream に依存し、固定表では確定できないため)
 - project bytecode に無い型への unbound method reference は導出しない
 - `java.lang.Object` は owner の根拠にしない。型変数・raw・欠落の erasure と見分けが付かないため、既存の前進解決と同じ規則で打ち切る
+- **変位を持つ型引数 (`?` / `? extends X` / `? super X`) は generic を諦めて erasure へ落とす。** chain の型導出でも要素型の根拠にしない。境界の型だけを見ると変位が消え、`List<? super Foo>` を `List<Foo>` として扱ってしまう。この差は overload の選択を変えるため、誤った edge になる
 
 JavaParser が「型引数を Object へ落とした部分成功」の解決結果を返す chain では、解決結果を捨てずに手段 2 の導出とマージし、劣化した型引数だけを補う。解決済みの erasure と導出の erasure が食い違う場合は、解決結果を正とする。
 

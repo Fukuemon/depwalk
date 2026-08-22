@@ -6,7 +6,7 @@ status: 完了
 keywords: [traversal, caller, callee, depth, minDepth]
 governs:
   - core/internal/traversal
-verified_commit: aa7de4c
+verified_commit: 4455e86
 ---
 
 # Feature 設計: Traversal (Caller / Callee 探索)

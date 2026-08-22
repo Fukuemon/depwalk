@@ -7,7 +7,7 @@ governs:
   - core/e2e
   - testdata
   - analyzers/java/src/test
-verified_commit: 4cae142
+verified_commit: 4455e86
 ---
 
 # Testing Conventions
@@ -97,6 +97,8 @@ Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実
 - 実 jar を起動する E2E だけが JDK 25 + build 済み fat jar を要求する。CI は「Go job (JVM 不要)」と「Java + E2E job (JDK 25 / Gradle build)」に分ける。
 - fake analyzer を使うテストでも、実 Core CLI の端から端までを見るなら `core/e2e/` に置く。この場合の skip 条件は JDK / jar の有無ではなく実行環境になる (POSIX shell に依存する fake なら `runtime.GOOS == "windows"` で skip する)。
 - inline workspace 系統は `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡し、classpath なしの source-only 解析として走らせる。metadata の透過表出を見るときは `--format json` の `nodes[].metadata` / `edges[].metadata` を照合する。
+- **Java unit test が `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer runtime と同じ 25 にする。** SootUp が読める classfile major は同梱する ASM の版で決まり、読めない major に当たると bytecode 救済が例外なしに静かに無効化される。古い major を明示して回避すると、SootUp が新しい major へ追随しなくなったときに検出できないまま実環境で無効化される。runtime と同じ major で compile することだけが、その回帰を test に捕まえさせる。
+  - [toolchain.md](toolchain.md) の 実装上の互換性ハマりどころ — SootUp と classfile major の対応、および実測結果を定める
 - 複数 context (project 依存関係) を要する Java unit test は、実 Gradle を起動せず in-memory の fake build model から production の context 構築を通して解析 pipeline を駆動する。model 取得 (Tooling API / daemon) の検証は E2E 側だけが担う。E2E はほかに CLI 結合や graph 全体照合も担う。境界の詳細は java-analyzer feature doc のテスト観点にある。
 
 ## path 比較は real path 基準 (macOS symlink)

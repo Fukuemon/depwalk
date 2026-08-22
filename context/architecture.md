@@ -7,7 +7,7 @@ governs:
   - core/internal
   - analyzers/java/src/main
   - core/.golangci.yml
-verified_commit: 57b9259
+verified_commit: 4455e86
 ---
 
 # Codebase Architecture
