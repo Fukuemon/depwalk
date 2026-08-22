@@ -6,7 +6,7 @@ keywords: [infrastructure, CI, secret, 運用, Gradle daemon]
 governs:
   - .github/workflows
   - analyzers/java/build.gradle.kts
-verified_commit: 57b9259
+verified_commit: 7a29a6b
 ---
 
 # Infrastructure & Operations

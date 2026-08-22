@@ -43,7 +43,7 @@ class BytecodeOnlyMemberTest {
         // SootUp 2.0 が読める classfile 範囲に合わせて --release 17 で compile する
         // (Analyzer runtime JDK と対象 project の compile toolchain は別軸)。
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17",
+                "--release", "25",
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 
@@ -103,7 +103,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("chain-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17",
+                "--release", "25",
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 
@@ -152,7 +152,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("inherit-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17", "-d", classes.toString(),
+                "--release", "25", "-d", classes.toString(),
                 build.resolve("com/example/Base.java").toString(),
                 build.resolve("com/example/Child.java").toString());
         assertEquals(0, rc, "fixture compile failed");
@@ -208,7 +208,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("generic-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17", "-d", classes.toString(),
+                "--release", "25", "-d", classes.toString(),
                 build.resolve("com/example/Item.java").toString(),
                 build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
@@ -281,7 +281,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("jar-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17",
+                "--release", "25",
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
         Path jar = temp.resolve("stale-owner.jar");
@@ -330,7 +330,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("static-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17",
+                "--release", "25",
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 

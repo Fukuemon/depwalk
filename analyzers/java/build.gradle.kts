@@ -24,9 +24,9 @@ repositories {
 dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.22.2")
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.28.2")
-    implementation("org.soot-oss:sootup.core:2.0.0")
-    implementation("org.soot-oss:sootup.java.core:2.0.0")
-    implementation("org.soot-oss:sootup.java.bytecode.frontend:2.0.0")
+    implementation("org.soot-oss:sootup.core:3.0.1")
+    implementation("org.soot-oss:sootup.java.core:3.0.1")
+    implementation("org.soot-oss:sootup.java.bytecode.frontend:3.0.1")
     implementation("org.gradle:gradle-tooling-api:9.7.1")
     // Tooling API は slf4j 経由で log を出す。Analyzer の stdout は Protocol
     // 専用・stderr は固定文のみのため、binding を nop に固定して Gradle 由来
