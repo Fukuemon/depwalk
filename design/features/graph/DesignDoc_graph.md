@@ -10,7 +10,7 @@ governs:
   # staging / 公開の原子性も定義する。その実装は下の 2 package にある。
   - core/internal/protocol
   - core/internal/analyze
-verified_commit: 24e3157
+verified_commit: 4455e86
 ---
 
 # Feature 設計: Graph (呼び出しグラフのデータモデル)

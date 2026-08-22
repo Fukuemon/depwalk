@@ -10,7 +10,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: 4cae142
+verified_commit: 4455e86
 ---
 
 # Java Analyzer: 解析エンジン

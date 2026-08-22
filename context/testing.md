@@ -7,7 +7,7 @@ governs:
   - core/e2e
   - testdata
   - analyzers/java/src/test
-verified_commit: 4cae142
+verified_commit: 4455e86
 ---
 
 # Testing Conventions
