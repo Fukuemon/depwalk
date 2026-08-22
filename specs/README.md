@@ -13,4 +13,4 @@ issue が close したら削除する (closeout)。長く残る判断は削除�
 手順は `spec-lifecycle` skill の `references/closeout.md` が定める。
 テンプレートは `templates/specs/template.md` (sdd-template から symlink で繋がる)。
 
-現在 spec はない。#40 の spec は 2026-08-03 に closeout した。
+現在 spec はない。

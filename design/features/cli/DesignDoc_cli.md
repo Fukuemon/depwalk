@@ -12,11 +12,13 @@ verified_commit: 4cae142
 
 # Feature 設計: CLI Interface (analyze コマンドの flag 体系と結合)
 
-depwalk CLI の設計を定める。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層と analyze use case)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
+depwalk CLI の設計を定める。定義するのは次の 7 つである。コマンド構造、flag 体系、method selector 書式、責務配置 (CLI 層 / analyze use case / ACL)、exit code 体系、出力先規約、CLI プロセス E2E の検証方針。
 
 ## 背景・要件解釈
 
-depwalk の中核機能は traversal / output / 解析パイプラインに分かれて実装されている。CLI はそれらを `analyze` コマンド 1 本へ結合し、[DesignDoc](../../DesignDoc.md) の成功条件 S1 (呼び出し元の網羅的な列挙) / S2 (呼び出し先の列挙) / S3 (Console・JSON 等での出力) を、利用者から見える形で達成させる層である。
+depwalk の中核機能は traversal / output / 解析パイプラインに分かれて実装されている。CLI はそれらを `analyze` コマンド 1 本へ結合する層である。結合によって、成功条件 S1 (呼び出し元の網羅的な列挙) / S2 (呼び出し先の列挙) / S3 (Console / JSON 等での出力) を利用者から見える形にする。
+
+- [design/DesignDoc.md](../../DesignDoc.md) の 提供価値 / 成功条件 (What) — S1 / S2 / S3 の内容と測定方法を定める
 
 ## コマンド構造と flag 体系
 
@@ -30,7 +32,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 
 | flag          | 型                         | 既定値                               | 説明                                                                                                           |
 | ------------- | -------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `--method`    | string                     | (未指定なら現行のサマリ動作)         | method selector (下記書式)。省略時は件数サマリ + diagnostics のみ (後方互換)                                   |
+| `--method`    | string                     | なし                                 | method selector (下記書式)。省略時は件数サマリと diagnostics だけを出す                                        |
 | `--direction` | string (`caller`/`callee`) | `caller`                             | 探索方向 (`graph.Direction` に対応)。不正値は許容値一覧を添えてエラー                                          |
 | `--max-depth` | int (非負)                 | 無制限                               | 深さ上限 (`traversal.Request.MaxDepth`)。0 = 起点のみ。負値はエラー                                            |
 | `--format`    | string                     | `console`                            | 出力形式。値域は output registry 登録済み formatter のみ (`output.RegisteredFormats()` 参照、ハードコード禁止) |
@@ -40,12 +42,14 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 flag は 2 群に分かれ、互いに独立している。
 
 - **解析対象を指定する群**: `--analyzer-cmd` / `--language` / `--analyzer-meta` / `--source-root`
+  - [ADR-0003](../../../adr/0003-analyzer-command-resolution.md) — Analyzer 起動コマンドを言語非依存な文字列として解決する決定
 - **探索を指定する群**: `--method` / `--direction` / `--max-depth` / `--format`
-  Analyzer 起動契約を定めるのは [ADR-0003](../../../adr/0003-analyzer-command-resolution.md)。
 
-`sourceRoots` / `include` / `exclude` の意味論を定めるのは [Analyzer Protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の `analysisRequest` 節。CLI は glob・path の意味解釈を行わず透過のみを担う。
+CLI は glob と path の意味を解釈せず、値を透過するだけである。
 
-**拡張余地**: 新出力形式は formatter 実装 + registry 登録だけで CLI に自動露出する。新しいクエリ種別 (例: パス探索) はサブコマンド新設でも flag 追加でも拡張できる (本節冒頭の方針宣言による)。
+- [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の `analysisRequest` — `sourceRoots` / `include` / `exclude` の意味論を定める
+
+**拡張余地**: 新しい出力形式は formatter 実装と registry 登録だけで CLI に自動露出する。新しいクエリ種別 (例: パス探索) は、サブコマンド新設でも flag 追加でも足せる。
 
 ## method selector 書式
 
@@ -59,8 +63,10 @@ flag は 2 群に分かれ、互いに独立している。
 
 ## 責務配置
 
-- **CLI 層 (`core/internal/cli`)**: flag 定義・入力 validation・エラー表示 (stderr)・exit code 判別。加えてコンポジションルートとして Analyzer 起動コマンドの解決 (ADR-0003) と ACL adapter の port への手動 DI を行い、探索結果の `output.Write` を呼ぶ (いずれも #34 で use case から移動。依存規則は [architecture.md](../../../context/architecture.md) の Package Boundary)。
-- **analyze use case (`core/internal/analyze`)**: 解析要求の組み立てと port 経由の実行、graph 構築後の method selector 照合・`traversal.Traverse` の orchestration。照合の曖昧・不一致は候補一覧を含む種別付きエラーで CLI 層へ返す。wire 表現 (`analysisRequest` の schemaVersion / requestId / AnalysisMode 常時 `fullGraph` / `Entrypoints` 空。) の組み立ては ACL (`core/internal/protocol`) が担う (#34)。
+- **CLI 層 (`core/internal/cli`)**: flag 定義、入力 validation、エラー表示 (stderr)、exit code 判別。加えてコンポジションルートとして、Analyzer 起動コマンドの解決と ACL adapter の port への手動 DI を行い、探索結果の `output.Write` を呼ぶ。
+  - [architecture.md](../../../context/architecture.md) の Package Boundary — package 単位の依存方向を定める
+- **analyze use case (`core/internal/analyze`)**: 解析要求の組み立てと port 経由の実行、graph 構築後の method selector 照合、`traversal.Traverse` の orchestration。照合が曖昧または不一致のときは、候補一覧を含む種別付きエラーで CLI 層へ返す。
+- **ACL (`core/internal/protocol`)**: wire 表現の組み立て。`analysisRequest` の schemaVersion / requestId、常時 `fullGraph` の AnalysisMode、空の `Entrypoints` はここで決める。
 - 探索方向に関わらず常時 fullGraph で解析し、方向による挙動分岐を持たない。
 
 ## exit code 体系
@@ -68,16 +74,25 @@ flag は 2 群に分かれ、互いに独立している。
 | exit | 区分         | 該当                                                                                                                                                                                                       |
 | ---- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0    | 探索成功     | 結果が空 (到達 node なし) や depthLimit cutoff 注釈付きも成功扱い。結果は stdout へ                                                                                                                        |
-| 1    | 実行時エラー | Analyzer 起動失敗、protocol 違反、Analyzer fatal (構造化表示 `renderAnalyzerFailure` を維持)、出力書き込み失敗                                                                                             |
+| 1    | 実行時エラー | Analyzer 起動失敗、protocol 違反、Analyzer fatal (`renderAnalyzerFailure` で構造化表示)、出力書き込み失敗                                                                                                  |
 | 2    | 入力エラー   | 不正な flag 値 (`--direction`/`--format`/`--max-depth` の値域外)、method selector のオーバーロード曖昧・不一致 (startNotFound 相当)、`--source-root`/`--include`/`--exclude` の不正 path/glob (validation) |
 
-- Cobra 既定 (RunE エラーを常に exit 1) に委ねず、CLI 層でエラー種別を判別して 0/1/2 を返す。
-- エラーメッセージ・候補一覧・diagnostics は stderr、探索結果のみ stdout (JSON の機械パース性の保護)。
-- Analyzer が valid `error` record なしで異常終了した場合、stderr の `java.lang.OutOfMemoryError` パターンを検知したときは「analyzer の heap 不足。`--analyzer-cmd` (または `DEPWALK_ANALYZER_CMD`) の java 起動に `-Xmx` を追加・増加する」という対処を含むエラーを表示する (exit 1。検知規則の契約は [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md) の「異常終了時の stderr の扱い」)。
+- Cobra 既定 (RunE エラーを常に exit 1) に委ねず、CLI 層でエラー種別を判別して 0 / 1 / 2 を返す。
+- エラーメッセージ、候補一覧、diagnostics は stderr へ出し、探索結果だけを stdout へ出す。JSON の機械パース性を守るためである。
+- Analyzer が valid `error` record なしで異常終了し、stderr に `java.lang.OutOfMemoryError` パターンを検知したときは、対処を含むエラーを表示する。対処の内容は「analyzer の heap 不足。`--analyzer-cmd` (または `DEPWALK_ANALYZER_CMD`) の java 起動に `-Xmx` を追加・増加する」とし、exit code は 1 とする。検知規則そのものは analyzer-protocol feature doc の「異常終了時の stderr の扱い」が定める。
 
 ## テスト (CLI プロセス E2E)
 
 - `os/exec` で build 済み depwalk バイナリを実プロセス起動し、stdout / stderr / exit code を検証する (harness の `buildCoreCLI` / `runCLI` を再利用する)。
 - console / json とも golden file との完全一致で照合し、json は加えて Unmarshal 成功を検証する (成功条件 S3 を CLI レベルで確かめる)。
-- 既存のグラフレベル E2E (`protocol.Runner` を直接呼び出し、record 単位で照合する層) と合わせた 2 層構成 ([context/testing.md](../../../context/testing.md) の E2E 2 層構造)。
+- グラフレベル E2E (`protocol.Runner` を直接呼び出し、record 単位で照合する層) と合わせて 2 層構成とする。
+  - [context/testing.md](../../../context/testing.md) の E2E 2 層構造 — 層ごとの担保範囲を定める
 - method selector は完全 signature、signature 省略の一意一致 / overload 曖昧性に加え、nested class の binary name (`Outer$Inner#method`) を回帰検証する。
+
+## 関連ドキュメント
+
+- [design/DesignDoc.md](../../DesignDoc.md): system landscape とモジュール責務
+- [analyzer-protocol feature doc](../analyzer-protocol/DesignDoc_analyzer-protocol.md): `analysisRequest` の意味論と異常終了時の stderr の扱い
+- [context/architecture.md](../../../context/architecture.md): package 単位の依存方向
+- [context/testing.md](../../../context/testing.md): test の責務分担と E2E の層構造
+- [ADR-0003](../../../adr/0003-analyzer-command-resolution.md): Analyzer 起動コマンドを言語非依存な文字列として解決する決定

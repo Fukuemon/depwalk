@@ -20,11 +20,15 @@ Output Engine の設計を定める。
 | **Console** | 端末にそのまま表示するツリー表現 | 人                    |
 | **JSON**    | 機械処理向けの構造化データ       | スクリプト / 他ツール |
 
-グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す (判断を定めるのは [ADR-0010](../../../adr/0010-defer-graph-visualization.md))。
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外である。形式を決めないまま将来の課題として残す。
+
+- [ADR-0010](../../../adr/0010-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
 ## 背景・要件解釈
 
-調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理用途 (JSON) の双方で使われる ([DesignDoc](../../DesignDoc.md) の成功条件 S3「呼び出しグラフを Console / JSON で出力できる」)。対応形式はこの 2 つで、図として描く形式は持たない ([ADR-0010](../../../adr/0010-defer-graph-visualization.md))。形式を足すときに Output Engine の構造を作り直さずに済むことを設計目標とする。
+調査結果の呼び出しグラフは、人が読む用途 (Console) と機械処理用途 (JSON) の双方で使われる。形式を足すときに Output Engine の構造を作り直さずに済むことを設計目標とする。
+
+- [design/DesignDoc.md](../../DesignDoc.md) の 提供価値 / 成功条件 (What) — 成功条件 S3「呼び出しグラフを Console / JSON で出力できる」を定める
 
 ## スコープ
 
@@ -37,16 +41,20 @@ Output Engine の設計を定める。
 
 ### やらないこと
 
-- グラフのビューワ提供、および図として描く形式の生成 (Non Goals / ADR-0010)。
-- 探索の意味論 (定めるのは [traversal feature doc](../traversal/DesignDoc_traversal.md))。
-- graph が保持する属性の定義 (定めるのは [graph feature doc](../graph/DesignDoc_graph.md))。
-- CLI の引数名 / exit code / エラー表示先 (定めるのは [CLI feature doc](../cli/DesignDoc_cli.md))。Output は `error` を返すところまでを責務とする。
+- グラフのビューワは提供しない。図として描く形式も生成しない。
+- 探索の意味論。traversal feature doc が定める。
+- graph が保持する属性の定義。
+  - [graph feature doc](../graph/DesignDoc_graph.md) の 設計 — node / edge が保持する属性と変換契約を定める
+- CLI の引数名 / exit code / エラー表示先。Output は `error` を返すところまでを責務とする。
+  - [CLI feature doc](../cli/DesignDoc_cli.md) の 責務配置 — flag 体系と exit code の判別を定める
 
 ## 設計
 
 ### 公開 entry point と Formatter / View
 
-`output.Write` を唯一の描画 entry point とし、format 検証 → `View` 構築 → formatter 選択 → 描画を担う。呼び出し側 (コンポジションルートである CLI 層) は formatter / `View` を知らず、`Write` と `RegisteredFormats` だけを使う。formatter interface は package 内に閉じており公開しない (新形式の追加は package 内の変更で完結する)。加えて `output.RegisteredFormats() []string` を公開し、CLI 層が `--format` の許容値検証とエラーメッセージの一覧表示に使う (許可値のハードコード禁止。formatter の registry 登録だけで CLI へ自動露出する)。
+`output.Write` を唯一の描画 entry point とする。`Write` は format 検証、`View` 構築、formatter 選択、描画の 4 つを担う。呼び出し側はコンポジションルートである CLI 層であり、formatter と `View` を知らずに `Write` と `RegisteredFormats` だけを使う。formatter interface は package 内に閉じ、公開しない。新しい形式の追加を package 内の変更で完結させるためである。
+
+`output.RegisteredFormats() []string` は公開する。CLI 層はこれを `--format` の許容値検証と、エラーメッセージでの一覧表示に使う。CLI 側に許可値をハードコードしてはならない。formatter を registry へ登録するだけで CLI へ自動的に露出させる。
 
 ```go
 // core/internal/output
@@ -90,7 +98,7 @@ type NodeView struct {
     Signature     string
     Source        *graph.SourceLocation // nil なら位置情報なし
     MinDepth      int                      // 起点からの最短距離。Result の minDepth を View 構築時に引き継ぐ
-    Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出 (issue #22)
+    Metadata      map[string]any           // Analyzer 固有情報 (opaque, optional)。JSON のみ表出
 }
 
 // EdgeView は 1 edge の Formatter 向け表現。
@@ -121,9 +129,8 @@ type formatter interface {
 
 - **Formatter は `View` 以外に依存しない**: Console / JSON いずれの出力項目も `View` / `NodeView` / `EdgeView` / `CutoffView` の field からのみ得られる (`traversal.Result` や `graph.Graph` へ直接アクセスしない)。全出力項目と対応 field の一覧は「View 境界の全数対応」節が定める。
 - **決定性の規約は `View` 構築に 1 本化する**: `Nodes` / `Edges` / `Cutoffs` を id の辞書順に固定し、同一 Result から常に同一のバイト列を出力する。
-- symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する ([graph feature doc](../graph/DesignDoc_graph.md) が属性を定める)。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
-- `traversal.Request` を入力に含めるのは、`traversal.Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
-- **`View` は `Request` の `direction` / `start` を保持して Formatter へ運ぶ** (JSON の `direction` field と Console の子方向判定・文言分岐が必要とするため)。
+- symbol (`QualifiedName` / `Signature` / `Source` / `CallSite`) は Graph の読み取り API から解決する。属性の定義は graph feature doc が持つ。`NodeView` は symbol 欠落 (ID のみ。`startNotFound` 時の起点など) を許容する。
+- **`View` は `Request` の `direction` / `start` を保持して Formatter へ運ぶ**: `traversal.Result` がこの 2 つを持たないため、`Input` に `traversal.Request` を含める。JSON の `direction` field と `start` field、Console の子方向判定と文言分岐が必要とする。
 - **`NodeView.MinDepth` / `CutoffView.TargetMinDepth` は `traversal.Result` の `minDepth` 公開を View 構築時に引き継ぐ** (JSON の `nodes[].minDepth` / `depthCutoffs[].targetMinDepth` が Formatter 内で `traversal.Result` に触れずに済むようにするため)。
 - 出力は `io.Writer` への逐次書き出しで足り、専用の streaming 機構は導入しない (graph は全体がメモリ上にあり、出力サイズは到達集合に比例する)。
 
@@ -165,7 +172,7 @@ Console / JSON 両 Formatter が出力する全項目と、対応する `View` f
 | 未対応 format 指定                                  | —                                                                         | —                                            | `error` (出力前に validation。対応形式を案内) |
 | `io.Writer` への書き込み失敗                        | —                                                                         | —                                            | `error`                                       |
 
-- 「到達なし」の判定は **`Edges` が空 かつ `Cutoffs` も空**。`maxDepth=0` では起点の隣接 edge が cutoff になる (起点 self-loop は誘導 edge として残る — traversal feature doc の `maxDepth=0` 契約) ため、`Edges` 空だけで判定してはならない。
+- 「到達なし」の判定は **`Edges` が空 かつ `Cutoffs` も空**である。`maxDepth=0` では起点の隣接 edge が cutoff になるため、`Edges` が空であることだけで判定してはならない。このとき起点の self-loop は誘導 edge として残る。traversal feature doc が定める `maxDepth=0` の契約による。
 - 該当なし / 到達なしの分岐は各 Formatter の内部で行う (`View.Status` / `Edges` / `Cutoffs` の 3 つを見る)。見せ方が形式ごとに異なるため、`Write` は status で分岐しない。
 - exit code とエラー表示先は CLI の責務。
 
@@ -180,7 +187,7 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 3. **兄弟の順序** = `qualifiedName` → `signature` → `methodId` の辞書順 (出力を決定的にするため)。
 4. **展開順序** = 上記順序の pre-order DFS。**node の展開に入る時点で、その node 自身を「展開済み」に記録し「経路上の祖先集合」に加える** (root を含む)。これにより self-loop も規則 6 の `(cycle)` になり、root の self-loop で root が再展開されることもない。
 5. **初出のみ展開** = 部分木を展開するのは tree 中で最初に出現したときの 1 回のみ。出力行数は O(到達 edge 数) に収まり、**停止性はこの規則だけで保証される**。
-6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない。** この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質であり、打ち切りに使うと 3 要素 SCC で最初の edge が切られて node が tree から消えるためである:
+6. **再登場 node の標識** = 展開しない葉に 2 種類の標識を付ける。判定は Console formatter が DFS 中に保持する経路 (祖先集合) で行う。**`Result.Cycles` (= `View.Edges[].Cycle` として運ばれる) は使わない。** この flag は同一 SCC の誘導 edge すべてを注釈するグラフ全体の性質である。打ち切りに使うと、3 要素 SCC で最初の edge が切られ、node が tree から消える:
    - **`(cycle)`** = 現在の経路上の祖先に戻る edge (back edge) の先。
    - **`(既出)`** = 祖先ではないが、別の枝で展開済みの node (合流)。
 7. **`… (depth limit: N edges cut)`** = cutoff edge の到達側 endpoint の子として、**子の最後に** 1 行出す。N はその node からの cutoff edge 数。cutoff 先 (`targetMethodId`) は到達集合外のため名前を出さない。
@@ -191,7 +198,11 @@ Traversal result は tree ではなく集合であるため、tree 化の規則�
 
 - node ラベル = `signature`。`signature` が欠落する場合だけ `qualifiedName`、さらに欠落する場合は `methodId` へ fallback する。Analyzer Protocol の `signature` は overload を区別する正規化済み表現であり、Core は言語固有の区切り文字や引数部分を解析しない。
 - 位置情報: 子行は `edge.CallSite` (呼び出し箇所)、root は宣言位置 (`Symbol.Source`)。欠落時は位置表記を省略する。メソッドの宣言位置は Console では出さない (JSON が両方持つ)。
-- **entry point 標識**: node の `Metadata` に `entryPoint` key (string 配列。値は検出アノテーションの FQN、Analyzer 側 feature doc が定める) が存在するとき、行末 (既存の `(cycle)` / `(既出)` 標識よりさらに後ろ) に `  (entry point: <simple 名をカンマ区切り>)` を付す (例: `  (entry point: @Scheduled)`)。simple 名変換 (`@` + FQN の最終 segment) 後に重複する場合は 1 つに除去し、変換前 FQN の辞書順を維持する。Output が意味解釈する metadata key はこの `entryPoint` のみで、配列の中身は FQN → simple 名の表示変換以外に解釈しない。key が無い node には何も出さない。root 行にも同じ規則で付す。表示順は Output 側で変換前 FQN を辞書順ソートして保証する (Analyzer の出力順に依存しない)。
+- **entry point 標識**: node の `Metadata` に `entryPoint` key があるとき、行末に `  (entry point: <simple 名をカンマ区切り>)` を付す (例: `  (entry point: @Scheduled)`)。位置は既存の `(cycle)` / `(既出)` 標識よりさらに後ろとする。key が無い node には何も出さない。root 行にも同じ規則を適用する。
+  - `entryPoint` の値は検出アノテーションの FQN を並べた string 配列であり、その中身は Analyzer 側 feature doc が定める。
+  - simple 名は `@` + FQN の最終 segment とする。変換後に重複する名前は 1 つに除去し、変換前 FQN の辞書順を保つ。
+  - 表示順は Output 側で変換前 FQN を辞書順にソートして決める。Analyzer の出力順には依存しない。
+  - Output が意味解釈する metadata key はこの `entryPoint` だけで、配列の中身も simple 名への表示変換以外には解釈しない。
 
 ```text
 com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
@@ -257,13 +268,14 @@ com.example.UserService#findById(java.lang.Long)  [UserService.java:42]
 - `edges[].cycle` は `Result.Cycles` (同一 SCC の誘導 edge) に対応し、**false でも省略しない**。
 - `nodes[].minDepth` は起点からの最短距離 (traversal feature doc の `minDepth` 公開を参照)。
 - `sourceLocation` / `callSite` は欠落時 field ごと省略する。
-- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`、[graph feature doc](../graph/DesignDoc_graph.md) が保持を定める) を意味解釈せずそのまま載せる。欠落時 (nil) は field ごと省略する (omitempty)。キー (例: `resolution` / `provenance` / `declaringType` / `inherited`) の意味を定めるのは Analyzer 側 feature doc であり、Output はスキーマに依存しない。Console への人間向け表現は、`entryPoint` key に限り例外として表示する (「行の書式」の entry point 標識を参照。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。それ以外の key の Console 表現は引き続き見送り (将来 phase で検討)。 で決定。
+- **`nodes[].metadata` / `edges[].metadata` (optional、additive)**: graph が保持する opaque metadata (`Symbol.Metadata` / `Edge.Metadata`) を意味解釈せずそのまま載せる。保持の規則は graph feature doc が定める。欠落時 (nil) は field ごと省略する (omitempty)。キーの意味を定めるのは Analyzer 側 feature doc であり、Output はそのスキーマに依存しない。キーの例は `resolution` / `provenance` / `declaringType` / `inherited` である。Console へ人間向けに表示するのは `entryPoint` key だけとし、書式は「行の書式」の entry point 標識に従う。それ以外の key は Console に出さない。
+  - [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — `entryPoint` を Console が表示する例外を定める
 - **`depthCutoffs[].targetMethodId` は探索方向の接続先** (= dangling する側): `direction=caller` なら `callerMethodId`、`callee` なら `calleeMethodId` と同値。cutoff 先の node は到達集合外のため **`nodes[]` に存在しない**。`targetMinDepth` はこの `targetMethodId` の minDepth。
 - **要素順序**: `nodes[]` は `methodId`、`edges[]` / `depthCutoffs[]` は `edgeId` の辞書順に固定する。
 
 #### 版管理
 
-- `schemaVersion` は **Analyzer Protocol と独立の採番** (Protocol は Analyzer ↔ Core、本 schema は Core ↔ 利用者の契約で、変更理由が独立)。
+- `schemaVersion` は **Analyzer Protocol と独立に採番する**。Protocol は Analyzer と Core の契約、本 schema は Core と利用者の契約であり、変更する理由が別だからである。
 - field の追加は後方互換 (additive、minor)。削除 / 意味変更 / 型変更は破壊的変更 (major)。利用者は未知 field を無視できることを前提にする。
 
 ### 画面・デザイン
@@ -283,44 +295,43 @@ flowchart TD
 
 ### フロー / シーケンス
 
-depwalk は CLI ツールであり画面操作を持たないため、flowchart の起点は「ユーザーが出力形式を指定して実行する」時点とし、以降は Output Engine 内部の処理として描く。participants は Core 内の層 (Analyze Use Case / Graph / Traversal / Output) を採る。
+depwalk は CLI ツールであり画面操作を持たない。flowchart はユーザーが出力形式を指定して実行する時点を起点とし、以降を Output Engine 内部の処理として描く。
 
-#### Flowchart (出力形式の指定 → 出力)
+#### Flowchart (出力形式の指定から出力まで)
 
-「エラー境界」節 (`error` を返すのは「未対応 format」「書き込み失敗」の 2 つのみ) と、「View 境界の全数対応」節の `View` 構築を経由する流れを示す。
+format 検証、`View` 構築、formatter の選択という `Write` の流れを示す。
 
 ```mermaid
 flowchart TD
     A["ユーザー / CI が出力形式を指定して実行"] --> B["Analyze Use Case が Traversal result を取得"]
     B --> C["output.Write(w, format, Input) を呼ぶ"]
-    C --> D{"format は対応形式か<br/>console / json / dot / mermaid"}
-    D -- "No" --> E["出力を書き出さず error を返す<br/>(対応形式を案内。V1。「エラー境界」節)"]
-    D -- "Yes" --> F["View を構築<br/>(Graph から symbol を解決し<br/>node/edge/cutoff を id 辞書順に sort。「公開 entry point と Formatter / View」「View 境界の全数対応」節)"]
+    C --> D{"format は対応形式か<br/>console / json"}
+    D -- "No" --> E["出力を書き出さず error を返す<br/>(対応形式を案内する)"]
+    D -- "Yes" --> F["View を構築<br/>(Graph から symbol を解決し<br/>node / edge / cutoff を id 辞書順に sort)"]
     F --> G["format に対応する Formatter を選ぶ"]
-    G --> H["Console: View から tree を構築して描画<br/>(「Console ツリー表現」節。下図)"]
-    G --> I["JSON: フラットな graph を描画<br/>(nodes/edges/depthCutoffs。「JSON 出力」節)"]
-    H --> K["各 Formatter は View.Status / Edges / Cutoffs を見て<br/>startNotFound (該当なし) と 到達なし を形式ごとに表現する<br/>(到達なし = Edges 空 かつ Cutoffs 空。<br/>Edges 空でも Cutoffs 非空なら cutoff ケース。「エラー境界」節 / 「Console ツリー表現」節の規則 8)"]
+    G --> H["Console: View から tree を構築して描画<br/>(下図)"]
+    G --> I["JSON: フラットな graph を描画<br/>(nodes / edges / depthCutoffs)"]
+    H --> K["各 Formatter は View.Status / Edges / Cutoffs を見て<br/>startNotFound (該当なし) と 到達なし を形式ごとに表現する<br/>(到達なし = Edges 空 かつ Cutoffs 空。<br/>Edges 空でも Cutoffs 非空なら cutoff ケース)"]
     I --> K
-    J --> K
     K --> L["io.Writer へ逐次書き出し"]
     L --> M{"書き込みは成功したか"}
-    M -- "No" --> N["error を返す<br/>(表示 / exit code は CLI の責務。「エラー境界」節)"]
+    M -- "No" --> N["error を返す<br/>(表示と exit code は CLI の責務)"]
     M -- "Yes" --> O["正常終了 (nil)"]
 ```
 
-`startNotFound` / 到達なしは **Formatter を迂回しない**。「該当なし」の見せ方は形式ごとに異なる (「エラー境界」節の表) ため、各 Formatter が `View.Status` / `View.Edges` / `View.Cutoffs` を見て分岐する。**「到達なし」は `Edges` 空 かつ `Cutoffs` 空**であり、`Edges` が空でも `Cutoffs` が非空なら (`maxDepth=0` 等) 到達なしではない (「Console ツリー表現」節の規則 8)。
+`startNotFound` と到達なしは **Formatter を迂回しない**。「該当なし」の見せ方が形式ごとに異なるため、各 Formatter が `View.Status` / `View.Edges` / `View.Cutoffs` を見て分岐する。
 
 #### Flowchart (Console の tree 構築)
 
-Traversal result は tree ではなく集合であるため、tree 化の規則を Output 側で定義する (「Console ツリー表現」節)。**停止性は「初出のみ展開」が単独で保証**し、`(cycle)` / `(既出)` は「なぜこの枝が展開されていないか」を説明する情報表示にすぎない。
+**停止性は「初出のみ展開」が単独で保証**し、`(cycle)` / `(既出)` は「なぜこの枝が展開されていないか」を説明する情報表示にすぎない。
 
 ```mermaid
 flowchart TD
-    S{"View.Status は"} -- "startNotFound" --> S1["該当なし: 起点メソッドが解析結果に存在しません (start)<br/>tree は組まない (「エラー境界」節)"]
+    S{"View.Status は"} -- "startNotFound" --> S1["該当なし: 起点メソッドが解析結果に存在しません (start)<br/>tree は組まない"]
     S -- "ok" --> A["root = 起点 node を出力<br/>(位置は宣言位置 Symbol.Source)"]
     A --> A2{"到達 edge があるか"}
     A2 -- "No" --> A4{"cutoff があるか<br/>(maxDepth=0 では起点の隣接 edge が cutoff になる。<br/>起点 self-loop は誘導 edge として残るため A2 = Yes)"}
-    A4 -- "No" --> A3["(呼び出し元なし) / (呼び出し先なし) を出力<br/>= 到達なし (「エラー境界」節)"]
+    A4 -- "No" --> A3["(呼び出し元なし) / (呼び出し先なし) を出力<br/>= 到達なし"]
     A4 -- "Yes" --> B
     A2 -- "Yes" --> B["visit(node = root, 祖先集合 = {}, 展開済み = {})"]
     B --> B2["visit 入口: 現 node を展開済みに記録し<br/>祖先集合に加える<br/>(これにより self-loop も (cycle) になり<br/>root が再展開されない)"]
@@ -331,7 +342,7 @@ flowchart TD
     F -- "Yes" --> G["(cycle) を付けて葉にする<br/>= 経路上の祖先に戻る back edge"]
     F -- "No" --> H{"子 node は既に展開済みか"}
     H -- "Yes" --> I["(既出) を付けて葉にする<br/>= 別の枝で展開済み (合流)"]
-    H -- "No" --> J["visit(子 node, 祖先集合, 展開済み) を再帰<br/>(初出のみ展開 → 停止性を保証)"]
+    H -- "No" --> J["visit(子 node, 祖先集合, 展開済み) を再帰<br/>(初出のみ展開するので停止する)"]
     G --> D
     I --> D
     J --> D
@@ -343,7 +354,7 @@ flowchart TD
 
 #### Sequence
 
-`Output` は `Graph` から symbol を引き (「公開 entry point と Formatter / View」節)、`traversal.Result` / `Request` を入力に取る (「View 境界の全数対応」節)。`Request` を渡すのは、`Result` が `direction` / `start` を保持しないため (JSON がこの 2 つを出力する)。
+`Output` は `Graph` から symbol を引き、`traversal.Result` と `Request` を入力に取る。
 
 ```mermaid
 sequenceDiagram
@@ -357,19 +368,18 @@ sequenceDiagram
 
     User->>CLI: メソッド / 方向 / 深さ / 出力形式を指定
     CLI->>UC: analyze 実行
-    UC->>Graph: methodSymbol / callEdge を登録<br/>(wire record → graph の値型に変換。「公開 entry point と Formatter / View」節)
+    UC->>Graph: methodSymbol / callEdge を登録<br/>(wire record を graph の値型へ変換)
     UC->>Trv: Traverse(graph, request)
     Trv->>Graph: 読み取り API で node / edge を取得
     Graph-->>Trv: node / edge
     Trv-->>UC: Result (到達集合 / cycle / depthCutoffs / minDepth)
-    Note over Trv: minDepth の公開は traversal feature doc へ反映済み
 
     UC->>Out: Write(w, format, Input{Graph, Result, Request})
-    Note over Out: 未対応 format はここで error (何も書き出さない。「エラー境界」節)
-    Out->>Graph: 到達 node / edge の symbol を解決 (「公開 entry point と Formatter / View」節)
+    Note over Out: 未対応 format はここで error (何も書き出さない)
+    Out->>Graph: 到達 node / edge の symbol を解決
     Graph-->>Out: Symbol / CallSite
-    Note over Out: View を構築 (id 辞書順に sort。決定性の規約はここに集約。「View 境界の全数対応」節)
-    Out->>W: format に対応する Formatter が逐次書き出し<br/>(startNotFound / 到達なしも Formatter 内で分岐。「エラー境界」節)
+    Note over Out: View を構築 (id 辞書順に sort。決定性の規約はここに集約)
+    Out->>W: format に対応する Formatter が逐次書き出し<br/>(startNotFound / 到達なしも Formatter 内で分岐)
     W-->>Out: 書き込み結果
     Out-->>UC: nil または error (書き込み失敗時)
     UC-->>CLI: 結果
@@ -386,9 +396,19 @@ sequenceDiagram
 
 横断規約は [context/testing.md](../../../context/testing.md)。本 feature 固有の観点を記す。
 
-- 各 formatter の出力を golden file と比較する unit test で保証する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result → 同一バイト列) を同時に検証する。
+- 各 formatter の出力を golden file と比較する unit test で保証する (golden は `core/internal/output/testdata/golden/`)。golden 比較は書式と決定性 (同一 Result から同一バイト列) を同時に検証する。
 - fixture ケース: 循環 (self-loop / 相互再帰 / 3 要素 SCC) / 合流 (ダイヤモンド) / `depthLimit` cutoff / 到達なし (`Edges` も `Cutoffs` も空) / `maxDepth=0` (`Edges` 空 + `Cutoffs` 非空) / `maxDepth=0` + 起点 self-loop / `startNotFound`。
 - Console: 3 要素 SCC で全 node が tree に現れること (`(cycle)` は back edge の先のみ)。self-loop が `(既出)` でなく `(cycle)` になること。root の self-loop で部分木が二重出力されないこと。`maxDepth=0` で `(呼び出し元なし)` を出さず cutoff 行を出すこと。実 Protocol と同じ完全な `signature` を入力しても `qualifiedName` と重複せず 1 回だけ表示され、`signature` 欠落時の fallback が機能すること。
 - JSON: `encoding/json` でパースできること (S3)。`targetMethodId` が `nodes[]` に存在しない (dangling) ことを caller / callee 両方向で検証すること。`cycle: false` が省略されないこと。
 - エラー境界: 未対応 format が出力を書き出す前に `error` になり、`startNotFound` / 到達なしが `error` にならないこと。
-- S3 の照合は **Output 層 (本 doc の unit / golden) と CLI 層 ([CLI feature doc](../cli/DesignDoc_cli.md) の E2E)** の 2 層からなる (S1/S2 と同じ分界)。
+- S3 の照合は **Output 層 (本 doc の unit / golden) と CLI 層の E2E** の 2 層からなる (S1/S2 と同じ分界)。
+
+## 関連ドキュメント
+
+- [design/DesignDoc.md](../../DesignDoc.md): system landscape と成功条件
+- [graph feature doc](../graph/DesignDoc_graph.md): node / edge が保持する属性と変換契約
+- [traversal feature doc](../traversal/DesignDoc_traversal.md): 探索の意味論と結果構造の契約
+- [CLI feature doc](../cli/DesignDoc_cli.md): flag 体系と exit code の判別
+- [context/testing.md](../../../context/testing.md): test の責務分担
+- [ADR-0010](../../../adr/0010-defer-graph-visualization.md): 可視化出力をスコープから外した決定
+- [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定
