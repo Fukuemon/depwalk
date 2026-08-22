@@ -29,3 +29,11 @@ verified_commit: unverified
 ## 横断テスト方針
 
 - 公開 / リリース判定に含めるテスト観点。
+
+## 参照
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。関連する正本を足してよい。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [project.yml](project.yml): test 系 commands の固有値
+- [design/features/](../design/features/): feature 単位のテスト観点

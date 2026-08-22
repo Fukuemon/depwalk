@@ -17,7 +17,7 @@ verified_commit: unverified
 **Document Status:** Draft <!-- Draft | In Review | Approved のいずれか 1 つ -->
 **Development Status:** TBD <!-- TBD | In Progress | Done のいずれか 1 つ -->
 
-本 Design Doc は <プロダクト名> の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](../features/)、技術規約は [context/](../../context/)、個別判断は [adr/](../../adr/) へ委譲する。
+本 Design Doc は <プロダクト名> の **全体像 (system landscape)** を扱う。Why/What の所在 → Goal → アーキテクチャ概観 → モジュール責務の順に示し、feature 単位の詳細は [design/features/](features/)、技術規約は [context/](../context/)、個別判断は [adr/](../adr/) へ委譲する。
 
 <!--
 このファイルは design-doc skill が本テンプレートから生成・更新する。
@@ -34,7 +34,7 @@ verified_commit: unverified
 
 ## Related PRD
 
-- [PRD.md](../../PRD.md)
+- [PRD.md](../PRD.md)
 
 ## Why / What
 
@@ -95,7 +95,7 @@ flowchart TD
 
 ## モジュール責務
 
-各モジュールの責務・境界を示す。依存方向は下図、実装レベルの規約は [context/architecture.md](../../context/architecture.md) を正本とする。
+各モジュールの責務・境界を示す。依存方向は下図で示し、実装レベルの規約は context/architecture.md を正本とする。
 
 | モジュール | 責務 | 公開境界 | 依存先 |
 | ---------- | ---- | -------- | ------ |
@@ -113,7 +113,7 @@ landscape より下の詳細は以下を正本とする。本 doc には重複�
 
 ### Feature 設計 (How: feature)
 
-feature 単位の設計 (データ構造・画面・主要シナリオ / フロー) は [design/features/](../features/) を正本とする。
+feature 単位の設計 (データ構造・画面・主要シナリオ / フロー) は feature doc を正本とする。
 
 | Feature | 文書 | 状態 |
 | ------- | ---- | ---- |
@@ -121,19 +121,19 @@ feature 単位の設計 (データ構造・画面・主要シナリオ / フロ�
 
 ### Engineering Context (How: 横断規約)
 
-技術スタック規約・codebase architecture・運用契約は [context/](../../context/) ライブラリを正本とする。プロジェクト固有値は [context/project.yml](../../context/project.yml)。
+技術スタック規約・codebase architecture・運用契約は context library を正本とする。プロジェクト固有値は `context/project.yml` を正本とする。
 
-| トピック                                    | 文書                                                         |
-| ------------------------------------------- | ------------------------------------------------------------ |
-| package / runtime / state boundary          | [context/architecture.md](../../context/architecture.md)     |
-| toolchain・build・scaffold policy           | [context/toolchain.md](../../context/toolchain.md)           |
-| root task / shared config / quality gate    | [context/engineering.md](../../context/engineering.md)       |
-| test 方針                                   | [context/testing.md](../../context/testing.md)               |
-| infra / deployment / environment / security | [context/infrastructure.md](../../context/infrastructure.md) |
+| トピック                                    | 文書                                                      |
+| ------------------------------------------- | --------------------------------------------------------- |
+| package / runtime / state boundary          | [context/architecture.md](../context/architecture.md)     |
+| toolchain・build・scaffold policy           | [context/toolchain.md](../context/toolchain.md)           |
+| root task / shared config / quality gate    | [context/engineering.md](../context/engineering.md)       |
+| test 方針                                   | [context/testing.md](../context/testing.md)               |
+| infra / deployment / environment / security | [context/infrastructure.md](../context/infrastructure.md) |
 
 ### Related ADRs / 代替案 (Why: 判断)
 
-確定した技術判断・却下した代替案は [adr/](../../adr/) を正本とする。本 doc では一覧のみ持つ。
+確定した技術判断・却下した代替案は adr を正本とする。本 doc では一覧のみ持つ。
 
 | ADR | 決定 | 関連ドキュメント |
 | --- | ---- | ---------------- |
@@ -142,3 +142,13 @@ feature 単位の設計 (データ構造・画面・主要シナリオ / フロ�
 ## Open Questions / Future Work
 
 <!-- 未決の論点 (担当者・期限付き) と、今回スコープ外だが将来検討する項目を分けて書く。 -->
+
+## 関連ドキュメント
+
+<!-- 本文からリンクした先をすべて載せる。Related ADRs 表と重複してよい。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [PRD.md](../PRD.md): プロダクト要求 (統合モードでは本 doc の Why / What 節)
+- [adr/](../adr/): 確定した技術判断
+- [context/](../context/): 横断規約
+- [design/features/](features/): feature 単位の設計

@@ -45,7 +45,7 @@ Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を�
 
 ### コンポーネント構成 (C4 L3)
 
-feature を構成する主要コンポーネントと依存を示す。全体像 (L1/L2) は [DesignDoc](../../DesignDoc.md)、内部シーケンスは spec へ委譲する。
+feature を構成する主要コンポーネントと依存を示す。全体像 (L1/L2) は DesignDoc、内部シーケンスは spec へ委譲する。
 
 ```mermaid
 flowchart TD
@@ -69,3 +69,12 @@ flowchart TD
 
 - 横断規約は [context/testing.md](../../../context/testing.md)。本 feature 固有の観点を記す。
 -
+
+## 関連ドキュメント
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [design/DesignDoc.md](../../DesignDoc.md): system landscape
+- [context/](../../../context/): 横断規約
+- [context/testing.md](../../../context/testing.md): テスト責務の分担

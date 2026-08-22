@@ -14,7 +14,7 @@ verified_commit: unverified
 
 # <プロダクト / 機能名> PRD
 
-PRD は **Why / What** を扱う。「誰のどの課題を、なぜ・何で解決するか」を確定し、How (実現方法) は [Design Doc](../design/DesignDoc.md) と [context/](../context/) へ委譲する。
+PRD は **Why / What** を扱う。「誰のどの課題を、なぜ・何で解決するか」を確定し、How (実現方法) は [Design Doc](design/DesignDoc.md) と [context/](context/) へ委譲する。
 
 技術設計と独立して長期参照される要求がある場合に独立 PRD を作る。要求が小規模・技術主導の場合は本テンプレートを使わず、Design Doc に Why / What を統合してよい (`design-doc` skill が判定する)。
 
@@ -90,3 +90,11 @@ PRD は **Why / What** を扱う。「誰のどの課題を、なぜ・何で解
 | 日付 | 変更者 | 変更内容 |
 | ---- | ------ | -------- |
 |      |        |          |
+
+## 関連ドキュメント
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。 -->
+
+- [Design Doc](design/DesignDoc.md): system landscape とモジュール責務
+- [context/](context/): 技術規約 / 運用契約
+- [{文書名}]({パス}): {何を定めているか}

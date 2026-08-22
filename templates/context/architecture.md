@@ -19,14 +19,26 @@ verified_commit: unverified
 
 - モジュール間の依存方向を定める (どこからどこへ依存してよいか / 禁止する経路)。
 - 共有コードの昇格条件 (いつローカルから共有 package へ移すか)。
-- 循環依存・未宣言依存の扱い ([engineering.md](engineering.md) の quality gate で検査)。
+- 循環依存・未宣言依存の扱い。
+  - [engineering.md](engineering.md) の Repository Quality Gate — 依存検査の実行経路を定める
 
 ## Runtime Boundary
 
 - runtime / 配信モデルの前提 (静的 / サーバ / edge 等)。
 - build-time と runtime の env 分離方針。
-- 秘密情報を client へ露出させない原則 ([infrastructure.md](infrastructure.md))。
+- 秘密情報を client へ露出させない原則。
+  - [infrastructure.md](infrastructure.md) の Security / Privacy — secret / token を client へ露出させない方針を定める
 
 ## State Boundary
 
 - server state / client state / URL state の分離方針 (該当する場合)。
+
+## 参照
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。関連する正本を足してよい。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [design/DesignDoc.md](../design/DesignDoc.md): system landscape とモジュール責務
+- [engineering.md](engineering.md): quality gate / root task boundary
+- [infrastructure.md](infrastructure.md): 配信基盤 / secret の扱い
+- [project.yml](project.yml): プロジェクト固有値

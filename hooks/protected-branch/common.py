@@ -14,7 +14,25 @@ DEFAULT_PROTECTED_BRANCHES = {"main", "master", "develop"}
 CONFIG_FILENAME = ".protected-branches"
 
 
-def current_branch() -> str:
+def _usable_cwd(cwd: str | None) -> str | None:
+    """subprocess に渡せる作業ディレクトリだけを返す。
+
+    存在しない path を渡すと subprocess が例外を投げ、hook が異常終了して
+    ガードごと無効になる。判定できないときは None に落として呼び出し元の
+    既定 (プロセスの cwd) に委ねる。
+    """
+    if not cwd or not os.path.isdir(cwd):
+        return None
+    return cwd
+
+
+def current_branch(cwd: str | None = None) -> str:
+    """判定対象のブランチ。cwd を渡すとその作業ツリーのブランチを見る。
+
+    git worktree を使うと、同じ repo でも作業ツリーごとにブランチが違う。
+    常に repo ルート (= メイン worktree) で判定すると、作業ブランチの
+    worktree にいても保護ブランチとみなされ、commit が一切できなくなる。
+    """
     env_branch = os.environ.get("PROTECTED_BRANCH_GUARD_BRANCH")
     if env_branch:
         return env_branch
@@ -24,24 +42,26 @@ def current_branch() -> str:
         check=False,
         capture_output=True,
         text=True,
+        cwd=_usable_cwd(cwd),
     )
     return result.stdout.strip()
 
 
-def _repo_root() -> pathlib.Path | None:
+def _repo_root(cwd: str | None = None) -> pathlib.Path | None:
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         check=False,
         capture_output=True,
         text=True,
+        cwd=_usable_cwd(cwd),
     )
     root = result.stdout.strip()
     return pathlib.Path(root) if root else None
 
 
-def protected_branches() -> set[str]:
+def protected_branches(cwd: str | None = None) -> set[str]:
     """保護対象のブランチ名。設定ファイルがあればそちらを使う。"""
-    root = _repo_root()
+    root = _repo_root(cwd)
     if root is None:
         return set(DEFAULT_PROTECTED_BRANCHES)
 
@@ -57,5 +77,30 @@ def protected_branches() -> set[str]:
     return names
 
 
-def is_protected_branch(branch: str) -> bool:
-    return branch in protected_branches()
+def is_protected_branch(branch: str, cwd: str | None = None) -> bool:
+    return branch in protected_branches(cwd)
+
+
+def _git_config(key: str, cwd: str | None) -> str:
+    result = subprocess.run(
+        ["git", "config", "--get", key],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=_usable_cwd(cwd),
+    )
+    return result.stdout.strip()
+
+
+def upstream_of(branch: str, cwd: str | None = None) -> tuple[str, str] | None:
+    """branch に設定された上流。(remote, ref) を返す。未設定なら None。
+
+    ref は `refs/heads/<name>` 形式。`git rev-parse @{upstream}` の出力を
+    分解する方法は取らない。`origin/feature/x` のようにブランチ名へ `/` が
+    入ると remote 名との境界を決められないためである。
+    """
+    remote = _git_config(f"branch.{branch}.remote", cwd)
+    merge = _git_config(f"branch.{branch}.merge", cwd)
+    if not remote or not merge:
+        return None
+    return remote, merge

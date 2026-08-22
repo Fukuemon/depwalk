@@ -63,3 +63,11 @@ shared config / root task / repository quality gate の境界規約。toolchain 
 
 - repository 全体に対する検査 (依存境界 / dead code / 型) の正本 config と実行点。
 - false positive を避けるための除外方針。
+
+## 参照
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。関連する正本を足してよい。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [project.yml](project.yml): commands / quality gate の固有値
+- [toolchain.md](toolchain.md): build / lint / test のツール選定
