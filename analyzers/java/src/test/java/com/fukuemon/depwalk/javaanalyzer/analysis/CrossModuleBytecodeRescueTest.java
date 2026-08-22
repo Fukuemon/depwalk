@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CrossModuleBytecodeRescueTest {
 
     /** SootUp 2.0 が読める classfile 範囲に合わせる (BytecodeOnlyMemberTest と同じ)。 */
-    private static final String FIXTURE_CLASSFILE_RELEASE = "17";
+    private static final String FIXTURE_CLASSFILE_RELEASE = "25";
 
     @TempDir
     Path temp;

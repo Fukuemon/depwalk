@@ -382,7 +382,7 @@ class ExternalChainClassificationTest {
         }
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
-        List<String> args = new java.util.ArrayList<>(List.of("--release", "17", "-d", classes.toString()));
+        List<String> args = new java.util.ArrayList<>(List.of("--release", "25", "-d", classes.toString()));
         args.addAll(files);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
         assertEquals(0, rc, "fixture compile failed");

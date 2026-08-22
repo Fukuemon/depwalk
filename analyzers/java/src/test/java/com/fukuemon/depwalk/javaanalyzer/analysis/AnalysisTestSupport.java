@@ -39,8 +39,14 @@ final class AnalysisTestSupport {
         }
     }
 
-    /** compile 済み fixture を生成する javac の {@code --release} 既定値。 */
-    static final String FIXTURE_RELEASE = "17";
+    /**
+     * compile 済み fixture を生成する javac の {@code --release} 既定値。
+     *
+     * <p>Analyzer runtime と同じ Java 25 に揃える。SootUp が最新の classfile major を
+     * 読めなくなると bytecode 救済が例外なく静かに無効化されるため、既定値を runtime に
+     * 合わせておくことで、その回帰を test が検出する。
+     */
+    static final String FIXTURE_RELEASE = "25";
 
     /** include / exclude / entrypoints / analysisMode を使わない基本形。 */
     static Ran run(Path workspaceRoot, Map<String, Object> metadata) throws Exception {

@@ -112,7 +112,10 @@ CI では次の 3 つを anchor として固定し、いずれも provider load�
 ### 実装上の互換性ハマりどころ
 
 - provider が呼べる Gradle API は「7.6 に存在し、かつ 9.x で削除されていない」ものだけである。compile baseline が 7.6 でも、runtime は対象 build の daemon (最大 9.7.x) で動くため、compile が通っても runtime で `NoSuchMethodError` になる。実例として `ProjectDependency.getDependencyProject()` は Gradle 9.0 で削除済みで、代替の `ProjectDependency.getPath()` は 8.11 追加のため 7.6 に無い。project 依存の収集には、両系列に存在する `ResolutionResult` の `ProjectComponentIdentifier#getProjectPath()` を使う。provider へ API を追加するときは、7.6 と 9.7 の両方の Javadoc で存在を確認する。
-- SootUp 2.0.0 は classfile major 69 (Java 25) を読めない。`guardQuery` が `unavailable` を返すため、bytecode 型階層の補完と bytecode-only member の救済が、例外なしに静かに無効化される (major 61 = Java 17 は読める)。解析対象 project の classes output が JDK 25 で compile されていると SootUp 依存の機能が効かないので、原因不明の `JAVA_INCOMPLETE_ANALYSIS` や候補 edge の欠落では、まず classes output の classfile version を疑う。test 内で `ToolProvider.getSystemJavaCompiler()` を使って fixture を compile するときは test JVM (JDK 25) の major になるため、`--release 17` を明示する。
+- **SootUp が読める classfile major は、SootUp が同梱する ASM の版で決まる。** 読めない major に当たると `guardQuery` が `unavailable` を返し、bytecode 型階層の補完と bytecode-only member の救済が、例外なしに静かに無効化される。失敗が診断に出ないため、原因不明の `JAVA_INCOMPLETE_ANALYSIS` や候補 edge の欠落では、まず classes output の classfile version を疑う。
+  - SootUp 3.0.1 は ASM 9.10.1 を同梱し、Java 25 (major 69) を読める。ASM は 9.8 で `Opcodes.V25` を追加した
+  - SootUp 2.0.0 は ASM 9.7.x のため major 69 を読めない。実測 (2026-08-22) では、fixture の classes output を Java 25 で compile すると bytecode 救済の test が 4 件 failure になった。3.0.1 では同じ条件で全件 pass する
+- test 内で `ToolProvider.getSystemJavaCompiler()` を使って fixture を compile するときは、`--release` を Analyzer runtime と同じ 25 にする。SootUp が最新の classfile major に追随しなくなったとき、この設定だけがその回帰を検出する。古い major を明示して回避すると、検出できないまま実環境で無効化される
 - cross-version matrix の daemon JDK は、Gradle toolchain (foojay resolver) の自動 provisioning で供給する。`analyzers/java` の `gradleCompatibilityTest` task が `javaToolchains.launcherFor` で解決し、system property で test へ渡す。JDK 8 は arm64 macOS では Temurin が無く Zulu が供給される。anchor の JDK を解決できない場合は、skip 成功にせず fail させる契約とする。daemon JVM の固定は、一時 copy した fixture の `gradle.properties` へ `org.gradle.java.home` を書く方式が全対象 version で機能する。
 
 ## 実環境解析の運用指針

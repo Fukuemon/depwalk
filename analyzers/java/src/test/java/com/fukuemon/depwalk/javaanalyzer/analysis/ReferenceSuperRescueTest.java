@@ -202,7 +202,7 @@ class ReferenceSuperRescueTest {
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "17",
+                "--release", "25",
                 "-d", classes.toString(), build.resolve(relative).toString());
         assertEquals(0, rc, "fixture compile failed");
         return classes;
