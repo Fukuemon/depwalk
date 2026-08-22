@@ -14,11 +14,11 @@ verified_commit: 4cae142
 
 # Feature 設計: Analyzer Protocol / SPI
 
-Analyzer SPI、JSONL Communication Protocol、Model schema の 設計を定める。Protocol / SPI / Model は本 doc が定める。
+Core と Analyzer をつなぐ Analyzer SPI、JSONL Protocol、Model schema を定める。
 
 ## 背景・要件解釈
 
-depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プロセスの Analyzer に閉じ込める。Analyzer Protocol / SPI は Core と Analyzer の唯一の結合点であり、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、および process contract を定義する。
+depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プロセスの Analyzer に閉じ込める。Analyzer Protocol / SPI は Core と Analyzer の唯一の結合点である。ここで `MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、process contract を定義する。
 
 本 feature は Design Doc の成功条件 S5「新しい言語の Analyzer を追加するとき Core を変更せずに済む」を満たすため、Analyzer 実装者が準拠すべき共通契約を提供する。
 
@@ -37,7 +37,8 @@ depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プ
 
 - Java 固有の AST 解析、型解決、DI 解決の方式は定義しない。
 - Graph Engine、Traversal Engine、Output Engine の内部構造は定義しない。
-- 出力表現は定義しない (定めるのは [output feature doc](../output/DesignDoc_output.md))。
+- 出力表現は定義しない。
+  - [output feature doc](../output/DesignDoc_output.md) の 出力形式ごとの表示規則 — 表示規則と View への変換契約を定める
 - Core 実装言語、package manager、test framework は定義しない。
 - Reflection、AspectJ Runtime、実行時 Proxy の動的解析は扱わない。
 
@@ -46,6 +47,20 @@ depwalk は Core を言語非依存に保ち、言語ごとの差異を独立プ
 ### データ構造 / コンテンツモデル
 
 Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱う。全 record は `schemaVersion` と `recordType` を必須 field に持つ。現行の `schemaVersion` は `"1"`。
+
+record は次の向きで流れる。
+
+```mermaid
+sequenceDiagram
+    participant Core
+    participant Analyzer
+
+    Core->>Analyzer: analysisRequest を stdin へ 1 件送って close
+    Analyzer-->>Core: methodSymbol (graph node)
+    Analyzer-->>Core: callEdge (呼び出し関係)
+    Analyzer-->>Core: diagnostic (継続可能な問題)
+    Analyzer-->>Core: error (継続不能な問題) + 非ゼロ exit
+```
 
 #### Core -> Analyzer
 
@@ -67,7 +82,9 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 `include` / `exclude` は `workspaceRoot` からの相対 path glob とする。path separator は `/` に正規化し、絶対 path、空文字、`..` を含む path は schema 不準拠として扱う。対応する glob は `*`、`?`、`**` とする。
 
-`sourceRoots` は optional な明示 override である。未指定なら Analyzer が自身の標準 discovery を行い、1 件以上指定した場合は discovery を完全に bypass する。空配列、空文字、絶対 path、`..` segment は不正とし、`.` は workspace root 自体を表す。separator は `/` に正規化する。`workspaceRoot` は `sourceRoots`、`include` / `exclude`、全 `SourceLocation` に共通する唯一の座標系であり、Protocol に module / root ID は追加しない。言語固有 metadata の必須条件や discovery の方式は各 Analyzer feature doc が定める。
+`sourceRoots` は任意の明示 override である。未指定なら Analyzer が自身の標準 discovery を行い、1 件以上指定した場合は discovery を完全に bypass する。空配列、空文字、絶対 path、`..` segment は不正とし、`.` は workspace root 自体を表す。separator は `/` に正規化する。
+
+`workspaceRoot` は `sourceRoots`、`include` / `exclude`、全 `SourceLocation` に共通する唯一の座標系である。Protocol に module / root ID は追加しない。言語固有 metadata の必須条件や discovery の方式は各 Analyzer feature doc が定める。
 
 `entrypoints` の各要素は method selector object とし、`qualifiedName` を必須、`signature` を任意にする。`entrypoints` が未指定または空配列の場合、Analyzer は scope 全体の call graph 生成要求として扱う。
 
@@ -112,9 +129,15 @@ Protocol は STDIN / STDOUT 上の JSONL とし、1 行を 1 record として扱
 
 valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み `methodSymbol` を参照する。未解決 symbol は `diagnostic` として表現する。
 
-**`metadata` の Core 内保持**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味であり、利用者へ透過すると決めた metadata を破棄してよいという意味ではない。解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。
+**`metadata` の Core 内保持**: 「Core の graph 構築は `metadata` に依存しない」は、Core が `metadata` の中身を解釈しないという意味である。利用者へ透過すると決めた metadata を破棄してよいという意味ではない。解決根拠を載せる `callEdge.metadata` は、Core の `graph.Edge` / `output.EdgeView` が意味解釈しない opaque passthrough として保持する。
 
-`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。唯一の例外は `methodSymbol.metadata` の `entryPoint` key で、Console が表示のためにのみ意味解釈する (判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md))。表示規則と例外の範囲を定めるのは [Output feature doc](../output/DesignDoc_output.md)。bytecode にだけ存在する symbol は `sourceLocation` を省略でき、source owner との対応が必要なら Analyzer 固有 metadata に保持する。具体的な graph 所有境界は [Graph feature doc](../graph/DesignDoc_graph.md) が定める。
+`methodSymbol.metadata` も `callEdge.metadata` と同じ opaque passthrough である。Core は意味を解釈せず、Graph の `Symbol.Metadata` へ nested value を含めて deep copy する。Traversal はこの追加属性を解釈・表出しない。Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出する。唯一の例外は `methodSymbol.metadata` の `entryPoint` key で、Console が表示のためにのみ意味解釈する。表示規則と例外の範囲は output feature doc が定める。
+
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md) の 決定 — framework 由来の暗黙呼び出しを opaque metadata で標識すると定めた決定
+
+bytecode にだけ存在する symbol は `sourceLocation` を省略できる。source owner との対応が必要なら、Analyzer 固有 metadata に保持する。
+
+- [Graph feature doc](../graph/DesignDoc_graph.md) の データ構造 / コンテンツモデル — graph の node / edge が metadata と `sourceLocation` を持つ境界を定める
 
 #### `SourceLocation`
 
@@ -141,11 +164,11 @@ valid な `callEdge` は、`callerMethodId` と `calleeMethodId` が解決済み
 
 `error.details` は Analyzer を問わず利用できる `FailureDetail` 配列である。各要素は `code` / `message` を必須、`sourceLocation` / opaque `metadata` を任意とし、Analyzer が定義する決定順で並べる。Core / CLI は Analyzer 固有 code を分岐せず、共通 field を汎用表示する。
 
-valid `error` record、非ゼロ exit、stdout の parse / schema error のいずれも request-level fatal であり、それ以前に受領した graph record と diagnostic を含む全成功候補を無効にする。Core は valid graph record を非公開 staging Graph へ 1-pass 変換し、exit `0`、fatal なし、stream 全体の参照完全性を確認した場合だけ公開する。fatal 時に保持してよい解析結果は共通 `error.details` に正規化された failure detail だけである。
+valid `error` record、非ゼロ exit、stdout の parse / schema error は、いずれも request-level fatal である。fatal はそれ以前に受領した graph record と diagnostic を含め、全成功候補を無効にする。Core は valid graph record を非公開 staging Graph へ 1-pass 変換し、exit `0`、fatal なし、stream 全体の参照完全性を確認した場合だけ公開する。fatal 時に保持してよい解析結果は共通 `error.details` に正規化された failure detail だけである。
 
 `diagnostic.severity` は `info` / `warning` / `partialFailure` とする。不正 JSONL、schema 不準拠、未対応 `schemaVersion` は Analyzer が表現する `error` ではなく、Core 側 validation error として扱う。
 
-**異常終了時の stderr の扱い**: Analyzer stderr は protocol record として parse しない (この契約は変更しない)。ただし Analyzer process が valid `error` record を出力せずに異常終了した場合に限り、Core は stderr の内容を診断ヒントとして照合してよい。例えば `OutOfMemoryError` パターンを検知して、heap 増加の対処を含むエラーを表示する。ヒント抽出は終了後のエラー表示の補助であり、解析結果の解釈・graph 構築には一切使わない。判断の正本は [ADR-0012](../../../adr/0012-implicit-call-resolution-and-type-propagation-rescue.md) とする。
+**異常終了時の stderr の扱い**: Analyzer stderr は protocol record として parse しない。ただし Analyzer process が valid `error` record を出力せずに異常終了した場合に限り、Core は stderr の内容を診断ヒントとして照合してよい。例えば `OutOfMemoryError` パターンを検知して、heap 増加の対処を含むエラーを表示する。ヒント抽出は終了後のエラー表示の補助であり、解析結果の解釈と graph 構築には一切使わない。
 
 ### 画面・デザイン
 
@@ -237,3 +260,10 @@ Handshake / capability negotiation は採用しない。
 - `error.details` を決定順で保持し、Core / CLI が Analyzer 固有 code に依存せず表示できること。
 - fatal / 非ゼロ終了で先行 graph record と diagnostic を破棄し、成功時だけ staging Graph を公開すること。
 - 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと。
+
+## 関連ドキュメント
+
+- [output feature doc](../output/DesignDoc_output.md): 出力形式ごとの表示規則と View への変換契約
+- [graph feature doc](../graph/DesignDoc_graph.md): node / edge が持つ属性と wire → 値型の変換契約
+- [context/testing.md](../../../context/testing.md): test の責務分担と test runtime contract
+- [ADR-0009](../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md): framework 由来の暗黙呼び出し解決と型伝播救済の決定

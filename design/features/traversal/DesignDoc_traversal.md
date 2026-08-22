@@ -6,7 +6,7 @@ status: 完了
 keywords: [traversal, caller, callee, depth, minDepth]
 governs:
   - core/internal/traversal
-verified_commit: 9b9d79d
+verified_commit: aa7de4c
 ---
 
 # Feature 設計: Traversal (Caller / Callee 探索)
@@ -20,17 +20,18 @@ Traversal Engine の設計を定める。
 - **caller 方向** = 「このメソッドを呼んでいるのは誰か」を遡る。変更の影響範囲を知りたいときに使う
 - **callee 方向** = 「このメソッドが何を呼んでいるか」を下る。処理の流れを追いたいときに使う
 
-いずれも 1 段で止まらず再帰的に辿るため、「A を変えると最終的に誰が影響を受けるか」が分かる。ただし呼び出しは循環しうる (A が B を呼び B が A を呼ぶ) ので、無限に辿らない打ち切りが要る。その打ち切りをどう定義するかが本 doc の中心である。Graph Engine が保持する node / edge を入力に、caller / callee 方向の到達集合を計算する探索エンジンの API・結果モデル・打ち切り意味論を定義する。
+いずれも 1 段で止まらず再帰的に辿るため、「A を変えると最終的に誰が影響を受けるか」が分かる。ただし呼び出しは循環しうる。A が B を呼び、B が A を呼ぶ場合、無限に辿らない打ち切りが要る。
 
-本 doc は Traversal result の契約 (到達 node / edge 集合、`cycle` 注釈、`depthLimit` cutoff) を定める。全体像は [DesignDoc](../../DesignDoc.md)、Core の package 境界は [architecture](../../../context/architecture.md) を参照する。
+本 doc は、Graph Engine が保持する node / edge を入力として、探索の API、結果モデル、打ち切りの意味論を定める。結果モデルの契約は、到達 node 集合、到達 edge 集合、`cycle` 注釈、`depthLimit` cutoff の 4 つである。
+
+- [design/DesignDoc.md](../../DesignDoc.md) の モジュール責務 — Traversal Engine の責務と公開境界を定める
+- [context/architecture.md](../../../context/architecture.md) の Package Boundary — Core の package 単位の依存方向を定める
 
 ## 背景・要件解釈
 
-depwalk は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを成功条件にしている ([DesignDoc](../../DesignDoc.md) の S1「呼び出し元の網羅的な列挙」と S2「呼び出し先の列挙」)。
+成功条件 S1「呼び出し元の網羅的な列挙」と S2「呼び出し先の列挙」は、指定メソッドの caller / callee を探索し、既知の呼び出し関係集合と一致する結果を返すことを求める。
 
-この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI (analyzer-protocol feature) が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
-
-循環呼び出し・再帰の打ち切り条件は本 doc が定める。探索 API、探索結果モデル、循環 / 深さ上限の意味論はいずれも本 doc が定める。
+この成功条件は 3 つの層を経て満たされる。まず Analyzer Protocol / SPI が `methodSymbol` / `callEdge` を Core 側へ渡す境界を提供する。次に Graph Engine がそれらから呼び出しグラフを構築する。最後に Traversal Engine がそのグラフを入力として、caller / callee 方向の到達集合を計算する。
 
 ## スコープ
 
@@ -44,10 +45,12 @@ depwalk は、指定メソッドの caller / callee を探索し、既知の呼�
 
 ### やらないこと
 
-- Java ソースの解析、型解決、DI 解決は行わない (`java-analyzer` の責務)。
-- Analyzer Protocol / SPI / Model schema は再定義しない (定めるのは analyzer-protocol feature doc と ADR-0001)。
-- Output Engine の表現形式は決めない (定めるのは [output feature doc](../output/DesignDoc_output.md))。
-- CLI `depwalk analyze` の引数、exit code、エラー表示は決めない ([CLI feature doc](../cli/DesignDoc_cli.md) の対象)。
+- Java ソースの解析、型解決、DI 解決は行わない。これらは java-analyzer feature の責務である。
+- Analyzer Protocol / SPI / Model schema は再定義しない。これらは analyzer-protocol feature の責務である。
+- Output Engine の表現形式は決めない。
+  - [output feature doc](../output/DesignDoc_output.md) の 出力形式ごとの表示規則 — Console / JSON の表示規則を定める
+- CLI `depwalk analyze` の引数、exit code、エラー表示は決めない。
+  - [CLI feature doc](../cli/DesignDoc_cli.md) の 責務配置 — flag 体系と exit code の判別を定める
 - 永続ストア、キャッシュ、並列探索、分散処理は扱わない。
 
 ## 設計
@@ -72,7 +75,7 @@ Traversal は起点 method ID、方向 (`caller` / `callee`)、深さ上限 (任
 - **到達 edge 集合**: 両端が到達 node 集合に属する、探索方向に沿った全 edge (誘導部分グラフ)。合流 edge も `cycle` 注釈付き edge も含む。
 - **`maxDepth=0`**: 起点 node のみを到達集合に含み、起点の隣接 edge は `depthLimit` cutoff になる。ただし起点自身への self-loop は両端が到達 node のため、誘導 edge (+ `cycle` 注釈) として到達 edge 集合に残る (誘導部分グラフ定義からの帰結)。
 
-呼び出しグラフでは、共有メソッドが複数箇所から呼ばれる合流構造が一般的である。探索木 edge 方式 (実際に辿った edge のみを結果に含める) では、この合流構造において BFS / DFS の選択によってどの edge が結果に残るかが変わってしまい、かつ循環していない合流 edge を誤って循環と標識してしまう。誘導部分グラフ + SCC 判定による定義は、この両方の問題を構造的に解消する。
+呼び出しグラフでは、共有メソッドが複数箇所から呼ばれる合流構造が一般的である。実際に辿った edge だけを結果に含める探索木 edge 方式は、この構造で 2 つの問題を起こす。1 つは、BFS と DFS のどちらを選ぶかで結果に残る edge が変わることである。もう 1 つは、循環していない合流 edge を循環と誤って標識することである。誘導部分グラフと SCC 判定による定義は、どちらの問題も起こさない。
 
 訪問済み node 管理 (再展開の抑止) は無限ループ防止のための内部実装機構であり、結果契約には現れない。
 
@@ -92,10 +95,13 @@ BFS / DFS の走査そのものは実装に存在するが、現時点ではど�
 
 ```mermaid
 flowchart TD
-    UseCase["Analyze Use Case"] --> Graph["Graph Engine<br/>(core/internal/graph)"]
+    CLI["CLI<br/>(core/internal/cli)"] --> UseCase["Analyze Use Case<br/>(core/internal/analyze)"]
+    CLI --> Output["Output Engine<br/>(core/internal/output)"]
+    UseCase --> Graph["Graph Engine<br/>(core/internal/graph)"]
     UseCase --> Traversal["Traversal Engine<br/>(core/internal/traversal)"]
     Traversal -->|"読み取り専用 API"| Graph
-    Traversal --> Output["Output Engine<br/>(consumer, #6 では参照のみ)"]
+    Output -->|"Traversal result を読む"| Traversal
+    Output --> Graph
 ```
 
 Traversal Engine は `core/internal/traversal` に閉じ、Graph の node / edge 管理には関与しない。Graph が公開する読み取り API 経由でのみ探索する。Analyzer 固有情報や Java 固有 metadata を分岐条件にしない。
@@ -162,3 +168,12 @@ sequenceDiagram
 - 到達 node ごとに公開される `minDepth` が起点からの最短距離に一致すること (合流 graph で最短経路側の値を採ること)。
 - 起点メソッドが存在しない場合、および Graph が空の場合に panic せず空結果 + `startNotFound` status を返すこと。
 - Traversal が Analyzer 実装や Output format に依存しないこと。
+
+## 関連ドキュメント
+
+- [design/DesignDoc.md](../../DesignDoc.md): system landscape と成功条件
+- [graph feature doc](../graph/DesignDoc_graph.md): 探索の入力となる node / edge の保持と読み取り
+- [output feature doc](../output/DesignDoc_output.md): 探索結果の表示規則
+- [CLI feature doc](../cli/DesignDoc_cli.md): flag 体系と exit code の判別
+- [context/architecture.md](../../../context/architecture.md): Core の package 単位の依存方向
+- [context/testing.md](../../../context/testing.md): test の責務分担

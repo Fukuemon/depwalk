@@ -39,3 +39,11 @@ verified_commit: unverified
 
 - 新規モジュールの初期 scaffold 手順 (公式 create command を優先する等)。
 - 生成後にプロジェクトの contract (命名 / root scripts / 共有 config) へ寄せる手順。
+
+## 参照
+
+<!-- 本文からリンクした先をすべて載せる。抜粋にしない。関連する正本を足してよい。 -->
+
+- [{文書名}]({パス}): {何を定めているか}
+- [project.yml](project.yml): commands / naming の固有値
+- [adr/](../adr/): 技術選定の決定記録

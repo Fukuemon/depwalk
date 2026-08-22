@@ -10,44 +10,68 @@
 
 ## 背景
 
-ADR-0001 で Core と Analyzer を JSONL over STDIN/STDOUT の process SPI で結合すると決めた。しかし Core 側には「どの Analyzer をどう起動するか」を決める配線がまだ無かった。`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけである。Java Analyzer を初号機として Core から実行するには、この起動コマンド解決の配線が必要になる。
+Core と Analyzer は JSONL over STDIN/STDOUT の process SPI で結合すると決めてある。しかし Core 側には、どの Analyzer をどう起動するかを決める配線が無かった。`core/internal/cli/root.go` に analyze command は無く、`core/internal/analyzer/runner.go` は起動コマンドを呼び出し側から受け取るだけである。Java Analyzer を初号機として Core から実行するには、この起動コマンド解決の配線が必要になる。
 
-Design Doc の成功条件 S5 は「**2 つ目以降**の言語 Analyzer 追加時に Core モジュールへ差分が発生しないこと」を求める。初号機 (Java) 導入に伴う言語非依存な初回配線自体は S5 の対象外である。ただしこの初回配線を言語固有の作り (例: `java` コマンドや jar path を Core に埋め込む) にしてしまうと、2 つ目以降の Analyzer 追加時に Core への分岐追加が避けられなくなる。したがって初回配線の設計そのものが、S5 をどう保証するかを左右する。
+- [ADR-0001](0001-analyzer-protocol-jsonl-spi.md) — Core と Analyzer を JSONL over STDIN/STDOUT の process SPI で結合する決定
+
+新しい言語の Analyzer を追加するとき、**2 つ目以降**では Core モジュールへ差分が発生しないことを成功条件としている。初号機 (Java) 導入に伴う言語非依存な初回配線そのものは、この成功条件の対象外である。ただし初回配線を言語固有の作り (例: `java` コマンドや jar path を Core へ埋め込む) にすると、2 つ目以降の Analyzer 追加時に Core への分岐追加を避けられなくなる。したがって初回配線の設計そのものが、この成功条件をどう保証するかを左右する。
+
+- [design/DesignDoc.md](../design/DesignDoc.md) の 提供価値 / 成功条件 (What) — 2 つ目以降の Analyzer 追加で Core に差分を出さないことを成功条件 S5 として定める
 
 ## 決定
 
-Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依存な文字列**として解決する。
+Analyzer の起動コマンドを、Core が意味を解釈しない**言語非依存な文字列**として解決する。
 
-- 解決順序: ① CLI flag `--analyzer-cmd` (例: `"java -jar analyzers/java.jar"`) → ② 環境変数 `DEPWALK_ANALYZER_CMD` → ③ どちらも無ければ実行前に validation error で拒否する。
-- Core は解決した文字列を **shell を介さず shell-word 分割して exec する** (shell injection を避ける)。Core は `java` / jar / JVM の存在を知らない。
-- metadata passthrough (`--analyzer-meta key=value`) も同様の原則に従う。Core は `analysisRequest.metadata` へ素通しするだけで、key / value の意味 (例: Java の `classpath`) を解釈しない。
-- 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入しない。必要になった時点で ③ の前段として追加できる形にしておく。
+- 解決順序は 3 段とする。1 段目は CLI flag `--analyzer-cmd` (例: `"java -jar analyzers/java.jar"`)、2 段目は環境変数 `DEPWALK_ANALYZER_CMD`、どちらも無ければ実行前に validation error で拒否する。
+- Core は解決した文字列を、shell を介さず shell-word 分割して exec する。shell injection を避けるためである。Core は `java` / jar / JVM の存在を知らない。
+- metadata passthrough (`--analyzer-meta key=value`) も同じ原則に従う。Core は `analysisRequest.metadata` へ素通しするだけで、key と value の意味 (例: Java の `classpath`) を解釈しない。
+- 規約 path による既定解決 (binary の隣を探す等) は Phase1 では導入しない。必要になった時点で、validation error で拒否する段の前段として追加できる形にしておく。
 
-**shell-word 分割の字句規則** (2026-07-12 追記、同日 PR レビュー指摘により規則を修正): 空白 (space / tab / newline) を語の区切りとする。single quote / double quote は語の結合に使え、quote 内の空白は区切りにならない (quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote のみが特別)。quote 外の backslash は、直後の 1 文字が特殊文字 (space / tab / newline / single quote / double quote / backslash) の場合に限り escape として働く。それ以外の文字が続く場合 (文字列末尾を含む) はリテラルの backslash として扱う。これにより `C:\jdk\bin\java.exe` のような quote 不要の Windows 絶対パスを無傷で分割できる。未終端の quote は validation error として実行前に拒否する。変数展開・glob 展開・コマンド置換は一切行わない。実装と contract test は `core/internal/cli` の `splitAnalyzerCommand` が定める。#34 で `core/internal/analyze` から移設した (起動コマンドの解決は use case ではなくコンポジションルートの責務)。
+```mermaid
+flowchart TD
+    A["depwalk analyze の実行"] --> B{"CLI flag --analyzer-cmd がある"}
+    B -->|ある| C["解決した文字列を採用"]
+    B -->|ない| D{"環境変数 DEPWALK_ANALYZER_CMD がある"}
+    D -->|ある| C
+    D -->|ない| E["実行前に validation error で拒否"]
+    C --> F["shell を介さず shell-word 分割して exec"]
+```
 
-具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と metadata 合成規則は [Java Analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) が定める。決定経緯は [issue #9](https://github.com/Fukuemon/depwalk/issues/9) に残す。
+### shell-word 分割の字句規則
+
+- 空白 (space / tab / newline) を語の区切りとする。
+- single quote と double quote は語の結合に使える。quote 内の空白は区切りにならない。quote 内では backslash を含む全文字をリテラルとして扱い、対応する閉じ quote だけが特別である。
+- quote 外の backslash は、直後の 1 文字が特殊文字 (space / tab / newline / single quote / double quote / backslash) の場合に限り escape として働く。それ以外の文字が続く場合と、文字列末尾に置かれた場合は、リテラルの backslash として扱う。これにより `C:\jdk\bin\java.exe` のような quote 不要の Windows 絶対パスを、無傷で分割できる。
+- 未終端の quote は、validation error として実行前に拒否する。
+- 変数展開、glob 展開、コマンド置換は一切行わない。
+
+実装と contract test は `core/internal/cli` の `splitAnalyzerCommand` が定める。起動コマンドの解決は use case ではなくコンポジションルートの責務であるため、`core/internal/analyze` ではなく `core/internal/cli` に置く。
+
+flag と環境変数の具体名 (`--analyzer-cmd` / `DEPWALK_ANALYZER_CMD` / `--analyzer-meta`) と、metadata の合成規則は本 ADR では定めない。
+
+- [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md) の 起動契約 — 起動契約と metadata 契約の具体名を定める
 
 ## 代替案
 
-- 規約 path (例: `analyzers/<language>/build/libs/analyzer.jar` を Core が既定で探す)。
-  - 却下理由: 言語ごとに build 成果物の path 規約が異なり、Core が言語別の path 規則を知ることになる。将来の Analyzer 追加のたびに Core 側の探索規則が増える。
-- Core に Analyzer を go:embed 等で同梱する。
-  - 却下理由: Core が JVM を含む言語ランタイムやビルド成果物を抱えることになり、Core を言語非依存に保つ設計原則 (P1-P3) と Runtime Boundary (別プロセス) に反する。Core の配布サイズと release 境界も言語ごとに膨らむ。
-- 言語別 flag (例: `--java-analyzer-cmd`, `--kotlin-analyzer-cmd`)。
-  - 却下理由: Analyzer を追加するたびに Core の CLI 定義へ新しい flag を追加する必要があり、S5 (2 つ目以降の Analyzer 追加時に Core 無変更) に直接反する。
+- 規約 path で解決する (例: `analyzers/<language>/build/libs/analyzer.jar` を Core が既定で探す)。
+  - 却下理由: 言語ごとに build 成果物の path 規約が異なり、Core が言語別の path 規則を知ることになる。将来の Analyzer 追加のたびに、Core 側の探索規則が増える。
+- Core へ Analyzer を go:embed 等で同梱する。
+  - 却下理由: Core が JVM を含む言語ランタイムやビルド成果物を抱えることになる。Core を言語非依存に保ち、Analyzer を独立プロセスとして共通 Protocol で結合する設計原則に反する。Core の配布サイズと release 境界も、言語ごとに膨らむ。
+- 言語別 flag を用意する (例: `--java-analyzer-cmd`, `--kotlin-analyzer-cmd`)。
+  - 却下理由: Analyzer を追加するたびに Core の CLI 定義へ新しい flag を追加する必要があり、2 つ目以降の Analyzer 追加で Core を無変更に保つ成功条件に直接反する。
 
 ## 影響
 
 ### 良い影響
 
 - Core は起動対象の言語ランタイムを知らずに済み、2 つ目以降の Analyzer 追加時に Core モジュールへ差分が発生しない。
-- fake analyzer (任意の実行可能ファイル) に差し替えられるため、JVM を持たない環境でも Core 側の unit / contract test が回る。
-- 起動コマンドと metadata の両方が文字列 / passthrough で扱われるため、Core の CLI 定義が言語追加に対して安定する。
+- fake analyzer (任意の実行可能ファイル) へ差し替えられるため、JVM を持たない環境でも Core 側の unit / contract test が回る。
+- 起動コマンドと metadata の両方を文字列と passthrough で扱うため、Core の CLI 定義が言語追加に対して安定する。
 
 ### 悪い影響 / トレードオフ
 
-- 利用者は Analyzer 起動コマンドを毎回明示 (flag または環境変数) する必要があり、規約 path による自動発見のような利便性は Phase1 では提供しない。
-- shell-word 分割の実装 (quote 処理等) を Core 側で持つ必要がある。
+- 利用者は Analyzer の起動コマンドを毎回 flag または環境変数で明示する必要があり、規約 path による自動発見のような利便性は Phase1 では提供しない。
+- shell-word 分割の実装 (quote 処理等) を、Core 側で持つ必要がある。
 
 ### 影響範囲
 
@@ -55,12 +79,14 @@ Analyzer 起動コマンドを、Core が意味を解釈しない **言語非依
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。issue #9 の durable 成果を feature doc / ADR へ引き継ぎ、spec 側は決定時スナップショットへ降格する。
-- context / AI 向け設定更新要否: 要。`context/project.yml` の Quick Commands (開発起動 / E2E) を本決定に沿って更新する。
+- spec 更新要否: 要。spec の durable な成果を feature doc と ADR へ引き継ぎ、spec 側は決定時のスナップショットへ降格する。
+- context / AI 向け設定更新要否: 要。`context/project.yml` の Quick Commands (開発起動 / E2E) を、本決定に沿って更新する。
 
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): 成功条件 S5、設計原則 P1-P4
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): 起動契約 / metadata 契約の具体名を定める
-- [adr/0001-analyzer-protocol-jsonl-spi.md](0001-analyzer-protocol-jsonl-spi.md): JSONL over STDIN/STDOUT の process SPI
-- [issue #9](https://github.com/Fukuemon/depwalk/issues/9): 決定経緯と issue 単位の作業記録
+- [ADR-0001](0001-analyzer-protocol-jsonl-spi.md): JSONL over STDIN/STDOUT の process SPI
+- issue / PR:
+  - [#9](https://github.com/Fukuemon/depwalk/issues/9): 決定経緯と issue 単位の作業記録
+  - [#34](https://github.com/Fukuemon/depwalk/issues/34): Core の wire 変換 ACL 化と依存方向の固定。起動コマンド解決のコンポジションルートへの移設を含む

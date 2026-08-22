@@ -2,7 +2,7 @@
 
 ソースコードの静的解析でメソッド間の **呼び出し関係 (caller / callee)** を抽出し、**変更影響調査**を支援する CLI ツール。「あるメソッドを直したいが、どこから呼ばれ・どこを呼んでいるか」を手作業で追う負荷を自動化し、CI 上でも実行できる形で提供する。
 
-> **Status: Java / Spring Boot 向けの中核機能まで実装済み。** Core (Go) と Java Analyzer が動作し、CI で unit / E2E テストが回っている。次に進める対象は [DesignDoc の Future Work](design/DesignDoc.md#future-work-rollout-plan) を参照。
+> **Status: Java / Spring Boot 向けの中核機能まで実装済み。** Core (Go) と Java Analyzer が動作し、CI で unit / E2E テストが回っている。次に進める対象は Design Doc の「Future Work (Rollout Plan)」節が定める。
 
 ## なぜ作るか (Why)
 
@@ -27,7 +27,9 @@ depwalk はこの調査を静的解析で自動化し、CLI として CI に組�
 
 Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / 実行時 Proxy の動的解析、IDE Plugin / Web UI の提供。本ツールは CLI に限定する。
 
-グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す (判断を定めるのは [ADR-0010](adr/0010-defer-graph-visualization.md))。
+グラフを図として描く形式 (DOT / Mermaid 等) は現時点で対象外とし、形式を決めないまま将来の課題として残す。
+
+- [ADR-0008](adr/0008-defer-graph-visualization.md) — 可視化出力をスコープから外し、解析精度と永続化を優先した決定
 
 ## 使い方
 
@@ -46,7 +48,9 @@ depwalk analyze <workspace-root> \
   --format json
 ```
 
-`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。コマンドを定めるのは [context/project.yml](context/project.yml) の `commands`。
+`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。
+
+- [context/project.yml](context/project.yml) の `commands` — 開発・ビルド・検査の各コマンドを定める
 
 ## アーキテクチャ
 
@@ -59,7 +63,9 @@ depwalk analyze <workspace-root> \
                                                               └─ Java / Spring ソース (read-only)
 ```
 
-詳細は [design/DesignDoc.md](design/DesignDoc.md) (C4 L1/L2・モジュール責務・Communication Protocol) を参照。
+C4 L1 / L2 の図、モジュール責務、Communication Protocol は Design Doc が定める。
+
+- [design/DesignDoc.md](design/DesignDoc.md) の アーキテクチャ概観 (Overview) — system landscape と主要な実行単位を定める
 
 ## ドキュメント構成
 
@@ -71,12 +77,14 @@ depwalk analyze <workspace-root> \
 | How (feature)     | [design/features/](design/features/)       | feature 単位の設計 (6 feature)                   |
 | How (規約 / 契約) | [context/](context/)                       | 技術規約・codebase architecture・運用契約        |
 | 固有値            | [context/project.yml](context/project.yml) | repo / 命名 / コマンド / 対象ドメイン / ラベル   |
-| 意思決定          | [adr/](adr/)                               | 長期参照する技術選定・境界 (ADR-0001〜0010)      |
+| 意思決定          | [adr/](adr/)                               | 長期参照する技術選定・境界                       |
 | 作業文書          | [specs/](specs/)                           | issue 単位の要求・設計 (close 時に削除する)      |
 
 **どこから読むか**が分からないときは [context/reading-map.yaml](context/reading-map.yaml) を引く。触るコードパスから「読むべき文書」を逆引きできる索引で、各文書の frontmatter から生成している。
 
-各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する (定めるのは [ADR-0008](adr/0008-doc-freshness-and-reading-map.md))。
+各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する。
+
+- [context/README.md](context/README.md) の 文書メタ情報と鮮度 — frontmatter の schema と鮮度検査の運用を定める
 
 > 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節が定める。
 > AI エージェントの操作契約 (`CLAUDE.md` / `AGENTS.md` / `.claude/` など) は sdd-template リポジトリが定め、symlink で接続する。本リポジトリでは追跡しないため、clone しただけの状態では存在しない。接続は sdd-template 側で `bash scripts/link.sh <このリポジトリ>`、確認は `bash scripts/doctor.sh`。

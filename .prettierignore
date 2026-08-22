@@ -17,9 +17,12 @@ CLAUDE.md
 # 読み取りマップ (正本は各文書の frontmatter。scripts/reading-map.sh が生成する)
 context/reading-map.yaml
 
-# project.yml のテンプレート。値がプレースホルダ (<host> / <path> 等) のため
-# YAML として解析できない。雛形としては正しい状態なので整形対象から外す。
-templates/context/project.yml
+# 配布物のテンプレート。編集も整形も配布元 (sdd-template) でのみ行う。
+# 消費側で整形すると、次の link.sh が配布元版で上書きして巻き戻り、
+# commit のたびに整形と巻き戻りを往復する。
+# (project.yml のテンプレートは、値がプレースホルダ (<host> / <path> 等) のため
+#  YAML として解析できず、いずれにせよ対象外)
+templates/
 
 # Gradle wrapper / fixture の build 生成物
 testdata/fixtures/java/**/build/

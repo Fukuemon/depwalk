@@ -36,7 +36,7 @@ pre-commit:
     # 状態を検出する。生成側 (スクリプト) と生成先の手編集も同じ検査で拾う。
     #
     # 入力が全対象文書の frontmatter なので depgraph のように狭い glob へは
-    # 絞れない (ADR-0008 決定 3)。frontmatter の先頭ブロックを読むだけで
+    # 絞れない。frontmatter の先頭ブロックを読むだけで
     # lint 起動を伴わないためコストは小さい。
     #
     # lefthook の run は sh -c で実行され set -e が効かないので && で連結する。
@@ -53,10 +53,6 @@ pre-push:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-push
-    # 生成物 drift の全体検査。pre-commit 側は staged file に対する glob で
-    # 発火するため「テンプレが先に進み、こちらが再生成していない」ケースを
-    # 捕まえられない (生成物が staged にならないので何も起きない)。
-    #
 
 commit-msg:
   commands:

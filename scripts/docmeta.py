@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """文書 frontmatter の収集と検証。
 
-reading-map.sh / doc-freshness.sh が共有する読み取り層。判断の正本は
-adr/0008-doc-freshness-and-reading-map.md。
+reading-map.sh / doc-freshness.sh が共有する読み取り層。
 
 PyYAML に依存しない。frontmatter の schema は「フラットなキー + 文字列 /
 インライン配列 / ブロック配列」に限られており、そのぶんだけを解釈する。
@@ -15,7 +14,7 @@ import pathlib
 import re
 import sys
 
-# 鮮度検査・索引生成の対象。ADR-0008 決定 2 の割り当て表に対応する。
+# 鮮度検査・索引生成の対象。
 # adr/ は決定時点の不変記録、specs/ は issue close 時に削除されるため対象外。
 TARGET_GLOBS = ("design/*.md", "design/features/*/*.md", "context/*.md")
 
@@ -144,7 +143,7 @@ def load_docs(root: pathlib.Path) -> list[dict]:
                 )
 
         # description は索引生成の入力。title で代替すると索引が文書名の羅列に
-        # なり「何を読めば足りるか」の判断に使えない (ADR-0008 決定 1)。
+        # なり「何を読めば足りるか」の判断に使えない。
         if not meta.get("description"):
             raise DocMetaError(f"{rel}: description が必要です (索引の 1 行説明)")
 

@@ -1,13 +1,15 @@
 # Feature 設計 doc 一覧
 
-`design/features/` は **feature 単位の設計 (How)** を置く層。全体像 (system landscape / モジュール責務 / 横断方針) は [design/DesignDoc.md](../DesignDoc.md)、技術スタック規約・運用契約は [context/](../../context/) が定める。
+`design/features/` は **feature 単位の設計 (How)** を置く層である。全体像 (system landscape、モジュール責務、横断方針) と技術スタック規約は、この層では扱わない。
 
-各 feature doc は「仕様 (What) をどう実現するか」を、データ構造・画面・主要シナリオ / フロー単位で記述する。責務・範囲・方針の層に留め、ファイル配置・directive・テスト手順などの実装レベルの手順は issue 単位の spec (作業文書。issue close 後に削除する) が持つ。
+- [design/DesignDoc.md](../DesignDoc.md) — system landscape とモジュール責務、横断方針を定める
+- [context/](../../context/) — 技術スタック規約と運用契約を定める
+
+各 feature doc は「仕様 (What) をどう実現するか」を、データ構造、画面、主要シナリオ / フローの単位で記述する。書く範囲は責務・範囲・方針の層に留める。ファイル配置やテスト手順といった実装レベルの手順は、issue 単位の spec が持つ。spec は作業文書であり、issue を close するときに削除する。
 
 ## 一覧
 
 各 feature doc の frontmatter (`description`) から生成する。手で編集しても次回の生成で消える。
-frontmatter を持たない feature doc はまだ載らない ([issue #40](https://github.com/Fukuemon/depwalk/issues/40) で解消する)。
 
 <!-- BEGIN GENERATED: features-index (scripts/reading-map.sh が更新する。手編集しない) -->
 
@@ -28,3 +30,8 @@ frontmatter を持たない feature doc はまだ載らない ([issue #40](https
 ## 新規追加
 
 `templates/features/template.md` を `design/features/<feature>/DesignDoc_<feature>.md` にコピーして起票する。`templates/` は sdd-template から symlink で繋がっており本 repo では追跡しない (未接続なら `bash scripts/doctor.sh`)。
+
+## 関連ドキュメント
+
+- [design/DesignDoc.md](../DesignDoc.md): system landscape / モジュール責務 / 横断方針
+- [context/](../../context/): 技術スタック規約・codebase architecture・運用契約

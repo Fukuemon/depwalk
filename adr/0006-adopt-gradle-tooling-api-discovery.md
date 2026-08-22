@@ -10,28 +10,85 @@
 
 ## 背景
 
-Java project は single-root だけでなく multi-project、変更された `projectDir`、custom source directory、project ごとの classpath / language level を持ち得る。root build file の include 記述だけを辿る方法では、settings logic、plugin、composite build、動的構成で確定する実効 modelを再現できない。filesystem convention scanning も build が定義した source set と依存関係を推測するため、不完全な Graph を成功結果として返す危険がある。
+Java project は single-root だけでなく multi-project、変更された `projectDir`、custom source directory、project ごとの classpath / language level を持ち得る。root build file の include 記述だけを辿る方法では、settings logic、plugin、composite build、動的構成で確定する実効 model を再現できない。filesystem convention scanning も、build が定義した source set と依存関係を推測するため、不完全な Graph を成功結果として返す危険がある。
 
-一方、すべての利用者に source roots、classpath、language level の列挙を要求すると通常利用の負担が大きい。自動 discovery と、Gradle buildを評価したくない利用者向けの明示 override の両方が必要である。
+一方、すべての利用者に source roots、classpath、language level の列挙を要求すると通常利用の負担が大きい。自動 discovery と、Gradle build を評価したくない利用者向けの明示 override の両方が必要である。
 
 ## 決定
 
 Java Analyzer は `analysisRequest.sourceRoots` 未指定時に Gradle Tooling API `9.6.1` を使い、対象 build の実効 model から解析 context を discovery する。
 
+```mermaid
+flowchart TD
+    REQ[analysisRequest] --> Q{sourceRoots の指定}
+    Q -->|1 件以上| BY[Tooling API / daemon / 一時 provider を完全に bypass]
+    BY --> SY[明示 classpath / language level から<br/>単一 synthetic context を構築]
+    Q -->|なし| NT[build 評価の通知を Analyzer stderr へ出す]
+    NT --> PF{pre-flight}
+    PF -->|Gradle version が範囲外 / 判定不能| F1[JAVA_GRADLE_MODEL_ERROR<br/>unsupported-gradle-version]
+    PF -->|daemon JVM が非互換| F2[JAVA_GRADLE_MODEL_ERROR<br/>daemon-jvm-incompatible]
+    PF -->|互換| INIT[workspace 外の一時 init script から<br/>custom tooling model provider を注入]
+    INIT --> MV{model 検証}
+    MV -->|provider が非互換| F3[JAVA_GRADLE_MODEL_ERROR<br/>provider-incompatible]
+    MV -->|成功| CTX[project ごとに解析 context を構築]
+    SY --> ANA[型解決へ]
+    CTX --> ANA
+```
+
+### model の取得範囲
+
 - workspace 外の一時 init script から bundled custom tooling model provider を注入する。
-- provider は project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無だけを返す。Gradle task や source generation は実行しない。
+- provider が返すのは project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無だけとする。Gradle task や source generation は実行しない。
 - `test` と名前付き source set は自動 discovery の対象外とする。
 - 各 project の `main` ごとに解析 context を作り、project dependency で到達可能な context と classpath だけを型解決へ接続する。
-- composite / included build のprojectはmodelの対象外 (root buildのproject階層だけを解析する)。workspace外のexternal included build projectと、providerが報告するincluded build rootは、いずれも`JAVA_SOURCE_ROOT_EXCLUDED` warningで除外を観測可能にし、黙示の脱落を残さない。解決済みartifactは外部依存として利用できる。一方、workspace内projectとして採用したsource root / fileのrealpathがworkspace外へ出る場合はfatalとする。
-- modelに宣言されたsource directoryが未作成なら生成前の空rootとして除外し、既存rootの非directory・読取不能はfatalにする。project classes outputが未作成、明示経路で自project classes output自体が指定されていない場合、またはmodel由来classpathのworkspace内project依存build outputが未buildの場合は`JAVA_SOOTUP_UNAVAILABLE` warningで該当bytecodeなしのsource解析を継続する (依存contextのsource rootがsolverへ入り型解決を補完する)。ただし、利用者が明示したclasspath entryまたはmodelが解決済みworkspace外external entryの欠落・読取不能はfatalとする。
-- provider は Gradle `7.6.5` API baseline に対してbuildしJava 8 classfileとする (compile 用の再配布 API artifact は `7.6.4` が最終のため `7.6.5` 相当として `7.6.4` を使用する。確定 2026-07-18)。対象Gradleは`7.6.5 <= version < 9.7.0`、wrapper不在時はbundled Tooling API `9.6.1`を使用する。固定CI anchorは`7.6.5 / daemon JDK 8`、`8.14.5 / daemon JDK 17`、`9.6.1 / daemon JDK 25`とし、詳細を定めるのは [toolchain context](../context/toolchain.md#gradle-discovery-compatibility-matrix) とする。
-- `sourceRoots` が 1 件以上指定された request は Gradle Tooling API、daemon、一時 provider を完全に bypass し、明示 classpath / language level から単一 synthetic context を構築する。
 
-自動 discovery は trusted build 前提である。build logic は利用者権限で評価され、repository credential、network、cache、daemon JVM 選択、任意の副作用は Gradle に任せる。depwalk は credential を受領・保存せず、Gradle stdout / stderr を Protocol / CLIへ転送しない。raw exception は sanitize する。非漏洩保証は depwalk が生成・転送する artifact に限定し、任意 build logic の sandbox は提供しない。
+### workspace 境界と除外
 
-CLI help はこの副作用と明示 bypass を常時説明する。自動 discovery の各 run では、build 評価の前に Analyzer stderr へ通知を出す。通知は「build logic 評価、repository / credential resolution、network、cache を利用し得る」ことを安定した定型文で伝える。discoveryの開始・終了と安定categoryは観測可能にするが、Gradle由来の自由文は転送しない。
+- composite / included build の project は model の対象外とし、root build の project 階層だけを解析する。
+- workspace 外の external included build project と、provider が報告する included build root は、いずれも `JAVA_SOURCE_ROOT_EXCLUDED` warning で除外を観測可能にし、黙示の脱落を残さない。解決済み artifact は外部依存として利用できる。
+- workspace 内 project として採用した source root / file の realpath が workspace 外へ出る場合は fatal とする。
 
-次の 3 つはいずれも `JAVA_GRADLE_MODEL_ERROR` の fatal とし、安定 reason で区別する。範囲外または version 判定不能は `unsupported-gradle-version`、provider 非互換は `provider-incompatible`、daemon JVM 非互換は `daemon-jvm-incompatible`。reasonの分類粒度は判定できたphaseに従う: version / daemon JVMはmodel要求前のpre-flightで、provider非互換はmodel検証で判定する。provider load中にGradle側で顕在化した失敗は原因を特定できないため`model-request-failed` / `connection-failed`として報告し、詳細をraw exceptionから推測しない。wrapper不在のbuildは同梱`9.6.1`で評価されるため、意図しないGradle versionでのbuild評価を避けたい場合はwrapperの利用または明示`sourceRoots`を推奨する。明示`sourceRoots`経路はwrapper判定を含めmatrix全体をbypassする。
+### 未生成 / 未 build の扱い
+
+- model に宣言された source directory が未作成なら、生成前の空 root として除外する。既存 root の非 directory と読取不能は fatal にする。
+- 次の 3 つは `JAVA_SOOTUP_UNAVAILABLE` warning とし、該当 bytecode なしで source 解析を継続する。依存 context の source root が solver へ入り型解決を補完する。
+  - project classes output が未作成である。
+  - 明示経路で自 project の classes output 自体が指定されていない。
+  - model 由来 classpath のうち、workspace 内 project 依存の build output が未 build である。
+- 利用者が明示した classpath entry と、model が解決済みの workspace 外 external entry については、欠落と読取不能を fatal とする。
+
+### version matrix
+
+- provider は Gradle `7.6.5` API baseline に対して build し、Java 8 classfile とする。compile 用の再配布 API artifact は `7.6.4` が最終のため、`7.6.5` 相当として `7.6.4` を使用する。
+- 対象 Gradle は `7.6.5 <= version < 9.7.0` とする。wrapper 不在時は bundled Tooling API `9.6.1` を使用する。
+- 固定 CI anchor は `7.6.5 / daemon JDK 8`、`8.14.5 / daemon JDK 17`、`9.6.1 / daemon JDK 25` とする。
+  - [context/toolchain.md](../context/toolchain.md) の Gradle discovery compatibility matrix — 互換 matrix の詳細を定める正本
+
+### 明示 override による bypass
+
+`sourceRoots` が 1 件以上指定された request は、Gradle Tooling API、daemon、一時 provider を完全に bypass する。解析 context は、明示された classpath / language level から単一の synthetic context として構築する。この経路は wrapper 判定を含め matrix 全体を bypass する。
+
+### 安全境界
+
+自動 discovery は trusted build 前提である。build logic は利用者権限で評価され、repository credential、network、cache、daemon JVM 選択、任意の副作用は Gradle に任せる。depwalk は credential を受領・保存せず、Gradle stdout / stderr を Protocol / CLI へ転送しない。raw exception は sanitize する。非漏洩保証は depwalk が生成・転送する artifact に限定し、任意 build logic の sandbox は提供しない。
+
+- [context/infrastructure.md](../context/infrastructure.md) の Security / Privacy — trusted build 前提、credential、network、非漏洩境界の運用契約を定める
+
+CLI help はこの副作用と明示 bypass を常時説明する。自動 discovery の各 run では、build 評価の前に Analyzer stderr へ通知を出す。通知は「build logic 評価、repository / credential resolution、network、cache を利用し得る」ことを安定した定型文で伝える。discovery の開始・終了と安定 category は観測可能にするが、Gradle 由来の自由文は転送しない。
+
+### 失敗の分類
+
+次の 3 つはいずれも `JAVA_GRADLE_MODEL_ERROR` の fatal とし、安定 reason で区別する。reason の分類粒度は、判定できた phase に従う。
+
+| reason                       | 条件                                          | 判定 phase                |
+| ---------------------------- | --------------------------------------------- | ------------------------- |
+| `unsupported-gradle-version` | 対象 Gradle が範囲外、または version 判定不能 | model 要求前の pre-flight |
+| `daemon-jvm-incompatible`    | daemon JVM が非互換                           | model 要求前の pre-flight |
+| `provider-incompatible`      | provider が非互換                             | model 検証                |
+
+provider load 中に Gradle 側で顕在化した失敗は原因を特定できない。この場合は `model-request-failed` / `connection-failed` として報告し、詳細を raw exception から推測しない。
+
+wrapper 不在の build は同梱 `9.6.1` で評価される。意図しない Gradle version での build 評価を避けたい場合は、wrapper の利用または明示 `sourceRoots` を推奨する。
 
 ## 代替案
 
@@ -65,12 +122,14 @@ CLI help はこの副作用と明示 bypass を常時説明する。自動 disco
 
 ## 実装・運用への反映
 
-- spec 更新要否: 要。issue #24 の durable 設計を本 ADR と Java Analyzer feature doc へハンドオフする。
+- spec 更新要否: 要。discovery の durable 設計を本 ADR と Java Analyzer feature doc へハンドオフする。
 - context / AI 向け設定更新要否: 要。runtime、toolchain、test、security contract へ反映する。
 
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): Java Analyzer の条件付き Gradle runtime
 - [design/features/java-analyzer/DesignDoc_java-analyzer.md](../design/features/java-analyzer/DesignDoc_java-analyzer.md): discovery / analysis context / 完全性を定める
+- [design/features/java-analyzer/discovery.md](../design/features/java-analyzer/discovery.md): source root discovery と Gradle runtime の安全境界の規則
+- [context/toolchain.md](../context/toolchain.md): Gradle discovery compatibility matrix の正本
 - [context/infrastructure.md](../context/infrastructure.md): trusted build、credential、network、非漏洩境界
 - [issue #24](https://github.com/Fukuemon/depwalk/issues/24): 決定経緯と issue 単位の作業記録

@@ -5,14 +5,13 @@
 #   context/README.md          ファイル一覧 (生成マーカー区間だけ置換)
 #
 # 手書きの索引は育たない (impact-index.yaml が実例) ため生成物にする。
-# 判断を定めるのは adr/0008-doc-freshness-and-reading-map.md。
 #
 # 冪等: frontmatter が変わっていなければ再実行しても差分は出ない。
 # その性質を使って pre-commit / CI が drift を検査する。
 #
 # 索引は markdown テーブルではなく箇条書きで出力する。prettier がテーブルの
 # 列幅を揃え直すため、テーブルだと生成 -> 整形 -> 再生成の ping-pong になり
-# drift 検査が恒久的に FAIL する (ADR-0008「生成区間を含む文書の整形」)。
+# drift 検査が恒久的に FAIL する。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -66,7 +65,7 @@ lines = [
     "# 読み取りマップ — 「何を読めば足りるか」のルーティング表",
     "#",
     "# scripts/reading-map.sh が各文書の frontmatter から生成する。手編集しない。",
-    "# 判断を定めるのは adr/0008-doc-freshness-and-reading-map.md。",
+    "# 運用は context/README.md の 文書メタ情報と鮮度 が定める。",
     "#",
     "# 使い方: 触るコードパスで前方一致するエントリを引き、docs のファイルだけを読む。",
     "# エントリが無い場合は repo 全体の探索へ逃げず、対象文書に governs を足す。",
