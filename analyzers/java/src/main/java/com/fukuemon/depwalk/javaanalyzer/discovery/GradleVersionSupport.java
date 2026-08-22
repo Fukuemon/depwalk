@@ -4,13 +4,13 @@ import java.util.Optional;
 
 /**
  * 自動 discovery の Gradle / daemon JVM 互換性判定。
- * target Gradle は {@code 7.6.5 <= version < 9.7.0}、daemon JVM は Gradle
+ * target Gradle は {@code 7.6.5 <= version < 9.8.0}、daemon JVM は Gradle
  * 公式 Java compatibility matrix に従う。
  */
 public final class GradleVersionSupport {
 
     /** 同梱 Tooling API / wrapper なし build へ使う version。 */
-    public static final String BUNDLED_GRADLE_VERSION = "9.6.1";
+    public static final String BUNDLED_GRADLE_VERSION = "9.7.1";
 
     private GradleVersionSupport() {
     }
@@ -23,7 +23,7 @@ public final class GradleVersionSupport {
      */
     public static Optional<Boolean> isSupportedGradleVersion(String gradleVersion) {
         Optional<int[]> parsed = parseVersion(gradleVersion);
-        return parsed.map(v -> compare(v, new int[] {7, 6, 5}) >= 0 && compare(v, new int[] {9, 7, 0}) < 0);
+        return parsed.map(v -> compare(v, new int[] {7, 6, 5}) >= 0 && compare(v, new int[] {9, 8, 0}) < 0);
     }
 
     /**
@@ -46,6 +46,9 @@ public final class GradleVersionSupport {
 
     // Gradle 公式 Java compatibility matrix (daemon JVM の上限 Java major)。
     private static int maxDaemonJava(int[] v) {
+        if (compare(v, new int[] {9, 4, 0}) >= 0) {
+            return 26;
+        }
         if (compare(v, new int[] {9, 1, 0}) >= 0) {
             return 25;
         }

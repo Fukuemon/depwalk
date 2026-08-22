@@ -1,7 +1,7 @@
 plugins {
     java
     application
-    id("com.gradleup.shadow") version "9.5.1"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "com.fukuemon.depwalk"
@@ -22,24 +22,24 @@ repositories {
 }
 
 dependencies {
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.2")
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.28.2")
     implementation("org.soot-oss:sootup.core:2.0.0")
     implementation("org.soot-oss:sootup.java.core:2.0.0")
     implementation("org.soot-oss:sootup.java.bytecode.frontend:2.0.0")
-    implementation("org.gradle:gradle-tooling-api:9.6.1")
+    implementation("org.gradle:gradle-tooling-api:9.7.1")
     // Tooling API は slf4j 経由で log を出す。Analyzer の stdout は Protocol
     // 専用・stderr は固定文のみのため、binding を nop に固定して Gradle 由来
     // の log 出力を遮断する (ADR-0006 の output 隔離)。
-    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
-    testImplementation(platform("org.junit:junit-bom:6.1.1"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.projectlombok:lombok:1.18.46")
     // 外部ライブラリ隔離 (ADR-0007) の機械検査。archunit-junit5 の TestEngine ではなく
     // core を使い、既存の Jupiter @Test から ArchRule.check() を呼ぶ (JUnit Platform 6 と
     // ArchUnit の JUnit5 engine のバージョン整合を持ち込まないため)。
-    testImplementation("com.tngtech.archunit:archunit:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit:1.5.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -73,7 +73,7 @@ tasks.test {
 // daemon JDK は toolchain 解決 (foojay) で供給し、未解決 anchor は fail させる (skip 成功にしない)。
 val matrixJdkMajors = listOf(8, 17, 25)
 tasks.register<Test>("gradleCompatibilityTest") {
-    description = "Gradle 7.6.5/8.14.5/9.6.1 × daemon JDK 8/17/25 の discovery 互換性 matrix"
+    description = "Gradle 7.6.5/8.14.5/9.7.1 × daemon JDK 8/17/25 の discovery 互換性 matrix"
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath

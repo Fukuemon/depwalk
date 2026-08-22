@@ -91,7 +91,7 @@ public final class GradleModelDiscovery {
             throw new DiscoveryFailure(
                     DiscoveryFailure.Category.UNSUPPORTED_GRADLE_VERSION,
                     DiscoveryFailure.Phase.VERSION_CHECK,
-                    "target Gradle version is outside the supported range 7.6.5 <= version < 9.7.0"
+                    "target Gradle version is outside the supported range 7.6.5 <= version < 9.8.0"
                             + " or could not be determined");
         }
         Optional<Integer> daemonJavaMajor = environment.daemonJavaMajor();

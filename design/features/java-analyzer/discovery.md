@@ -7,7 +7,7 @@ keywords:
   [discovery, Gradle, Tooling API, source root, classpath, composite build]
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
-verified_commit: 4cae142
+verified_commit: 70e70c5
 ---
 
 # Java Analyzer: Source root discovery
@@ -38,11 +38,11 @@ Java Analyzer が **解析対象のソースと classpath をどう決めるか*
 | 明示 override  | `sourceRoots` 1 件以上 + `classpath` + `javaLanguageLevel`、必要なら `javaPreview` | Gradle runtime を完全 bypass し、全 root と global classpath から単一 synthetic `SourceSetAnalysisContext` を構築する           |
 | 自動 discovery | `sourceRoots` 未指定                                                               | Gradle Tooling API で build model を取得し、各 Gradle project の `main` source set ごとに `SourceSetAnalysisContext` を構築する |
 
-自動 discovery は filesystem convention や root module の include 記述を独自解析しない。Gradle Tooling API `9.6.1` と、一時 init script から注入する bundled custom model provider を用いる。provider が返すのは次だけである。project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無。
+自動 discovery は filesystem convention や root module の include 記述を独自解析しない。Gradle Tooling API `9.7.1` と、一時 init script から注入する bundled custom model provider を用いる。provider が返すのは次だけである。project identifier、`main` source roots、compile classpath、classes output、project dependencies、実効 source language level、preview 有無。
 
 task 実行と source 生成は行わない。`test` と名前付き source set は、明示 override で指定された場合を除き対象外とする。一時 provider と init script は workspace 外へ置く。
 
-provider は Gradle `7.6.5` API に対して build し、Java 8 classfile とする。対象 Gradle は `7.6.5 <= version < 9.7.0` である。Tooling API client と Analyzer build wrapper は `9.6.1` とし、wrapper がない build には bundled の `9.6.1` を使う。Analyzer runtime は JDK 25 とする。
+provider は Gradle `7.6.5` API に対して build し、Java 8 classfile とする。対象 Gradle は `7.6.5 <= version < 9.8.0` である。Tooling API client と Analyzer build wrapper は `9.7.1` とし、wrapper がない build には bundled の `9.7.1` を使う。Analyzer runtime は JDK 25 とする。
 
 Gradle daemon JVM は対象 Gradle の互換条件に従って選び、project compile toolchain や source language level とは別軸で扱う。daemon JVM が対象 Gradle の互換範囲外になる場合 (例: Analyzer JVM が daemon に引き継がれるとき) は、request `metadata.gradleJavaHome` で daemon JVM を明示指定できる。
 

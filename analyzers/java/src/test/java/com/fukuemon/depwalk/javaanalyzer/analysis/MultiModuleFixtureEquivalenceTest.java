@@ -49,7 +49,7 @@ class MultiModuleFixtureEquivalenceTest {
             // test harness が起動する。Analyzer 自身は task を起動しない。
             try (ProjectConnection connection = GradleConnector.newConnector()
                     .forProjectDirectory(fixture.toFile())
-                    .useGradleVersion("9.6.1")
+                    .useGradleVersion("9.7.1")
                     .connect()) {
                 connection.newBuild()
                         .forTasks("writeDepwalkClasspath")
