@@ -1,11 +1,19 @@
+# git hooks。有効化: pnpm install (prepare が lefthook install を実行する)
+
 pre-commit:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-commit
-    format:
-      run: hooks/format/run_prettier.sh
-    repo-analysis:
-      run: hooks/quality/validate_repo_analysis.sh
+    # 整形した結果だけを stage_fixed で staging へ戻す。明示的な git add を使うと、
+    # 部分 stage したファイルの未 stage 変更まで commit に巻き込む。
+    prettier:
+      glob: "*.{md,yml,yaml,json}"
+      run: pnpm exec prettier --write --ignore-unknown -- {staged_files}
+      stage_fixed: true
+    # 文章の規則。経緯の混入とリンクは編集後のフックと CI が見る
+    textlint:
+      glob: "*.md"
+      run: pnpm exec textlint {staged_files}
     # Go の依存方向 gate。import かルール自体を
     # 触ったときだけ走らせる (毎 commit で linter を起動しない)。
     #
@@ -18,9 +26,9 @@ pre-commit:
         - "core/.golangci.yml"
         - "scripts/golangci-lint.sh"
       run: scripts/golangci-lint.sh ./...
-    # 依存図の drift 検査: 実 import が変わったのに architecture.md の
+    # 依存図の drift 検査: 実 import が変わったのに design/DesignDoc.md の
     # 生成区間を更新していない状態を検出する。生成側 (スクリプト) と
-    # 生成先 (architecture.md) の手編集も同じ検査で拾う。
+    # 生成先 (design/DesignDoc.md) の手編集も同じ検査で拾う。
     #
     # lefthook の run は sh -c で実行され set -e が効かない。複数行にすると
     # 終了コードが最後のコマンドのものになり、生成の失敗を git diff が
@@ -30,24 +38,8 @@ pre-commit:
         - "core/**/*.go"
         - "core/*.go"
         - "scripts/depgraph.sh"
-        - "context/architecture.md"
-      run: scripts/depgraph.sh && git diff --exit-code context/architecture.md
-    # 読み取りマップの drift 検査。frontmatter を変えたのに生成し直していない
-    # 状態を検出する。生成側 (スクリプト) と生成先の手編集も同じ検査で拾う。
-    #
-    # 入力が全対象文書の frontmatter なので depgraph のように狭い glob へは
-    # 絞れない。frontmatter の先頭ブロックを読むだけで
-    # lint 起動を伴わないためコストは小さい。
-    #
-    # lefthook の run は sh -c で実行され set -e が効かないので && で連結する。
-    reading-map-drift:
-      glob:
-        - "design/**/*.md"
-        - "context/**/*.md"
-        - "context/reading-map.yaml"
-        - "scripts/reading-map.sh"
-        - "scripts/docmeta.py"
-      run: scripts/reading-map.sh && git diff --exit-code context/reading-map.yaml context/README.md
+        - "design/DesignDoc.md"
+      run: scripts/depgraph.sh && git diff --exit-code design/DesignDoc.md
 
 pre-push:
   commands:
@@ -59,15 +51,6 @@ commit-msg:
     ticket-number:
       glob: "**/*"
       run: hooks/commit-msg/check_ticket_number.sh {1}
-    # AI の attribution trailer を落とす。.claude/settings.json で無効化して
-    # いるが、それでも入った commit が積み上がったため機械検査を置く。
-    no-ai-attribution:
-      run: bash hooks/commit-msg/check_no_ai_attribution.sh {1}
-
-# git worktree を作った直後に共有プロセス層を繋ぐ。
-# 配布は symlink で追跡されないため、worktree には配布物が 1 つも来ない。
-# 手当てしないと lefthook.yml だけが残り、hook が silent に no-op になる。
-post-checkout:
-  commands:
-    link-worktree:
-      run: bash scripts/link-worktree.sh
+    # 形式と AI の帰属表示の禁止は commitlint.config.mjs が持つ
+    commitlint:
+      run: pnpm exec commitlint --edit {1}

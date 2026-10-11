@@ -69,7 +69,7 @@ tasks.test {
     dependsOn(tasks.shadowJar)
 }
 
-// Gradle discovery compatibility matrix (context/toolchain.md の CI anchor)。
+// Gradle discovery compatibility matrix (javaanalyzer/discovery/DesignDoc.md の CI anchor)。
 // daemon JDK は toolchain 解決 (foojay) で供給し、未解決 anchor は fail させる (skip 成功にしない)。
 val matrixJdkMajors = listOf(8, 17, 25)
 tasks.register<Test>("gradleCompatibilityTest") {

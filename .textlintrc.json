@@ -1,19 +1,16 @@
 {
-  "filters": {
-    "node-types": {
-      "nodeTypes": [
-        "BlockQuote",
-        "ListItem",
-        "Table",
-        "CodeBlock",
-        "Code",
-        "Html"
-      ]
-    }
-  },
   "rules": {
+    "preset-ai-words-ja": true,
+    "prh": {
+      "rulePaths": ["./prh.yml"]
+    },
+    "no-mix-dearu-desumasu": {
+      "preferInBody": "である",
+      "preferInList": "である",
+      "strict": true
+    },
     "sentence-length": {
-      "max": 140
+      "max": 120
     }
   }
 }

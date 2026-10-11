@@ -3,7 +3,7 @@
 解析段階の**実行順を知る唯一の場所**。`AnalysisRunner` が各 sub-package の段階を以下の順で調停する。
 他 package は自段階の責務のみを持ち、段階間の順序・依存を知らない。
 
-正本: `design/features/java-analyzer/DesignDoc_java-analyzer.md` 「内部 package 構成と依存境界」 /
+設計の説明: `analyzers/java/DesignDoc.md` 「内部の package 構成と外部ライブラリの隔離」 /
 `adr/0007-layered-architecture-refactor.md`
 
 ## 実行順
@@ -16,11 +16,10 @@
 | 4   | SootUp 型階層 index                 | `analysis/sootup`                       |
 | 5   | Spring DI index                     | `analysis/spring`                       |
 | 6   | call graph 構築                     | `analysis/graph`                        |
-| 7   | completeness 検査                   | `analysis/completeness`                 |
+| 7   | completeness の確認                 | `analysis/completeness`                 |
 | 8   | io 出力                             | `io`                                    |
 
 - `analysis/normalize` は段階横断の naming util (実行順に位置を持たない)
-- 補足: SootUp index の instance は段階 2 (TypeSolver 構築) が bytecode member 合成
-  (java-analyzer feature doc「solver 層の bytecode member 合成」) で
-  index を要するため context 構築より先に全 context 分を生成するが、索引化は lazy のため
-  段階としては 4 に位置づける
+- 補足: SootUp index の instance は、context の構築より先に、全 context の分を生成する。
+  段階 2（TypeSolver 構築）が、bytecode member の合成（Java Analyzer の Design Doc「solver 層の bytecode member 合成」）で index を要するためである。
+  索引化は lazy なので、段階としては 4 に位置づける。
