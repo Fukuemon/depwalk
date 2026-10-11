@@ -61,11 +61,11 @@ jobs:
 
       - name: Dependency graph drift check
         run: |
-          # 実 import が変わったのに architecture.md の生成区間を再生成して
+          # 実 import が変わったのに design/DesignDoc.md の生成区間を再生成して
           # いない状態を検出する (手描き図が静かに腐るのを構造的に防ぐ)。
           scripts/depgraph.sh
-          if ! git diff --exit-code context/architecture.md; then
-            echo "::error::context/architecture.md の依存図が実 import と一致しません。scripts/depgraph.sh を実行して結果を commit してください"
+          if ! git diff --exit-code design/DesignDoc.md; then
+            echo "::error::design/DesignDoc.md の依存図が実 import と一致しません。scripts/depgraph.sh を実行して結果を commit してください"
             exit 1
           fi
 
@@ -147,39 +147,35 @@ jobs:
           DEPWALK_E2E_REQUIRED: "1"
 
   docs:
-    name: "Docs (読み取りマップ drift / 鮮度)"
+    name: "Docs (文書のチェック)"
     runs-on: ubuntu-latest
     steps:
+      # list-drift.mjs が Git の履歴を全部読む
       - name: Checkout
-        # doc-freshness は verified_commit..HEAD を git log で辿るため全履歴が要る。
-        # shallow clone だと古い verified_commit が解決できず「参照不能」になる。
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 読み取りマップは各文書の frontmatter だけを入力にするため、rulesync 生成物と
-      # 違い .rulesync/ (sdd-template への symlink) を必要としない。したがってこの
-      # 検査は CI で成立する (生成物 drift 検査を CI に置けない理由は issue #46)。
-      - name: Reading map drift check
+      # Node.js、pnpm、apm の版は mise.toml にある
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+
+      - run: pnpm install --frozen-lockfile
+
+      # docs のチェックは apm の配置先にあり、Git で追跡しない
+      - run: apm install --frozen
+
+      # 既存の文書の指摘は残っている。pull request で変えた Markdown だけを見る
+      - name: textlint
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          scripts/reading-map.sh
-          git diff --exit-code context/reading-map.yaml context/README.md
+          git diff --name-only --diff-filter=ACMR "origin/$BASE_REF...HEAD" -- '*.md' > changed.txt
+          if [ -s changed.txt ]; then xargs pnpm exec textlint < changed.txt; fi
 
-      - name: Link check
-        run: python3 scripts/check-links.py
+      - run: node .claude/hooks/docs/hooks/check-history.mjs
+      - run: node .claude/hooks/docs/hooks/check-links.mjs
 
-      # 一文の長さの検査。表・箇条書き・コードは対象外にする。
-      # prettier と同じく node_modules を作らず、pin した版を npx で実行する。
-      - name: Sentence length check
-        run: |
-          npx --yes \
-            -p textlint@15.2.1 \
-            -p textlint-rule-sentence-length@5.0.0 \
-            -p textlint-filter-rule-node-types@1.1.0 \
-            textlint --format compact 'context/*.md' 'design/**/*.md' 'adr/*.md' README.md
-
-      # 鮮度は常に exit 0。判定が不確実な検査を FAIL にすると、内容を読まずに
-      # verified_commit だけ進めて通す運用へ堕ちるため、stale で CI を落とさない。
-      # 結果は job summary に出して PR から読めるようにする。
-      - name: Doc freshness report
-        run: scripts/doc-freshness.sh
+      # 実装が変わった文書の一覧。失敗にはしない
+      - run: node .claude/hooks/docs/hooks/list-drift.mjs
+        continue-on-error: true

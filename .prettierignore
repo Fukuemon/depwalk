@@ -1,28 +1,12 @@
 # Prettier の対象外。
-#
-# 生成物は整形の責務を生成器に一任する。prettier と生成器の整形規則が食い違うと
-# 「生成 -> prettier が整形 -> 再生成で元に戻る」の ping-pong になり、生成物の
-# drift 検査 (再生成して git diff) が恒久的に FAIL する。
-# 判断の正本は adr/0008-doc-freshness-and-reading-map.md。
 
-# rulesync 生成物 (正本は .rulesync/。scripts/generate.sh が生成する)
-AGENTS.md
-CLAUDE.md
+# apm が配置し、書き換えるファイル。整形すると次の apm install で差分が出る
 .agents/
 .claude/
 .codex/
-.cursor/
-.mcp.json
-
-# 読み取りマップ (正本は各文書の frontmatter。scripts/reading-map.sh が生成する)
-context/reading-map.yaml
-
-# 配布物のテンプレート。編集も整形も配布元 (sdd-template) でのみ行う。
-# 消費側で整形すると、次の link.sh が配布元版で上書きして巻き戻り、
-# commit のたびに整形と巻き戻りを往復する。
-# (project.yml のテンプレートは、値がプレースホルダ (<host> / <path> 等) のため
-#  YAML として解析できず、いずれにせよ対象外)
-templates/
+apm.yml
+apm.lock.yaml
+pnpm-lock.yaml
 
 # Gradle wrapper / fixture の build 生成物
 testdata/fixtures/java/**/build/
