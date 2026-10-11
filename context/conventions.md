@@ -75,9 +75,9 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 
 文書の置き場は次のとおり。
 
-- プロダクトの Why と What は、`design/DesignDoc.md` の Why / What の節に書く。PRD を別のファイルにしない。
+- プロダクトの Why と What は、ルートの `PRD.md` に書く。
 - 全体の設計は `design/DesignDoc.md` に置く。
-- 機能ごとの設計は `design/features/<feature>/DesignDoc_<feature>.md` に置く。1 つの機能の文書を分けるときは、同じディレクトリに置く。
+- 機能ごとの設計は、対象のコードのディレクトリに `DesignDoc.md` として置く。1 つの機能の文書を分けるときは、下位の package のディレクトリに `DesignDoc.md` を置く。
 - issue ごとの作業の文書は `specs/<issue 番号>-<slug>/` に置き、issue を閉じるときに消す。
 
 ADR は、決定した時点の記録として書き換えない。  

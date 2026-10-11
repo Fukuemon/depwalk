@@ -21,7 +21,7 @@ depwalk は CLI のツールで、サーバーと Web UI を持たない。
 環境の種類と用途は次のとおり。
 
 - local: 開発者の手元で CLI を直接実行し、caller と callee を調べる。
-- CI: プルリクエストのたびにバッチで実行し、変更の影響範囲のグラフとレポートを出す。
+- CI: ビルド、テスト、文書のチェックを実行する。pull request ごとに影響範囲を報告する使い方は、まだない。[PRD の Lower-Priority Goals](../PRD.md#lower-priority-goals) にある。
 - production に当たる公開は、CLI のリリースの配布を指す。公開へ進む条件は未定。
 
 depwalk は、hosted service と depwalk 専用の外部の基盤に依存しない。  
