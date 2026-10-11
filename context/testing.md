@@ -1,193 +1,143 @@
 ---
 type: context
-title: "Testing Conventions"
-description: test の責務分担と test runtime contract
-keywords: [testing, unit test, E2E, golden, fixture]
+title: テスト
+description: テストの種類ごとの保証と置き場、JDK と fat jar が要るテスト、fake analyzer と fixture の作り方、macOS の real path、リリースの前に通す E2E
+status: draft
 governs:
   - core/e2e
   - testdata
   - analyzers/java/src/test
-verified_commit: 4455e86
+  - analyzers/java/build.gradle.kts
+verified_commit: unverified
 ---
 
-# Testing Conventions
+# テスト
 
-テストの横断規約。feature 固有のテスト観点は各 [feature doc](../design/features/) が持ち、テストコマンドの固有値は [project.yml](project.yml) が持つ。
+## Test Types and Guarantees
 
-Core の test framework は Go 標準の `testing` とする。
+テストの種類ごとに、保証することと置き場は次のとおり。  
+機能ごとのテストの観点は、対象のコードの隣の機能ごとの Design Doc にある。一覧は [Design Doc の Components](../design/DesignDoc.md#components) にある。
 
-- [ADR-0002](../adr/0002-core-implementation-foundation.md) — Core 実装基盤に Go と Go modules を採用した決定
+| 種類                   | 置き場                                                                           | 保証すること                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Go の unit             | `core/internal/...`                                                              | Graph、Traversal、Output のロジック。JSONL の parse と validate。循環と深さの上限による探索の打ち切り                                  |
+| Go の process contract | `core/internal/analyzer` と fake analyzer                                        | Core から見た Analyzer のプロセスとの境界。JVM を使わずに確かめる                                                                      |
+| Protocol contract      | `testdata/analyzer-protocol/` と Core と Analyzer の contract テスト             | `analysisRequest`、`MethodSymbol`、`CallEdge`、`SourceLocation`、`diagnostic`、`error`、versioning、プロセスの契約がスキーマに従うこと |
+| Java の unit（JUnit）  | `analyzers/java/src/test`                                                        | Java Analyzer の解析の規則                                                                                                             |
+| E2E の Traversal 層    | `testdata/fixtures/traversal/` の graph の入力と期待する集合の JSON              | 到達する node と edge の集合                                                                                                           |
+| E2E の CLI 層          | `core/e2e/` と `testdata/fixtures/java/` のサンプルの Java/Spring のプロジェクト | 既知の caller と callee の集合と CLI の出力の一致、出力の形式ごとに parse できること                                                   |
 
-## テスト責務の分担
+- caller の探索、callee の探索、出力の形式の成功条件は、どれも E2E の CLI 層で期待する集合と比べて測る。
+  - 成功条件と測り方は [PRD の Success Metrics](../PRD.md#success-metrics) にある。
+- 出力の形式は、Output の unit と golden による比較と、E2E の CLI 層での比較の 2 段で確かめる。
+- Analyzer の実装は、Core と Analyzer の間の JSONL の入出力を境界にした Protocol contract に対してテストする。
+  - ADR-0001: [Analyzer Protocol を JSONL の process SPI にする](../adr/0001-analyzer-protocol-jsonl-spi.md)
+- 公開する API だけを検証するテストは、black-box（`package <pkg>_test`）にする。非公開の関数や seam に触る必要があるときだけ、同じ package に置く。
 
-| 種別              | 配置                                                              | 主担当範囲                                                                                                                                                                       |
-| ----------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit test         | `core/internal/...` / Analyzer                                    | Graph / Traversal / Output のロジック、JSONL の parse / validate、循環と深さ上限による探索打ち切り。Analyzer 側は `analyzers/java/` で JUnit を使う (下記「Java Analyzer 三層」) |
-| Protocol contract | `testdata/analyzer-protocol/` と Core / Analyzer の contract test | `analysisRequest`、`MethodSymbol` / `CallEdge` / `SourceLocation`、`diagnostic` / `error`、versioning、process contract の JSONL スキーマ準拠                                    |
-| E2E               | `testdata/fixtures/` のサンプル Java/Spring repo                  | 既知の caller / callee 集合と CLI 出力の一致、各出力形式のパース可否                                                                                                             |
+`core/e2e/` のテストは、fixture の作り方で次の 3 つに分かれる。
 
-## テストの層と担保範囲
+| 系統             | fixture                                                                                           | 要るもの                                |
+| ---------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 実 fixture       | `testdata/fixtures/java/` のサンプルの Java/Spring のプロジェクト                                 | Analyzer の JDK と build 済みの fat jar |
+| inline workspace | `t.TempDir()` に書き出したソース。helper は `core/e2e/java_fixture_helpers_test.go` の `mkdirFor` | Analyzer の JDK と build 済みの fat jar |
+| fake analyzer    | `t.TempDir()` の最小のソースと、shell script の fake analyzer                                     | 実行の環境だけ                          |
 
-テストの層は、実行系のどこを担保するかで分ける。
+- fake analyzer を使うテストでも、実際の Core の CLI を端から端まで見るなら `core/e2e/` に置く。例は `core/e2e/oom_hint_cli_test.go` である。
+- inline workspace の系統は、classpath のないソースだけの解析として動かす。
+  - `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡す。
+  - metadata がそのまま出力に出ることを見るときは、`--format json` の `nodes[].metadata` と `edges[].metadata` を比べる。
+- Gradle の model の取得（Tooling API と daemon）は E2E だけで確かめる。E2E は、CLI の結合と、graph の全体の一致も確かめる。
 
-```mermaid
-flowchart TB
-    subgraph runtime["実行系"]
-        direction LR
-        core["Core process<br/>CLI / Traversal / Output"]
-        wire["JSONL 境界<br/>stdin / stdout"]
-        analyzer["Analyzer process<br/>Java Analyzer"]
-        core --- wire --- analyzer
-    end
+テストのコマンドは次のとおり。
 
-    unit["Unit test (Go)"] -.-> core
-    junit["Java unit test (JUnit)"] -.-> analyzer
-    contract["Protocol contract test"] -.-> wire
-    trav["E2E / Traversal 層<br/>graph fixture と期待集合の照合"] -.-> core
-    cli["E2E / CLI 層<br/>実 CLI 出力の照合"] -.-> runtime
-```
+- `cd core && go test ./...`: Core の unit テストと contract テストを実行する。JVM がなくても動く状態を保つ。
+- `cd analyzers/java && ./gradlew test`: Java Analyzer の unit テストと ArchUnit のテストを実行する。
+- E2E の全体:
 
-E2E は 2 層からなる。
-Traversal 層は `testdata/fixtures/traversal/` の graph 入力と期待集合 JSON fixture で、到達 node / edge 集合を照合する。
-CLI 層はサンプル Java/Spring プロジェクトを fixture として、既知の呼び出し関係集合と CLI 出力を照合する。
-どちらも実装済みで、CLI 出力照合の実体は `core/e2e/cli_query_test.go` にある。
+  ```sh
+  (cd analyzers/java && ./gradlew shadowJar) && ./analyzers/java/gradlew --no-daemon -p testdata/fixtures/java/spring-project clean writeDepwalkClasspath && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -count=1)
+  ```
 
-caller / callee 探索と出力形式の成功条件は、いずれも CLI 層の照合が測定方法にあたる。
-出力形式の照合も 2 層で、Output Engine 層の unit / golden 照合と CLI 出力照合からなる。
+  - fixture の `writeDepwalkClasspath` は、fixture の `classes` に依存する。
 
-- [DesignDoc](../design/DesignDoc.md) の 提供価値 / 成功条件 (What) — caller / callee 探索と出力形式の成功条件、およびその測定方法を定める
-- [traversal feature doc](../design/features/traversal/DesignDoc_traversal.md) — Traversal Engine 層の到達集合照合を定める
-- [output feature doc](../design/features/output/DesignDoc_output.md) — Output Engine 層の照合を定める
-- [CLI feature doc](../design/features/cli/DesignDoc_cli.md) — flag 体系と exit code を定める
+- Gradle の multi-project の E2E だけ:
 
-## テスト runtime contract
+  ```sh
+  (cd analyzers/java && ./gradlew shadowJar) && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -run TestGradleMultiProjectCLI -count=1)
+  ```
 
-- Core と Analyzer は別プロセスのため、JSONL 入出力を境界とした contract test を analyzer-protocol 側に置き、Analyzer 実装はこの契約に対してテストする。横断的な contract test 観点は本書が定める。
-  - [analyzer-protocol feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md) — Protocol / SPI / Model schema を定める
-  - [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md) — Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とした決定
-- Core の unit test / contract test は `cd core && go test ./...` で実行できる状態を保つ。
-- Mock は手書き fake / interface stub で開始する。
-- Golden fixture は `testdata/` 配下に置く。repo root の `testdata/` に加え、Go 慣習の package-local `testdata/` (例: `core/internal/output/testdata/golden/`) も使える。単一 package に閉じる golden は package-local を優先する。
-- CLI 出力照合の golden は `testdata/fixtures/java/multi-module-spring-project/expected/` に置く。caller / callee × console / json の 4 組と、exit code (0 / 1 / 2) を照合する。
-- Java unit test の fixture source は `analyzers/java/src/test/resources/fixtures/<ケース名>/<package path>/*.java` に置く。テストはケース名の directory を workspace root (source root は `.`) として解析を走らせるため、package 宣言と directory 階層を一致させる。
-- `testify`、mock generator、`github.com/google/go-cmp/cmp` は初期導入しない。`go-cmp` は graph / Protocol record の deep diff が読みにくくなった時、mock generator は同一 interface の fake が複数 test package に重複した時に検討する。
-- fixture に framework の実 jar を持ち込まない。Spring / MyBatis などへの依存は、annotation / interface の最小 stub source を fixture tree 内に置いて解決させる (`analyzers/java/src/test/resources/fixtures/event/org/springframework/...` が例)。unit test と CLI E2E の双方に同じ方針を適用する。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換性の matrix を確かめる。`./gradlew test` には含まれない。
 
-### Java Analyzer 三層
+## Runtime Requirements
 
-Java Analyzer (`analyzers/java/`) は Java unit test / Go process contract / 実 jar E2E の三層でテストする。
+- Go の unit テストと contract テストは、fake analyzer（任意の実行ファイル）で動くため、JVM を要らない。
+- 実際の Analyzer の jar を起動する E2E だけが、Analyzer の JDK と build 済みの fat jar を要る。JDK のバージョンは `mise.toml` にある。
+  - CI は、JVM の要らない Go の job と、JDK と Gradle の build を使う Java と E2E の job に分ける。
+- E2E は、JDK か fat jar がないと skip する。`DEPWALK_E2E_REQUIRED=1` を与えると、skip せずに失敗する。
+  - CI の E2E の job はこの変数を与える。前提が欠けたまま、assertion を 1 つも実行せずに job が成功するのを防ぐ。
+- POSIX の shell に依存する fake analyzer を使うテストは、JDK と jar の有無ではなく、`runtime.GOOS == "windows"` で skip する。
+- `gradleCompatibilityTest` は、anchor の daemon の JDK を Gradle の toolchain（foojay resolver）が自動で用意する。
+  - `javaToolchains.launcherFor` で解決した JDK を、system property でテストへ渡す。
+  - arm64 の macOS には JDK 8 の Temurin がないため、Zulu が使われる。
+  - anchor の JDK を解決できないときは、skip して成功にせず、失敗させる。
+  - daemon の JVM は、一時的に写した fixture の `gradle.properties` に `org.gradle.java.home` を書いて固定する。この方式は、対象のすべての Gradle で働く。
 
-- [java-analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md) — 三層に分けた判断根拠と feature 固有のテスト観点を定める
+macOS では、一時ディレクトリの path を real path に揃えてから比べる。
 
-| 層                     | 配置                                                                                           | JVM 要否               |
-| ---------------------- | ---------------------------------------------------------------------------------------------- | ---------------------- |
-| Java unit test (JUnit) | `analyzers/java/` (fixture source は `analyzers/java/src/test/resources/fixtures/<ケース名>/`) | 要 (Java job)          |
-| Go process contract    | `core/internal/analyzer` + fake analyzer                                                       | **不要** (fake で代替) |
-| E2E                    | `core/e2e/` (テスト自体の置き場は 1 つで、fixture の作り方が下記の 3 系統に分かれる)           | 系統ごとに異なる       |
+- macOS の `/tmp` と `/var/folders` は `/private` の下への symlink である。JUnit の `@TempDir`、`Files.createTempDirectory`、Go の `t.TempDir()` は、symlink の側の path を返す。
+- Gradle の model と `toRealPath()` 済みの source root は `/private/...` を返す。
+- 片方だけを real path にして `relativize` すると、`../../private/...` のような誤った相対 path になる。record の path の破損や glob の不一致として現れる。
+- Analyzer は、`workspaceRoot` と source root の両方を real path にしてから相対にする。
+- テストで一時ディレクトリを workspace にするときは、作った直後に `.toRealPath()` してから、request と期待する値の基準にする。JavaParser の CU storage の path も、real path のファイルを parse に渡して揃える。
 
-`core/e2e/` の test は fixture の作り方で 3 系統に分かれる。
+## Mocking and Test Data
 
-| 系統             | fixture                                                                                              | 要求するもの                                   |
-| ---------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 実 fixture       | `testdata/fixtures/java/` のサンプル Java/Spring プロジェクト                                        | JDK 25 + build 済み fat jar                    |
-| inline workspace | `t.TempDir()` に source を書き出す (helper は `core/e2e/java_fixture_helpers_test.go` の `mkdirFor`) | JDK 25 + build 済み fat jar                    |
-| fake analyzer    | `t.TempDir()` の最小 source と shell script の fake analyzer                                         | 実行環境のみ (`core/e2e/oom_hint_cli_test.go`) |
+- Go の mock は、手で書いた fake と interface の stub で作る。
+- `testify`、mock の generator、`github.com/google/go-cmp/cmp` は入れない。
+  - `go-cmp` は、graph や Protocol の record の深い差分が読みにくくなったときに入れるかを決める。
+  - mock の generator は、同じ interface の fake が複数のテストの package に重なったときに入れるかを決める。
+- 複数の package のテストから使う fixture の builder の置き場は、[codebase.md](codebase.md#placement-rules) にある。
 
-- Go 側の unit / contract test は fake analyzer (任意の実行可能ファイル) で回せるため、CI の Go job に JVM を要求しない。
-- 実 jar を起動する E2E だけが JDK 25 + build 済み fat jar を要求する。CI は「Go job (JVM 不要)」と「Java + E2E job (JDK 25 / Gradle build)」に分ける。
-- fake analyzer を使うテストでも、実 Core CLI の端から端までを見るなら `core/e2e/` に置く。この場合の skip 条件は JDK / jar の有無ではなく実行環境になる (POSIX shell に依存する fake なら `runtime.GOOS == "windows"` で skip する)。
-- inline workspace 系統は `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡し、classpath なしの source-only 解析として走らせる。metadata の透過表出を見るときは `--format json` の `nodes[].metadata` / `edges[].metadata` を照合する。
-- **Java unit test が `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer runtime と同じ 25 にする。** SootUp が読める classfile major は同梱する ASM の版で決まり、読めない major に当たると bytecode 救済が例外なしに静かに無効化される。古い major を明示して回避すると、SootUp が新しい major へ追随しなくなったときに検出できないまま実環境で無効化される。runtime と同じ major で compile することだけが、その回帰を test に捕まえさせる。
-  - [toolchain.md](toolchain.md) の 実装上の互換性ハマりどころ — SootUp と classfile major の対応、および実測結果を定める
-- 複数 context (project 依存関係) を要する Java unit test は、実 Gradle を起動せず in-memory の fake build model から production の context 構築を通して解析 pipeline を駆動する。model 取得 (Tooling API / daemon) の検証は E2E 側だけが担う。E2E はほかに CLI 結合や graph 全体照合も担う。境界の詳細は java-analyzer feature doc のテスト観点にある。
+golden と fixture の置き場は次のとおり。
 
-## path 比較は real path 基準 (macOS symlink)
+- golden の fixture は `testdata/` に置く。1 つの package に閉じる golden は、その package の `testdata/` に置く。例は `core/internal/output/testdata/golden/` である。
+- CLI の出力と比べる golden は `testdata/fixtures/java/multi-module-spring-project/expected/` に置く。caller と callee の 2 つと、console と json の 2 つの組み合わせの 4 つと、終了コード（0、1、2）を比べる。
+- Java の unit テストの fixture のソースは `analyzers/java/src/test/resources/fixtures/<ケース名>/<package の path>/*.java` に置く。
+  - テストはケース名のディレクトリを workspace root（source root は `.`）にして解析するため、package の宣言とディレクトリの階層を一致させる。
 
-macOS では `/tmp` と `/var/folders` が `/private` 配下への symlink である。
-JUnit の `@TempDir` / `Files.createTempDirectory` / Go の `t.TempDir()` はいずれも symlink 側の path を返す。
-一方 Gradle model や `toRealPath()` 済みの source root は `/private/...` を返す。
-片側だけ real 化して `relativize` すると `../../private/...` のような壊れた相対 path になり、record path の破損や glob 不一致として現れる。
+fixture は、本物の framework に依存させない。
 
-- production 契約: Analyzer は `workspaceRoot` と source root を**両方 real path 化してから**相対化する。
-- test 側: 一時 directory を workspace として使うときは、作成直後に `.toRealPath()` してから request / 期待値の基準にする。JavaParser の CU storage path も real path の file を parse に渡して揃える。
+- fixture に framework の本物の jar を持ち込まない。Spring や MyBatis への依存は、annotation と interface の最小の stub のソースを fixture の中に置いて解決させる。
+  - 例は `analyzers/java/src/test/resources/fixtures/event/org/springframework/...` である。
+  - unit テストと CLI の E2E の両方に同じ方針を当てる。
+- 複数の context（project の間の依存）が要る Java の unit テストは、実際の Gradle を起動しない。in-memory の fake の build model から、本番と同じ context の構築を通して解析の pipeline を動かす。
+  - 境界の詳細は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 
-## テスト構造
+Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer の JDK と同じにする。
 
-- テストは仕様単位の `Test...` 関数に分ける。1 つの巨大な table-driven test に、異なる仕様の invalid case を混在させない。
-- table-driven test は、同じ仕様に対する具体例の列挙に使う。`Test...` 関数名は検証する仕様、`t.Run` の subtest 名は具体的な入力条件や境界値を表す。
-- Protocol / contract test は、失敗時に壊れた契約が test output から分かる構造にする。fixture 検証では `request` / `stdout` / `stderr` / `exit-code` など、契約境界ごとに subtest を分ける。
-- helper は assertion や fixture 生成の重複削減に使う。ただし、helper 名や table の抽象化で仕様名が隠れる場合は分割を優先する。
-- `go test -run '<TestName>/<case>'` で仕様または具体例を絞り込める命名にする。
-- **公開 API だけを検証するテストは black-box (`package <pkg>_test`) にする。** Go 公式 style guide が定めている。非公開の関数・seam を触る必要があるときだけ同一パッケージに置く。
-- black-box テストは自パッケージを import する。そのため依存方向 gate (depguard) の deny は、前方一致の一括指定を避けて完全一致 (`$`) で列挙する。前方一致にすると外部テストパッケージが自分自身を import できなくなる。
-- **複数パッケージのテストから使う fixture builder は、対象パッケージ配下のテスト支援 sub-package に置く。** 配置例は `core/internal/graph/graphtest` で、Go 標準の `net/http/httptest` と同じ形である。本番パッケージの公開面をテスト都合で広げないための分離であり、本番コードから import しない (depguard で検査)。
+- SootUp が読める classfile の major は、同梱する ASM のバージョンで決まる。読めない major に当たると、bytecode の救済が例外を出さずに無効になる。
+- 古い major を指定して避けると、SootUp が新しい major に追いつかなくなったときに検出できず、利用者の環境で救済が無効になる。Analyzer の JDK と同じ major で compile すれば、その回帰をテストが捕まえる。
+- 詳しくは [tech-stack.md](tech-stack.md#upgrade-checks) にある。
 
-### JUnit の `@DisplayName`
+## Required Tests
 
-- JUnit の test class と、その中の全 `@Test` に日本語の `@DisplayName` を付ける。`*TestSupport` / fake などのテスト支援クラスには付けない。
-- class の `@DisplayName` は「検証対象と境界」を書く。例: `event publish から listener への呼び出し関係 (edge) の生成`。
-- method の `@DisplayName` は「〈条件〉のとき、〈観測できる結果〉になる」の 1 文にする。
-- 識別子をそのまま並べず、契約を日本語で言い切る。protocol の値を引用するときだけ括弧で添える (例: `曖昧 (ambiguous) になる`)。
-- method 名は英語のまま残す。Gradle の `--tests` で絞り込む手段であり、Go 側の「`go test -run` で絞り込める命名にする」と同じ意図による。
-
-## Protocol contract test
-
-Analyzer Protocol / SPI の contract test は、実装スタック確定前でも以下の観点が定める。
-
-- valid `analysisRequest` record を Analyzer が受け取れること。
-- `analysisRequest.include` / `analysisRequest.exclude` が `workspaceRoot` からの相対 path glob 配列として扱われ、絶対 path、空文字、`..` を含む path が schema 不準拠として拒否されること。
-- `analysisRequest.entrypoints` の method selector object が `qualifiedName` 必須、`signature` 任意として検証されること。
-- `analysisRequest.entrypoints` 未指定または空配列の場合に、scope 全体の call graph 生成要求として扱われること。
-- `analysisRequest.analysisMode` 未指定時に `fullGraph` として扱われること。
-- Core が `analysisRequest` 送信後に stdin を close すること。
-- Analyzer stdout の JSONL record が逐次 parse / validate されること。
-- Analyzer stdout に invalid UTF-8 を含む JSONL record が出た場合、Core が invalid record として拒否すること。
-- Analyzer stdout に duplicate key を含む JSON object が出た場合、Core が invalid record として拒否すること。
-- Protocol field 名の大小文字違いを別 field として扱い、`schemaVersion` の代わりに `schemaversion` が出た場合は必須 field 欠落として拒否すること。
-- Protocol 上 array / object と定義する field を Core が出力する場合、nil slice / nil map 由来の `null` を出力しないこと。
-- Analyzer stderr が protocol record として parse されないこと。
-- exit code `0` を成功、非ゼロを fatal failure として扱うこと。
-- 複数 request が必要な場合、Core が request ごとに Analyzer process を起動すること。
-- `methodSymbol` / `callEdge` が 0 件の正常解析を success として扱えること。
-- `methodId` / `edgeId` が同一 Analyzer 実装 version、同一 request、同一 source content で決定的に再生成されること。
-- `schemaVersion` が protocol 全体 version として全 record に必須であること。
-- Analyzer が `analysisRequest` の未知 field を無視できること。
-- Core が Analyzer response record の未知 field を無視できること。
-- 未対応 major version の record を Core が schema version mismatch として拒否できること。
-- 必須 field の削除、型変更、意味変更を非互換変更として検出できること。
-- valid `diagnostic` record を Core が利用者へ伝播し、`diagnostic` だけを理由に fatal failure としないこと。
-- valid `error` record を Core が fatal failure として扱うこと。
-- Analyzer が `error` record 出力後に非ゼロ exit code で終了すること。
-- valid `error`、非ゼロ exit、parse / schema error が先行 graph record と diagnostic をすべて無効化し、staging Graph を公開しないこと。正常 stream だけが参照完全性を満たすこと。
-- 未解決 symbol が `diagnostic` として表現され、未解決 callee を参照する `callEdge` が valid edge として扱われないこと。
-- valid `methodSymbol` / `callEdge` record と embedded `SourceLocation` value object を Core が parse / validate できること。
-- Java 固有情報を `metadata` に含む record でも、Core が意味を解釈せず Graph の Symbol / Edge へ nested value を deep copy できること。Traversal は表出せず、Output は JSON の `nodes[].metadata` / `edges[].metadata` (optional、omitempty) として意味解釈なしに透過表出すること。表出の形式は output feature doc が定める。
-- `error.details` の共通 field を決定順で保持し、Analyzer 固有 code に分岐せず CLI が汎用表示できること。
-
-## Gradle multi-project / 完全性の横断テスト
-
-- Protocol contract: optional `sourceRoots`、workspace 相対 path、`.`、empty / absolute / `..` rejection、fatal request の原子性、共通 `FailureDetail`、optional symbol location / opaque metadata。
-- Java unit / integration: Tooling API discovery、custom model、`main` source set、root normalize / realpath / dedup / nesting、project dependency context、language level / preview、parse pre-flight、resolver allowlist、source attribution、call-site driven bytecode member index、initializer caller 展開、call inventory / ledger、`JAVA_INCOMPLETE_ANALYSIS` details。
-- Go process / Graph: valid record の staging Graph への 1-pass 変換、wire DTO 非保持、metadata deep copy、成功時だけ公開、fatal 時の Graph / diagnostic 破棄、正常 stream の参照完全性、generic CLI failure 表示。
-- Required E2E: app / service / repository の 3 project、変更 `projectDir`、custom source dir、project 間 call / DI を含む fixture。実 Core CLI と実 Analyzer jar を test-only 透過 proxy で接続し、自動 discovery と明示 override の graph、request、exit を照合する。
-- Compatibility / security: Gradle `7.6.5`〜`9.6.x` と daemon JVM anchor matrix、Gradle stdout / stderr の隔離、credential / URL / absolute path を含む negative fixture の非漏洩を検証する。
-- Performance: 明示 single-root、自動 single-project、自動 multi-project の初回と warm 3 回中央値、および discovery phase 別時間を記録する。本書は記録する項目だけを定め、数値 SLO は定めない。
-
-## 横断テスト方針
-
-- リリース判定には最低限、caller 探索 (S1) / callee 探索 (S2) / 各出力形式 (S3) の E2E 照合を含める。
-- **2 つ目以降**の Analyzer 追加時は Protocol contract test の通過を必須とする。Core を変えずに済むこと (S5) の確認であり、初号機導入時の言語非依存な初回配線は対象外とする。
-
-## 参照
-
-- [design/features/](../design/features/): feature 単位の設計とテスト観点
-- [project.yml](project.yml): テストコマンドの固有値
-- [DesignDoc](../design/DesignDoc.md) の 提供価値 / 成功条件 (What): S1 / S2 / S3 / S5 の成功条件と測定方法
-- [traversal feature doc](../design/features/traversal/DesignDoc_traversal.md): Traversal Engine 層の到達集合照合
-- [output feature doc](../design/features/output/DesignDoc_output.md): Output Engine 層の照合と JSON 出力の schema
-- [CLI feature doc](../design/features/cli/DesignDoc_cli.md): flag 体系と exit code
-- [analyzer-protocol feature doc](../design/features/analyzer-protocol/DesignDoc_analyzer-protocol.md): Protocol / SPI / Model schema
-- [java-analyzer feature doc](../design/features/java-analyzer/DesignDoc_java-analyzer.md): Java Analyzer のテスト観点と三層の判断根拠
-- [toolchain.md](toolchain.md) の Gradle discovery compatibility matrix: 互換 matrix の対象 version
-- [ADR-0001](../adr/0001-analyzer-protocol-jsonl-spi.md): Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とした決定
-- [ADR-0002](../adr/0002-core-implementation-foundation.md): Core 実装基盤に Go と Go modules を採用した決定
+- リリースを判断する前に、caller の探索、callee の探索、各出力の形式の E2E を通す。
+- 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core を変えずに Analyzer を足せることを確かめるためである。
+  - 最初の Analyzer を入れたときの、言語によらない最初の配線は対象外にする。
+- Gradle の multi-project と、解析の完全性にかかわる変更では、次の観点を確かめる。
+  - Protocol contract
+    - 省略できる `sourceRoots`、workspace からの相対 path、`.`、空と絶対 path と `..` の拒否
+    - fatal な request の原子性、共通の `FailureDetail`、省略できる symbol の位置と opaque な metadata
+  - Go のプロセスと Graph
+    - 正しい record を staging Graph へ 1 回の走査で写すこと、wire の DTO を持たないこと、metadata の deep copy
+    - 成功したときだけの公開、fatal のときの Graph と diagnostic の破棄、正常な stream の参照の完全性
+    - 汎用の CLI の失敗の表示
+  - 必須の E2E
+    - fixture は、app、service、repository の 3 つの project、変えた `projectDir`、独自の source のディレクトリ、project の間の呼び出しと DI を含む。
+    - 実際の Core の CLI と Analyzer の jar を、テスト専用の透過の proxy でつなぐ。
+    - 自動 discovery と明示の override のそれぞれで、graph、request、終了コードを期待する値と比べる。
+  - 互換性と安全
+    - Gradle と daemon の JVM の anchor の matrix、Gradle の stdout と stderr の隔離
+    - credential と URL と絶対 path を含む negative fixture で、それらが出力に漏れないこと
+  - 性能: 明示の single-root、自動の single-project、自動の multi-project について、初回と warm の 3 回の中央値、discovery の phase ごとの時間を記録する。数値の SLO は決めない。
+- ほかの変更ごとに足すテストの種類は未定。
