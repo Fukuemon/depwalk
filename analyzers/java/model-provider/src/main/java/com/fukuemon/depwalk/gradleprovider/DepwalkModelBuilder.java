@@ -123,7 +123,7 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
     /**
      * source language level は {@code compileJava.options.release} を優先し、
      * 未指定なら実効 {@code sourceCompatibility} を使用する
-     * (context/toolchain.md の4軸分離)。
+     * (javaanalyzer/discovery/DesignDoc.md の4軸分離)。
      */
     private String sourceLanguageLevel(Project project, SourceSet main) {
         JavaCompile compileTask = compileJavaTask(project, main);

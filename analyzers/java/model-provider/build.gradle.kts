@@ -6,7 +6,7 @@ group = "com.fukuemon.depwalk"
 version = "0.1.0"
 
 // The provider runs inside the target build's Gradle daemon, whose JVM can be
-// as old as Java 8 for Gradle 7.6.x (context/toolchain.md の matrix)。
+// as old as Java 8 for Gradle 7.6.x (javaanalyzer/discovery/DesignDoc.md の matrix)。
 // --release 8 keeps the classfile major at 52 and rejects newer JDK APIs at
 // compile time.
 tasks.withType<JavaCompile> {

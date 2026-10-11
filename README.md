@@ -48,13 +48,13 @@ depwalk analyze <workspace-root> \
   --format json
 ```
 
-`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示するとその経路を完全に bypass する。
+`--source-root` を省略すると Gradle の build model から source root と classpath を自動で取得する。明示すると自動の取得を完全に bypass する。
 
-- [context/project.yml](context/project.yml) の `commands` — 開発・ビルド・検査の各コマンドを定める
+- [context/tech-stack.md](context/tech-stack.md#toolchain) — 開発、ビルド、チェックの主なコマンド
 
 ## アーキテクチャ
 
-呼び出しグラフの構築・探索・出力を担う **Core を言語非依存**に保ち、言語ごとの解析差異を独立プロセスの **Analyzer** に閉じ込める。両者は共通データモデル (`MethodSymbol` / `CallEdge` / `SourceLocation`) を **JSONL (STDIN/STDOUT)** で受け渡すのみで結合するため、新しい言語の Analyzer を Core 変更なしに追加できる。
+呼び出しグラフの構築・探索・出力を担う **Core を言語非依存**に保ち、言語ごとの解析差異を独立プロセスの **Analyzer** に閉じ込める。両者は共通データモデル (`MethodSymbol` / `CallEdge` / `SourceLocation`) を **JSONL (STDIN/STDOUT)** で受け渡すのみで結合する。このため、新しい言語の Analyzer を Core 変更なしに追加できる。
 
 ```text
 ユーザー / CI
@@ -63,43 +63,41 @@ depwalk analyze <workspace-root> \
                                                               └─ Java / Spring ソース (read-only)
 ```
 
-C4 L1 / L2 の図、モジュール責務、Communication Protocol は Design Doc が定める。
+C4 の L2 の図、モジュールの責務、Core の package の依存図は Design Doc にある。
 
-- [design/DesignDoc.md](design/DesignDoc.md) の アーキテクチャ概観 (Overview) — system landscape と主要な実行単位を定める
+- [design/DesignDoc.md](design/DesignDoc.md) — 全体の構成とモジュールの責務
 
 ## ドキュメント構成
 
-本リポジトリは Spec Driven Development (SDD) テンプレートを土台に運用する。決まりは層ごとに分かれる。
+文書は種類ごとに分かれる。
 
-| 層                | 文書                                       | 役割                                             |
-| ----------------- | ------------------------------------------ | ------------------------------------------------ |
-| Why / What + How  | [design/DesignDoc.md](design/DesignDoc.md) | 統合モード: Why/What を内包した system landscape |
-| How (feature)     | [design/features/](design/features/)       | feature 単位の設計 (6 feature)                   |
-| How (規約 / 契約) | [context/](context/)                       | 技術規約・codebase architecture・運用契約        |
-| 固有値            | [context/project.yml](context/project.yml) | repo / 命名 / コマンド / 対象ドメイン / ラベル   |
-| 意思決定          | [adr/](adr/)                               | 長期参照する技術選定・境界                       |
-| 作業文書          | [specs/](specs/)                           | issue 単位の要求・設計 (close 時に削除する)      |
+| 文書           | 置き場                                                                    | 役割                                                        |
+| -------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| PRD            | [PRD.md](PRD.md)                                                          | 誰のどの課題を何で解決するか                                |
+| Design Doc     | [design/DesignDoc.md](design/DesignDoc.md)                                | 全体の構成、モジュールの責務と依存                          |
+| 機能ごとの設計 | 対象のコードの隣の `DesignDoc.md`（例: `core/internal/cli/DesignDoc.md`） | 機能の内部の構成と処理の流れ                                |
+| context        | [context/](context/)                                                      | 取り決めと契約。目次は [context/index.md](context/index.md) |
+| ADR            | [adr/](adr/)                                                              | 選択肢を比べて決めた判断                                    |
+| spec           | [specs/](specs/)                                                          | issue ごとの要求と設計。issue を閉じるときに削除する        |
 
-**どこから読むか**が分からないときは [context/reading-map.yaml](context/reading-map.yaml) を引く。触るコードパスから「読むべき文書」を逆引きできる索引で、各文書の frontmatter から生成している。
+どこから読むかが分からないときは [context/index.md](context/index.md) を読む。
 
-各文書は frontmatter に `governs` (その文書が語る実装範囲) と `verified_commit` (最後に実装と突き合わせた commit) を持つ。実装が進んで文書が古くなると CI が検出する。
+Design Doc と context は、frontmatter に `governs`（その文書が語る実装の範囲）と `verified_commit`（最後に実装と読み比べたコミット）を持つ。
+書き方の規則は [context/conventions.md](context/conventions.md#documents) にあり、文書のチェックの実行方法は [CONTRIBUTING.md](CONTRIBUTING.md) にある。
 
-- [context/README.md](context/README.md) の 文書メタ情報と鮮度 — frontmatter の schema と鮮度検査の運用を定める
-
-> 統合モードのため独立した `PRD.md` は作らず、Why/What は DesignDoc の「## Why / What」節が定める。
-> AI エージェントの操作契約 (`CLAUDE.md` / `AGENTS.md` / `.claude/` など) は sdd-template リポジトリが定め、symlink で接続する。本リポジトリでは追跡しないため、clone しただけの状態では存在しない。接続は sdd-template 側で `bash scripts/link.sh <このリポジトリ>`、確認は `bash scripts/doctor.sh`。
+> AI エージェントの規約とスキルは agent-harness を apm で導入する（`apm.yml`）。配置先は Git で追跡しない。手順は [CONTRIBUTING.md](CONTRIBUTING.md) にある。
 
 ## ディレクトリ
 
 ```text
+PRD.md       # PRD
 core/        # Core CLI (Go) — graph / traversal / output / protocol / analyzer / cli
 analyzers/   # 言語別 Analyzer — java/ (JavaParser / SymbolSolver / SootUp)
-design/      # Design Doc (landscape) と feature 設計
-context/     # 技術規約・運用契約 + project.yml (固有値・Label Policy)
+design/      # 全体の Design Doc
+context/     # 取り決めと契約
 adr/         # Architecture Decision Records
 specs/       # issue 単位の作業文書 (close 時に削除する)
 testdata/    # JSONL contract fixture / E2E fixture
-templates/   # 各文書のテンプレート
-scripts/     # 生成・検査スクリプト (依存図 / 読み取りマップ / 鮮度 / drift)
-hooks/       # protected branch / 文書検証 / markdown 整形などの hook
+scripts/     # 依存図の生成、golangci-lint の起動、specs の残りの検査
+hooks/       # protected branch と commit message の Git hook
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # core/internal の package 依存図を `go list` の実 import から生成し、
-# context/architecture.md の生成マーカー区間を置き換える。
+# design/DesignDoc.md の生成マーカー区間を置き換える。
 #
 # 手描きの依存図は実装が変わると静かに腐るため、図は必ず本スクリプトで
 # 生成する (判断の正本は ADR-0007)。
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DOC="$ROOT/context/architecture.md"
+DOC="$ROOT/design/DesignDoc.md"
 MODULE_PREFIX="github.com/Fukuemon/depwalk/core/internal/"
 BEGIN_MARKER="<!-- BEGIN GENERATED: core-depgraph (scripts/depgraph.sh が更新する。手編集しない) -->"
 END_MARKER="<!-- END GENERATED: core-depgraph -->"
@@ -17,7 +17,7 @@ END_MARKER="<!-- END GENERATED: core-depgraph -->"
 # `<package> <依存 package>...` を core/internal 内のエッジだけに絞って出す。
 #
 # 図の対象は core/internal 間のエッジのみ。`cmd/depwalk` は cli を呼ぶだけの
-# entrypoint で、依存規則 (architecture.md の Package Boundary) が語るのは
+# entrypoint で、依存規則 (context/codebase.md の Dependency Rules) が語るのは
 # internal の package 間なので含めない。
 #
 # package 名は module prefix を落とした相対 path (例: `graph/graphtest`)。
