@@ -46,7 +46,20 @@ verified_commit: unverified
 - inline workspace の系統は、classpath のないソースだけの解析として動かす。
   - `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡す。
   - metadata がそのまま出力に出ることを見るときは、`--format json` の `nodes[].metadata` と `edges[].metadata` を比べる。
-- Gradle の model の取得（Tooling API と daemon）は E2E だけで確かめる。E2E は、CLI の結合と、graph の全体の一致も確かめる。
+
+Gradle の model の取得（Tooling API、daemon、provider の配布）を、実際の Gradle を起動して確かめるテストは次の 4 つ。
+
+| テスト                                                                                 | 層                               | 確かめること                                                                             | CI                 |
+| -------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- | ------------------ |
+| `TestGradleMultiProjectCLI`                                                            | E2E の CLI 層（`core/e2e/`）     | 実際の Core の CLI と Analyzer の jar の結合と、graph の全体の一致                       | E2E の job で動く  |
+| `MultiModuleFixtureEquivalenceTest`                                                    | Java の unit（`./gradlew test`） | fat jar を子のプロセスで起動し、自動 discovery と明示の override の graph が一致すること | Java の job で動く |
+| `CredentialIsolationTest`                                                              | Java の unit（`./gradlew test`） | build logic の出力が、Protocol、stderr、生成物に漏れないこと                             | Java の job で動く |
+| `GradleCompatibilityMatrixTest`（task `gradleCompatibilityTest`、tag `gradle-compat`） | Java の unit（専用の task）      | anchor ごとの Gradle と daemon の JVM で、model を取得できること                         | 動かない           |
+
+- `./gradlew test` は tag `gradle-compat` のテストを除くため、`GradleCompatibilityMatrixTest` は専用の task の `gradleCompatibilityTest` で実行する。
+- 上の表のほかの Java の unit テストは、実際の Gradle を起動しない。
+  - 複数の context（project の間の依存）が要るテストは、in-memory の fake の build model から、本番と同じ context の構築を通して解析の pipeline を動かす。
+  - 境界の詳細は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 
 テストのコマンドは次のとおり。
 
@@ -66,13 +79,17 @@ verified_commit: unverified
   (cd analyzers/java && ./gradlew shadowJar) && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -run TestGradleMultiProjectCLI -count=1)
   ```
 
-- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換性の matrix を確かめる。`./gradlew test` には含まれない。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換性の matrix を確かめる。`./gradlew test` には含まれず、CI でも動かない。
 
 ## Runtime Requirements
 
 - Go の unit テストと contract テストは、fake analyzer（任意の実行ファイル）で動くため、JVM を要らない。
-- 実際の Analyzer の jar を起動する E2E だけが、Analyzer の JDK と build 済みの fat jar を要る。JDK のバージョンは `mise.toml` にある。
+- 実際の Analyzer の jar を起動するのは、E2E と、Java の `MultiModuleFixtureEquivalenceTest` である。どちらも Analyzer の JDK と build 済みの fat jar を要る。JDK のバージョンは `mise.toml` にある。
+  - Java の側は、`./gradlew test` が先に fat jar を作る。
   - CI は、JVM の要らない Go の job と、JDK と Gradle の build を使う Java と E2E の job に分ける。
+- `./gradlew test` は、実際の Gradle を起動するテストのために、ネットワークを要る。
+  - Tooling API が Gradle 9.7.1 の distribution を取得し、`multi-module-spring-project` の build が Maven Central から依存の jar を取得する。
+  - どちらも、Gradle の user home に cache があれば取得しない。
 - E2E は、JDK か fat jar がないと skip する。`DEPWALK_E2E_REQUIRED=1` を与えると、skip せずに失敗する。
   - CI の E2E の job はこの変数を与える。前提が欠けたまま、assertion を 1 つも実行せずに job が成功するのを防ぐ。
 - POSIX の shell に依存する fake analyzer を使うテストは、JDK と jar の有無ではなく、`runtime.GOOS == "windows"` で skip する。
@@ -105,13 +122,17 @@ golden と fixture の置き場は次のとおり。
 - Java の unit テストの fixture のソースは `analyzers/java/src/test/resources/fixtures/<ケース名>/<package の path>/*.java` に置く。
   - テストはケース名のディレクトリを workspace root（source root は `.`）にして解析するため、package の宣言とディレクトリの階層を一致させる。
 
-fixture は、本物の framework に依存させない。
+framework の本物の jar を fixture に持ち込むかは、fixture の種類で分ける。
 
-- fixture に framework の本物の jar を持ち込まない。Spring や MyBatis への依存は、annotation と interface の最小の stub のソースを fixture の中に置いて解決させる。
+- Java の unit テストの fixture と、`core/e2e/` の inline workspace には、framework の本物の jar を持ち込まない。
+  - Spring や MyBatis への依存は、annotation と interface の最小の stub のソースを fixture の中に置いて解決させる。
   - 例は `analyzers/java/src/test/resources/fixtures/event/org/springframework/...` である。
-  - unit テストと CLI の E2E の両方に同じ方針を当てる。
-- 複数の context（project の間の依存）が要る Java の unit テストは、実際の Gradle を起動しない。in-memory の fake の build model から、本番と同じ context の構築を通して解析の pipeline を動かす。
-  - 境界の詳細は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
+  - inline workspace の例は、`core/e2e/event_edges_cli_test.go` が書き出す stub である。
+- `testdata/fixtures/java/` の Gradle の fixture は、本物の framework の jar に依存する。fixture ごとの依存は次のとおり。
+  - `spring-project/`: Spring Boot の autoconfigure、Spring Data Commons、MyBatis、Lombok
+  - `multi-module-spring-project/`: Spring Context。中にある独立した build の `patterns/` は Spring に依存せず、`lib` だけが Lombok に依存する。
+  - jar のバージョンは、各 fixture の build ファイルで固定する。
+  - この fixture で確かめる観点は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 
 Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer の JDK と同じにする。
 
@@ -124,20 +145,9 @@ Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture �
 - リリースを判断する前に、caller の探索、callee の探索、各出力の形式の E2E を通す。
 - 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core の変更を `language` の値の追加に限って Analyzer を足せることを確かめるためである。
   - 最初の Analyzer を入れたときの、言語によらない最初の配線は対象外にする。
-- Gradle の multi-project と、解析の完全性にかかわる変更では、次の観点を確かめる。
-  - Protocol contract
-    - 省略できる `sourceRoots`、workspace からの相対 path、`.`、空と絶対 path と `..` の拒否
-    - fatal な request の原子性、共通の `FailureDetail`、省略できる symbol の位置と opaque な metadata
-  - Go のプロセスと Graph
-    - 正しい record を staging Graph へ 1 回の走査で写すこと、wire の DTO を持たないこと、metadata の deep copy
-    - 成功したときだけの公開、fatal のときの Graph と diagnostic の破棄、正常な stream の参照の完全性
-    - 汎用の CLI の失敗の表示
-  - 必須の E2E
-    - fixture は、app、service、repository の 3 つの project、変えた `projectDir`、独自の source のディレクトリ、project の間の呼び出しと DI を含む。
-    - 実際の Core の CLI と Analyzer の jar を、テスト専用の透過の proxy でつなぐ。
-    - 自動 discovery と明示の override のそれぞれで、graph、request、終了コードを期待する値と比べる。
-  - 互換性と安全
-    - Gradle と daemon の JVM の anchor の matrix、Gradle の stdout と stderr の隔離
-    - credential と URL と絶対 path を含む negative fixture で、それらが出力に漏れないこと
-  - 性能: 明示の single-root、自動の single-project、自動の multi-project について、初回と warm の 3 回の中央値、discovery の phase ごとの時間を記録する。数値の SLO は決めない。
+- Gradle の multi-project と、解析の完全性にかかわる変更では、次の Design Doc の Verification の観点を確かめる。
+  - [Analyzer Protocol](../core/internal/protocol/DesignDoc.md#verification)、[Graph](../core/internal/graph/DesignDoc.md#verification)、[Java Analyzer](../analyzers/java/DesignDoc.md#verification)、[discovery](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification)
+- Gradle の対応範囲、Tooling API、custom model provider を変えるときは、手元で `gradleCompatibilityTest` を通す。CI では動かないためである。
+  - 確かめることは [tech-stack.md の Upgrade Checks](tech-stack.md#upgrade-checks) にある。
+- 性能は、[Java Analyzer の Design Doc の「性能の計測」](../analyzers/java/DesignDoc.md#性能の計測) の方法で測る。SLO は手動のリリースの目標で、テストの gate にしない。
 - ほかの変更ごとに足すテストの種類は未定。

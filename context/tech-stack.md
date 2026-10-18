@@ -51,7 +51,7 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - Shadow のプラグイン: Java Analyzer を 1 つの fat jar にする。Core は `java -jar` の 1 つのコマンドで起動する。
 - JavaParser: ソースを構文木にする。
 - SymbolSolver: 呼び出しの型を解決する。
-- SootUp: 型の階層と、override と interface の実装の候補を引く索引にだけ使う。call graph の生成には使わない。
+- SootUp: 型の階層と、override と interface の実装の候補を引く。使う範囲は [Java Analyzer の Design Doc の「解析の 3 段」](../analyzers/java/DesignDoc.md#解析の-3-段) にある。
   - ADR-0005: [SootUp と Spring DI の解決](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
 - Gradle Tooling API: source root を自動で discovery するときに、対象の build の model を取得する。
   - ADR-0006: [Gradle Tooling API による discovery](../adr/0006-adopt-gradle-tooling-api-discovery.md)
@@ -63,7 +63,7 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 
 - mise: ランタイムとツールのバージョンを `mise.toml` で固定する。
 - pnpm: ルートの `package.json` のツールを入れる。ルートの `package.json` は文書とコミットのメッセージのチェックのツールだけを持つ。
-- lefthook: Git のフックからチェックを実行する。
+- lefthook: Git のフックからチェックを実行する。確かめる内容は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。
 - prettier、textlint、commitlint: Markdown と設定ファイルを整形し、文書とコミットのメッセージをチェックする。
 - apm: agent-harness のスキルとフックと、agent-playbooks の playbook を配置する。
 

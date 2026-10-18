@@ -67,7 +67,7 @@ request の metadata に `classpath` があれば、共通の extra として全
 `classpath` の各要素には、依存の jar か compile 済みの classes directory を指定できる。  
 自分のプロジェクトの bytecode を引くときは、解析の対象のプロジェクトの classes output directory も `classpath` の配列へ足す。  
 Gradle なら `build/classes/java/main` である。  
-新しい metadata の key は導入しない。  
+classes output を渡すための専用の metadata の key は持たない。  
 SootUp は、ソースから得た binary name と一致する `.class` を classpath の上で引き、自分のプロジェクトの class と依存の class を区別する。
 
 pre-flight のチェック（classpath の key の有無、指定した jar か classes directory の存在と読み取りの可否）は、解析の開始の前に一括で行う。  
@@ -98,7 +98,8 @@ bytecode の救済がなかったことが原因の未解決を、fatal の後�
 SootUp の依存は、`sootup.core`、`sootup.java.core`、`sootup.java.bytecode.frontend` の 3 つに限る。  
 この 3 つは、bytecode の `AnalysisInputLocation` と `View` に要る最小の module である。  
 バージョンは `analyzers/java/build.gradle.kts` にある。  
-`sootup.callgraph` は、SootUp に call graph の生成を任せない責務の境界に反するため、足さない。  
+`sootup.callgraph` は足さない。  
+SootUp に任せる範囲は [Java Analyzer の Design Doc の「解析の 3 段」](../../../../../../../../DesignDoc.md#解析の-3-段) にある。  
 ADR-0005: [SootUp と Spring DI の解決を導入する](../../../../../../../../../../adr/0005-adopt-sootup-and-spring-di-resolution.md)
 
 ### solver の層での bytecode member の合成
@@ -106,7 +107,7 @@ ADR-0005: [SootUp と Spring DI の解決を導入する](../../../../../../../.
 scope の中のソースの型を solver が解決するとき、同じ context の classes output にしかない一意な callable member（Lombok などの生成 member）を、解決の時に合成する。  
 call site が駆動する救済（生成 member の索引）だけでは、式の型の伝播（chained call、stream の連鎖）をたどれないためである。
 
-- ソースの宣言と、ソースを優先する帰属の規則は変えない。
+- 合成の対象は classes output にしかない member だけで、ソースの宣言と、ソースを優先する帰属の規則に影響しない。
 - 合成した member の出力は、bytecode にだけある member と同じ契約（定義の位置の省略と owner の metadata）に従う。
 - generic の戻り値は、classes output の Signature 属性から実際の型引数を復元する。
 - Signature がない member、読めない member、型変数は、erasure（Object）へ落とし、解析は失敗させない。
@@ -277,7 +278,7 @@ outcome ledger の分類のロジック、帰属の意味論、emit される ed
 bytecode の救済（project の bytecode member の index）と `external-target` の除外の分類は、method call だけに当てるのではない。  
 method reference（constructor reference を含む）と、明示の constructor invocation（`super(...)` と `this(...)`）の resolve の失敗にも当てる。  
 救済と分類を試みてから diagnostic にする。  
-outcome ledger の 3 つの終端と帰属の意味論は変えない。
+outcome ledger の 3 つの終端と帰属の意味論は、method call と同じものを当てる。
 
 ### 呼び出し元の型が分からないとき
 
@@ -339,7 +340,7 @@ JavaParser が「型引数を Object へ落とした部分的な成功」の解�
 
 SAM の arity も、functional interface の bytecode から導く（例: `java.util.function.Function#apply` は arity 1）。  
 これで、arity の推論の失敗による救済のスキップは減る。  
-ただし、「宣言の上で名前が一意であることを根拠にする救済はしない」保守の側の原則は変えない。
+ただし、宣言の上で名前が一意であることを根拠にした救済はしない。
 
 型伝播救済層は、「呼び出し元の型が分からないとき」の規則と同じ分類の段階に組み込む。
 
@@ -495,12 +496,4 @@ lambda の本体の中の呼び出しそのものは、`viaLambda` の帰属で 
 
 テストの観点は、[Java Analyzer の Design Doc の Verification](../../../../../../../../DesignDoc.md#verification) にある。
 
-SootUp が読める classfile の major は、SootUp が同梱する ASM のバージョンで決まる。  
-SootUp か Analyzer の JDK を上げるときに確かめることは、[tech-stack.md の Upgrade Checks](../../../../../../../../../../context/tech-stack.md#upgrade-checks) にある。  
-バージョンの対応と計測の結果は次のとおり。
-
-- SootUp 3.0.1 は ASM 9.10.1 を同梱し、Java 25（major 69）を読める。
-  - ASM は 9.8 で `Opcodes.V25` を追加した。
-- SootUp 2.0.0 は ASM 9.7.x を同梱するため、major 69 を読めない。
-  - fixture の classes output を Java 25 で compile すると、2.0.0 では bytecode の救済のテストが 4 件失敗した。
-    - 3.0.1 では同じ条件ですべて通る。
+SootUp か Analyzer の JDK を上げるときに確かめることは、[tech-stack.md の Upgrade Checks](../../../../../../../../../../context/tech-stack.md#upgrade-checks) にある。

@@ -62,30 +62,13 @@ graph の model は Output だけのものではなく、Traversal も読む横�
 
 ### データ構造
 
-graph は、node と edge の ID に加えて、表示に要る属性を graph に固有の値型として持つ。
+graph は、node と edge の ID に加えて、表示に要る属性を graph に固有の値型として持つ。  
+型の定義は `core/internal/graph/graph.go` にある。
 
-```go
-// core/internal/graph
-type Node struct {
-    ID     string // Analyzer の methodId (不透明な stable ID)
-    Symbol Symbol
-}
-
-type Symbol struct {
-    QualifiedName string
-    Signature     string
-    Source        *SourceLocation // 宣言位置 (optional。graph 固有の値型)
-    Metadata      map[string]any  // Analyzer 固有情報 (opaque, optional)
-}
-
-type Edge struct {
-    ID       string
-    CallerID string
-    CalleeID string
-    CallSite *SourceLocation // 呼び出し箇所 (optional。graph 固有の値型)
-    Metadata map[string]any  // Analyzer 固有情報 (opaque, optional)
-}
-```
+- node は、Analyzer の `methodId`（不透明な stable ID）と、symbol を持つ。
+  - symbol は、qualified name、signature、宣言の位置、opaque な metadata からなる。宣言の位置と metadata は省ける。
+- edge は、ID、caller と callee の ID、呼び出しの箇所、opaque な metadata を持つ。呼び出しの箇所と metadata は省ける。
+- 宣言の位置と呼び出しの箇所は、graph の値型の `SourceLocation` で表す。
 
 - 変換は 1 回だけ行う。
   - `protocol.MethodSymbol` と `protocol.CallEdge`（wire の record）から上の値型への写しは、ACL（`protocol`。app が定める port の実装の側）が担う。

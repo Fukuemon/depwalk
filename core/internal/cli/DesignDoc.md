@@ -1,11 +1,12 @@
 ---
 type: feature-design
 title: CLI Interface
-description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置、終了コード、出力先、CLI のプロセスの E2E の観点
+description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置。起動コマンドの解決と分割、`--analyzer-meta` の合成、終了コード、出力先、CLI のプロセスの E2E の観点
 status: stable
 governs:
   - core/internal/cli
   - core/cmd/depwalk
+  - core/internal/analyze
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
@@ -24,6 +25,7 @@ CLI は、traversal、output、解析のパイプラインを、`analyze` コマ
 - コマンドの構造と flag の体系
 - method selector の書式
 - CLI の層、analyze の use case、ACL の責務の配置
+- 起動コマンドの解決と分割、`--analyzer-meta` の合成
 - 終了コードの体系と出力先の規約
 - CLI のプロセスの E2E で確かめる観点
 
@@ -40,7 +42,8 @@ CLI は、traversal、output、解析のパイプラインを、`analyze` コマ
 
 ### コマンドと flag
 
-探索のクエリは、サブコマンドを新しく作らず、`analyze` コマンドへの flag の追加で提供する。
+探索のクエリは、`analyze` コマンドの flag で指定する。  
+ADR-0018: [探索のクエリを、サブコマンドを足さずに analyze コマンドの flag で指定する](../../../adr/0018-query-flags-on-analyze-command.md)
 
 ```text
 depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta k=v ...]
@@ -65,8 +68,7 @@ flag は 2 つの群に分かれ、互いに独立している。
 
 CLI は glob と path の意味を解釈せず、値をそのまま渡すだけである。
 
-新しい出力の形式は、formatter の実装と registry への登録だけで、CLI に自動で現れる。  
-新しいクエリの種別（たとえば 2 つのメソッドの間のパスの探索）は、サブコマンドの新設でも flag の追加でも足せる。
+新しい出力の形式は、formatter の実装と registry への登録だけで、CLI に自動で現れる。
 
 ### method selector の書式
 
@@ -91,11 +93,15 @@ CLI は glob と path の意味を解釈せず、値をそのまま渡すだけ�
   - `analysisRequest` の schemaVersion と requestId、常に `fullGraph` の AnalysisMode、空の `Entrypoints` は、ここで決める。
 - 探索の方向に関わらず常に `fullGraph` で解析し、方向による挙動の分岐を持たない。
 
-### Analyzer の起動コマンドの分割
+### Analyzer の起動コマンドの解決と分割
+
+CLI は、`--analyzer-cmd`（flag）、`DEPWALK_ANALYZER_CMD`（環境変数）の順で、Analyzer の起動コマンドの文字列を解決する。  
+どちらも指定がない場合は、Analyzer を起動する前に入力の誤りとして拒否する。  
+Core は `java`、jar、JVM の存在を知らず、言語に固有の分岐と path の解決の規約を持ち込まない。
 
 合成ルートは、解決した起動コマンドの文字列を、shell を介さずに次の字句の規則で語に分割する。  
-実装と contract test は `splitAnalyzerCommand` にある。  
-起動コマンドを解決する順序は [Java Analyzer の Design Doc の起動の契約](../../../analyzers/java/DesignDoc.md#起動の契約) にある。  
+shell を介さないのは、shell injection を避けるためである。  
+実装と contract test は `resolveAnalyzerCommand` と `splitAnalyzerCommand` にある。  
 ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非依存の文字列として解決する](../../../adr/0003-analyzer-command-resolution.md)
 
 - 空白（space、tab、newline）を語の区切りとする。
@@ -107,13 +113,30 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
 - 終わっていない quote は、入力の検証のエラーとして実行の前に拒否する。
 - 変数の展開、glob の展開、コマンドの置換はしない。
 
+### `--analyzer-meta` の合成
+
+analyze の use case（`analyze.BuildMetadata`）は、`--analyzer-meta key=value` の指定を、指定の順に `analysisRequest.metadata` の JSON へ組み立てる。  
+Core は key と value の意味を解釈しない。  
+Java に固有の key は [Java Analyzer の Protocol への写像の文書](../../../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol/DesignDoc.md#metadata-契約) にある。  
+ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非依存の文字列として解決する](../../../adr/0003-analyzer-command-resolution.md)
+
+- 値は常に string の JSON の配列に積む。
+  - 1 回だけ指定した場合も、要素 1 の配列になる（`--analyzer-meta classpath=/a.jar` → `{"classpath": ["/a.jar"]}`）。
+- 同じ key の繰り返しは、指定の順に配列へ足す。
+- 空の値（`key=`）は、その key がまだ登録されていないときだけ、空の配列として登録する（`--analyzer-meta classpath=` → `{"classpath": []}`）。
+  - 既に登録された値は消さない。
+  - `classpath=/a.jar` → `classpath=` は `["/a.jar"]` になり、`classpath=` → `classpath=/a.jar` も `["/a.jar"]` になる。
+- 最初の `=` で key と value に分ける。value の側は `=` を含んでよい。
+- `=` を含まない指定と、key が空の指定（`=value`）は、入力エラーとして Analyzer を起動する前に拒否する。
+- `--analyzer-meta` を 1 回も指定しないときは、`analysisRequest` に `metadata` を載せない。
+
 ### 終了コード
 
-| 終了コード | 区分         | 当たるもの                                                                                                                                                                                                                                                                                                                                                   |
-| ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0          | 探索の成功   | 結果が空（到達 node なし）のときと、depthLimit cutoff の注釈がつくときも成功とする。結果は stdout へ出す                                                                                                                                                                                                                                                     |
-| 1          | 実行時エラー | Analyzer の起動の失敗、Protocol の違反、Analyzer の fatal（`renderAnalyzerFailure` で構造化して表示）、出力の書き込みの失敗                                                                                                                                                                                                                                  |
-| 2          | 入力エラー   | 未知のサブコマンドと flag、多すぎる位置引数、不正な flag の値（`--direction`、`--format`、`--max-depth` の範囲外）、method selector の overload の曖昧と不一致（startNotFound に相当）、`--source-root`、`--include`、`--exclude` の不正な path と glob、Analyzer の起動コマンドの欠落と空の値と閉じていない quote、`key=value` の形でない `--analyzer-meta` |
+| 終了コード | 区分         | 当たるもの                                                                                                                                                                                                                                                                                                                                                                |
+| ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0          | 探索の成功   | 結果が空（到達 node なし）のときと、depthLimit cutoff の注釈がつくときも成功とする。結果は stdout へ出す                                                                                                                                                                                                                                                                  |
+| 1          | 実行時エラー | Analyzer の起動の失敗、Protocol の違反、Analyzer の fatal（`renderAnalyzerFailure` で構造化して表示）、出力の書き込みの失敗                                                                                                                                                                                                                                               |
+| 2          | 入力エラー   | 未知のサブコマンドと flag、多すぎる位置引数、不正な flag の値（`--direction`、`--format`、`--max-depth` の範囲外）、method selector の overload の曖昧と不一致（startNotFound に相当）、`--source-root`、`--include`、`--exclude` の不正な path と glob、Analyzer の起動コマンドの欠落と空の値と閉じていない quote、`key=value` の形でないか key が空の `--analyzer-meta` |
 
 - Cobra の既定（RunE のエラーは常に終了コード 1）に任せず、CLI の層がエラーの種別を判別して 0、1、2 を返す。
 - エラーのメッセージ、候補の一覧、diagnostics は stderr へ出し、探索の結果だけを stdout へ出す。JSON を機械で parse できる状態を守るためである。
@@ -129,8 +152,9 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
 - `core/cmd/depwalk/main.go`: `main` の関数。`cli` だけに依存する。
 - `core/internal/cli/root.go`: root のコマンドと、終了コードの判別（`ExitCode`）
 - `core/internal/cli/analyze.go`: `analyze` コマンドと flag の定義、入力の検証、package の配線、Analyzer の失敗の表示（`renderAnalyzerFailure`）
-- `core/internal/cli/analyzerlaunch.go`: Analyzer の起動コマンドの解決
+- `core/internal/cli/analyzerlaunch.go`: Analyzer の起動コマンドの解決と分割
 - `core/internal/cli/errors.go`: flag の入力エラーの型（`inputError`）
+- `core/internal/analyze/metadata.go`: `--analyzer-meta` の合成（`BuildMetadata`）
 
 ## Verification
 
@@ -145,3 +169,10 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
   - 層ごとに保証する範囲は [context/testing.md](../../../context/testing.md#test-types-and-guarantees) にある。
 - method selector は、完全な signature、signature を省いた一意の一致、overload の曖昧さを確かめる。
   - 加えて、nested class の binary name（`Outer$Inner#method`）の回帰を確かめる。
+
+Analyzer の起動の契約は、fake analyzer を使い、JVM なしで確かめる。
+
+- `--analyzer-cmd` と `DEPWALK_ANALYZER_CMD` の解決の順と、どちらもない場合の実行の前の拒否
+- shell を介さない分割で exec されること
+- `--analyzer-meta` の合成の規則。不正な指定は終了コード 2 になること。
+- stdin の close、逐次の parse、stderr を parse しないこと、終了コードの扱いは、Protocol の contract テストの観点を再利用する。

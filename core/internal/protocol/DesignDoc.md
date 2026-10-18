@@ -41,6 +41,8 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
   - 表示の規則と View への変換は [Output の Design Doc](../output/DesignDoc.md) が持つ。
 - Core の実装の言語、package manager、test framework
 - Reflection、AspectJ の Runtime、実行時の Proxy の動的な解析
+- capability の handshake と negotiation。1 つの request に 1 つのプロセスを起動する形に限る。
+  - ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 ## Design
 
@@ -209,11 +211,9 @@ Core と CLI は、Analyzer に固有の code で分岐せず、共通の field 
 ### 致命的な失敗と公開の原子性
 
 正しい `error` の record、非ゼロの終了、stdout の parse と schema のエラーは、どれも request の単位の致命的な失敗である。  
-致命的な失敗は、それより前に受け取った graph の record と diagnostic を含め、成功の候補をすべて無効にする。
-
-- Core は、正しい graph の record を非公開の staging Graph へ 1 回の走査で変換する。
-- Core は、終了コードが `0` で、致命的な失敗がなく、stream の全体で参照が揃ったときだけ公開する。
-- 致命的な失敗のときに保持してよい解析の結果は、共通の `error.details` に正規化した failure detail だけである。
+致命的な失敗は、それより前に受け取った graph の record と diagnostic を含め、成功の候補をすべて無効にする。  
+致命的な失敗のときに保持してよい解析の結果は、共通の `error.details` に正規化した failure detail だけである。  
+Core が record を staging Graph へ登録し、公開か破棄かを決める条件は [Graph の Design Doc の構築と公開の原子性](../graph/DesignDoc.md#構築と公開の原子性) にある。
 
 ### 異常終了のときの stderr
 
@@ -256,7 +256,8 @@ Core は、Analyzer の内部のライブラリと言語のランタイムに依
 
 ### 解析の流れ
 
-次の図は、Core が要求を作ってから Graph を公開するか破棄するまでの流れを示す。
+次の図は、Core が要求を作ってから Graph を公開するか破棄するまでの流れを示す。  
+公開の条件の規則は、Graph の Design Doc が持つ。
 
 ```mermaid
 flowchart TD
@@ -287,7 +288,8 @@ flowchart TD
 
 `schemaVersion` は、record の種類ごとのバージョンではなく、Protocol の全体のバージョンを表す。  
 record の受信者は、対応している major バージョンの record だけを受け付ける。  
-対応していない major バージョンの record を受け取ったら、受信者は schema version mismatch として解析を失敗させる。
+対応していない major バージョンの record を受け取ったら、受信者は schema version mismatch として解析を失敗させる。  
+ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 | 変更の種類                             | 互換性 | 扱い                                                                                  |
 | -------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
@@ -306,9 +308,6 @@ Core は、これらの object の中で、field 名の大文字と小文字だ�
 `entrypoints[]` は `analysisRequest` にだけあり、受信者の Analyzer は中の未知の field も無視する。  
 Core の parser は `entrypoints[]` の各要素の未知の field も拒否するが、これは Core 自身の検証のためで、互換性の規則に含めない。  
 ADR-0013: [Core は record の最上位の未知の field を無視し、入れ子の object の未知の field を invalid にする](../../../adr/0013-reject-unknown-nested-fields.md)
-
-Handshake と capability negotiation は採用しない。  
-ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 ## Interface
 

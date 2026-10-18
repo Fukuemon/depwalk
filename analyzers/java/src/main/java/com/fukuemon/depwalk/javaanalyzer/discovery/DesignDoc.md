@@ -37,7 +37,7 @@ Gradle Tooling API は、外部のプログラムから Gradle に build を評�
 
 - 得た source root と classpath を使った型の解決。
   - [解析エンジンの文書](../analysis/DesignDoc.md) が持つ。
-- request の metadata の key の一覧と合成の規則。
+- request の metadata の key の一覧。
   - [Protocol への写像の文書](../protocol/DesignDoc.md#metadata-契約) が持つ。
 
 ## Design
@@ -154,15 +154,11 @@ location は source index から取り、solver の origin と dependency の到
 
 ### Gradle の runtime と安全の境界
 
-自動 discovery は、利用者が信頼する Gradle の build logic を、利用者の権限で評価する。  
-repository の認証、credential provider、network、Gradle の cache、daemon の JVM の選択は、Gradle に任せる。  
-depwalk は、任意の build logic の副作用を sandbox に閉じ込めることを保証しない。  
-明示の `sourceRoots` は、この runtime を完全に bypass する安全な方式である。
+自動 discovery は、対象の build logic を利用者の権限で評価し、その副作用を sandbox に閉じ込めない。  
+この前提と、CLI の help と安全の通知が伝える内容は、[operations.md の Environments](../../../../../../../../../../context/operations.md#environments) にある。
 
-CLI の help は、この副作用の境界と明示の override を常に説明する。  
 自動 discovery を始める各 run では、build を評価する前に、Analyzer の stderr へ安全の通知の定型文を出す。  
-定型文は、run をまたいで同じ文面にする。  
-定型文が伝える内容と非漏洩の境界は [operations.md の Environments](../../../../../../../../../../context/operations.md#environments) にある。
+定型文は、run をまたいで同じ文面にする。
 
 discovery の開始と終了、使った Gradle の version、project と root と除外した source set の件数、discovery の所要時間も stderr へ出す。  
 失敗の安定した category は、stderr ではなく error record の message と metadata に載せる。  
@@ -170,8 +166,7 @@ Gradle から来た自由な文は出力しない。
 
 Gradle の stdout と stderr は、Protocol と CLI の出力へ渡さずに捨てる。  
 例外は、raw の message、URL の query、credential、絶対 path をそのまま返さず、分類した code と sanitize した message と detail に変える。  
-非漏洩を保証する範囲は、depwalk が生成して渡す Protocol、CLI、log、test の artifact に限る。  
-Gradle 自身と利用者の build logic の出力と副作用は含めない。
+非漏洩を保証する範囲は [operations.md の Secrets](../../../../../../../../../../context/operations.md#secrets) にある。
 
 ### discovery の失敗の reason
 

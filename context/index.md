@@ -16,7 +16,7 @@
 - [Java Analyzer: 解析エンジン](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/DesignDoc.md) — 型の解決、bytecode member の補完、Spring DI、完全性の gate、型伝播救済、暗黙の呼び出し
 - [Java Analyzer: Source root discovery](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md) — Gradle の build model から source root と classpath を得る方式、互換の範囲、安全の境界
 - [Java Analyzer: Protocol への写像](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol/DesignDoc.md) — Java の構文要素を JSONL の record へ写す規則（methodId、帰属型、dispatch、metadata、code）
-- [CLI Interface](../core/internal/cli/DesignDoc.md) — analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置、終了コード、出力先、CLI のプロセスの E2E の観点
+- [CLI Interface](../core/internal/cli/DesignDoc.md) — analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置。起動コマンドの解決と分割、`--analyzer-meta` の合成、終了コード、出力先、CLI のプロセスの E2E の観点
 - [Graph（呼び出しグラフのデータモデル）](../core/internal/graph/DesignDoc.md) — 呼び出しグラフの node と edge が持つ属性、wire の record から graph の値型への変換、staging Graph の公開の原子性。変換と公開の実装は protocol と analyze にある
 - [Output（Console と JSON）](../core/internal/output/DesignDoc.md) — Output の entry point、Formatter と View、エラーの境界、Console の tree と行の書式、JSON の schema と版の管理
 - [Analyzer Protocol / SPI](../core/internal/protocol/DesignDoc.md) — Core と Analyzer の間の JSONL の record、プロセスの契約、失敗の扱い、バージョンと互換性、contract test の観点
