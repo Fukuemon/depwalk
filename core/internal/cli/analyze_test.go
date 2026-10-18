@@ -58,46 +58,22 @@ func TestAnalyzeCommandRejectsMissingLanguage(t *testing.T) {
 	}
 }
 
-func TestAnalyzeCommandRejectsMissingAnalyzerCommand(t *testing.T) {
-	t.Parallel()
-
-	cmd := newAnalyzeCommand()
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-	cmd.SetArgs([]string{
-		t.TempDir(),
-		"--language=java",
-	})
-
-	if err := cmd.Execute(); err == nil {
-		t.Fatal("Execute() error = nil, want validation error when no analyzer command is configured")
-	}
-}
-
-func TestAnalyzeCommandRejectsInvalidAnalyzerInputWithExit2(t *testing.T) {
+func TestAnalyzeCommandRejectsInvalidAnalyzerCommandWithExit2(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
+		env  string
 		want string
 	}{
-		{name: "missing-command", want: "analyzer command is required"},
-		{name: "empty-command", args: []string{"--analyzer-cmd=   "}, want: "must not be empty"},
-		{name: "unterminated-quote", args: []string{`--analyzer-cmd=java "-jar`}, want: "unterminated"},
-		{
-			name: "meta-without-equals",
-			args: []string{"--analyzer-cmd=/nonexistent/analyzer/binary", "--analyzer-meta=classpath"},
-			want: "key=value",
-		},
-		{
-			name: "meta-empty-key",
-			args: []string{"--analyzer-cmd=/nonexistent/analyzer/binary", "--analyzer-meta==value"},
-			want: "non-empty key",
-		},
+		{name: "missing", want: "analyzer command is required"},
+		{name: "empty-flag", args: []string{"--analyzer-cmd=   "}, want: "must not be empty"},
+		{name: "unterminated-quote-flag", args: []string{`--analyzer-cmd=java "-jar`}, want: "unterminated"},
+		{name: "unterminated-quote-env", env: `java '-jar`, want: "unterminated"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 環境変数の起動コマンドを空にする。t.Setenv を使うので並列にしない。
-			t.Setenv(analyzerCmdEnv, "")
+			// 環境変数の起動コマンドを固定する。t.Setenv を使うので並列にしない。
+			t.Setenv(analyzerCmdEnv, tt.env)
 			cmd := newAnalyzeCommand()
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
@@ -114,6 +90,58 @@ func TestAnalyzeCommandRejectsInvalidAnalyzerInputWithExit2(t *testing.T) {
 				t.Errorf("error = %q, want %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestAnalyzeCommandRejectsMalformedAnalyzerMetaWithExit2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		meta string
+		want string
+	}{
+		{name: "without-equals", meta: "classpath", want: "key=value"},
+		{name: "empty-key", meta: "=value", want: "non-empty key"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{
+				t.TempDir(),
+				"--language=java",
+				"--analyzer-cmd=/nonexistent/analyzer/binary",
+				"--analyzer-meta=" + tt.meta,
+			})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want input error")
+			}
+			if got := ExitCode(err); got != 2 {
+				t.Fatalf("ExitCode(error) = %d, want 2; error = %v", got, err)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %q, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnalyzeCommandRejectsExtraPositionalArgumentsWithExit2(t *testing.T) {
+	t.Parallel()
+
+	cmd := newAnalyzeCommand()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{t.TempDir(), t.TempDir(), "--language=java"})
+
+	err := cmd.Execute()
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("ExitCode(%v) = %d, want 2", err, got)
 	}
 }
 

@@ -2,7 +2,7 @@ package cli
 
 import "fmt"
 
-// inputError は利用者がコマンドラインで渡した値が原因の失敗を表す。未知の flag 値、
+// inputError は利用者がコマンドラインの引数か環境変数で渡した値が原因の失敗を表す。未知の flag 値、
 // 必須 flag の欠落、許容範囲外の値など。[ExitCode] が exit status 2 へ写す。
 //
 // analyze.InputError とは意図的に分けている。これらは use case が走る前にここで

@@ -58,7 +58,12 @@ func newAnalyzeCommand() *cobra.Command {
 		Use:   "analyze [path]",
 		Short: "Run an Analyzer process and build a call graph",
 		Long:  analyzeLongHelp,
-		Args:  cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.MaximumNArgs(1)(cmd, args); err != nil {
+				return &inputError{err: err}
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// stdout に出してよいのは query の出力だけ。RunE の失敗では Cobra の
 			// usage 表示を抑止する。通常の error は Cobra が stderr へ出し、
