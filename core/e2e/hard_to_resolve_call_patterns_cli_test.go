@@ -10,7 +10,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/protocol"
 )
 
-// TestUnresolvedCallPatternsCLI は解決が難しい呼び出しパターンの fixture
+// TestHardToResolveCallPatternsCLI は解決が難しい呼び出しパターンの fixture
 // (testdata/fixtures/java/multi-module-spring-project/patterns/) を、実 Core CLI と
 // 実 Analyzer jar の自動 discovery で解析する。
 //
@@ -20,7 +20,7 @@ import (
 //
 // patterns/ は root fixture の settings.gradle が含めない独立 build なので、
 // TestGradleMultiProjectCLI の期待値には影響しない。
-func TestUnresolvedCallPatternsCLI(t *testing.T) {
+func TestHardToResolveCallPatternsCLI(t *testing.T) {
 	javaPath := findJava25(t)
 	jarPath := findAnalyzerJar(t)
 	fixture := patternsFixtureRoot(t)

@@ -22,7 +22,7 @@
   },
   "cases": [
     {
-      "name": "S2: callee from a reaches the whole chain",
+      "name": "callee from a reaches the whole chain",
       "start": "method:a",
       "direction": "callee",
       "expected": {
@@ -34,7 +34,7 @@
       }
     },
     {
-      "name": "S1: caller from d reaches the whole chain",
+      "name": "caller from d reaches the whole chain",
       "start": "method:d",
       "direction": "caller",
       "expected": {
@@ -46,7 +46,7 @@
       }
     },
     {
-      "name": "S1: caller from b reaches only upstream",
+      "name": "caller from b reaches only upstream",
       "start": "method:b",
       "direction": "caller",
       "expected": {

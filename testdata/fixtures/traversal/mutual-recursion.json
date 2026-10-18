@@ -27,7 +27,7 @@
   },
   "cases": [
     {
-      "name": "S2: callee from o annotates only the SCC edges",
+      "name": "callee from o annotates only the SCC edges",
       "start": "method:o",
       "direction": "callee",
       "expected": {
@@ -39,7 +39,7 @@
       }
     },
     {
-      "name": "S1: caller from c reaches through the recursion",
+      "name": "caller from c reaches through the recursion",
       "start": "method:c",
       "direction": "caller",
       "expected": {

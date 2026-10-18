@@ -32,7 +32,7 @@
   },
   "cases": [
     {
-      "name": "S2: maxDepth 2 keeps the cross edge between two frontier nodes",
+      "name": "maxDepth 2 keeps the cross edge between two frontier nodes",
       "start": "method:o",
       "direction": "callee",
       "maxDepth": 2,
@@ -45,7 +45,7 @@
       }
     },
     {
-      "name": "S2: unlimited depth keeps the same induced set",
+      "name": "unlimited depth keeps the same induced set",
       "start": "method:o",
       "direction": "callee",
       "expected": {
