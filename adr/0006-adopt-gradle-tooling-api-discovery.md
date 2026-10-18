@@ -11,7 +11,7 @@
 - root の build file の include の記述だけを辿っても、settings の logic、plugin、composite build、動的な構成で決まる実効の model を再現できない。
 - filesystem の convention を走査する方法は、build が定義した source set と依存関係を推測するため、不完全な Graph を成功の結果として返す危険がある。
 - すべての利用者に source root、classpath、language level の列挙を求めると、通常の利用の負担が大きい。
-- 自動の discovery と、Gradle の build を評価したくない利用者のための明示の override の両方が要る。
+- 自動 discovery と、Gradle の build を評価したくない利用者のための明示の override の両方が要る。
 
 ## Decision
 

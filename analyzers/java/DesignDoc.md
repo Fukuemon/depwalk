@@ -7,6 +7,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/Main.java
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 

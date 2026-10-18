@@ -6,9 +6,16 @@ status: stable
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/normalize
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/attribution
-  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/AttributionSites.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/CallEdgeMetadata.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/MethodSymbolFactory.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/ReachabilityFilter.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/SourceLocations.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/UnresolvedDiagnostics.java
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/JavaErrorCode.java
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/JavaDiagnosticCode.java
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
@@ -59,7 +66,7 @@ Java の overload の解決は erasure に基づき、erasure だけで overload
 そのため generics を持たない。  
 `methodId` を hash しないのは、デバッグのしやすさのために JSONL を選んだ判断と揃えるためである。  
 決定性は、文字列を作る規則が決定的であることで満たす。  
-ADR-0001: [Analyzer Protocol を JSONL の process SPI にする](../../../../../../../../../../adr/0001-analyzer-protocol-jsonl-spi.md)
+ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../../../../../../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 匿名クラスのメソッドは、宣言型に binary name を採番して扱う。  
 採番は、直近の enclosing class ごとに、1 から始まるソースの出現の順で行う（`com.example.Outer$1`。JVM の binary name と互換がある）。  

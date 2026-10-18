@@ -6,6 +6,7 @@ status: stable
 governs:
   - core/
   - analyzers/
+  - scripts/depgraph.sh
 verified_commit: unverified
 ---
 
@@ -49,7 +50,7 @@ ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準�
 - 解析は静的解析で行い、実行時の情報には依存しない。
 - 対象は JVM の言語を先行させ、まず Java と Spring Boot を扱う。Kotlin、TypeScript、Vue、Go は将来の対象である。
 - 言語ごとの解析は、その言語のランタイムの上で動く独立した Analyzer のプロセスが担う。Core は特定の言語のランタイムに依存しない。
-- Core と Analyzer は、共通のデータモデル（`MethodSymbol`、`CallEdge`）と Protocol の diagnostics（`diagnostic`、`error`）だけを介して結合する。
+- Core と Analyzer は、Protocol の record（`analysisRequest`、`MethodSymbol`、`CallEdge`、`diagnostic`、`error`）と、Analyzer の終了コードを介して結合する。
 - Gradle のランタイムは、Java Analyzer が source root を自動で discovery するときだけ使う、条件つきの依存である。
   - 自動 discovery を使う場合も、Core と Analyzer Protocol の言語非依存の境界は変わらず、成功の条件にも影響しない。
   - 動くものと副作用の前提は [context/operations.md の Environments](../context/operations.md#environments) にある。
@@ -73,14 +74,14 @@ flowchart TD
     subgraph analyzer_proc["Analyzer process (JVM)"]
         ja["Java Analyzer<br/>JavaParser / SymbolSolver / SootUp"]
     end
-    spi <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge / diagnostics"| ja
+    spi <-->|"JSONL over STDIN/STDOUT<br/>MethodSymbol / CallEdge / diagnostic / error"| ja
     ja -->|"AST 解析・型解決・DI 解決"| src[("Java / Spring ソース")]
     ja -.->|"source root 自動 discovery のときだけ"| gradle["Gradle Tooling API / 対象 build の Gradle daemon / 一時 custom model provider"]
     core -->|"Console / JSON"| out["出力"]
 ```
 
 Core は Analyzer の内部（使うライブラリと言語のランタイム）を知らない。  
-Core が解析の要求を渡し、Analyzer が graph model（`MethodSymbol`、`CallEdge`）と diagnostics（`diagnostic`、`error`）を JSONL で 1 行 1 レコードで返す。  
+Core が解析の要求を渡し、Analyzer が graph model（`MethodSymbol`、`CallEdge`）と `diagnostic` と `error` の record を JSONL で 1 行 1 レコードで返す。  
 ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 ## Components
@@ -107,7 +108,7 @@ Core は、呼び出しグラフの構築、探索、出力に責務を限り、
 - [Graph](../core/internal/graph/DesignDoc.md): node と edge の属性、wire の record から graph の値への変換、公開の原子性
 - [Traversal](../core/internal/traversal/DesignDoc.md): caller と callee の探索の意味、深さ、訪問の順、結果の構造
 - [Output](../core/internal/output/DesignDoc.md): 出力の形式ごとの表示の規則
-- [Analyzer Protocol / SPI](../core/internal/protocol/DesignDoc.md): JSONL の wire schema、SPI、版の管理、失敗のときの契約
+- [Analyzer Protocol / SPI](../core/internal/protocol/DesignDoc.md): JSONL の wire schema、SPI、バージョンの管理、失敗のときの契約
 - [Java Analyzer](../analyzers/java/DesignDoc.md): Java と Spring の解析の構成、外部のライブラリの隔離、起動の契約
   - [Source root discovery](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md)
   - [解析エンジン](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/DesignDoc.md)
@@ -146,7 +147,7 @@ flag と method selector の書式、exit code、出力先は [CLI の Design Do
 出力は Console と JSON で、形式ごとの規則は [Output の Design Doc](../core/internal/output/DesignDoc.md) にある。
 
 Analyzer を作る人に見える境界は、STDIN と STDOUT の上の JSONL の Protocol である。  
-`MethodSymbol`、`CallEdge`、`SourceLocation` の schema、SPI の形、版の管理の方針は [Analyzer Protocol / SPI の Design Doc](../core/internal/protocol/DesignDoc.md) にある。
+`MethodSymbol`、`CallEdge`、`SourceLocation` の schema、SPI の形、バージョンの管理の方針は [Analyzer Protocol / SPI の Design Doc](../core/internal/protocol/DesignDoc.md) にある。
 
 配布のチャネルは未定で、[context/operations.md](../context/operations.md#deployment-conditions) が扱う。
 
@@ -154,12 +155,12 @@ Analyzer を作る人に見える境界は、STDIN と STDOUT の上の JSONL �
 
 ### 設計原則
 
-| 原則                                    | 内容                                                                                                                                                                                                | 狙い                   |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| Core は言語非依存                       | 呼び出しグラフの構築、探索、出力は言語によらない。言語の差は Analyzer へ閉じ込める                                                                                                                  | マルチ言語化の容易さ   |
-| Analyzer は独立プロセス                 | Core から各言語のランタイムへの依存を避ける（Java は JVM、TypeScript は Node.js、Go は Go）                                                                                                         | ランタイムの混在の回避 |
-| Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と diagnostics だけ                                                                                                                       | 結合点の最小化         |
-| Core は Analyzer をプラグインとして扱う | Analyzer を足すときの Core の変更を、`core/internal/protocol` の許す `language` の値 1 つの追加に限る。2 つ目以降の Analyzer の追加が対象で、初号機を入れるときの言語に依存しない最初の配線は対象外 | 拡張の変更の局所化     |
+| 原則                                    | 内容                                                                                                                                                                                                          | 狙い                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Core は言語非依存                       | 呼び出しグラフの構築、探索、出力は言語によらない。言語の差は Analyzer へ閉じ込める                                                                                                                            | マルチ言語化の容易さ   |
+| Analyzer は独立プロセス                 | Core から各言語のランタイムへの依存を避ける（Java は JVM、TypeScript は Node.js、Go は Go）                                                                                                                   | ランタイムの混在の回避 |
+| Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と `diagnostic` と `error` の record だけ                                                                                                           | 結合点の最小化         |
+| Core は Analyzer をプラグインとして扱う | Analyzer を足すときの Core の変更を、`core/internal/protocol` の許す `language` の値 1 つの追加に限る。2 つ目以降の Analyzer の追加が対象で、最初の Analyzer を入れるときの言語に依存しない最初の配線は対象外 | 拡張の変更の局所化     |
 
 Core と Analyzer をプロセスで分ける判断と、Core を Go で実装する判断は、次の ADR にある。
 
@@ -193,8 +194,10 @@ flowchart TB
     unit["Unit test (Go)"] -.-> core
     junit["Java unit test (JUnit)"] -.-> analyzer
     contract["Protocol contract test"] -.-> wire
-    trav["E2E / Traversal 層<br/>graph fixture と期待集合の照合"] -.-> core
-    cli["E2E / CLI 層<br/>実 CLI 出力の照合"] -.-> runtime
+    pcontract["Go の process contract<br/>fake analyzer"] -.-> core
+    pcontract -.-> wire
+    trav["E2E の Traversal 層<br/>graph fixture と期待集合の照合"] -.-> core
+    cli["E2E の CLI 層<br/>実際の CLI の出力の照合"] -.-> runtime
 ```
 
 テストの種類ごとに保証することと置き場は [context/testing.md](../context/testing.md#test-types-and-guarantees) にある。
@@ -210,11 +213,11 @@ depwalk/
 ├── specs/                # issue ごとの作業文書。issue を閉じるときに消す
 ├── core/                 # Go の Core。cmd/depwalk と internal/ の package
 │   ├── cmd/depwalk/
-│   ├── e2e/              # CLI の E2E
+│   ├── e2e/              # E2E の CLI 層
 │   └── internal/         # cli、graph、traversal、output、protocol は DesignDoc.md を含む
 ├── analyzers/            # 言語別の Analyzer
 │   └── java/             # Java Analyzer。DesignDoc.md を含む
 ├── testdata/             # JSONL の contract の fixture と E2E の fixture
 ├── hooks/                # lefthook が呼ぶ Git の hook。保護したブランチでの commit と push の拒否、commit message への issue 番号の補完
-└── scripts/              # 依存図の生成、golangci-lint の起動、specs の残りの検査
+└── scripts/              # 依存図の生成、golangci-lint の起動、specs の残りのチェック
 ```

@@ -7,7 +7,7 @@ governs:
   - core/internal/protocol
   - core/internal/analyze
   - core/internal/analyzer
-  - testdata
+  - testdata/analyzer-protocol
 verified_commit: 8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333
 ---
 
@@ -225,7 +225,7 @@ Analyzer の stderr は、Protocol の record として parse しない。
 
 ### コンポーネントの構成
 
-次の図は、use case が `analyze.Source` の port を通して、Analyzer のプロセスから graph の値と diagnostics を受け取るまでの L3 を示す。
+次の図は、use case が `analyze.Source` の port を通して、Analyzer のプロセスから graph の値と diagnostic を受け取るまでの L3 を示す。
 
 ```mermaid
 flowchart TD

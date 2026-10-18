@@ -5,6 +5,7 @@ description: Gradle の build model から source root と classpath を得る�
 status: stable
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
+  - analyzers/java/model-provider
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 

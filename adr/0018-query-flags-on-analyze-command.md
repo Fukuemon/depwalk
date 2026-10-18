@@ -7,7 +7,7 @@
 ## Context
 
 `depwalk analyze` は、解析の対象を `--language`、`--analyzer-cmd`、`--analyzer-meta` の flag で受け取る。  
-`--method` を省くと、件数の要約と diagnostics だけを出す。  
+`--method` を省くと、件数の要約と diagnostic だけを出す。  
 起点のメソッドから caller か callee を探索し、深さの上限と出力の形式を指定する手段が要る。
 
 探索のクエリを足す形は、次の 2 つが候補になる。

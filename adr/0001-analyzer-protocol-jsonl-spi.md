@@ -21,7 +21,7 @@ Core と Analyzer は別プロセスとし、Analyzer SPI は JSONL over STDIN/S
 - Core は 1 `analysisRequest` ごとに Analyzer process を 1 つ起動する。
 - Core は Analyzer の stdin へ `analysisRequest` record を 1 件送信し、その後 stdin を close する。
 - Analyzer は stdout へ `methodSymbol` / `callEdge` / `diagnostic` / `error` record を JSONL で逐次出力する。
-- stderr は人間向けの diagnostics とし、Core は protocol record として parse しない。
+- stderr は人間が読むログとし、Core は protocol record として parse しない。
 - exit code `0` は成功、非ゼロは fatal failure とする。
 
 ### schemaVersion と互換性の判定

@@ -27,7 +27,7 @@ Java の静的解析に固有の語（classpath、bytecode member、scope、救�
 - diagnostic: 解析を続けられる問題の報告。出しても結果は返る。
 - fatal: 解析を続けられない問題。Analyzer は `error` の record を出して非ゼロで終了し、それまでに出した record はすべて捨てられる。
 - staging Graph: 1 つの request の間だけ Core のプロセスの中に持つ、公開する前の Graph。成功したときだけ公開する。
-- ACL（腐敗防止層）: wire の record を domain の値へ写す層。`core/internal/protocol` が担う。
+- ACL（腐敗防止層）: wire の record を domain の層の値（graph の値型）へ写す層。`core/internal/protocol` が担う。
 - source root: 解析の対象のソースを置いたディレクトリ。`src/main/java` などが当たる。
 - 自動 discovery: source root を指定しないときに、Java Analyzer が Gradle の build model から source root と classpath を取得すること。
 - 明示の override: `--source-root`（request の `sourceRoots`）で source root を指定し、Gradle を起動せずに解析すること。

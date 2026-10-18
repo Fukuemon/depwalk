@@ -1,7 +1,7 @@
 ---
 type: feature-design
 title: CLI Interface
-description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置。起動コマンドの解決と分割、`--analyzer-meta` の合成、終了コード、出力先、CLI のプロセスの E2E の観点
+description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置。起動コマンドの解決と分割、`--analyzer-meta` の合成、終了コード、出力先、E2E の CLI 層の観点
 status: stable
 governs:
   - core/internal/cli
@@ -27,7 +27,7 @@ CLI は、traversal、output、解析のパイプラインを、`analyze` コマ
 - CLI の層、analyze の use case、ACL の責務の配置
 - 起動コマンドの解決と分割、`--analyzer-meta` の合成
 - 終了コードの体系と出力先の規約
-- CLI のプロセスの E2E で確かめる観点
+- E2E の CLI 層で確かめる観点
 
 持たないものは次のとおり。
 
@@ -53,7 +53,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
 
 | flag          | 型                           | 既定値                                    | 説明                                                                                                                    |
 | ------------- | ---------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `--method`    | string                       | なし                                      | method selector。省くと、件数の要約と diagnostics だけを出す                                                            |
+| `--method`    | string                       | なし                                      | method selector。省くと、件数の要約と diagnostic だけを出す                                                             |
 | `--direction` | string（`caller`、`callee`） | `caller`                                  | 探索の方向（`graph.Direction` に対応）。不正な値は、許す値の一覧を添えてエラーにする                                    |
 | `--max-depth` | int（非負）                  | 無制限                                    | 深さの上限（`traversal.Request.MaxDepth`）。0 は起点だけ。負の値はエラー                                                |
 | `--format`    | string                       | `console`                                 | 出力の形式。値の範囲は output の registry に登録した formatter だけ（`output.RegisteredFormats()`）。ハードコードしない |
@@ -139,7 +139,7 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
 | 2          | 入力エラー   | 未知のサブコマンドと flag、多すぎる位置引数、不正な flag の値（`--direction`、`--format`、`--max-depth` の範囲外）、method selector の overload の曖昧と不一致（startNotFound に相当）、`--source-root`、`--include`、`--exclude` の不正な path と glob、Analyzer の起動コマンドの欠落と空の値と閉じていない quote、`key=value` の形でないか key が空の `--analyzer-meta` |
 
 - Cobra の既定（RunE のエラーは常に終了コード 1）に任せず、CLI の層がエラーの種別を判別して 0、1、2 を返す。
-- エラーのメッセージ、候補の一覧、diagnostics は stderr へ出し、探索の結果だけを stdout へ出す。JSON を機械で parse できる状態を守るためである。
+- エラーのメッセージ、候補の一覧、diagnostic は stderr へ出し、探索の結果だけを stdout へ出す。JSON を機械で parse できる状態を守るためである。
 - Analyzer が正しい `error` の record を出さずに異常終了し、stderr に `java.lang.OutOfMemoryError` の pattern があるときは、対処を含むエラーを表示する。
   - 終了コードは 1 にする。
   - 対処の内容は「analyzer の heap 不足。`--analyzer-cmd`（または `DEPWALK_ANALYZER_CMD`）の java の起動に `-Xmx` を足すか増やす」とする。

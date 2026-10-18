@@ -9,6 +9,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
+  - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 

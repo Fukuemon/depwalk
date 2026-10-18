@@ -12,7 +12,7 @@ governs:
   - analyzers/java/settings.gradle.kts
   - analyzers/java/model-provider/build.gradle.kts
   - analyzers/java/gradle/wrapper/gradle-wrapper.properties
-verified_commit: unverified
+verified_commit: c71318f06f5d42e2b73a2eb3aa81d6d926282d30
 ---
 
 # 技術スタック
@@ -22,19 +22,21 @@ verified_commit: unverified
 ツールのバージョンは次のファイルにある。
 
 - `mise.toml`: Go、Java（JDK）、Node.js、pnpm、uv、apm
-- `core/go.mod`: Core の Go のモジュールと依存
+- `core/go.mod`: Core の Go のバージョンと、モジュールと依存。CI の Go もこのバージョンを使う。
 - `analyzers/java/build.gradle.kts`: Java Analyzer の依存のライブラリ、Shadow のプラグイン、Analyzer が動く JDK の toolchain
 - `analyzers/java/model-provider/build.gradle.kts`: Gradle の custom model provider が compile に使う Gradle API と Java の release
+- `analyzers/java/settings.gradle.kts`: JDK の toolchain を解決する foojay のプラグイン
 - `analyzers/java/gradle/wrapper/gradle-wrapper.properties`: Java Analyzer を build する Gradle
 - `scripts/golangci-lint.sh`: golangci-lint
-- `package.json`: 文書とコミットのメッセージのチェックのツール
+- `package.json`: 文書の整形とチェック、コミットのメッセージのチェック、Git のフックのツールと、`packageManager` の pnpm
+- `.github/workflows/ci.yml`: CI の JDK（setup-java の `java-version`）。`mise.toml` を読まないので、`mise.toml` と揃える。
 
 Core の実装の基盤は ADR が持つ。  
 ADR-0002: [Core 実装基盤](../adr/0002-core-implementation-foundation.md)
 
 Core（`core/`）のツールの役割は次のとおり。
 
-- Go: Core の CLI、graph、traversal、output、protocol を実装する。
+- Go: Core を実装する。
 - Go modules: `core/go.mod` を module の manifest にする。
 - Go の標準のコマンド: build、test、vet、fmt をタスクとして実行する。make のようなラッパーは置かない。置く条件は [conventions.md](conventions.md#shared-configuration) にある。
 - `github.com/spf13/cobra`: CLI のコマンドと flag を組み立てる。
@@ -46,7 +48,7 @@ Core（`core/`）のツールの役割は次のとおり。
 Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 
 - Java: Java Analyzer を実装する。Kotlin は使わない。
-  - Kotlin を使わない理由は [Java Analyzer の Design Doc](../analyzers/java/DesignDoc.md#実装基盤) にある。
+  - ADR-0011: [Java Analyzer を Java で実装し、Kotlin を採らない](../adr/0011-java-analyzer-in-java.md)
 - Gradle（Kotlin DSL）と `gradlew`: Java Analyzer を build し、テストする。
 - Shadow のプラグイン: Java Analyzer を 1 つの fat jar にする。Core は `java -jar` の 1 つのコマンドで起動する。
 - JavaParser: ソースを構文木にする。
@@ -55,17 +57,21 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
   - ADR-0005: [SootUp と Spring DI の解決](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
 - Gradle Tooling API: source root を自動で discovery するときに、対象の build の model を取得する。
   - ADR-0006: [Gradle Tooling API による discovery](../adr/0006-adopt-gradle-tooling-api-discovery.md)
+- slf4j-nop: Tooling API が slf4j に出す log を捨て、Analyzer の stdout と stderr に Gradle の log を出さない。
+- foojay のプラグイン: `gradleCompatibilityTest` が daemon の JVM に使う JDK を、toolchain として取得する。
+- Jackson（jackson-databind）: Protocol の JSONL の request を読み、record を書く。
 - custom model provider（`analyzers/java/model-provider`）: Gradle の daemon の上で読み込まれ、build の model を返す。古い Gradle の daemon でも読み込めるよう、Java 8 の classfile にする。
 - JUnit: Java Analyzer の unit テストを実行する。
+- Lombok: テストの中で、Lombok が生成する member の解決を確かめるために使う。
 - ArchUnit: Java Analyzer の package が外部のライブラリを import してよい範囲をチェックする。
 
 リポジトリのルートのツールの役割は次のとおり。
 
 - mise: ランタイムとツールのバージョンを `mise.toml` で固定する。
-- pnpm: ルートの `package.json` のツールを入れる。ルートの `package.json` は文書とコミットのメッセージのチェックのツールだけを持つ。
+- pnpm: ルートの `package.json` のツールを入れる。ルートの `package.json` は、文書の整形とチェック、コミットのメッセージのチェック、Git のフックのツールだけを持つ。
 - lefthook: Git のフックからチェックを実行する。確かめる内容は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。
 - prettier、textlint、commitlint: Markdown と設定ファイルを整形し、文書とコミットのメッセージをチェックする。
-- apm: agent-harness のスキルとフックと、agent-playbooks の playbook を配置する。
+- apm: agent-harness のスキルとフックと、agent-playbooks の playbook のスキルとレビューのサブエージェントを配置する。
 
 依存を足すときは、次の条件に従う。
 
@@ -82,34 +88,40 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 主なコマンドは次のとおり。  
 テストのコマンドは [testing.md](testing.md#test-types-and-guarantees) にある。
 
-- `cd core && go build ./...`: Core を build する。
+- `cd core && go build ./...`: Core を build する。実行ファイルは書き出さない。
+- `cd core && go build -o ../dist/depwalk ./cmd/depwalk`: CLI の実行ファイルを `dist/depwalk` に作る。
 - `cd core && go vet ./...`: Core に `go vet` を掛ける。
 - `cd core && go fmt ./...`: Core を整形する。整形済みかは `cd core && test -z "$(gofmt -l .)"` で確かめる。
 - `cd core && go mod tidy`: Core の依存を整理する。
 - `cd core && go get <module>@<version>`: Core に依存を足す。
 - `scripts/golangci-lint.sh ./...`: depguard で Core の依存の向きを確かめる。
 - `cd analyzers/java && ./gradlew shadowJar`: Java Analyzer の fat jar を `analyzers/java/build/libs/java-analyzer.jar` に作る。
-- `lefthook run pre-commit`: コミットの前のチェックをまとめて実行する。
+- `pnpm exec lefthook run pre-commit`: コミットの前のチェックをまとめて実行する。lefthook は `package.json` の devDependencies で入る。
 
 手元で Java のプロジェクトを解析するコマンドは次のとおり。  
+リポジトリのルートで、上の `go build -o` で作った `dist/depwalk` を使う。  
 flag の体系は [CLI の Design Doc](../core/internal/cli/DesignDoc.md) にある。
 
 ```sh
 # source root を Gradle の build model から自動で discovery する
-depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar"
+./dist/depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar"
 
 # source root を明示する。--source-root は繰り返せる。preview の機能は --analyzer-meta javaPreview=true で有効にする
-depwalk analyze <workspace-root> --language java --source-root <relative-root> --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --analyzer-meta classpath= --analyzer-meta javaLanguageLevel=21
+./dist/depwalk analyze <workspace-root> --language java --source-root <relative-root> --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --analyzer-meta classpath= --analyzer-meta javaLanguageLevel=21
 
 # 1 つのメソッドから caller を探索し、JSON で出す
-depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --method "com.example.UserService#findById(java.lang.Long)" --direction caller --format json
+./dist/depwalk analyze <workspace-root> --language java --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" --method "com.example.UserService#findById(java.lang.Long)" --direction caller --format json
 ```
 
 ## Upgrade Checks
 
 Gradle の対応範囲、Tooling API、custom model provider のバージョンを変えるときは、次を確かめる。
 
-- 対象の Gradle の範囲は、[discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md) と `analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の anchor を同時に直す。ADR-0006 は直さない。
+- 対象の Gradle の範囲は、次を同時に直す。ADR-0006 は直さない。
+  - [discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md)
+  - `GradleVersionSupport` の対象の範囲と、同梱する Gradle のバージョン（`BUNDLED_GRADLE_VERSION`）
+  - `GradleCompatibilityMatrixTest` の `@CsvSource` の anchor（Gradle と daemon の JDK の組）
+  - `analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の `matrixJdkMajors` と `description`
   - ADR は決定した時点の記録で、現在の対象の範囲は Design Doc が持つ。
 - `cd analyzers/java && ./gradlew gradleCompatibilityTest` で、anchor ごとの Gradle と daemon の JVM の組み合わせを確かめる。
   - 確かめる観点は、provider が読み込めること、model のフィールド、task を実行しないこと、出力の隔離、固定した Graph である。
@@ -120,7 +132,7 @@ Gradle の対応範囲、Tooling API、custom model provider のバージョン�
 
 SootUp か、Analyzer が動く JDK のバージョンを変えるときは、次を確かめる。
 
-- SootUp が読める classfile の major は、SootUp が同梱する ASM のバージョンで決まる。Analyzer の JDK の classfile の major を、同梱の ASM が読めるかを確かめる。
+- SootUp が読める classfile の major は、SootUp が依存する ASM のバージョンで決まる。ASM は SootUp の jar に含まれず、推移的な依存として fat jar に入る。Analyzer の JDK の classfile の major を、その ASM が読めるかを確かめる。
   - 読めない major に当たると、`guardQuery` が `unavailable` を返す。bytecode による型の階層の補完と、bytecode にだけある member の救済が、例外を出さずに無効になる。
   - 失敗が diagnostic に出ないため、原因の分からない `JAVA_INCOMPLETE_ANALYSIS` や候補の edge の欠落を見たら、まず classes output の classfile のバージョンを確かめる。
   - この回帰をテストで検出する設定は [testing.md](testing.md#mocking-and-test-data) にある。
@@ -130,7 +142,7 @@ SootUp か、Analyzer が動く JDK のバージョンを変えるときは、�
   - JDK 24 以降の JVM は、Tooling API が native-platform を読み込むときに、stderr に警告を出す。
     - 警告の文は `WARNING: A restricted method in java.lang.System has been called` 系である。
   - fat jar の manifest に `Enable-Native-Access: ALL-UNNAMED` を設定して警告を抑えている。設定は `analyzers/java/build.gradle.kts` の `shadowJar` にある。
-  - 実 CLI の E2E の `TestGradleMultiProjectCLI` が、stderr が depwalk の固定の行だけであることを確かめ、この回帰を検出する。
+  - E2E の CLI 層の `TestGradleMultiProjectCLI` が、stderr が depwalk の固定の行だけであることを確かめ、この回帰を検出する。
 
 Go を上げるときは、`encoding/json/v2` と `encoding/json/jsontext` を使えるかを見直す。
 
