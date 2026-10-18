@@ -118,8 +118,8 @@ final class UnresolvedDiagnostics {
     }
 
     /**
-     * functional interface の invocation だが callable が静的追跡範囲 (同一メソッド内 /
-     * 引数渡し 1 段) の外にあり invocation edge を張れなかった advisory 診断 (info)。
+     * functional interface の invocation だが callable が静的追跡範囲 (使う位置から見える
+     * local / 引数渡し 1 段) の外にあり invocation edge を張れなかった advisory 診断 (info)。
      * 設計上の制約による対象外を表し、outcome ledger には触れない。
      */
     void reportCallableUnresolved(Node callNode, List<String> callerMethodIds) {

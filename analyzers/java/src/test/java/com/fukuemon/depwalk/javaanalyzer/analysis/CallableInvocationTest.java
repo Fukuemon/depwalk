@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 追跡する範囲は、同じメソッドの中の local と、workspace のメソッドの parameter へ 1 hop で渡した
+ * 追跡する範囲は、使う位置から見える local と、workspace のメソッドの parameter へ 1 hop で渡した
  * callable に限る。範囲の外の functional interface の呼び出しは、呼び出し先を推測せず、info の
  * {@code JAVA_CALLABLE_UNRESOLVED} で表に出す。
  */

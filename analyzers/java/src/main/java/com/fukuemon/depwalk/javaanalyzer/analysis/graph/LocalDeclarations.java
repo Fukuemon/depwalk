@@ -31,7 +31,8 @@ import java.util.List;
  * <p>{@link #visibleAt} は、使う位置から外側へスコープを辿り、最初に見える宣言を採る。
  * 宣言の順序とスコープの入れ子だけで決めるので、兄弟の block の宣言と、使う位置より後ろの宣言は採らない。
  * parameter とパターン変数は宣言として返さないので、field で補う前に {@link #sameNameDeclaredInMember} で
- * 同名の local がないことを確かめる。
+ * 同名の local がないことを確かめる。{@link #reassigned} は、{@link #visibleAt} が返した宣言のスコープで
+ * 再代入を判定する。2 つが同じスコープの模型を使うように、同じ class に置く。
  */
 final class LocalDeclarations {
 
@@ -42,6 +43,7 @@ final class LocalDeclarations {
      * {@code use} から外側へスコープを辿り、{@code use} から見える同名の宣言のうち、最も内側のものを返す。
      * lambda か catch 節の parameter が同じ名前なら、宣言は parameter なので null を返す。
      * method、constructor、initializer、field などの member の境界で探すのをやめる。
+     * 匿名 class の member も境界になるので、匿名 class の中から外側の local は探さない。
      */
     static VariableDeclarator visibleAt(Node use, String name) {
         Node child = use;
@@ -72,15 +74,22 @@ final class LocalDeclarations {
     /**
      * {@code parent} が持つスコープのうち、{@code child} から見える同名の宣言。
      * Node の equals は構造の比較なので、位置は参照の同一性で比べる。
+     * switch の selector や case のラベルのように、{@code child} が宣言の並びの外にあるときは、
+     * 並びの宣言はどれも {@code child} より後ろにあるので採らない。
      */
     private static VariableDeclarator declaredBefore(Node parent, Node child, String name) {
         if (parent instanceof BlockStmt block) {
             return declaredInStatementsBefore(block.getStatements(), child, name);
         }
         if (parent instanceof SwitchEntry entry) {
-            return declaredInStatementsBefore(entry.getStatements(), child, name);
+            return contains(entry.getStatements(), child)
+                    ? declaredInStatementsBefore(entry.getStatements(), child, name)
+                    : null;
         }
         if (parent instanceof SwitchNode switchNode) {
+            if (!contains(switchNode.getEntries(), child)) {
+                return null;
+            }
             // 文の group の switch では、前の case で宣言した local が後ろの case から見える。
             VariableDeclarator found = null;
             for (SwitchEntry entry : switchNode.getEntries()) {
@@ -95,10 +104,12 @@ final class LocalDeclarations {
             return found;
         }
         if (parent instanceof VariableDeclarationExpr declaration) {
-            return namedBefore(declaration.getVariables(), child, name);
+            return contains(declaration.getVariables(), child)
+                    ? namedBefore(declaration.getVariables(), child, name)
+                    : null;
         }
         if (parent instanceof ForStmt loop) {
-            if (loop.getInitialization().stream().anyMatch(init -> init == child)) {
+            if (contains(loop.getInitialization(), child)) {
                 return null;
             }
             return declaredInExpressions(loop.getInitialization(), null, name);
@@ -110,11 +121,15 @@ final class LocalDeclarations {
             if (tryStmt.getTryBlock() == child) {
                 return declaredInExpressions(tryStmt.getResources(), null, name);
             }
-            if (tryStmt.getResources().stream().anyMatch(resource -> resource == child)) {
+            if (contains(tryStmt.getResources(), child)) {
                 return declaredInExpressions(tryStmt.getResources(), child, name);
             }
         }
         return null;
+    }
+
+    private static boolean contains(NodeList<? extends Node> nodes, Node child) {
+        return nodes.stream().anyMatch(node -> node == child);
     }
 
     /** {@code end} より前の文の、変数の宣言のうち同名で最も後ろのもの。{@code end} が null なら全部の文を見る。 */
@@ -163,9 +178,9 @@ final class LocalDeclarations {
 
     /**
      * 宣言のスコープの中で、宣言より後ろに同名の変数への代入があるか。
-     * 宣言より前の代入は、兄弟の block の別の変数への代入である。宣言より後ろでは local は隠せないので、
-     * 同名の代入はこの変数への代入とみなす。local class が同名の field に代入していても数えるが、
-     * 多く見積もっても、callable の実体を決めずに diagnostic に残すだけで済む。
+     * 宣言より前の代入は、兄弟の block の別の変数への代入なので数えない。
+     * 宣言より後ろの local class と匿名 class の member が同じ名前を宣言して代入していても数え、
+     * 多く見積もる側に倒す。スコープを決められないときも true を返す。
      */
     static boolean reassigned(VariableDeclarator declarator) {
         Node scope = scopeOf(declarator);
@@ -198,6 +213,7 @@ final class LocalDeclarations {
      * {@code use} を囲む member の中に、同名の local の宣言（変数の宣言、for のヘッダ、try-resource、
      * catch 節、パターン変数、parameter）があるか。
      * 使う位置で実際に shadowing しているかまでは判定しない。多く見積もっても diagnostic が残るだけで済む。
+     * 匿名 class は TypeDeclaration ではないので、匿名 class の外側の member まで見る。
      */
     static boolean sameNameDeclaredInMember(NameExpr use) {
         String name = use.getNameAsString();

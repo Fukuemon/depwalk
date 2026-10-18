@@ -292,7 +292,7 @@ receiver の型を取れない call は、次の順で分類を試みてから d
    - 暗黙の this の link は、囲む型で補う。
    - 型の分からない単純名は、確定した AST の initializer か、囲む型の bytecode の field の型で補う。
    - initializer は、使う位置から外へスコープを辿り、最初に見える local の宣言から採る。兄弟の block の宣言と、使う位置より後ろの宣言は採らない。辿るのは、囲む member の境界までである。
-   - field の型で補うのは、囲む member の中に同じ名前の local の宣言（parameter とパターン変数を含む）が見えない場合に限る。
+   - field の型で補うのは、囲む member の中に、同じ名前の local の宣言（parameter とパターン変数を含む）が位置によらず 1 つもない場合に限る。上の「見える」宣言の判定とは別の、より広い判定である。
    - 宣言を探す規則は、parameter とパターン変数を宣言として返さない。これらが field を shadowing しているときに、field の型で誤って判定する（false exclusion）のを避けるためである。
 2. **起点をさかのぼる external の判定**: 前進して解決できない場合、chain、変数の initializer、`this.field` をさかのぼって、最初に静的な型が取れる起点を探す。
    - その型が scope の外（ソースの宣言の索引にない）なら、`external-target` の除外へ分類する。

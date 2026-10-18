@@ -116,7 +116,7 @@ final class CallableInvocationEdgeEmitter {
                     instanceof ResolvedFieldDeclaration) {
                 callables = List.of();
             } else {
-                callables = callablesForLocal(receiver.getNameAsString(), mce);
+                callables = callablesForLocal(receiver);
             }
         }
         // constructor body の callable は対象外 (symbol の形が method と異なる)。
@@ -213,9 +213,10 @@ final class CallableInvocationEdgeEmitter {
     /**
      * 使う位置から見える local の宣言が、lambda か method reference を initializer に直接持つときの実体。
      * callable の実体は呼び出す時点の値で決まるので、再代入のある変数は追跡しない。
+     * 再代入を多く見積もっても、実体を決めずに advisory 診断に残すだけで済む。
      */
-    private List<CallablePassIndex.CallableTarget> callablesForLocal(String variableName, MethodCallExpr mce) {
-        VariableDeclarator declarator = LocalDeclarations.visibleAt(mce, variableName);
+    private List<CallablePassIndex.CallableTarget> callablesForLocal(NameExpr receiver) {
+        VariableDeclarator declarator = LocalDeclarations.visibleAt(receiver, receiver.getNameAsString());
         if (declarator == null || LocalDeclarations.reassigned(declarator)) {
             return List.of();
         }

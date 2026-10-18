@@ -30,7 +30,7 @@ public enum JavaDiagnosticCode {
     /** {@code publishEvent} の引数型が静的に解決できず、イベント edge を張れない。 */
     JAVA_EVENT_UNRESOLVED("warning"),
 
-    /** callable が静的追跡範囲 (同一メソッド内 / 引数渡し 1 段) の外にあり、invocation edge を張れない。 */
+    /** callable が静的追跡範囲 (使う位置から見える local / 引数渡し 1 段) の外にあり、invocation edge を張れない。 */
     JAVA_CALLABLE_UNRESOLVED("info");
 
     private final String severity;
