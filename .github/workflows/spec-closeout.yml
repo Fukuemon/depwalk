@@ -154,7 +154,7 @@ jobs:
             --body-file /tmp/body.md 2> /tmp/pr-err.txt; then
             cat /tmp/pr-err.txt >&2
             if grep -q "not permitted to create or approve pull requests" /tmp/pr-err.txt; then
-              echo "::error::既知の前提未設定: repo の Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests' を有効にすること (specs/README.md の「closeout を確かめる仕組み」)。"
+              echo "::error::既知の前提未設定: repo の Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests' を有効にすること (specs/README.md の「spec の削除を確かめる仕組み」)。"
               echo "::error::なお Workflow permissions (default_workflow_permissions) は Read のままでよい — contents: write は本 workflow の permissions 宣言で足りている。"
             fi
             exit 1

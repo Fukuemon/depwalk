@@ -131,3 +131,49 @@ rules:
     specs:
       - from: いかがでしたか
         to: 結びの定型を削る
+
+  # ここから下は depwalk の用語の規則
+  - expected: diagnostic
+    pattern: /(?<![\w/.-])diagnostics(?![\w.])/
+    prh: Protocol の record は diagnostic と error に分かれ、diagnostics は error を含むかが曖昧になる。diagnostic か「diagnostic と error の record」と書く。stderr の人間向けの出力はログと書く
+    specs:
+      - from: 件数の要約と diagnostics だけを出す
+        to: 件数の要約と diagnostic だけを出す
+      - from: expected/diagnostics.json にある
+        to: expected/diagnostics.json にある
+  - expected: バージョンの管理
+    pattern: /(?<!(?:語|\d\s?|[A-Za-z]\s?))版の管理/
+    prh: ソフトウェアの version はバージョンと書く。共通の規則は「版の管理」を検出しない
+    specs:
+      - from: JSON の schema と版の管理
+        to: JSON の schema とバージョンの管理
+      - from: 日本語版の管理
+        to: 日本語版の管理
+  - expected: 最初の Analyzer
+    pattern: 初号機
+    prh: Java Analyzer を指すときは、context と同じく「最初の Analyzer」と書く
+    specs:
+      - from: 初号機 (Java) の導入
+        to: 最初の Analyzer (Java) の導入
+  - expected: 自動 discovery
+    pattern: /自動の\s?discovery/
+    prh: source root を指定しないときに Gradle の build model から取得することは、context/domain.md の用語の「自動 discovery」と書く
+    specs:
+      - from: 自動の discovery と明示の override
+        to: 自動 discovery と明示の override
+  - expected: E2E の CLI 層
+    pattern: /(?:実\s?CLI\s?の|CLI\s?のプロセスの|CLI\s?の層の|CLI\s?の)\s?E2E/
+    prh: 実際の CLI のプロセスを動かす E2E は、context/testing.md のテストの種類の名前の「E2E の CLI 層」と書く
+    specs:
+      - from: CLI のプロセスの E2E で確かめる
+        to: E2E の CLI 層 で確かめる
+      - from: 実 CLI の E2E の
+        to: E2E の CLI 層 の
+  - expected: 削除
+    pattern: /(?<![-\w])closeout(?![-.\w])|清算/
+    prh: spec を消すことは、スキル write-design-docs と同じく「削除」と書く。workflow の名前の spec-closeout は識別子なので検出しない
+    specs:
+      - from: spec を清算する
+        to: spec を削除する
+      - from: spec-closeout.yml が作る
+        to: spec-closeout.yml が作る

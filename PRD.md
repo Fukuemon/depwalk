@@ -171,16 +171,16 @@ interface を注入している箇所では、実装クラスのメソッドが�
 ### Success Metrics
 
 - 指定したメソッドの呼び出し元を再帰的に探索し、到達する呼び出し元を網羅的に列挙できる。
-  - 確認の方法: サンプルの Java/Spring のプロジェクトで、既知の呼び出し元の集合と CLI の出力が一致する。到達する集合そのものを比べる規則は [Traversal の Design Doc](core/internal/traversal/DesignDoc.md) が定め、CLI の出力の水準の比較は CLI の層の E2E が担う。
+  - 確認の方法: サンプルの Java/Spring のプロジェクトで、既知の呼び出し元の集合と CLI の出力が一致する。到達する集合そのものを比べる規則は [Traversal の Design Doc](core/internal/traversal/DesignDoc.md) が定め、CLI の出力の水準の比較は E2E の CLI 層が担う。
 - 指定したメソッドの呼び出し先を探索し、列挙できる。
   - 確認の方法: 呼び出し元と同じ。callee の方向で、既知の集合と一致する。
 - 呼び出しグラフを Console と JSON で出力できる。
-  - 確認の方法: 各形式で parse できる出力が得られる。形式ごとに比べる規則は [Output の Design Doc](core/internal/output/DesignDoc.md) が定め、CLI の出力の水準の比較は CLI の層の E2E が担う。
+  - 確認の方法: 各形式で parse できる出力が得られる。形式ごとに比べる規則は [Output の Design Doc](core/internal/output/DesignDoc.md) が定め、CLI の出力の水準の比較は E2E の CLI 層が担う。
 - Spring の DI を経由する呼び出し先を、実体まで解決できる。
   - 確認の方法: interface の注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる。
 - 新しい言語の Analyzer を足すときに、Core の変更が `language` の値の追加だけで済む。
   - 確認の方法: 2 つ目以降の言語の Analyzer を足したとき、Core の差分が `core/internal/protocol` の許す `language` の値 1 つの追加だけになる（Protocol だけで結合する）。
-  - 初号機の Java を入れるときの、言語に依存しない最初の配線（`depwalk analyze` のコマンドと、Analyzer の起動のコマンドの解決）は対象外とする。
+  - 最初の Analyzer である Java を入れるときの、言語に依存しない最初の配線（`depwalk analyze` のコマンドと、Analyzer の起動のコマンドの解決）は対象外とする。
 
 ## Open Questions / Risks
 

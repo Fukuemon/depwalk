@@ -1,7 +1,7 @@
 ---
 type: feature-design
 title: Output（Console と JSON）
-description: Output の entry point、Formatter と View、エラーの境界、Console の tree と行の書式、JSON の schema と版の管理
+description: Output の entry point、Formatter と View、エラーの境界、Console の tree と行の書式、JSON の schema とバージョンの管理
 status: stable
 governs:
   - core/internal/output
@@ -27,7 +27,7 @@ Output Engine は、探索の結果の呼び出しグラフを、人が読む用
 
 - Output の package の公開の entry point と、Formatter と View の構造
 - Console の tree の表現（tree を組む規則、標識、行の書式）
-- JSON の出力の schema、版の管理、後方互換の方針、要素の順序の決定性
+- JSON の出力の schema、バージョンの管理、後方互換の方針、要素の順序の決定性
 - 該当なし、到達なし、未対応の format のエラーの境界
 
 持たないものは次のとおり。
@@ -226,7 +226,7 @@ field の名前は、Analyzer Protocol の語を踏襲する。
   - cutoff の先の node は到達集合の外なので、`nodes[]` にない。`targetMinDepth` は、この `targetMethodId` の `minDepth` である。
 - 要素の順序は、`nodes[]` を `methodId`、`edges[]` と `depthCutoffs[]` を `edgeId` の辞書順に固定する。
 
-#### 版の管理
+#### バージョンの管理
 
 - `schemaVersion` は、Analyzer Protocol とは別に採番する。
   - Protocol は Analyzer と Core の契約で、この schema は Core と利用者の契約であり、変える理由が別だからである。
@@ -375,4 +375,4 @@ sequenceDiagram
   - `targetMethodId` が `nodes[]` にない（dangling）ことを、caller と callee の両方の方向で確かめること。
   - `cycle: false` が省かれないこと。
 - エラーの境界では、未対応の format が出力を書き出す前に `error` になり、`startNotFound` と到達なしが `error` にならないことを確かめる。
-- 出力の形式の成功条件は、Output の層（この文書の unit と golden）と、CLI の層の E2E の 2 層で確かめる。呼び出し元と呼び出し先の列挙と同じ分け方である。
+- 出力の形式の成功条件は、Output の層（この文書の unit と golden）と、E2E の CLI 層の 2 層で確かめる。呼び出し元と呼び出し先の列挙と同じ分け方である。

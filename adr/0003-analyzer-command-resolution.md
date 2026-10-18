@@ -11,12 +11,12 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
 
 Core 側には、どの Analyzer をどう起動するかを決める配線が無かった。  
 Analyzer process の runner は、起動コマンドを呼び出し側から受け取るだけだった。  
-Java Analyzer を初号機として Core から実行するには、起動コマンドを解決する配線が必要になる。
+Java Analyzer を最初の Analyzer として Core から実行するには、起動コマンドを解決する配線が必要になる。
 
 新しい言語の Analyzer を追加するとき、**2 つ目以降**では Core のモジュールへ差分が発生しないことを、成功条件「新しい言語の Analyzer を追加するとき Core を変更せずに済む」としている。  
 Design Doc: [design/DesignDoc.md](../design/DesignDoc.md)
 
-初号機 (Java) の導入に伴う言語非依存な初回の配線そのものは、この成功条件の対象外である。  
+最初の Analyzer (Java) の導入に伴う言語非依存な初回の配線そのものは、この成功条件の対象外である。  
 ただし初回の配線を言語固有の作り (例: `java` コマンドや jar の path を Core へ埋め込む) にすると、2 つ目以降の Analyzer の追加時に Core への分岐の追加を避けられなくなる。  
 したがって初回の配線の設計が、この成功条件を保証できるかを左右する。
 

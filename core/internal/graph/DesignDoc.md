@@ -112,7 +112,7 @@ Graph Engine の公開の API から、request の部分的な結果は観測で
 
 ```mermaid
 flowchart TD
-    ACL["protocol (ACL)<br/>(wire record → graph 値型の変換)"] --> UseCase["Analyze Use Case<br/>(port 経由で domain 値を受領し staging へ登録)"]
+    ACL["protocol (ACL)<br/>(wire record → graph 値型の変換)"] --> UseCase["Analyze Use Case<br/>(port 経由で domain の層の値を受領し staging へ登録)"]
     UseCase --> Graph["Graph Engine<br/>(core/internal/graph)"]
     Traversal["Traversal Engine"] -->|"読み取り API"| Graph
     Output["Output Engine"] -->|"symbol / callSite を解決"| Graph

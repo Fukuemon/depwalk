@@ -31,7 +31,7 @@ verified_commit: unverified
   - 成功条件と測り方は [PRD の Success Metrics](../PRD.md#success-metrics) にある。
 - 出力の形式は、Output の unit と golden による比較と、E2E の CLI 層での比較の 2 段で確かめる。
 - Analyzer の実装は、Core と Analyzer の間の JSONL の入出力を境界にした Protocol contract に対してテストする。
-  - ADR-0001: [Analyzer Protocol を JSONL の process SPI にする](../adr/0001-analyzer-protocol-jsonl-spi.md)
+  - ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 - 公開する API だけを検証するテストは、black-box（`package <pkg>_test`）にする。非公開の関数や seam に触る必要があるときだけ、同じ package に置く。
 
 `core/e2e/` のテストは、fixture の作り方で次の 3 つに分かれる。
@@ -136,7 +136,7 @@ framework の本物の jar を fixture に持ち込むかは、fixture の種類
 
 Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer の JDK と同じにする。
 
-- SootUp が読める classfile の major は、同梱する ASM のバージョンで決まる。読めない major に当たると、bytecode の救済が例外を出さずに無効になる。
+- SootUp が読める classfile の major は、SootUp が依存する ASM のバージョンで決まる。読めない major に当たると、bytecode の救済が例外を出さずに無効になる。
 - 古い major を指定して避けると、SootUp が新しい major に追いつかなくなったときに検出できず、利用者の環境で救済が無効になる。Analyzer の JDK と同じ major で compile すれば、その回帰をテストが捕まえる。
 - 詳しくは [tech-stack.md](tech-stack.md#upgrade-checks) にある。
 
@@ -149,5 +149,5 @@ Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture �
   - [Analyzer Protocol](../core/internal/protocol/DesignDoc.md#verification)、[Graph](../core/internal/graph/DesignDoc.md#verification)、[Java Analyzer](../analyzers/java/DesignDoc.md#verification)、[discovery](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification)
 - Gradle の対応範囲、Tooling API、custom model provider を変えるときは、手元で `gradleCompatibilityTest` を通す。CI では動かないためである。
   - 確かめることは [tech-stack.md の Upgrade Checks](tech-stack.md#upgrade-checks) にある。
-- 性能は、[Java Analyzer の Design Doc の「性能の計測」](../analyzers/java/DesignDoc.md#性能の計測) の方法で測る。SLO は手動のリリースの目標で、テストの gate にしない。
+- 性能は、[Java Analyzer の Design Doc の「性能の計測」](../analyzers/java/DesignDoc.md#性能の計測) の方法で測る。SLO は手動のリリースの目標で、テストの合否の条件にしない。
 - ほかの変更ごとに足すテストの種類は未定。
