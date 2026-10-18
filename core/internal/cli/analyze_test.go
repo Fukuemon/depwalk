@@ -53,8 +53,12 @@ func TestAnalyzeCommandRejectsMissingLanguage(t *testing.T) {
 		"--analyzer-cmd=" + fakeAnalyzerCommand(t, "success"),
 	})
 
-	if err := cmd.Execute(); err == nil {
-		t.Fatal("Execute() error = nil, want validation error for missing --language")
+	err := cmd.Execute()
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("ExitCode(%v) = %d, want 2", err, got)
+	}
+	if !strings.Contains(err.Error(), "--language is required") {
+		t.Errorf("error = %q, want --language is required", err)
 	}
 }
 

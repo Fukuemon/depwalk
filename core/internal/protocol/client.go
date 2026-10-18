@@ -11,7 +11,7 @@ import (
 // process を 1 つ動かし、要求を JSONL で送って、stdout の record を受け取る。
 //
 // process の起動と stdio は analyzer package に任せ、そこでは行を opaque な
-// byte 列として扱う。record の parse と検証は本型が持つ。
+// byte 列として扱う。Run が record を parse して検証する。
 type Client struct {
 	command analyzer.Command
 }

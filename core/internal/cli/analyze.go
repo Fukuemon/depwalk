@@ -69,7 +69,7 @@ func newAnalyzeCommand() *cobra.Command {
 			// usage 表示を抑止する。通常の error は Cobra が stderr へ出し、
 			// AnalyzerFailure は独自の描画を保つ。
 			cmd.SilenceUsage = true
-			input, err := validateAnalyzeFlags(cmd, args, flags)
+			input, err := buildAnalyzeInput(cmd, args, flags)
 			if err != nil {
 				return err
 			}
@@ -104,9 +104,10 @@ type analyzeInput struct {
 	options      analyze.Options
 }
 
-// validateAnalyzeFlags は位置引数と flag の値を検証し、use case への入力に変える。
-// 利用者の入力の誤りは入力エラーとして返す。
-func validateAnalyzeFlags(cmd *cobra.Command, args []string, flags *analyzeFlags) (analyzeInput, error) {
+// buildAnalyzeInput は位置引数、flag、環境変数から analyze の入力を組み立てる。
+// 利用者の入力の誤りは入力エラーとして返し、workspace root を絶対パスにできない
+// ときのような実行環境の失敗はそのまま返す。
+func buildAnalyzeInput(cmd *cobra.Command, args []string, flags *analyzeFlags) (analyzeInput, error) {
 	workspaceRoot, err := resolveWorkspaceRoot(args)
 	if err != nil {
 		return analyzeInput{}, err
