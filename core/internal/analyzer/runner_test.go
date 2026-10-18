@@ -83,8 +83,6 @@ func (w *failingWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("stderr forwarding failed")
 }
 
-// 転送先の writer が失敗しても capture は途切れないこと。stderr は EOF まで
-// 読み切られる。
 func TestRunnerDrainsStderrWhenForwardWriterFails(t *testing.T) {
 	t.Parallel()
 

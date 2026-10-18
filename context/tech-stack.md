@@ -42,7 +42,7 @@ Core（`core/`）のツールの役割は次のとおり。
 - Go の標準のコマンド: build、test、vet、fmt をタスクとして実行する。make のようなラッパーは置かない。置く条件は [conventions.md](conventions.md#shared-configuration) にある。
 - `github.com/spf13/cobra`: CLI のコマンドと flag を組み立てる。
 - `go vet`: Go の静的なチェックを行う。
-- golangci-lint: depguard だけを有効にし、package の依存の向きをチェックする。規則は [codebase.md](codebase.md#dependency-rules) にある。
+- golangci-lint: depguard と、revive の exported のルールだけを有効にする。depguard は package の依存の向きを、revive は export した識別子の doc の有無を確かめる。依存の規則は [codebase.md](codebase.md#dependency-rules) にある。
 - `gofmt`: Go のコードを整形する。Go の標準の formatter を正とする。
 - Go の標準の `testing`: unit テスト、contract テスト、E2E を実行する。E2E は `core/e2e` にある。
 
@@ -95,7 +95,7 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - `cd core && go fmt ./...`: Core を整形する。整形済みかは `cd core && test -z "$(gofmt -l .)"` で確かめる。
 - `cd core && go mod tidy`: Core の依存を整理する。
 - `cd core && go get <module>@<version>`: Core に依存を足す。
-- `scripts/golangci-lint.sh ./...`: depguard で Core の依存の向きを確かめる。
+- `scripts/golangci-lint.sh ./...`: Core の依存の向きと、export した識別子の doc の有無を確かめる。
 - `cd analyzers/java && ./gradlew shadowJar`: Java Analyzer の fat jar を `analyzers/java/build/libs/java-analyzer.jar` に作る。
 - `pnpm exec lefthook run pre-commit`: コミットの前のチェックをまとめて実行する。lefthook は `package.json` の devDependencies で入る。
 

@@ -14,10 +14,9 @@ import (
 // (testdata/fixtures/java/multi-module-spring-project/patterns/) を、実 Core CLI と
 // 実 Analyzer jar の自動 discovery で解析する。
 //
-// かつて未解決として報告されていた 5 パターン (fluent chain、method reference、
-// 明示的な super 呼び出し、generics 付き var、cross-module の Lombok member) は
-// すべて救済済みである。bytecode-only member の契約下で各パターンが edge になる、
-// という成功の期待を本テストが守る。
+// 対象は 5 パターン (fluent chain、method reference、明示的な super 呼び出し、
+// generics 付き var、cross-module の Lombok member) で、bytecode-only member の
+// 契約の下で、どのパターンも未解決にならず edge になることを期待する。
 //
 // patterns/ は root fixture の settings.gradle が含めない独立 build なので、
 // TestGradleMultiProjectCLI の期待値には影響しない。
@@ -56,9 +55,8 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	itemGetName := "java:com.example.pat.lib.Item#getName()"
 	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
 
-	// getName には 4 つの caller が到達する (cross-module のコンストラクタ、
-	// generics 付き var、fluent chain の先頭、method reference)。
-	// コンストラクタ側の caller は 2 つ。
+	// getName には 3 つの caller (cross-module、generics 付き var、method reference) が、
+	// コンストラクタには 2 つの caller (cross-module、fluent chain の先頭) が到達する。
 	if got := len(edges[itemCtor]); got < 2 {
 		t.Errorf("Item ctor edges = %d, want >= 2 (cross-module, fluent chain head): %v", got, edges[itemCtor])
 	}

@@ -60,6 +60,7 @@ const (
 // SymbolKind は呼び出せる symbol の種別を識別する。
 type SymbolKind string
 
+// methodSymbol.symbolKind が取る値。Core は値で node の扱いを変えない。
 const (
 	SymbolKindMethod      SymbolKind = "method"
 	SymbolKindConstructor SymbolKind = "constructor"
@@ -70,6 +71,7 @@ const (
 // Severity は diagnostic record の深刻度を識別する。
 type Severity string
 
+// diagnostic.severity が取る値。どの値でも解析は続き、致命的な失敗は error record で表す。
 const (
 	SeverityInfo    Severity = "info"
 	SeverityWarning Severity = "warning"

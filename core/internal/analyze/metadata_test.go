@@ -76,3 +76,11 @@ func TestBuildMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildMetadataRejectsEmptyKey(t *testing.T) {
+	t.Parallel()
+
+	if _, err := analyze.BuildMetadata([]string{"=value"}); err == nil {
+		t.Fatal("BuildMetadata() error = nil, want an error for an empty key")
+	}
+}

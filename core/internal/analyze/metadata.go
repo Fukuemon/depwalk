@@ -9,11 +9,12 @@ import (
 // analysisRequest.metadata を組み立てる。
 //
 // Core は key も value も解釈しない。Analyzer と共有する組み立て規則だけを適用する。
-//   - every value is appended to a JSON array under its key, in the order
-//     the flags were given, even when the key appears once;
-//   - an empty value (key=) registers the key with an empty array;
-//   - the split happens on the first "=", so a value may itself contain "=";
-//   - an entry without "=" is rejected as a validation error.
+//   - 値は、key ごとの JSON 配列へ flag の指定順に追加する。key が 1 回しか
+//     現れなくても配列にする。
+//   - 空の値 (key=) は配列に足さない。その key にほかの値がなければ、空の配列で登録する。
+//   - 最初の "=" で key と値に分ける。値の中に "=" を含めてよい。
+//   - "=" を含まない指定と、key が空の指定は、検証エラーとして拒否する。
+//   - 指定が 1 つもなければ nil を返す。呼び出し側は analysisRequest から metadata を省く。
 //
 // 公開しているのは、record レベルの E2E が use case と同じ規則で metadata を
 // 組めるようにするため。テスト側で組み立てを書き直すと、規則がずれても気づけない。

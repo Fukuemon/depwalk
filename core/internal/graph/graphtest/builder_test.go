@@ -86,7 +86,7 @@ func TestBuilderExistingMethodsUseZeroValueMetadata(t *testing.T) {
 }
 
 func TestBuilderBuildsDiamondGraph(t *testing.T) {
-	// o -> a -> m, o -> b -> m (convergence at m)
+	// o -> a -> m, o -> b -> m (m で合流する)
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:ob", "method:o", "method:b").

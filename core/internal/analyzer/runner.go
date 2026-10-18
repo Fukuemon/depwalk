@@ -25,6 +25,8 @@ type Runner struct {
 	command Command
 }
 
+// New は command で Analyzer を起動する [Runner] を返す。command は呼び出しの時点では
+// 検証せず、Path が空なら [Runner.Run] が error を返す。
 func New(command Command) Runner {
 	return Runner{command: command}
 }

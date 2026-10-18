@@ -3,7 +3,7 @@
 //
 //  1. 実 fixture: 実 analyzers/java fat jar を testdata/fixtures/java の fixture
 //     project に対して動かし、既知の caller / callee の期待値や golden 出力と
-//     突き合わせる (testdata/fixtures/java/README.md)。
+//     突き合わせる。
 //  2. inline workspace: t.TempDir() に source を書き出して workspace を組み立て、
 //     --analyzer-meta classpath= を渡して classpath なしの解析を実 jar で走らせる。
 //     framework の依存は annotation / interface の最小 stub を workspace に置いて
@@ -12,7 +12,7 @@
 //     Core CLI だけを動かす。異常系 (analyzer の異常終了など) の検証に使う。
 //
 // analyzers/java の JUnit テストは解析ロジックをプロセス内で、
-// core/internal/analyzer の Go テストは Analyzer Protocol を fake analyzer に対して
+// core/internal/protocol の Go テストは Analyzer Protocol を fake analyzer に対して
 // 検証する。本 package は Core と実 Java Analyzer プロセスが端から端まで実際に
 // 噛み合うことを検証する場所である。
 //

@@ -27,7 +27,7 @@ func edgeIDs(res traversal.Result) map[string]bool {
 }
 
 func TestResultEdgesFormInducedSubgraph(t *testing.T) {
-	// a -> b -> c: 到達 node 間の edge がすべて含まれること。
+	// a -> b -> c
 	res := mustTraverse(t, linearGraph(), traversal.Request{StartID: "method:a", Direction: graph.DirectionCallee})
 
 	want := []string{"edge:ab", "edge:bc"}
@@ -221,7 +221,7 @@ func TestResultNoDepthCutoffsWhenUnlimited(t *testing.T) {
 }
 
 func TestResultCallerDirectionBuildsInducedSubgraph(t *testing.T) {
-	// a -> c, b -> c: c からの caller 探索が両方の caller に到達すること。
+	// a -> c, b -> c
 	g := graphtest.NewBuilder().
 		Edge("edge:ac", "method:a", "method:c").
 		Edge("edge:bc", "method:b", "method:c").
@@ -246,8 +246,7 @@ func TestResultStartNotFoundHasEmptyCollections(t *testing.T) {
 }
 
 func TestResultIdenticalForBFSAndDFS(t *testing.T) {
-	// 非対称な合流 + 閉路 + 深さ上限。結果の契約 (nodes / edges / cycles /
-	// cutoffs) がすべて訪問順に依存しないこと。
+	// 腕の長さが違う合流と、閉路と、深さ上限を 1 つの graph に含める。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").

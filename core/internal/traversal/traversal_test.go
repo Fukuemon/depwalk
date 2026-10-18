@@ -189,7 +189,6 @@ func TestTraverseConvergentNodeUsesShortestPathDepth(t *testing.T) {
 
 func TestTraverseNodesIdenticalForBFSAndDFS(t *testing.T) {
 	// DFS 側の腕が深さ 3 で m に着き、短い深さ 2 の腕より先に到達する合流。
-	// node 集合が順序に依存しないこと。
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").

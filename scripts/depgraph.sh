@@ -3,7 +3,7 @@
 # design/DesignDoc.md の生成マーカー区間を置き換える。
 #
 # 手描きの依存図は実装が変わると静かに腐るため、図は必ず本スクリプトで
-# 生成する (判断の正本は ADR-0007)。
+# 生成する。
 # 冪等: 実 import が変わっていなければ再実行しても差分は出ない。
 # その性質を使って CI / pre-commit が drift を検査する。
 set -euo pipefail
@@ -17,8 +17,7 @@ END_MARKER="<!-- END GENERATED: core-depgraph -->"
 # `<package> <依存 package>...` を core/internal 内のエッジだけに絞って出す。
 #
 # 図の対象は core/internal 間のエッジのみ。`cmd/depwalk` は cli を呼ぶだけの
-# entrypoint で、依存規則 (context/codebase.md の Dependency Rules) が語るのは
-# internal の package 間なので含めない。
+# entrypoint で、依存の向きの規則は internal の package の間だけを決めるので含めない。
 #
 # package 名は module prefix を落とした相対 path (例: `graph/graphtest`)。
 # Go 慣習のテスト支援 sub-package (net/http/httptest 相当) を素直に描けるよう、

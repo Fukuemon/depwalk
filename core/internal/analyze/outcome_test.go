@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// 異常終了 + HeapExhausted のとき、Err は対処 (-Xmx の追加・増加) を含む。
-// ヒントなしの異常終了は従来の文言のまま (非回帰)。
 func TestOutcomeErrRendersHeapGuidance(t *testing.T) {
 	withHint := Outcome{ExitCode: 1, HeapExhausted: true}.Err()
 	if withHint == nil {

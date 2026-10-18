@@ -58,6 +58,8 @@ type UseCase struct {
 	source Source
 }
 
+// New は、source から解析結果を受け取る [UseCase] を返す。source が nil なら、
+// [UseCase.Run] が error を返す。
 func New(source Source) UseCase {
 	return UseCase{source: source}
 }

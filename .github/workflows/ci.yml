@@ -56,7 +56,7 @@ jobs:
           git diff --exit-code go.mod go.sum
         working-directory: core
 
-      - name: Dependency direction gate (depguard)
+      - name: golangci-lint (depguard, revive)
         run: scripts/golangci-lint.sh ./...
 
       - name: Dependency graph drift check

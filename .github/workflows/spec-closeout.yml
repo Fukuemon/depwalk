@@ -2,13 +2,12 @@ name: Spec closeout
 
 # issue の close 時に spec ディレクトリが残っていれば、削除を提案する PR を起票する。
 # 自動では消さない: 削除の前提 (durable な成果が design / context / ADR へ sync 済みか) は
-# 機械判定できないため、可否は PR のマージで人が決める。spec の取り決めは agent-harness の
-# write-design-docs の references/spec.md にある。
+# 機械判定できないため、可否は PR のマージで人が決める。
 #
 # 前提: Settings → Actions → General で "Allow GitHub Actions to create and approve pull requests"
 # を有効にする (未設定は Open deletion PR step が検出して案内する)。Workflow permissions
 # (default_workflow_permissions) は Read のままでよい — contents: write は下の permissions 宣言で
-# 足りている (実測)。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
+# 足りている。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
 # マージするまで発火しない。
 #
 # secret CLOSEOUT_PR_TOKEN (任意、contents:write / pull-requests:write を持つ PAT):

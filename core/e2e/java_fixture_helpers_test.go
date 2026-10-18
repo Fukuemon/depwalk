@@ -50,9 +50,6 @@ func TestE2ERequired(t *testing.T) {
 
 // TestJavaMajorVersion は正規表現による java -version の解析を、実在する
 // 出力の変種に対して検証する。
-//
-// 以前の `version "25` という部分文字列一致は、JDK のベンダーやバージョンで
-// 書式が変わると壊れた。
 func TestJavaMajorVersion(t *testing.T) {
 	t.Parallel()
 
