@@ -46,3 +46,4 @@
 - [ADR-0016](../adr/0016-split-execution-order-between-main-and-runner.md) — Java Analyzer の実行の順を、解析の段は AnalysisRunner に、context の組み立てまでは Main に持たせる
 - [ADR-0017](../adr/0017-limit-core-change-to-language-value.md) — 2 つ目以降の言語の Analyzer を足すとき、Core の変更を protocol の許す language の値の追加に限る
 - [ADR-0018](../adr/0018-query-flags-on-analyze-command.md) — 探索のクエリを、サブコマンドを足さずに analyze コマンドの flag で指定する
+- [ADR-0019](../adr/0019-oom-hint-from-analyzer-stderr.md) — Analyzer が error の record を出さずに異常終了したとき、Core は stderr の OutOfMemoryError から heap の不足を案内する

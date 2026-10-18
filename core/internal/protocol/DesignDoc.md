@@ -221,7 +221,8 @@ Analyzer の stderr は、Protocol の record として parse しない。
 ただし、Analyzer のプロセスが正しい `error` の record を出さずに異常終了したときに限り、Core は stderr の内容から診断のヒントを探してよい。  
 たとえば `OutOfMemoryError` の pattern を検知して、heap を増やす対処を含むエラーを表示する。  
 ヒントの抽出は終了した後のエラーの表示の補助であり、解析の結果の解釈と graph の構築には使わない。  
-表示の文言と終了コードは [CLI の Design Doc の終了コード](../cli/DesignDoc.md#終了コード) にある。
+表示の文言と終了コードは [CLI の Design Doc の終了コード](../cli/DesignDoc.md#終了コード) にある。  
+ADR-0019: [Analyzer が error の record を出さずに異常終了したとき、Core は stderr の OutOfMemoryError から heap の不足を案内する](../../../adr/0019-oom-hint-from-analyzer-stderr.md)
 
 ### コンポーネントの構成
 

@@ -7,7 +7,7 @@ governs:
   - core/
   - analyzers/
   - scripts/depgraph.sh
-verified_commit: unverified
+verified_commit: 5dad40d699e6c0eb1c9c50dc3de02dabaa2240b4
 ---
 
 # depwalk Design Doc
@@ -159,7 +159,7 @@ Analyzer を作る人に見える境界は、STDIN と STDOUT の上の JSONL �
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | Core は言語非依存                       | 呼び出しグラフの構築、探索、出力は言語によらない。言語の差は Analyzer へ閉じ込める                                                                                                                            | マルチ言語化の容易さ   |
 | Analyzer は独立プロセス                 | Core から各言語のランタイムへの依存を避ける（Java は JVM、TypeScript は Node.js、Go は Go）                                                                                                                   | ランタイムの混在の回避 |
-| Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と `diagnostic` と `error` の record だけ                                                                                                           | 結合点の最小化         |
+| Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と `diagnostic` と `error` の record だけ。例外は、異常終了のときの stderr からの heap の不足の案内（ADR-0019）                                     | 結合点の最小化         |
 | Core は Analyzer をプラグインとして扱う | Analyzer を足すときの Core の変更を、`core/internal/protocol` の許す `language` の値 1 つの追加に限る。2 つ目以降の Analyzer の追加が対象で、最初の Analyzer を入れるときの言語に依存しない最初の配線は対象外 | 拡張の変更の局所化     |
 
 Core と Analyzer をプロセスで分ける判断と、Core を Go で実装する判断は、次の ADR にある。
