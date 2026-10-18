@@ -50,10 +50,9 @@ ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準�
 - 対象は JVM の言語を先行させ、まず Java と Spring Boot を扱う。Kotlin、TypeScript、Vue、Go は将来の対象である。
 - 言語ごとの解析は、その言語のランタイムの上で動く独立した Analyzer のプロセスが担う。Core は特定の言語のランタイムに依存しない。
 - Core と Analyzer は、共通のデータモデル（`MethodSymbol`、`CallEdge`）と Protocol の diagnostics（`diagnostic`、`error`）だけを介して結合する。
-- Gradle のランタイムは、Java Analyzer の条件つきの依存である。
-  - `analysisRequest.sourceRoots` を指定した明示の override では、Tooling API、Gradle daemon、一時の provider のどれも起動しない。
+- Gradle のランタイムは、Java Analyzer が source root を自動で discovery するときだけ使う、条件つきの依存である。
   - 自動 discovery を使う場合も、Core と Analyzer Protocol の言語非依存の境界は変わらず、成功の条件にも影響しない。
-  - Gradle daemon と一時の provider を起動するときの安全の境界は [context/operations.md](../context/operations.md#environments) にある。
+  - 動くものと副作用の前提は [context/operations.md の Environments](../context/operations.md#environments) にある。
   - ADR-0006: [source root を指定しない request では、Gradle Tooling API で build の実効 model から解析 context を discovery する](../adr/0006-adopt-gradle-tooling-api-discovery.md)
 
 ## Architecture
@@ -162,7 +161,7 @@ Analyzer を作る人に見える境界は、STDIN と STDOUT の上の JSONL �
 | Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と diagnostics だけ                                                                                                                       | 結合点の最小化         |
 | Core は Analyzer をプラグインとして扱う | Analyzer を足すときの Core の変更を、`core/internal/protocol` の許す `language` の値 1 つの追加に限る。2 つ目以降の Analyzer の追加が対象で、初号機を入れるときの言語に依存しない最初の配線は対象外 | 拡張の変更の局所化     |
 
-Core を Kotlin で実装する案、Analyzer をライブラリとして組み込む案、Core と Analyzer を同じプロセスにする案は、この 4 つの原則を優先して採らなかった。
+Core と Analyzer をプロセスで分ける判断と、Core を Go で実装する判断は、次の ADR にある。
 
 - ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 - ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準ライブラリに絞る](../adr/0002-core-implementation-foundation.md)
