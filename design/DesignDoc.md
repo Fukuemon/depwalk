@@ -20,10 +20,10 @@ depwalk は、静的解析でメソッド間の呼び出し関係を抽出し、
 言語ごとの解析の差は、独立したプロセスの Analyzer に閉じ込める。  
 呼び出しグラフの構築、探索、出力を担う Core は、言語に依存させない。  
 この分離により、Kotlin、TypeScript、Vue、Go の解析を、Core を変えずに足せる。  
-ADR-0001: [Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とする](../adr/0001-analyzer-protocol-jsonl-spi.md)
+ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 Core は Go で実装し、Go modules と Go の標準のコマンドで build する。  
-ADR-0002: [Core の実装基盤](../adr/0002-core-implementation-foundation.md)
+ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準ライブラリに絞る](../adr/0002-core-implementation-foundation.md)
 
 ## Goals and Non-Goals
 
@@ -32,15 +32,15 @@ ADR-0002: [Core の実装基盤](../adr/0002-core-implementation-foundation.md)
 - 呼び出しグラフの構築、caller と callee の探索、Console と JSON の出力を、言語に依存しない Core で提供する。
 - 言語ごとの解析を Analyzer のプロセスに閉じ、Core とは Protocol だけで結合する。
 - Java と Spring Boot の解析では、Spring の DI を経由する呼び出し先を実体まで解決する。
-  - ADR-0005: [SootUp と Spring の DI の解決](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
+  - ADR-0005: [Java Analyzer に SootUp による型階層の補完と Spring DI の解決を 1 つの feature として導入する](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
 
 ### Non-Goals
 
 - 実行時の情報に依存する解析。Runtime Trace と APM の計測、Reflection、AspectJ の Runtime、実行時の Proxy の解析を持たない。
-  - ADR-0004: [動的な呼び出しの完全な追跡を初期のスコープに含めない](../adr/0004-defer-runtime-call-tracing.md)
+  - ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めず、候補と未解決理由を観測可能にする](../adr/0004-defer-runtime-call-tracing.md)
 - IDE の Plugin と Web UI。提供の形は CLI に限る。
 - グラフの可視化の出力。
-  - ADR-0008: [可視化の出力をスコープから外す](../adr/0008-defer-graph-visualization.md)
+  - ADR-0008: [可視化の出力（DOT / Mermaid）をスコープから外し、解析の精度と永続化を先に進める](../adr/0008-defer-graph-visualization.md)
 
 ## Assumptions and Constraints
 
@@ -52,7 +52,7 @@ ADR-0002: [Core の実装基盤](../adr/0002-core-implementation-foundation.md)
   - `analysisRequest.sourceRoots` を指定した明示の override では、Tooling API、Gradle daemon、一時の provider のどれも起動しない。
   - 自動 discovery を使う場合も、Core と Analyzer Protocol の言語非依存の境界は変わらず、成功の条件にも影響しない。
   - Gradle daemon と一時の provider を起動するときの安全の境界は [context/operations.md](../context/operations.md#environments) にある。
-  - ADR-0006: [自動 discovery に Gradle Tooling API と custom model provider を採用する](../adr/0006-adopt-gradle-tooling-api-discovery.md)
+  - ADR-0006: [source root を指定しない request では、Gradle Tooling API で build の実効 model から解析 context を discovery する](../adr/0006-adopt-gradle-tooling-api-discovery.md)
 
 ## Architecture
 
@@ -80,22 +80,25 @@ flowchart TD
 
 Core は Analyzer の内部（使うライブラリと言語のランタイム）を知らない。  
 Core が解析の要求を渡し、Analyzer が graph model（`MethodSymbol`、`CallEdge`）と diagnostics（`diagnostic`、`error`）を JSONL で 1 行 1 レコードで返す。  
-ADR-0001: [Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とする](../adr/0001-analyzer-protocol-jsonl-spi.md)
+ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 ## Components
 
 Core は、呼び出しグラフの構築、探索、出力に責務を限り、解析の処理を持たない。  
-言語ごとの差は Analyzer に閉じ込める。
+言語ごとの差は Analyzer に閉じ込める。  
+表の package は `core/internal` の下にある。  
+依存先の列は、下の生成の依存図と一致する。
 
-| モジュール       | 責務                                                                                                                                                           | 公開境界            | 依存先                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| CLI              | 引数の解析、実行の制御、Core の呼び出し                                                                                                                        | コマンドライン I/F  | Core                                                                                                                        |
-| Graph Engine     | Node の管理、Edge の管理、Graph の生成                                                                                                                         | グラフ構造 API      | Model                                                                                                                       |
-| Traversal Engine | Caller の探索、Callee の探索（BFS、DFS）                                                                                                                       | 探索 API            | Graph Engine                                                                                                                |
-| Output Engine    | Console と JSON への出力                                                                                                                                       | 出力 API            | Graph Engine、Traversal Engine、Model                                                                                       |
-| Model            | `MethodSymbol`、`CallEdge`、`SourceLocation` の定義（Analyzer の出力の共通のデータモデル）                                                                     | データ型            | なし                                                                                                                        |
-| Analyzer SPI     | Analyzer をプラグインとして扱う境界。Core は graph model と diagnostics を Protocol を通して受け取る                                                           | Protocol（JSONL）   | Model                                                                                                                       |
-| Java Analyzer    | Java と Spring の AST の解析、型の解決、DI の解決、CallGraph の生成。source root の指定がないときは Gradle の build model から解析の context を discovery する | Analyzer SPI の実装 | JavaParser、SymbolSolver、SootUp。自動 discovery のときだけ Gradle Tooling API、Gradle daemon、一時の custom model provider |
+| package / モジュール | 責務                                                                                                                                                                         | 公開境界                     | 依存先                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `cli`                | `analyze` コマンドの flag の定義と入力の検証、Analyzer の起動のコマンドの解決、package の配線、探索の結果の出力の呼び出し、エラーの表示と終了コード                          | コマンドライン I/F           | `analyze`、`analyzer`、`graph`、`output`、`protocol`                                                                        |
+| `analyze`            | `depwalk analyze` の use case。`Source` の port から受け取った node と edge で Graph を組み、method selector で選んだ起点から探索する                                        | use case と `Source` の port | `graph`、`traversal`                                                                                                        |
+| `graph`              | node と edge の登録と参照。呼び出しグラフの値の型（node、edge、`SourceLocation`）を自前で持つ                                                                                | グラフ構造 API               | なし                                                                                                                        |
+| `traversal`          | 起点から caller または callee の向きに辿り、深さの上限までに到達する node と edge を求める                                                                                   | 探索 API                     | `graph`                                                                                                                     |
+| `output`             | 探索の結果の Console と JSON への出力                                                                                                                                        | 出力 API                     | `graph`、`traversal`                                                                                                        |
+| `protocol`           | Analyzer Protocol の ACL。record（`MethodSymbol`、`CallEdge`、`SourceLocation` ほか）の定義、parse、検証、graph の値への変換を持ち、`analyze` の `Source` の port を実装する | Protocol（JSONL）            | `analyze`、`analyzer`、`graph`                                                                                              |
+| `analyzer`           | Analyzer のプロセスの起動、stdin と stdout と stderr の受け渡し、終了コードの扱い。JSONL の中身は解釈しない                                                                  | プロセスの実行 API           | なし                                                                                                                        |
+| Java Analyzer        | Java と Spring の AST の解析、型の解決、DI の解決、CallGraph の生成。source root の指定がないときは Gradle の build model から解析の context を discovery する               | Analyzer SPI の実装          | JavaParser、SymbolSolver、SootUp。自動 discovery のときだけ Gradle Tooling API、Gradle daemon、一時の custom model provider |
 
 機能ごとの設計は次の文書にある。
 
@@ -116,7 +119,7 @@ Core の `core/internal` の package の間の依存は、次の図のとおり�
 図に出るのは本番のコードの import だけで、テストのコードの import は含まない。  
 再生成して差分が出る状態（図を更新し忘れた状態）は、lefthook の pre-commit と CI が drift として検出する。  
 依存の向きの規則とそのチェックは [context/codebase.md](../context/codebase.md#dependency-rules) にある。  
-ADR-0007: [層の依存境界を ACL と機械のチェックで固定する](../adr/0007-layered-architecture-refactor.md)
+ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェックで固定し、Core はフラットな package 構成のまま保つ](../adr/0007-layered-architecture-refactor.md)
 
 <!-- BEGIN GENERATED: core-depgraph (scripts/depgraph.sh が更新する。手編集しない) -->
 
@@ -157,9 +160,10 @@ Analyzer を作る人に見える境界は、STDIN と STDOUT の上の JSONL �
 | Analyzer は共通の Protocol を実装する   | Core は Analyzer の内部を知らず、受け取るのは graph model と diagnostics だけ                                                               | 結合点の最小化         |
 | Core は Analyzer をプラグインとして扱う | Analyzer を足すときに Core の変更を不要にする。2 つ目以降の Analyzer の追加が対象で、初号機を入れるときの言語に依存しない最初の配線は対象外 | 拡張の変更の局所化     |
 
-Core を Kotlin で実装する案、Analyzer をライブラリとして組み込む案、Core と Analyzer を同じプロセスにする案は、この 4 つの原則を優先して採らなかった。  
-ADR-0001: [Analyzer Protocol を JSONL over STDIN/STDOUT の process SPI とする](../adr/0001-analyzer-protocol-jsonl-spi.md)  
-ADR-0002: [Core の実装基盤](../adr/0002-core-implementation-foundation.md)
+Core を Kotlin で実装する案、Analyzer をライブラリとして組み込む案、Core と Analyzer を同じプロセスにする案は、この 4 つの原則を優先して採らなかった。
+
+- ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
+- ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準ライブラリに絞る](../adr/0002-core-implementation-foundation.md)
 
 ### 判断の優先順位
 
@@ -210,5 +214,6 @@ depwalk/
 ├── analyzers/            # 言語別の Analyzer
 │   └── java/             # Java Analyzer。DesignDoc.md を含む
 ├── testdata/             # JSONL の contract の fixture と E2E の fixture
+├── hooks/                # lefthook が呼ぶ Git の hook。保護したブランチでの commit と push の拒否、commit message への issue 番号の補完
 └── scripts/              # 依存図の生成、golangci-lint の起動、specs の残りの検査
 ```

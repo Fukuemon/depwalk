@@ -5,7 +5,7 @@ description: Output の entry point、Formatter と View、エラーの境界、
 status: stable
 governs:
   - core/internal/output
-verified_commit: 4cae142
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Output（Console と JSON）
@@ -396,21 +396,21 @@ sequenceDiagram
 
     User->>CLI: メソッド / 方向 / 深さ / 出力形式を指定
     CLI->>UC: analyze 実行
-    UC->>Graph: methodSymbol / callEdge を登録<br/>(wire record を graph の値型へ変換)
+    UC->>Graph: protocol が graph の値型へ変換した node / edge を staging Graph に登録
     UC->>Trv: Traverse(graph, request)
     Trv->>Graph: 読み取り API で node / edge を取得
     Graph-->>Trv: node / edge
     Trv-->>UC: Result (到達集合 / cycle / depthCutoffs / minDepth)
+    UC-->>CLI: Graph と MethodQuery (Request / Result)
 
-    UC->>Out: Write(w, format, Input{Graph, Result, Request})
+    CLI->>Out: Write(w, format, Input{Graph, Result, Request})
     Note over Out: 未対応 format はここで error (何も書き出さない)
     Out->>Graph: 到達 node / edge の symbol を解決
     Graph-->>Out: Symbol / CallSite
     Note over Out: View を構築 (id 辞書順に sort。決定性の規約はここに集約)
     Out->>W: format に対応する Formatter が逐次書き出し<br/>(startNotFound / 到達なしも Formatter 内で分岐)
     W-->>Out: 書き込み結果
-    Out-->>UC: nil または error (書き込み失敗時)
-    UC-->>CLI: 結果
+    Out-->>CLI: nil または error (書き込み失敗時)
     CLI-->>User: 出力 (exit code は CLI が決める)
 ```
 

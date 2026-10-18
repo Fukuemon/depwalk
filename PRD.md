@@ -63,8 +63,7 @@ Spring の DI を経由する呼び出しも、実体のメソッドまでたど
 
 1. グラフの永続化（コミットの SHA の単位）
    - 再解析を避け、2 つの時点の差分に答えられるようにする。差分とは、その pull request で影響範囲がどう変わったかである。
-   - Core の実装基盤の ADR の「永続ストアを持たない」を変えるため、着手するときに ADR を書く。
-   - ADR-0002: [Core の実装基盤](adr/0002-core-implementation-foundation.md)
+   - [codebase.md の State Ownership](context/codebase.md#state-ownership) の「永続的なストアを持たない」を変えるため、着手するときに ADR を書く。
 2. CI との連携
    - SHA ごとのグラフを Artifact にし、pull request へ影響範囲をコメントする。
    - グラフの永続化の上に乗る。永続化がないと毎回すべてを解析することになり、実用に耐えない。
@@ -73,11 +72,12 @@ Spring の DI を経由する呼び出しも、実体のメソッドまでたど
 
 - CLI の使い勝手: 解析中の進捗の表示、method selector が曖昧なときの候補の選択、結果の絞り込み、診断の要約の表示
 - 解析の精度の残り
-  - 外部のライブラリの型を根拠にする chain と、一意に絞れない overload が、未解決のまま残る。実環境で測ると、全 call site の約 1.3% にあたる。
+  - 外部のライブラリの型を根拠にする chain と、一意に絞れない overload が、未解決のまま残る。実環境で測ると、全 call site の 1.3%〜2.3% にあたる。
+    - ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めず、候補と未解決理由を観測可能にする](adr/0004-defer-runtime-call-tracing.md)
   - どちらも診断として観測できる。推測で埋めると誤った edge を作るため、取りにいくかは費用対効果で判断する。
 - 可視化の再導入
   - 形式は決めない。DOT と Mermaid は外部のレンダラへの依存を利用者に負わせるため、自己完結した単一の HTML を含めて選び直す。
-  - ADR-0008: [可視化の出力をスコープから外す](adr/0008-defer-graph-visualization.md)
+  - ADR-0008: [可視化の出力（DOT / Mermaid）をスコープから外し、解析の精度と永続化を先に進める](adr/0008-defer-graph-visualization.md)
 - 多言語への対応: Kotlin、TypeScript、Vue、Go
 
 各項目の完了の条件は、着手するときに決める。
@@ -88,11 +88,11 @@ Spring の DI を経由する呼び出しも、実体のメソッドまでたど
 
 - 実行時の計測: Runtime Trace、APM
 - 動的な解析: Reflection の解析、AspectJ の Runtime の解析、実行時の Proxy の解析
-  - ADR-0004: [動的な呼び出しの完全な追跡を初期のスコープに含めない](adr/0004-defer-runtime-call-tracing.md)
+  - ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めず、候補と未解決理由を観測可能にする](adr/0004-defer-runtime-call-tracing.md)
 - CLI のほかの提供形態: IDE の Plugin、Web UI
 - グラフの可視化
   - 形式を決めないまま、将来の課題として残す。解析の精度と永続化を優先する。
-  - ADR-0008: [可視化の出力をスコープから外す](adr/0008-defer-graph-visualization.md)
+  - ADR-0008: [可視化の出力（DOT / Mermaid）をスコープから外し、解析の精度と永続化を先に進める](adr/0008-defer-graph-visualization.md)
 
 ## User Stories
 
