@@ -105,7 +105,8 @@ Core の共有の設定は、Go の標準のコマンドを優先し、専用の
 
 Git のフックで動かすコマンドは `lefthook.yml` にある。  
 チェックの内容と直し方は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。  
-`lefthook.yml` を書くときの注意（`stage_fixed`、`&&` でつなぐこと、depguard の glob）は、`lefthook.yml` のコメントにある。
+lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数のコマンドは `&&` でつなぐ。  
+`lefthook.yml` を書くときのほかの注意（`stage_fixed`、depguard の glob）は、`lefthook.yml` のコメントにある。
 
 ## Check Exclusions
 

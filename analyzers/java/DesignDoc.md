@@ -47,7 +47,7 @@ Java Analyzer は、[PRD の Success Metrics](../../PRD.md#success-metrics) の�
 - 抽出の結果を、Analyzer Protocol の JSONL のスキーマ（`methodSymbol`、`callEdge`、`diagnostic`、`error`）で stdout へ出力する。
 - `analysisRequest` を stdin から受け取り、process contract（exit code、stderr）を守る。
 - Java Analyzer の build と配布の形（Gradle と Shadow のプラグイン、単一の fat jar）
-- Core からの起動の方法（CLI の flag と環境変数による起動のコマンドの解決）
+- Core から起動される形（fat jar を `java -jar` で起動する）
 - 未解決の symbol と部分的な解析を表す `diagnostic`
 - SootUp による型の階層の補完、Interface Dispatch と Override の解決、Spring の Bean と DI の解決、候補の edge の統合の契約
 - single-project と multi-project を同じ request で扱う Gradle の build model の discovery と、source root の明示の override
@@ -70,6 +70,8 @@ Java Analyzer は、[PRD の Success Metrics](../../PRD.md#success-metrics) の�
   - ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めない](../../adr/0004-defer-runtime-call-tracing.md)
 - CLI の引数の完全な仕様（出力の形式、探索の方向、深さの上限などの flag の体系）。
   - [CLI の Design Doc](../../core/internal/cli/DesignDoc.md) が持つ。
+- CLI の flag と環境変数による起動のコマンドの解決。
+  - [CLI の Design Doc の「Analyzer の起動コマンドの解決と分割」](../../core/internal/cli/DesignDoc.md#analyzer-の起動コマンドの解決と分割) が持つ。
 
 ## Design
 
@@ -506,6 +508,11 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - build model は、Tooling API が構造的に adapt する interface である。
     - そのため fake でも、root の検証と依存する context の id の導出は本番のコードが行う。
   - model の取得（Tooling API、Gradle の daemon、provider の配布）を実際の Gradle で確かめるテストは、[context/testing.md](../../context/testing.md#test-types-and-guarantees) にある。
+- Gradle の output の破棄と、negative fixture の非漏洩
+  - `CredentialIsolationTest` は、実際の Gradle で build logic が出した credential 相当の marker が、Protocol、stderr、生成物に現れないことを確かめる。
+  - Gradle の失敗の message の URL が出力に現れないことは、fake の Tooling API で確かめる。
+  - Gradle と daemon の JVM の anchor の matrix は、`gradleCompatibilityTest` で確かめる。
+  - 観点は [discovery の文書の Verification](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification) にある。
 
 起動のコマンドの解決と `--analyzer-meta` の合成を、fake analyzer で確かめる観点は [CLI の Design Doc の Verification](../../core/internal/cli/DesignDoc.md#verification) にある。
 
@@ -528,9 +535,6 @@ JUnit で、`analyzers/java/` の中で確かめる。
 - 自動 discovery と明示の override の graph が一致すること
   - fixture は、app、service、repository の 3 つの project、変えた `projectDir`、独自の source のディレクトリ、project の間の呼び出しと DI を含む。
 - テスト専用の透過の proxy を介して、実際の Core の CLI と実際の Analyzer の jar をつなぎ、request、raw の graph、CLI の終了の状態を required gate で比べること
-- Gradle の output の破棄と、credential、URL、絶対 path を含む negative fixture の非漏洩を検証すること
-  - Gradle と daemon の JVM の anchor の matrix は、`gradleCompatibilityTest` で確かめる。
-  - 観点は [discovery の文書の Verification](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification) にある。
 - **Spring Boot の fixture**: `testdata/fixtures/java/spring-project/` に、単一の source root の Spring の fixture を置く。
   - DI（constructor、field、setter の injection）、stereotype、`@Qualifier`、`@Primary` を含む。
   - 条件付きの Bean（`@Profile`、`@ConditionalOnProperty`）と、Spring Data の Repository を含む。
@@ -571,6 +575,12 @@ SLO は、計測の結果から次の規則で導く。
 - 最大 RSS: warm の 3 回の最大値の 1.25 倍を、64 MiB の単位で切り上げる。
 
 小さい fixture では JVM の起動と Gradle の daemon の寄与が大きいため、値は「小さいプロジェクトでの下限に近い値」として扱う。
+
+| 方式                      | latency SLO | 最大 RSS SLO |
+| ------------------------- | ----------- | ------------ |
+| 明示 single-root (8 file) | 3.0s 以下   | 512 MiB 以下 |
+| single-project discovery  | 4.5s 以下   | 576 MiB 以下 |
+| multi-module discovery    | 4.0s 以下   | 512 MiB 以下 |
 
 SLO は、計測した fixture と環境に対する手動のリリースの目標にする。  
 **時間と RSS は、機械的なテストの gate にしない。**  

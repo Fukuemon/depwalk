@@ -47,16 +47,17 @@ verified_commit: unverified
   - `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡す。
   - metadata がそのまま出力に出ることを見るときは、`--format json` の `nodes[].metadata` と `edges[].metadata` を比べる。
 
-Gradle の model の取得（Tooling API、daemon、provider の配布）を、実際の Gradle を起動して確かめるテストは次の 3 つ。
+Gradle の model の取得（Tooling API、daemon、provider の配布）を、実際の Gradle を起動して確かめるテストは次の 4 つ。
 
-| テスト                                           | 層                               | 確かめること                                                                             | CI                 |
-| ------------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- | ------------------ |
-| `TestGradleMultiProjectCLI`                      | E2E の CLI 層（`core/e2e/`）     | 実際の Core の CLI と Analyzer の jar の結合と、graph の全体の一致                       | E2E の job で動く  |
-| `MultiModuleFixtureEquivalenceTest`              | Java の unit（`./gradlew test`） | fat jar を子のプロセスで起動し、自動 discovery と明示の override の graph が一致すること | Java の job で動く |
-| `gradleCompatibilityTest`（tag `gradle-compat`） | Java の unit（専用の task）      | anchor ごとの Gradle と daemon の JVM で、model を取得できること                         | 動かない           |
+| テスト                                                                                 | 層                               | 確かめること                                                                             | CI                 |
+| -------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- | ------------------ |
+| `TestGradleMultiProjectCLI`                                                            | E2E の CLI 層（`core/e2e/`）     | 実際の Core の CLI と Analyzer の jar の結合と、graph の全体の一致                       | E2E の job で動く  |
+| `MultiModuleFixtureEquivalenceTest`                                                    | Java の unit（`./gradlew test`） | fat jar を子のプロセスで起動し、自動 discovery と明示の override の graph が一致すること | Java の job で動く |
+| `CredentialIsolationTest`                                                              | Java の unit（`./gradlew test`） | build logic の出力が、Protocol、stderr、生成物に漏れないこと                             | Java の job で動く |
+| `GradleCompatibilityMatrixTest`（task `gradleCompatibilityTest`、tag `gradle-compat`） | Java の unit（専用の task）      | anchor ごとの Gradle と daemon の JVM で、model を取得できること                         | 動かない           |
 
-- `./gradlew test` は tag `gradle-compat` のテストを除くため、`gradleCompatibilityTest` は専用の task で実行する。
-- ほかの Java の unit テストは、実際の Gradle を起動しない。
+- `./gradlew test` は tag `gradle-compat` のテストを除くため、`GradleCompatibilityMatrixTest` は専用の task の `gradleCompatibilityTest` で実行する。
+- 上の表のほかの Java の unit テストは、実際の Gradle を起動しない。
   - 複数の context（project の間の依存）が要るテストは、in-memory の fake の build model から、本番と同じ context の構築を通して解析の pipeline を動かす。
   - 境界の詳細は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 
@@ -86,6 +87,9 @@ Gradle の model の取得（Tooling API、daemon、provider の配布）を、�
 - 実際の Analyzer の jar を起動するのは、E2E と、Java の `MultiModuleFixtureEquivalenceTest` である。どちらも Analyzer の JDK と build 済みの fat jar を要る。JDK のバージョンは `mise.toml` にある。
   - Java の側は、`./gradlew test` が先に fat jar を作る。
   - CI は、JVM の要らない Go の job と、JDK と Gradle の build を使う Java と E2E の job に分ける。
+- `./gradlew test` は、実際の Gradle を起動するテストのために、ネットワークを要る。
+  - Tooling API が Gradle 9.7.1 の distribution を取得し、`multi-module-spring-project` の build が Maven Central から依存の jar を取得する。
+  - どちらも、Gradle の user home に cache があれば取得しない。
 - E2E は、JDK か fat jar がないと skip する。`DEPWALK_E2E_REQUIRED=1` を与えると、skip せずに失敗する。
   - CI の E2E の job はこの変数を与える。前提が欠けたまま、assertion を 1 つも実行せずに job が成功するのを防ぐ。
 - POSIX の shell に依存する fake analyzer を使うテストは、JDK と jar の有無ではなく、`runtime.GOOS == "windows"` で skip する。
@@ -124,8 +128,9 @@ framework の本物の jar を fixture に持ち込むかは、fixture の種類
   - Spring や MyBatis への依存は、annotation と interface の最小の stub のソースを fixture の中に置いて解決させる。
   - 例は `analyzers/java/src/test/resources/fixtures/event/org/springframework/...` である。
   - inline workspace の例は、`core/e2e/event_edges_cli_test.go` が書き出す stub である。
-- `testdata/fixtures/java/` の Gradle の fixture は、本物の Spring、MyBatis、Lombok の jar に依存する。
-  - 対象は `spring-project/` と `multi-module-spring-project/` である。
+- `testdata/fixtures/java/` の Gradle の fixture は、本物の framework の jar に依存する。fixture ごとの依存は次のとおり。
+  - `spring-project/`: Spring Boot の autoconfigure、Spring Data Commons、MyBatis、Lombok
+  - `multi-module-spring-project/`: Spring Context。中にある独立した build の `patterns/` は Spring に依存せず、`lib` だけが Lombok に依存する。
   - jar のバージョンは、各 fixture の build ファイルで固定する。
   - この fixture で確かめる観点は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 

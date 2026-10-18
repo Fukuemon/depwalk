@@ -41,6 +41,8 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
   - 表示の規則と View への変換は [Output の Design Doc](../output/DesignDoc.md) が持つ。
 - Core の実装の言語、package manager、test framework
 - Reflection、AspectJ の Runtime、実行時の Proxy の動的な解析
+- capability の handshake と negotiation。1 つの request に 1 つのプロセスを起動する形に限る。
+  - ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
 ## Design
 

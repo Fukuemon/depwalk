@@ -1,11 +1,12 @@
 ---
 type: feature-design
 title: CLI Interface
-description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置、終了コード、出力先、CLI のプロセスの E2E の観点
+description: analyze コマンドの flag の体系、method selector の書式、CLI と use case と ACL の責務の配置。起動コマンドの解決と分割、`--analyzer-meta` の合成、終了コード、出力先、CLI のプロセスの E2E の観点
 status: stable
 governs:
   - core/internal/cli
   - core/cmd/depwalk
+  - core/internal/analyze
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
@@ -24,6 +25,7 @@ CLI は、traversal、output、解析のパイプラインを、`analyze` コマ
 - コマンドの構造と flag の体系
 - method selector の書式
 - CLI の層、analyze の use case、ACL の責務の配置
+- 起動コマンドの解決と分割、`--analyzer-meta` の合成
 - 終了コードの体系と出力先の規約
 - CLI のプロセスの E2E で確かめる観点
 
@@ -150,8 +152,9 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
 - `core/cmd/depwalk/main.go`: `main` の関数。`cli` だけに依存する。
 - `core/internal/cli/root.go`: root のコマンドと、終了コードの判別（`ExitCode`）
 - `core/internal/cli/analyze.go`: `analyze` コマンドと flag の定義、入力の検証、package の配線、Analyzer の失敗の表示（`renderAnalyzerFailure`）
-- `core/internal/cli/analyzerlaunch.go`: Analyzer の起動コマンドの解決
+- `core/internal/cli/analyzerlaunch.go`: Analyzer の起動コマンドの解決と分割
 - `core/internal/cli/errors.go`: flag の入力エラーの型（`inputError`）
+- `core/internal/analyze/metadata.go`: `--analyzer-meta` の合成（`BuildMetadata`）
 
 ## Verification
 
