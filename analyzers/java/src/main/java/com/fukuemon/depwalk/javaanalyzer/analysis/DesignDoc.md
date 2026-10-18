@@ -219,10 +219,12 @@ solver の前に、resolution と独立した visitor で、call を inventory �
 allowlist の外の resolver の failure は、`JAVA_INTERNAL_ERROR` の request fatal にする。  
 1 つの call の symbol、edge、ledger の更新は原子的に行い、中途半端な record を出さない。
 
-call site に属さない次の 2 つの失敗も、同じ ledger に call site の外の欠けとして記録する。
+call site に属さない次の 2 つの失敗も、outcome ledger とは別の内部の ledger に、call site の外の欠けとして記録する。
 
 - メソッドか constructor の宣言の resolve の失敗。その宣言の node を出さず、reason を `unresolved-declaration` にする。
   - 同じ宣言を複数の箇所から記録しても、1 件にまとめる。
+  - 宣言は、path と、宣言の開始の行と列で識別する。同じ行に並ぶ overload も別の宣言として数える。
+  - 開始の位置を持たない宣言は識別できないので、まとめずに記録ごとに 1 件と数え、`sourceLocation` を省く。
 - first pass の Spring DI の索引で起きた例外。その file の索引を見送り、reason を `spring-di-index-failed` にする。
 
 Spring DI の注入点の候補が 0 件のときは、この欠けに数えない。  
@@ -249,7 +251,7 @@ index は、generator に固有の annotation の名前に依存せず、compile
 - 各共通の `error.details` には、source location、元の diagnostic の code と message、opaque な metadata を自己完結の形で含める。
   - opaque な metadata が持つのは、reason、call kind、判明済みの target、candidate である。
   - この内容は、top-level の metadata の total と reasonCounts と一致させる。
-- call site の外の欠けは、未解決の call の後に、path、行、reason、target の順で並べる。
+- call site の外の欠けは、未解決の call の後に、path、開始の行、開始の列、reason、target の順で並べる。
   - opaque な metadata が持つのは、reason、判明済みの target（宣言の名前）、例外のクラスの名前である。
   - total と reasonCounts には、この欠けも数える。
 - `silentOmission` は常に 0 でなければならない。

@@ -11,6 +11,7 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.graph.GraphAccumulator;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.ReachabilityFilter;
 import com.fukuemon.depwalk.javaanalyzer.analysis.graph.SourceMethodIndex;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.AnalysisGapLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteOutcomeLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
@@ -94,7 +95,8 @@ public final class AnalysisRunner {
      * @param parsePreflightMillis 全 file parse pre-flight の所要時間 (通常解析と分離して計測)
      * @param contextBuildMillis context 別 TypeSolver / parser 構築の所要時間
      *     (段階別計測として通常解析と分離する)
-     * @param callSiteSummary call site ledger の総数と終端種別・理由別集計 (stderr 用)
+     * @param callSiteSummary call site ledger の総数と終端種別・理由別集計と、call site に属さない欠けの
+     *     理由別集計 (stderr 用)
      */
     public record RunStats(
             long analyzedFileCount,
@@ -194,6 +196,7 @@ public final class AnalysisRunner {
         CallSiteInventory inventory = new CallSiteInventory(workspaceRoot);
         WorkspaceSourceDeclarationIndex declIndex = new WorkspaceSourceDeclarationIndex(workspaceRoot);
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
+        AnalysisGapLedger gapLedger = new AnalysisGapLedger();
 
         // Spring Bean/注入点と候補 method の source location は compact な first-pass index に落とす。
         // CompilationUnit は各 iteration で破棄し、fullGraph の AST 逐次破棄契約を維持する。
@@ -212,19 +215,17 @@ public final class AnalysisRunner {
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
-                SourceLocation fileLocation = SourceLocation.of(
-                        RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString()), 1);
+                String recordPath = RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString());
                 accumulator.incrementUnresolved();
                 accumulator.addDiagnostic(Diagnostic.of(
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
                         "failed to index Spring DI metadata: " + e.getMessage(),
-                        fileLocation,
+                        SourceLocation.of(recordPath, 1),
                         null,
                         null));
-                ledger.recordSpringDiIndexFailure(
-                        JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(), fileLocation, e);
-                // Spring DI 索引に失敗した unit は source method 索引も見送る (従来の挙動)。
+                gapLedger.recordSpringDiIndexFailure(JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(), recordPath, e);
+                // Spring DI 索引に失敗した unit は source method 索引も見送る。
                 continue;
             }
             // SourceMethodIndex は method 単位で解決失敗を自前で握る (未登録のまま second pass の
@@ -251,6 +252,7 @@ public final class AnalysisRunner {
                     sourceMethodIndex,
                     springResult,
                     ledger,
+                    gapLedger,
                     declIndex,
                     bytecodeIndexByContext.get(context.id()),
                     reachable,
@@ -289,7 +291,7 @@ public final class AnalysisRunner {
         // 欠けが残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
-        List<CallSiteOutcomeLedger.AnalysisGap> gaps = ledger.analysisGaps();
+        List<AnalysisGapLedger.AnalysisGap> gaps = gapLedger.gaps();
         if ((!primary.isEmpty() || !gaps.isEmpty()) && !allowIncompleteAnalysis) {
             // fatal は先行 warning record を無効化するため、SootUp を利用できず
             // source-only で解析した context 数を upstream cause として error
@@ -312,7 +314,7 @@ public final class AnalysisRunner {
                 accumulator.unresolvedCount(),
                 preflightMillis,
                 contextBuildMillis,
-                ledger.summary());
+                callSiteSummary(ledger, gapLedger));
     }
 
     /** context 別 bytecode 索引の組 (いずれも key は context id)。 */
@@ -523,7 +525,7 @@ public final class AnalysisRunner {
 
     private static IncompleteAnalysisException incompleteAnalysis(
             Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary,
-            List<CallSiteOutcomeLedger.AnalysisGap> gaps,
+            List<AnalysisGapLedger.AnalysisGap> gaps,
             long sootUpUnavailableContexts) {
         List<FailureDetail> details = new ArrayList<>();
         Map<String, Long> reasonCounts = new TreeMap<>();
@@ -552,7 +554,7 @@ public final class AnalysisRunner {
                     metadata));
             reasonCounts.merge(outcome.code() + ":" + outcome.reason(), 1L, Long::sum);
         }
-        for (CallSiteOutcomeLedger.AnalysisGap gap : gaps) {
+        for (AnalysisGapLedger.AnalysisGap gap : gaps) {
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("reason", gap.reason());
             if (gap.target() != null) {
@@ -573,6 +575,12 @@ public final class AnalysisRunner {
                         + " after all resolvers and bytecode recovery",
                 details,
                 topMetadata);
+    }
+
+    /** call site の集計の後ろに、call site に属さない欠けの集計 ({@code gap[...]}) を続ける。 */
+    private static String callSiteSummary(CallSiteOutcomeLedger ledger, AnalysisGapLedger gapLedger) {
+        String gapSummary = gapLedger.summary();
+        return gapSummary.isEmpty() ? ledger.summary() : ledger.summary() + " " + gapSummary;
     }
 
     private static boolean hasEntrypoints(AnalysisRequest request) {

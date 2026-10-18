@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,7 +26,7 @@ class DeclarationResolutionTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("解決できないメソッド / constructor 宣言があるとき、宣言ごとの details を載せて解析を fatal にする")
+    @DisplayName("解決できないメソッド / constructor 宣言があるとき、field の初期化子の caller としても失敗した constructor を含め、宣言ごとに 1 件の details を載せて解析を fatal にする")
     void unresolvableMethodAndConstructorDeclarationsFailTheRequest() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
                 FIXTURE, AnalysisTestSupport.classpathMetadata(), null, null, null, null);
@@ -54,7 +55,13 @@ class DeclarationResolutionTest {
 
         Map<String, Object> metadata = (Map<String, Object>) errors.get(0).get("metadata");
         Map<String, Object> reasonCounts = (Map<String, Object>) metadata.get("reasonCounts");
-        assertEquals(2, ((Number) reasonCounts.get("JAVA_UNRESOLVED_SYMBOL:unresolved-declaration")).intValue());
+        // field の初期化子の呼び出しは、caller の constructor を resolve できないため unresolved-caller で残る。
+        assertEquals(Map.of(
+                        "JAVA_UNRESOLVED_SYMBOL:unresolved-caller", 1L,
+                        "JAVA_UNRESOLVED_SYMBOL:unresolved-declaration", 2L),
+                reasonCounts.entrySet().stream().collect(Collectors.toMap(
+                        Map.Entry::getKey, e -> ((Number) e.getValue()).longValue())));
+        assertEquals(3, ((Number) metadata.get("total")).intValue());
         assertEquals(details.size(), ((Number) metadata.get("total")).intValue());
     }
 
@@ -73,6 +80,11 @@ class DeclarationResolutionTest {
                 .count();
         assertTrue(unresolvedDeclCount >= 2,
                 "expected JAVA_UNRESOLVED_SYMBOL/warning diagnostics for the broken method and constructor: " + diagnostics);
+        // constructor の resolve の失敗は、field の初期化子の走査と constructor 自身の走査の 2 回起きる。
+        assertEquals(2, diagnostics.stream()
+                        .filter(d -> "failed to resolve constructor declaration: BadDecl".equals(d.get("message")))
+                        .count(),
+                () -> "the constructor failure must be detected on both paths: " + diagnostics);
         assertTrue(ran.stderr().contains("gap[JAVA_UNRESOLVED_SYMBOL:unresolved-declaration]=2"),
                 () -> "callSiteSummary must report the unresolvable declarations: " + ran.stderr());
 

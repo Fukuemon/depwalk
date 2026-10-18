@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.AnalysisGapLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
@@ -84,6 +85,7 @@ public final class CallGraphBuilder {
     private final ReachableOwners reachableOwners;
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
+    private final AnalysisGapLedger gapLedger;
     private final WorkspaceSourceDeclarationIndex declIndex;
     /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
     private String currentPath;
@@ -92,6 +94,7 @@ public final class CallGraphBuilder {
      * @param workspaceRoot source location を相対化する workspace root (絶対・正規化済み)
      * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する完全性 gate 用 ledger。
      *     どの経路でも call site 1 件につき必ず 1 つの終端を commit する
+     * @param gapLedger resolve できない宣言を、call site に属さない欠けとして記録する完全性 gate 用 ledger
      * @param declIndex workspace の source 宣言から型の所有 context と source location を引く索引。
      *     bytecode 救済の対象を workspace source を持つ型に限定する判定に使う
      * @param bytecodeIndex 呼び出し元 context の classpath 視点で bytecode member
@@ -108,6 +111,7 @@ public final class CallGraphBuilder {
             SourceMethodIndex sourceMethodIndex,
             SpringDiIndex.Result springResult,
             CallSiteOutcomeLedger ledger,
+            AnalysisGapLedger gapLedger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
             Set<String> reachableContextIds,
@@ -122,6 +126,7 @@ public final class CallGraphBuilder {
                 new MethodSymbolFactory(accumulator, sourceLocations, sourceMethodIndex, reachableOwners);
         this.bytecodeRescue = new BytecodeRescue(sootUpIndex, declIndex, bytecodeIndex, reachableOwners);
         this.ledger = ledger;
+        this.gapLedger = gapLedger;
         this.declIndex = declIndex;
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
@@ -296,11 +301,8 @@ public final class CallGraphBuilder {
     /** 宣言の resolve の失敗を、warning の診断と、完全性 gate の対象になる ledger の欠けの両方に記録する。 */
     private void reportUnresolvedDeclaration(Node declNode, String declarationName, String message, Throwable failure) {
         diagnostics.reportUnresolvedDeclaration(declNode, message);
-        ledger.recordUnresolvedDeclaration(
-                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
-                sourceLocations.sourceLocationOf(declNode),
-                declarationName,
-                failure);
+        gapLedger.recordUnresolvedDeclaration(
+                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(), currentPath, declNode, declarationName, failure);
     }
 
     /**
