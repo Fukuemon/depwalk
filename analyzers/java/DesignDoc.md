@@ -64,8 +64,7 @@ Java Analyzer は、[PRD の Success Metrics](../../PRD.md#success-metrics) の�
 - 出力の整形。
   - [Output の Design Doc](../../core/internal/output/DesignDoc.md) が持つ。
 - SootUp への call graph の生成の委任。
-  - SootUp は、型の階層、override、interface の実装の候補の索引にだけ使う。
-  - ADR-0005: [SootUp と Spring DI の解決を段階導入する](../../adr/0005-adopt-sootup-and-spring-di-resolution.md)
+  - SootUp に任せる範囲は「解析の 3 段」の節にある。
 - Reflection、AspectJ Runtime、実行時の Proxy の動的な解析。
   - 全体の Non-Goals に当たる。
   - ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めない](../../adr/0004-defer-runtime-call-tracing.md)
@@ -191,7 +190,8 @@ flowchart TB
   - 段階別の package のうち、`graph` と `spring` は互いに import する。
     - `graph` は `spring` の索引（`SpringDiIndex`、`EventListenerIndex`、`EntryPointIndex`）を読む。
     - `spring` の `SpringDiagnosticEmitter` は、`graph` の `GraphAccumulator` へ diagnostic を足す。
-  - `normalize` は、段階を横断する naming の util である。
+  - `normalize` は、段階を横断する naming の util で、実行の順に位置を持たない。
+  - `scope` は glob と path の helper だけを持つ。scope の列挙は `analysis/context` の `ContextScope` が行う。
 - 外部のライブラリは 3 段に分けて隔離する。
   - SootUp は `analysis/sootup` の adapter に完全に封じ込める。
     - facade が自前の型で公開し、他の package から `sootup.*` を import しない。
@@ -201,20 +201,26 @@ flowchart TB
 - 依存の境界は ArchUnit の JUnit のテストで機械的にチェックする。
   - import してよい範囲とチェックの実行点は [codebase.md の Dependency Rules](../../context/codebase.md#dependency-rules) にある。
 
-`AnalysisRunner` が実行する段階の順は次のとおり。
+`AnalysisRunner` が実行する段階の順と、各段階を担う package は次のとおり。
 
-1. workspaceRoot の real path 化と scope の列挙
-2. bytecode の索引の構築（context ごとの SootUp の型の階層と、project の bytecode member）
-3. context の構築（context ごとの TypeSolver、parser、AST の injector の生成）
-4. parse の pre-flight と、成功した後の context の warning の出力
-5. attribution の準備（`liftExcludePackages` の解決と、帰属型の resolver の生成）
-6. first pass。
-   - 全 file を parse し、inventory、宣言の索引、entry point、event listener、callable、source method、Spring DI を索引にする。
-7. builder の構築（context ごとの CallGraphBuilder）
-8. second pass。
-   - 全 file を再び parse し、bytecode にだけある member を AST へ注入して、CallGraphBuilder で呼び出しを解析する。
-9. completeness gate。
-   - `fullGraph` の io の出力は second pass の中で逐次起きるため、このチェックより先に始まる。
+| 順  | 段階                                                                                       | package                                                      |
+| --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| 1   | workspaceRoot の real path 化と scope の列挙                                               | `analysis/context`（`ContextScope`）、`analysis/scope`       |
+| 2   | bytecode の索引の構築（context ごとの SootUp の型の階層と、project の bytecode member）    | `analysis/sootup`、`analysis/completeness`                   |
+| 3   | context の構築（context ごとの TypeSolver、parser、AST の injector の生成）                | `analysis/context`、`analysis/augment`                       |
+| 4   | parse の pre-flight と、成功した後の context の warning の出力                             | `analysis/context`（`ParsePreflight`）、`io`                 |
+| 5   | attribution の準備（`liftExcludePackages` の解決と、帰属型の resolver の生成）             | `analysis/attribution`                                       |
+| 6   | first pass（索引の構築と Spring DI の diagnostic）                                         | `analysis/completeness`、`analysis/spring`、`analysis/graph` |
+| 7   | builder の構築（context ごとの `CallGraphBuilder`）                                        | `analysis/graph`                                             |
+| 8   | second pass（bytecode にだけある member の AST への注入と、`CallGraphBuilder` による解析） | `analysis/augment`、`analysis/graph`、`io`                   |
+| 9   | completeness gate                                                                          | `analysis/completeness`                                      |
+
+- 段 2 の bytecode の索引は、段 3 の TypeSolver が bytecode member の合成に使うため、段 3 より先に作る。
+  - 合成の規則は [解析エンジンの文書の「solver の層での bytecode member の合成」](src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/DesignDoc.md#solver-の層での-bytecode-member-の合成) にある。
+- 段 6 の first pass は、全 file を parse し、inventory、宣言の索引、entry point、event listener、callable、source method、Spring DI を索引にする。
+- 段 8 の second pass は、全 file を再び parse する。
+- `fullGraph` の record は、段 8 の中で file ごとに逐次に出力する。そのため、出力は段 9 の completeness gate より先に始まる。
+- `reachableFromEntrypoints` の record は、段 8 の後、段 9 の前にまとめて出力する。
 
 ### 起動から結果を返すまで
 
@@ -336,7 +342,6 @@ flowchart TD
     Merge --> Output
 ```
 
-SootUp は edge を直接作らず、候補の索引だけを提供する。  
 Spring の絞り込みの後に、JavaParser の側で候補の edge を作り、同じ候補の provenance を統合する。  
 宣言型 edge は、どの分岐でも残す。  
 注入点が Bean の候補を持つ場合は Bean の候補だけを出す。注入点がないか、Bean の定義が見つからない（unresolved）場合は SootUp の候補を出す。runtime-provided の型では、候補の edge を出さない。
@@ -349,8 +354,7 @@ Spring の絞り込みの後に、JavaParser の側で候補の edge を作り�
 - SootUp と Spring の解析: SootUp が型の階層、Interface Dispatch、Override の候補を補い、Spring の Bean と DI の解決が候補を絞り込む。
   - これで Spring の DI を経由する呼び出し先の解決を満たす。
 
-SootUp は、型の階層、override、interface の実装の候補の索引にだけ使い、call graph の生成は任せない。  
-view の構築を lazy にする規則は「性能の方針」の節にある。
+SootUp の view を lazy に構築する規則は「性能の方針」の節にある。
 
 Lombok が生成するコンストラクタ（`@AllArgsConstructor`、`@RequiredArgsConstructor` など）は、ソースからは見えない。  
 そのため、SootUp が bytecode の型の階層を引く対象に、自分のプロジェクトの compile 済みの class を含めて解決する。
@@ -431,16 +435,14 @@ ADR-0004: [動的呼び出しの完全追跡を初期スコープに含めない
 
 ### 起動の契約
 
-Core は、`--analyzer-cmd`（CLI の flag）、`DEPWALK_ANALYZER_CMD`（環境変数）の順で、Analyzer の起動のコマンドの文字列を解決する。  
-どちらも指定がない場合は、実行の前に validation error で拒否する。  
-解決した文字列は、shell を介さずに shell-word で分割して exec する。  
-shell injection を避けるためである。  
-Core は `java`、jar、JVM の存在を知らず、言語に固有の分岐と path の解決の規約を持ち込まない。  
+Java Analyzer は、Core が解決した起動コマンドで、独立したプロセスとして起動する。  
+起動コマンドを解決する順序と分割の規則は、[CLI の Design Doc の「Analyzer の起動コマンドの解決と分割」](../../core/internal/cli/DesignDoc.md#analyzer-の起動コマンドの解決と分割) にある。  
 ADR-0003: [Analyzer 起動コマンドを言語非依存な文字列として解決する](../../adr/0003-analyzer-command-resolution.md)
 
 metadata の受け渡しも、同じ言語非依存の原則に従う。  
-Core は `--analyzer-meta key=value` を `analysisRequest.metadata` へ素通しするだけで、key と value の意味を解釈しない。  
-合成の規則と Java に固有の key は [Protocol への写像の文書](src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol/DesignDoc.md) にある。
+Core は `--analyzer-meta key=value` を `analysisRequest.metadata` へ渡すだけで、key と value の意味を解釈しない。  
+Core が metadata を組み立てる規則は [CLI の Design Doc の「`--analyzer-meta` の合成」](../../core/internal/cli/DesignDoc.md#--analyzer-meta-の合成) にある。  
+Java に固有の key は [Protocol への写像の文書](src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol/DesignDoc.md#metadata-契約) にある。
 
 ### チェック
 
@@ -476,7 +478,7 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - 明示の `sourceRoots` の方式での classpath の key の不在、classpath の entry の欠落と読み取り不能
   - `liftExcludePackages` が文字列の配列であること（空の配列は「除外なし」として正当）
   - `allowIncompleteAnalysis` が要素 1 の `["true"]` か `["false"]` であること
-  - `gradleJavaHome` が要素 1 の空でない string で、実在する directory で、`bin/java` が実行できること（自動 discovery の方式でだけ解釈する）
+  - `gradleJavaHome` の受理と拒否。規則は [discovery の文書](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#daemon-の-jvm-の明示の指定) にある。
 - discovery の context
   - explicit と auto の排他の validation、root の正規化、重複、包含、realpath の境界
   - custom model、main source set、project の依存の到達性、context ごとの language level と preview
@@ -499,27 +501,13 @@ JUnit で、`analyzers/java/` の中で確かめる。
 - 同じ compilation unit の中での、bytecode にだけある member の AST への注入と、暗黙の宣言を注入しないこと
 - 型伝播救済層の generic の前進の導出
   - chain link の型引数の伝播、固定表の適用の範囲、`java.lang.Object` での打ち切り
-- `gradleJavaHome` の受理と拒否
-  - 要素 1 の空でない string で、実在する directory で、`bin/java` が実行できれば受理する。
-  - それ以外は `JAVA_INVALID_REQUEST` にする。
-  - 明示の `sourceRoots` の方式では解釈しない。
 - **複数の context（依存する project の関係）を要する規則**（cross-module の bytecode の救済など）は、`MultiContextAnalysisTestSupport` で検証する。
   - in-memory の fake の build model から、本番の context の構築（`discoveredContexts`）を通し、`AnalysisRunner` を直接動かす。
   - build model は、Tooling API が構造的に adapt する interface である。
     - そのため fake でも、root の検証と依存する context の id の導出は本番のコードが行う。
-  - unit テストの範囲から外れるのは、model の取得（Tooling API、Gradle の daemon、provider の配布）だけである。
-  - model の取得は、実際の jar の E2E（`TestGradleMultiProjectCLI` など）が実際の Gradle で担う。
+  - model の取得（Tooling API、Gradle の daemon、provider の配布）を実際の Gradle で確かめるテストは、[context/testing.md](../../context/testing.md#test-types-and-guarantees) にある。
 
-### Go の process contract で確かめること
-
-fake analyzer を使い、JVM を要らない。
-
-- `--analyzer-cmd` と `DEPWALK_ANALYZER_CMD` の解決の順と、どちらもない場合の実行の前の拒否
-- `--analyzer-meta key=value` の合成の規則
-  - 1 回の指定は要素 1 の配列、繰り返しは指定の順の配列、空の値（`key=`）は空の配列
-  - `=` なしは validation error、value に `=` を含む指定は最初の `=` で分割する。
-- shell を介さない shell-word の分割で exec されること
-- contract テストの既存の観点（stdin の close、逐次の parse、stderr を parse しないこと、exit code）を再利用する。
+起動のコマンドの解決と `--analyzer-meta` の合成を、fake analyzer で確かめる観点は [CLI の Design Doc の Verification](../../core/internal/cli/DesignDoc.md#verification) にある。
 
 ### E2E で確かめること
 
@@ -563,8 +551,8 @@ fake analyzer を使い、JVM を要らない。
   - 検証したい表出だけを含む最小の構成にし、共有の fixture の変更でテストが失敗しないようにするためである。
 - **fixture の build と classpath の契約**:
   - `testdata/fixtures/java/spring-project/` は独立した Gradle の project にし、リポジトリの `analyzers/java/gradlew -p` で build する。
-  - fixture の `build.gradle.kts` は、Java の toolchain 25 と `options.release=21` を固定する。
-  - 同じく、Spring Boot Autoconfigure 4.1.0、Spring Data Commons 4.1.0、MyBatis 3.5.19、Lombok 1.18.46 を固定する。
+  - Java の toolchain と release、依存する framework の jar のバージョンは、fixture の `build.gradle.kts` で固定する。
+  - 本物の framework の jar を使う fixture の範囲は [context/testing.md の Mocking and Test Data](../../context/testing.md#mocking-and-test-data) にある。
   - `writeDepwalkClasspath` の task は、`build/classes/java/main` と `runtimeClasspath` の jar を `build/depwalk-classpath.txt` へ書く。
     - 書き方は、絶対 path、辞書順、1 行に 1 entry である。
   - Go の E2E は、その全行を `analysisRequest.metadata.classpath` に渡す。
@@ -577,19 +565,13 @@ stderr へは、discovery の終了の行の `discoveryMs` と、解析の終了
 解析の終了の行は、ほかに `analyzedFiles` と `unresolvedSymbols` を持つ。  
 model、resolution、graph の phase ごとの時間は記録しない。
 
-数値の目標は、計測の結果から次の規則で導く。
+SLO は、計測の結果から次の規則で導く。
 
 - latency: warm の wall の中央値の 1.5 倍を、0.5 秒の単位で切り上げる。
 - 最大 RSS: warm の 3 回の最大値の 1.25 倍を、64 MiB の単位で切り上げる。
 
 小さい fixture では JVM の起動と Gradle の daemon の寄与が大きいため、値は「小さいプロジェクトでの下限に近い値」として扱う。
 
-| 方式                      | 初回 wall | warm wall 3 回        | warm 中央値 | warm 最大 RSS                    | latency SLO | 最大 RSS SLO |
-| ------------------------- | --------- | --------------------- | ----------- | -------------------------------- | ----------- | ------------ |
-| 明示 single-root (8 file) | 1.78s     | 1.71s / 1.81s / 1.69s | 1.71s       | 418,873,344 bytes (約 399.5 MiB) | 3.0s 以下   | 512 MiB 以下 |
-| single-project discovery  | 3.52s     | 3.00s / 2.52s / 2.73s | 2.73s       | 445,415,424 bytes (約 424.8 MiB) | 4.5s 以下   | 576 MiB 以下 |
-| multi-module discovery    | 3.11s     | 2.51s / 2.64s / 2.49s | 2.51s       | 399,687,680 bytes (約 381.2 MiB) | 4.0s 以下   | 512 MiB 以下 |
-
-この SLO は、特定の fixture と計測の環境に対する手動のリリースの目標であり、**時間や RSS を機械的なテストの gate にはしない**。  
-呼び出し元の探索、呼び出し先の探索、出力の形式の CLI の E2E を required gate にする方針は保つ。  
+SLO は、計測した fixture と環境に対する手動のリリースの目標にする。  
+**時間と RSS は、機械的なテストの gate にしない。**  
 fixture の規模、Analyzer の runtime の JDK、Gradle の major が変わったら、測り直す。
