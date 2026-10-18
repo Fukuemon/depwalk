@@ -60,7 +60,8 @@ final class LocalDeclarations {
                     || parent instanceof ConstructorDeclaration
                     || parent instanceof InitializerDeclaration
                     || parent instanceof LambdaExpr) {
-                // 境界の外の同名の宣言は字句のスコープの外にあることがあり、結びつけると誤るので探さない。
+                // 境界の内側では、外側の local を class の member や lambda の parameter が隠していることがある。
+                // この探し方では隠しているかを判定できないので、境界の外は探さない。
                 return null;
             }
             child = parent;
