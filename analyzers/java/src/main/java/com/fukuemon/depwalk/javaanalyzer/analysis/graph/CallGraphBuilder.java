@@ -35,11 +35,8 @@ import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
-import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
-import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
-import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserConstructorDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 
@@ -58,13 +55,20 @@ import java.util.function.Supplier;
  * ({@link BinaryNames#forTypeLikeNode(Node)}) は、ファイルの visit 順序に依存しない純粋な構造計算で
  * 実装しているため、ファイル単位で 1 パス (declare + call-edge を同時に処理) で完結できる。
  *
- * <p>symbol 生成は {@link MethodSymbolFactory}、解決失敗時の bytecode 救済と external 分類の判定は
- * {@link BytecodeRescue}、その判定を試す順は {@link UnresolvedCallClassifier}、Spring DI 照合は
- * {@link SpringInjectionMatcher}、Spring イベントの突合と edge 生成は {@link EventEdgeEmitter}、診断は
- * {@link UnresolvedDiagnostics} が担い、本クラスは走査と各経路の調停に専念する。
+ * <p>本クラスが持つのは、AST の走査、呼び出しの種類ごとの振り分け、method call と object creation と
+ * 明示の constructor invocation の解決、call site の終端の ledger への記録である。call site 1 件に
+ * つき必ず 1 つの終端 (emitted / excluded / diagnostic) を記録し、完全性 gate から漏らさない。
  *
- * <p>以下の各経路は、call site 1 件につき必ず 1 つの終端 (emitted / excluded / diagnostic)
- * を ledger へ記録し、完全性 gate から漏らさない。
+ * <p>次の処理は持たず、それぞれの class に任せる。
+ * <ul>
+ *   <li>symbol の生成: {@link MethodSymbolFactory}
+ *   <li>解決の失敗の分類: {@link UnresolvedCallClassifier} と {@link BytecodeRescue}
+ *   <li>method reference と constructor reference の解決: {@link MethodReferenceResolver}
+ *   <li>dispatch の候補の edge: {@link DispatchCandidateEdgeEmitter}
+ *   <li>callable の実体への edge: {@link CallableInvocationEdgeEmitter}
+ *   <li>Spring イベントの listener への edge: {@link EventEdgeEmitter}
+ *   <li>診断の出力: {@link UnresolvedDiagnostics}
+ * </ul>
  */
 public final class CallGraphBuilder {
 
@@ -77,6 +81,7 @@ public final class CallGraphBuilder {
     private final EventEdgeEmitter eventEdges;
     private final DispatchCandidateEdgeEmitter dispatchCandidates;
     private final CallableInvocationEdgeEmitter callableInvocations;
+    private final MethodReferenceResolver methodReferences;
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
     private final AnalysisGapLedger gapLedger;
@@ -144,6 +149,14 @@ public final class CallGraphBuilder {
                 reachableOwners,
                 diagnostics,
                 this::edgeCallers);
+        this.methodReferences = new MethodReferenceResolver(
+                attributionResolver,
+                methodSymbols,
+                bytecodeRescue,
+                unresolvedCallClassifier,
+                diagnostics,
+                dispatchCandidates,
+                new Recorder());
     }
 
     /**
@@ -246,7 +259,7 @@ public final class CallGraphBuilder {
             return;
         }
         if (node instanceof MethodReferenceExpr mre) {
-            processMethodReference(mre, ctx);
+            methodReferences.process(mre, ctx);
             recurseChildren(node, ctx);
             return;
         }
@@ -356,7 +369,7 @@ public final class CallGraphBuilder {
             resolved = mce.resolve();
         } catch (RuntimeException e) {
             // resolve に失敗した call は callable invocation 追跡の対象外
-            // (emitCallableInvocationEdges は解決済み宣言を前提とする)。
+            // (CallableInvocationEdgeEmitter は解決済み宣言を前提とする)。
             rethrowUnlessIsolableResolutionFailure(e);
             recordResolutionFailure(
                     mce, CallSiteId.CallKind.METHOD_CALL, ctx,
@@ -469,189 +482,6 @@ public final class CallGraphBuilder {
         emitResolvedEdge(callNode, kind, ctx, calleeSymbol, CallEdgeMetadata.forCall(null, ctx.viaLambda()));
     }
 
-    /** {@code Foo::new} の source 上の識別子 ({@code getIdentifier()} が返す値)。 */
-    private static final String METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER = "new";
-
-    /**
-     * lambda と同じ囲みメソッドへの帰属規則を method reference
-     * ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) に適用する。囲みメソッドを caller、
-     * 通常の帰属規則を適用した参照先メソッドを callee とする {@code callEdge} を出力し、
-     * {@code metadata.viaMethodReference: true} で標識する (Core は metadata を解釈しないため契約変更なし)。
-     */
-    private void processMethodReference(MethodReferenceExpr mre, WalkContext ctx) {
-        if (METHOD_REFERENCE_CONSTRUCTOR_IDENTIFIER.equals(mre.getIdentifier())) {
-            processConstructorReference(mre, ctx);
-            return;
-        }
-
-        ResolvedMethodDeclaration resolved;
-        try {
-            resolved = mre.resolve();
-        } catch (RuntimeException e) {
-            rethrowUnlessIsolableResolutionFailure(e);
-            recordResolutionFailure(
-                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    unresolvedCallClassifier.classifyMethodReference(mre, () -> inferFunctionalInterfaceArity(mre)),
-                    new PendingDiagnostic(
-                            "unresolved-method-reference", mre.getIdentifier(),
-                            () -> diagnostics.metadataOf(
-                                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mre.getScope(), null)));
-            return;
-        }
-
-        SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
-        if (bytecodeOnly != null) {
-            emitBytecodeOnlyMember(
-                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    bytecodeOnly, bytecodeOnly.methodName(), "method");
-            return;
-        }
-
-        TypeSite declaringSite = AttributionSites.typeSiteOf(resolved.declaringType());
-        TypeSite receiverSite = AttributionSites.typeSiteOfExpression(mre.getScope());
-        AttributionResult attribution = attributionResolver.resolveMethod(declaringSite, receiverSite);
-        if (attribution.isOmitted()) {
-            commitExcluded(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, attribution);
-            return;
-        }
-
-        MethodSymbol calleeSymbol = methodSymbols.buildMethodSymbol(attribution, resolved);
-        String dispatch = AttributionSites.dispatchOf(resolved);
-        SourceLocation callSite = emitResolvedEdge(
-                mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, calleeSymbol,
-                CallEdgeMetadata.forMethodReference(dispatch, ctx.viaLambda()));
-        dispatchCandidates.emit(
-                resolved,
-                dispatch,
-                receiverSite,
-                mre,
-                ctx,
-                callSite,
-                calleeSymbol.methodId());
-    }
-
-    /**
-     * constructor reference ({@code Foo::new}) の扱い。constructor は継承されないため帰属型の
-     * 引き上げを行わず、scope 外なら出力しない。{@code JavaParser} は
-     * constructor reference の {@code resolve()} を未実装 ({@code UnsupportedOperationException}) と
-     * しているため、参照先型の constructor 一覧から候補を自前で選ぶ (単一候補ならそれを使い、複数候補
-     * のときは呼び出し先の関数型インタフェースの SAM 引数数で絞り込む)。
-     */
-    private void processConstructorReference(MethodReferenceExpr mre, WalkContext ctx) {
-        ResolvedReferenceTypeDeclaration scopeDecl;
-        try {
-            ResolvedType scopeType = mre.getScope().calculateResolvedType();
-            if (!scopeType.isReferenceType()) {
-                reportUnresolvedConstructorReferenceScope(mre, ctx, null);
-                return;
-            }
-            scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
-            if (scopeDecl == null) {
-                reportUnresolvedConstructorReferenceScope(mre, ctx, null);
-                return;
-            }
-        } catch (RuntimeException | LinkageError e) {
-            reportUnresolvedConstructorReferenceScope(mre, ctx, e);
-            return;
-        }
-
-        TypeSite declaringSite = AttributionSites.typeSiteOf(scopeDecl);
-        AttributionResult attribution = attributionResolver.resolveConstructor(declaringSite);
-        if (attribution.isOmitted()) {
-            commitExcluded(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, attribution);
-            return;
-        }
-
-        ResolvedConstructorDeclaration resolvedCtor = selectConstructor(scopeDecl.getConstructors(), mre);
-        if (resolvedCtor == null) {
-            // source 側の候補選択で決まらない場合、SAM arity の一意
-            // bytecode constructor (生成 constructor 含む) を救済してから
-            // diagnostic 化する。
-            BytecodeRescue.Rescue rescue =
-                    bytecodeRescue.constructorReferenceRescue(scopeDecl, () -> inferFunctionalInterfaceArity(mre));
-            if (rescue != null) {
-                emitBytecodeOnlyCall(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, rescue);
-                return;
-            }
-            reportAndCommitUnresolved(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "ambiguous-constructor-reference", mre.getScope().toString(),
-                    diagnostics.metadataOf(
-                            UnresolvedDiagnostics.PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null));
-            return;
-        }
-
-        SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolvedCtor);
-        if (injectedCtor != null) {
-            emitBytecodeOnlyMember(
-                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
-            return;
-        }
-
-        MethodSymbol calleeSymbol = methodSymbols.buildConstructorSymbol(attribution, resolvedCtor);
-        emitResolvedEdge(
-                mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, calleeSymbol,
-                CallEdgeMetadata.forMethodReference(null, ctx.viaLambda()));
-    }
-
-    /** constructor reference の参照先の型を solver が決められなかったことを診断と ledger に残す。 */
-    private void reportUnresolvedConstructorReferenceScope(MethodReferenceExpr mre, WalkContext ctx, Throwable failure) {
-        reportAndCommitUnresolved(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                "unresolved-constructor-reference", mre.getScope().toString(),
-                diagnostics.metadataOf(UnresolvedDiagnostics.PHASE_SOLVER_RESOLVE, failure, mre.getScope(), null));
-    }
-
-    /**
-     * constructor reference の候補選択。候補が 1 つならそれを使う。複数の overload があるときは、
-     * {@code mre} が代入される関数型インタフェースの SAM (single abstract method) の引数数に一致する
-     * ものを選ぶ。一致がゼロ / 複数 (曖昧) / SAM 引数数が推論できない場合は {@code null} (呼び出し側で
-     * {@code JAVA_UNRESOLVED_SYMBOL} diagnostic にする)。
-     */
-    private ResolvedConstructorDeclaration selectConstructor(List<ResolvedConstructorDeclaration> ctors, MethodReferenceExpr mre) {
-        if (ctors.isEmpty()) {
-            return null;
-        }
-        if (ctors.size() == 1) {
-            return ctors.get(0);
-        }
-        int arity = inferFunctionalInterfaceArity(mre);
-        if (arity < 0) {
-            return null;
-        }
-        ResolvedConstructorDeclaration match = null;
-        for (ResolvedConstructorDeclaration ctor : ctors) {
-            if (ctor.getNumberOfParams() == arity) {
-                if (match != null) {
-                    return null;
-                }
-                match = ctor;
-            }
-        }
-        return match;
-    }
-
-    /** {@code mre} が代入される関数型インタフェースの SAM の引数数。推論できなければ {@code -1}。 */
-    private int inferFunctionalInterfaceArity(MethodReferenceExpr mre) {
-        try {
-            ResolvedType functionalType = mre.calculateResolvedType();
-            if (!functionalType.isReferenceType()) {
-                return -1;
-            }
-            ResolvedReferenceTypeDeclaration decl = functionalType.asReferenceType().getTypeDeclaration().orElse(null);
-            if (decl == null) {
-                return -1;
-            }
-            for (MethodUsage methodUsage : decl.getAllMethods()) {
-                if (methodUsage.getDeclaration().isAbstract()) {
-                    return methodUsage.getNoParams();
-                }
-            }
-        } catch (RuntimeException | LinkageError e) {
-            return -1;
-        }
-        return -1;
-    }
-
     // ------------------------------------------------------------------
     // 呼び出し箇所ごとの結果台帳 (ledger)
     // ------------------------------------------------------------------
@@ -751,7 +581,7 @@ public final class CallGraphBuilder {
      * @param target ledger の target
      * @param metadata 診断の metadata。diagnostic に残すときだけ評価する
      */
-    private record PendingDiagnostic(String reason, String target, Supplier<Map<String, Object>> metadata) {
+    record PendingDiagnostic(String reason, String target, Supplier<Map<String, Object>> metadata) {
     }
 
     /**
@@ -781,6 +611,50 @@ public final class CallGraphBuilder {
                     target,
                     null,
                     diagnosticMetadata);
+        }
+    }
+
+    /** {@link MethodReferenceResolver} に、この builder の ledger への記録を使わせる。 */
+    private final class Recorder implements MethodReferenceResolver.CallSiteRecorder {
+
+        @Override
+        public SourceLocation emitResolvedEdge(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx, MethodSymbol calleeSymbol,
+                Map<String, Object> edgeMetadata) {
+            return CallGraphBuilder.this.emitResolvedEdge(callNode, kind, ctx, calleeSymbol, edgeMetadata);
+        }
+
+        @Override
+        public void commitExcluded(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx, AttributionResult attribution) {
+            CallGraphBuilder.this.commitExcluded(callNode, kind, ctx, attribution);
+        }
+
+        @Override
+        public void recordResolutionFailure(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx,
+                UnresolvedCallClassifier.Classification classification, PendingDiagnostic pending) {
+            CallGraphBuilder.this.recordResolutionFailure(callNode, kind, ctx, classification, pending);
+        }
+
+        @Override
+        public void reportAndCommitUnresolved(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target,
+                Map<String, Object> diagnosticMetadata) {
+            CallGraphBuilder.this.reportAndCommitUnresolved(callNode, kind, ctx, reason, target, diagnosticMetadata);
+        }
+
+        @Override
+        public void emitBytecodeOnlyMember(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx,
+                SootUpTypeHierarchyIndex.MethodCandidate candidate, String nameToken, String symbolKind) {
+            CallGraphBuilder.this.emitBytecodeOnlyMember(callNode, kind, ctx, candidate, nameToken, symbolKind);
+        }
+
+        @Override
+        public void emitBytecodeOnlyCall(
+                Node callNode, CallSiteId.CallKind kind, WalkContext ctx, BytecodeRescue.Rescue rescue) {
+            CallGraphBuilder.this.emitBytecodeOnlyCall(callNode, kind, ctx, rescue);
         }
     }
 
@@ -831,7 +705,7 @@ public final class CallGraphBuilder {
     }
 
     /** 解決結果が AST 注入の bytecode-only constructor ならその candidate。 */
-    private static SootUpTypeHierarchyIndex.MethodCandidate injectedConstructorCandidate(
+    static SootUpTypeHierarchyIndex.MethodCandidate injectedConstructorCandidate(
             ResolvedConstructorDeclaration resolved) {
         if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
                 && InjectedDeclarations.isInjected(declaration.getWrappedNode())) {
@@ -841,7 +715,7 @@ public final class CallGraphBuilder {
     }
 
     /** 解決結果が solver 合成または AST 注入の bytecode-only member ならその candidate。 */
-    private static SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnlyCandidate(
+    static SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnlyCandidate(
             ResolvedMethodDeclaration resolved) {
         if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
             return synthesized.candidate();
@@ -898,7 +772,7 @@ public final class CallGraphBuilder {
      * LinkageError はここへ来ず
      * Main の internal error 境界で処理される。
      */
-    private static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
+    static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
         String packageName = e.getClass().getPackageName();
         if (packageName.startsWith("com.github.javaparser.resolution")) {
             return;
