@@ -74,6 +74,49 @@ func TestAnalyzeCommandRejectsMissingAnalyzerCommand(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCommandRejectsInvalidAnalyzerInputWithExit2(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "missing-command", want: "analyzer command is required"},
+		{name: "empty-command", args: []string{"--analyzer-cmd=   "}, want: "must not be empty"},
+		{name: "unterminated-quote", args: []string{`--analyzer-cmd=java "-jar`}, want: "unterminated"},
+		{
+			name: "meta-without-equals",
+			args: []string{"--analyzer-cmd=/nonexistent/analyzer/binary", "--analyzer-meta=classpath"},
+			want: "key=value",
+		},
+		{
+			name: "meta-empty-key",
+			args: []string{"--analyzer-cmd=/nonexistent/analyzer/binary", "--analyzer-meta==value"},
+			want: "non-empty key",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 環境変数の起動コマンドを空にする。t.Setenv を使うので並列にしない。
+			t.Setenv(analyzerCmdEnv, "")
+			cmd := newAnalyzeCommand()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs(append([]string{t.TempDir(), "--language=java"}, tt.args...))
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute() error = nil, want input error")
+			}
+			if got := ExitCode(err); got != 2 {
+				t.Fatalf("ExitCode(error) = %d, want 2; error = %v", got, err)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %q, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestAnalyzeCommandPassesSourceRootsInOrder(t *testing.T) {
 	t.Parallel()
 

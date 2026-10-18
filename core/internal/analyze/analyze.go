@@ -74,7 +74,7 @@ func (r Runner) Run(opts Options) (Result, error) {
 
 	metadata, err := BuildMetadata(opts.AnalyzerMeta)
 	if err != nil {
-		return Result{}, err
+		return Result{}, &InputError{Err: err}
 	}
 
 	request := Request{
