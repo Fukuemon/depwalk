@@ -3,6 +3,7 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
 import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
+import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.AnalysisGapLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.InjectedDeclarations;
@@ -84,6 +85,7 @@ public final class CallGraphBuilder {
     private final ReachableOwners reachableOwners;
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
+    private final AnalysisGapLedger gapLedger;
     private final WorkspaceSourceDeclarationIndex declIndex;
     /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
     private String currentPath;
@@ -92,6 +94,7 @@ public final class CallGraphBuilder {
      * @param workspaceRoot source location を相対化する workspace root (絶対・正規化済み)
      * @param ledger call site ごとの終端 (emitted / excluded / diagnostic) を記録する完全性 gate 用 ledger。
      *     どの経路でも call site 1 件につき必ず 1 つの終端を commit する
+     * @param gapLedger resolve できない宣言を、call site に属さない欠けとして記録する完全性 gate 用 ledger
      * @param declIndex workspace の source 宣言から型の所有 context と source location を引く索引。
      *     bytecode 救済の対象を workspace source を持つ型に限定する判定に使う
      * @param bytecodeIndex 呼び出し元 context の classpath 視点で bytecode member
@@ -108,6 +111,7 @@ public final class CallGraphBuilder {
             SourceMethodIndex sourceMethodIndex,
             SpringDiIndex.Result springResult,
             CallSiteOutcomeLedger ledger,
+            AnalysisGapLedger gapLedger,
             WorkspaceSourceDeclarationIndex declIndex,
             ProjectBytecodeMemberIndex bytecodeIndex,
             Set<String> reachableContextIds,
@@ -122,6 +126,7 @@ public final class CallGraphBuilder {
                 new MethodSymbolFactory(accumulator, sourceLocations, sourceMethodIndex, reachableOwners);
         this.bytecodeRescue = new BytecodeRescue(sootUpIndex, declIndex, bytecodeIndex, reachableOwners);
         this.ledger = ledger;
+        this.gapLedger = gapLedger;
         this.declIndex = declIndex;
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
@@ -181,6 +186,7 @@ public final class CallGraphBuilder {
                     () -> methodSymbols.buildMethodSymbol(
                             AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
                             md.resolve()),
+                    md.getNameAsString(),
                     "failed to resolve method declaration: " + md.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.methodCallerId(ctx.enclosingTypeNode(), md, currentPath));
             return;
@@ -196,6 +202,7 @@ public final class CallGraphBuilder {
                     () -> methodSymbols.buildConstructorSymbol(
                             AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
                             cd.resolve()),
+                    cd.getNameAsString(),
                     "failed to resolve constructor declaration: " + cd.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.constructorCallerId(
                             ctx.enclosingTypeNode(), cd, currentPath));
@@ -210,6 +217,7 @@ public final class CallGraphBuilder {
                     node,
                     ctx,
                     () -> methodSymbols.buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd),
+                    ccd.getNameAsString(),
                     "failed to resolve compact constructor declaration: " + ccd.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.compactConstructorCallerId(
                             ctx.enclosingTypeNode(), ccd, currentPath));
@@ -267,25 +275,34 @@ public final class CallGraphBuilder {
     /**
      * 宣言 (method / constructor / compact constructor) を 1 件処理する。{@code symbolFactory} が
      * symbol を作れたら node として積み、その methodId を caller に子を辿る。例外で失敗した場合は
-     * {@code failureMessage} の診断を出し、{@code fallbackCallerId} (失敗時のみ評価する。宣言を解決
-     * できない site も完全性 gate から漏らさないための識別子) を caller に子を辿る。
+     * {@code failureMessage} の診断を出して宣言の欠けを ledger へ記録し、{@code fallbackCallerId}
+     * (失敗時のみ評価する。宣言を解決できない site も完全性 gate から漏らさないための識別子) を
+     * caller に子を辿る。
      */
     private void walkCallableDeclaration(
             Node node,
             WalkContext ctx,
             Supplier<MethodSymbol> symbolFactory,
+            String declarationName,
             String failureMessage,
             Supplier<String> fallbackCallerId) {
         MethodSymbol symbol;
         try {
             symbol = symbolFactory.get();
         } catch (RuntimeException | LinkageError e) {
-            diagnostics.reportUnresolvedDeclaration(node, failureMessage);
+            reportUnresolvedDeclaration(node, declarationName, failureMessage, e);
             recurseChildren(node, ctx.withCaller(List.of(fallbackCallerId.get())));
             return;
         }
         accumulator.addNode(symbol);
         recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+    }
+
+    /** 宣言の resolve の失敗を、warning の診断と、完全性 gate の対象になる ledger の欠けの両方に記録する。 */
+    private void reportUnresolvedDeclaration(Node declNode, String declarationName, String message, Throwable failure) {
+        diagnostics.reportUnresolvedDeclaration(declNode, message);
+        gapLedger.recordUnresolvedDeclaration(
+                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(), currentPath, declNode, declarationName, failure);
     }
 
     /**
@@ -992,7 +1009,8 @@ public final class CallGraphBuilder {
                 String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
                 ids.add(MethodIds.methodId(signature));
             } catch (RuntimeException | LinkageError e) {
-                diagnostics.reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
+                reportUnresolvedDeclaration(
+                        cd, cd.getNameAsString(), "failed to resolve constructor declaration: " + cd.getNameAsString(), e);
                 ids.add(CallSiteInventory.CallerIdentities.constructorCallerId(enclosingType, cd, currentPath));
             }
         }
