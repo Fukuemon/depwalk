@@ -12,7 +12,7 @@ import (
 
 // fixtureFile は traversal の E2E fixture の schema。graph の入力
 // (key は Analyzer Protocol の json tag に合わせる) と、探索ケースごとの到達集合の
-// 期待値 (S1 = caller、S2 = callee) からなる。
+// 期待値からなる。
 type fixtureFile struct {
 	Description string        `json:"description"`
 	Graph       fixtureGraph  `json:"graph"`

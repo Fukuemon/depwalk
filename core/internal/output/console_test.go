@@ -103,7 +103,7 @@ func TestConsoleRendersEntryPointMarker(t *testing.T) {
 	}}
 	view.Nodes = append([]NodeView(nil), view.Nodes...)
 	view.Nodes[0].Metadata = view.Start.Metadata
-	// javax/jakarta variants collapse to one label after the simple-name conversion.
+	// javax と jakarta の同名の annotation は、単純名に変えた後で 1 つの標識にまとまる。
 	view.Nodes[1].Metadata = map[string]any{"entryPoint": []any{
 		"jakarta.annotation.PostConstruct",
 		"javax.annotation.PostConstruct",
@@ -123,7 +123,7 @@ func TestConsoleRendersEntryPointMarker(t *testing.T) {
 }
 
 func TestConsoleEntryPointMarkerJoinsSortedLabelsAndCoexistsWithRevisited(t *testing.T) {
-	// Diamond: a -> b, a -> c, b -> d, c -> d. The second reach of d renders (既出).
+	// 菱形: a -> b, a -> c, b -> d, c -> d。d に 2 回目に届いたところは (既出) と出る。
 	view := consoleView("method:a",
 		[]NodeView{node("method:a", "A"), node("method:b", "B"), node("method:c", "C"), node("method:d", "D")},
 		[]EdgeView{
@@ -133,7 +133,7 @@ func TestConsoleEntryPointMarkerJoinsSortedLabelsAndCoexistsWithRevisited(t *tes
 			edge("edge:cd", "method:c", "method:d"),
 		}, nil)
 	view.Nodes = append([]NodeView(nil), view.Nodes...)
-	// Unsorted input: the marker sorts by FQN before converting to simple names.
+	// 並んでいない入力: 標識は、単純名に変える前に FQN で並べる。
 	view.Nodes[3].Metadata = map[string]any{"entryPoint": []any{
 		"org.springframework.web.bind.annotation.GetMapping",
 		"jakarta.annotation.PostConstruct",

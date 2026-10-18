@@ -2,7 +2,7 @@ package output
 
 import "slices"
 
-// formatters returns the formatter for every [Format] the package renders.
+// formatters は、package が描画する [Format] ごとの formatter を返す。
 //
 // init で package 変数に持たせず、呼ばれるたびに組み立てる。状態の持ち主が
 // 明示され、テストが共有 registry を書き換えて戻す必要もなくなる。

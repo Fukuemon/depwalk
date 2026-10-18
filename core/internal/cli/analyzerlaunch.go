@@ -2,8 +2,6 @@ package cli
 
 import "strings"
 
-// analyzerCmdEnv は Analyzer 起動コマンドを指定する環境変数。
-// DEPWALK_ 名前空間に置く。
 const analyzerCmdEnv = "DEPWALK_ANALYZER_CMD"
 
 // resolveAnalyzerCommand は Analyzer の起動コマンド文字列を解決する。
@@ -23,11 +21,7 @@ func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (strin
 	return "", invalidInput("analyzer command is required: set --analyzer-cmd or %s", analyzerCmdEnv)
 }
 
-// isEscapableRune は r が「引用符の外で backslash が escape できる文字」かを返す
-// (空白・tab・改行・単引用符・二重引用符・backslash)。
-//
-// それ以外の文字が続く場合 (および入力末尾) の backslash はリテラルとして残す。
-// `C:\jdk\bin\java.exe` のような Windows 形式のパスを壊さずに分割するため。
+// isEscapableRune は r が、引用符の外で backslash が escape できる文字かを返す。
 func isEscapableRune(r rune) bool {
 	switch r {
 	case ' ', '\t', '\n', '\'', '"', '\\':
@@ -82,8 +76,6 @@ func splitAnalyzerCommand(command string) ([]string, error) {
 				i++
 				continue
 			}
-			// escape 対象が続かない (または backslash が最後) ときはリテラルとして
-			// 残す。Windows のパスをそのまま通すため。
 			current.WriteRune(r)
 			hasCurrent = true
 		case r == '\'' || r == '"':

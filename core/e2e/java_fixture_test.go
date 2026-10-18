@@ -226,10 +226,9 @@ func assertDiagnosticCode(t *testing.T, diagnostics []protocol.Diagnostic, code 
 // diagnostic の期待値と突き合わせる。要求の組み立てと Analyzer 起動の経路は
 // `depwalk analyze` (core/internal/analyze) と同じものを通る。
 //
-// analyze の Result ではなく、1 層下の protocol.Client を直接叩いている。
-// Result.Graph は callEdge.metadata を運ばないためである (現行の Traversal が
-// 必要としないので graph.Edge に Metadata field が無い)。本テストは
-// callEdge.metadata の dispatch と viaLambda を見る必要がある。
+// analyze の Result ではなく、1 層下の protocol.Client を直接使う。
+// PerformanceBaseline が Analyzer の stderr の metrics を記録し、同じ wire の要求で
+// runForMaxRSS を動かすためで、analyze.Result はどちらも持たない。
 //
 // 1 層下げても analyze / protocol のロジックは書き直さない。metadata の組み立ては
 // analyze.BuildMetadata、要求の検証は protocol.AnalysisRequest.Validate を、

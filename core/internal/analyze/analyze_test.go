@@ -190,8 +190,6 @@ func TestRunPropagatesAnalyzerFailure(t *testing.T) {
 func TestRunKeepsFatalReasonOverValidationErrorAndPublishesNothing(t *testing.T) {
 	t.Parallel()
 
-	// 同じ stream に fatal record と検証エラーが並ぶ場合。fatal 側の理由が勝ち、
-	// 部分結果は公開してはならない。
 	source := &fakeSource{
 		nodes: []graph.Node{{ID: "method:caller"}},
 		edges: []graph.Edge{{ID: "edge:1", CallerID: "method:caller", CalleeID: "method:missing"}},

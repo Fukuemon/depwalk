@@ -56,7 +56,7 @@ func TestVisitOrderDoesNotRevisitOnCycle(t *testing.T) {
 }
 
 func TestMinDepthsComputesShortestDistances(t *testing.T) {
-	// o -> a -> a2 -> m と o -> b -> m: minDepth(m) は 2 になること。
+	// o -> a -> a2 -> m と o -> b -> m
 	g := graphtest.NewBuilder().
 		Edge("edge:oa", "method:o", "method:a").
 		Edge("edge:aa2", "method:a", "method:a2").
