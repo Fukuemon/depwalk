@@ -135,7 +135,7 @@ rules:
   # ここから下は depwalk の用語の規則
   - expected: diagnostic
     pattern: /(?<![\w/.-])diagnostics(?![\w.])/
-    prh: Protocol の record は diagnostic と error に分かれ、diagnostics は error を含むかが曖昧になる。diagnostic か「diagnostic と error の record」と書く
+    prh: Protocol の record は diagnostic と error に分かれ、diagnostics は error を含むかが曖昧になる。diagnostic か「diagnostic と error の record」と書く。stderr の人間向けの出力はログと書く
     specs:
       - from: 件数の要約と diagnostics だけを出す
         to: 件数の要約と diagnostic だけを出す
@@ -156,7 +156,7 @@ rules:
       - from: 初号機 (Java) の導入
         to: 最初の Analyzer (Java) の導入
   - expected: 自動 discovery
-    pattern: /自動の\s?(?:discovery|取得)/
+    pattern: /自動の\s?discovery/
     prh: source root を指定しないときに Gradle の build model から取得することは、context/domain.md の用語の「自動 discovery」と書く
     specs:
       - from: 自動の discovery と明示の override

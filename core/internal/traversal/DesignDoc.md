@@ -5,6 +5,7 @@ description: 呼び出しグラフの探索の API、到達集合の定義（min
 status: stable
 governs:
   - core/internal/traversal
+  - testdata/fixtures/traversal
 verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 

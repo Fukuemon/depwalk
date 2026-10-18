@@ -535,7 +535,8 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - 不正な値（`["true"]` と `["false"]` 以外）は `JAVA_INVALID_REQUEST` で fatal になること。
 - 自動 discovery と明示の override の graph が一致すること
   - fixture は、app、service、repository の 3 つの project、変えた `projectDir`、独自の source のディレクトリ、project の間の呼び出しと DI を含む。
-- テスト専用の透過の proxy を介して、実際の Core の CLI と実際の Analyzer の jar をつなぎ、request、raw の graph、CLI の終了の状態を required gate で比べること
+- テスト専用の透過の proxy を介して、実際の Core の CLI と実際の Analyzer の jar をつなぎ、request、raw の graph、CLI の終了の状態を E2E の CLI 層で比べること
+  - CI の E2E の job で動かし、JDK か jar が欠けたときは skip せずに失敗にする。
 - **Spring Boot の fixture**: `testdata/fixtures/java/spring-project/` に、単一の source root の Spring の fixture を置く。
   - DI（constructor、field、setter の injection）、stereotype、`@Qualifier`、`@Primary` を含む。
   - 条件付きの Bean（`@Profile`、`@ConditionalOnProperty`）と、Spring Data の Repository を含む。
@@ -584,5 +585,5 @@ SLO は、計測の結果から次の規則で導く。
 | multi-module discovery    | 4.0s 以下   | 512 MiB 以下 |
 
 SLO は、計測した fixture と環境に対する手動のリリースの目標にする。  
-**時間と RSS は、機械的なテストの gate にしない。**  
+**時間と RSS は、テストの合否の条件にしない。**  
 fixture の規模、Analyzer の runtime の JDK、Gradle の major が変わったら、測り直す。

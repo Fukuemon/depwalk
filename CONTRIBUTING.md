@@ -33,6 +33,12 @@ node .claude/hooks/docs/hooks/check-links.mjs
 
 手元では直した文書に掛ける。CI の textlint が見る範囲と、その理由は [context/conventions.md の Check Exclusions](context/conventions.md#check-exclusions) にある。
 
+`prh.yml` か `.textlintrc.json` を変えたときは、全文書に掛ける。
+
+```sh
+git ls-files -z '*.md' | xargs -0 pnpm exec textlint
+```
+
 `verified_commit` の後に実装が変わった文書は、`node .claude/hooks/docs/hooks/list-drift.mjs` で一覧する。実装と読み比べてから `verified_commit` を進める。
 
 ## コミットするとき

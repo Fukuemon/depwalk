@@ -14,7 +14,7 @@ governs:
   - scripts/check-specs-residue.sh
   - hooks
   - .github/workflows
-verified_commit: unverified
+verified_commit: 5dad40d699e6c0eb1c9c50dc3de02dabaa2240b4
 ---
 
 # コードと文書の規約
@@ -50,7 +50,7 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 - テストのコード: 何が成り立つべきか
 - コミットと pull request: なぜこの変更をしたか
 - コードの中のコメント: なぜ他の方法を採らなかったか
-- 関数と型の doc: 何をするものか。公開する API は godoc と javadoc の規約に従う。
+- 関数と型の doc: 何をするものかと、呼び出す側が頼る契約。公開する API は godoc と javadoc の規約に従う。
 
 コードの中のコメントには、主に「なぜ他の方法を採らなかったか」を書く。  
 コードを読めば動き方は分かるが、素直な方法を採らなかった理由は分からない。  
@@ -58,7 +58,7 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 
 - 書くもの: 採らなかった実装とその理由、外部の仕様やライブラリの制約を避ける方法、冗長に見える処理が要る理由、破ると動かなくなる不変条件
 - 書かないもの: コードを日本語に言い換えただけの行、引数と戻り値の型を繰り返すだけの doc、変更の経緯、issue の番号
-- 関数と型の doc には、何をするかだけを書き、内部の手順を書き写さない。
+- 関数と型の doc には、要約の 1 文と契約（返す値、副作用、失敗する条件、呼び出しの前提）を書き、内部の手順を書き写さない。
 
 コメントは日本語で書く。
 
@@ -75,12 +75,11 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 - 外部の制約を書くコメントにも、issue や仕様のリンクを添えない。外部のライブラリの公式の文書の URL も添えない。
   - 今のコードのコメントは URL を持たず、制約の内容をコメントの中に書いている。この書き方に揃える。
 
-この節の規約は、スキル write-comments より優先する。スキルとの違いは次の 2 つ。
+この節の規約は、スキル write-comments より優先する。スキルとの違いは次の 3 つ。
 
-- write-comments は残してよい実装のコメントを 3 種類に限るが、このリポジトリでは、採らなかった方法とその理由も書いてよい。
+- write-comments は残してよい実装のコメントを 3 種類に限る。このリポジトリでは、採らなかった方法とその理由、冗長に見える処理が要る理由、破ると動かなくなる不変条件も書いてよい。
+- write-comments は文書コメントの有無を lint で確かめるとするが、このリポジトリでは lint（Go の revive の exported、Java の Checkstyle）を入れていない。
 - write-comments は外部の制約のコメントに issue や仕様へのリンクを添えるとするが、このリポジトリでは添えない。
-
-文書コメントの有無を確かめる lint（Go の revive の exported、Java の Checkstyle）は入れていない。
 
 ## Documents
 
@@ -101,12 +100,13 @@ ADR は、決定した時点の記録として書き換えない。
 ただし、用語を揃えるための語の置き換えと、移った文書へのリンクの修正は、決定を変えないので行ってよい。  
 対応するバージョンの範囲のように、決定の後に変わる値は、context か Design Doc に書き、ADR からはリンクする。
 
-`context/` と `design/` の文書の frontmatter は、次の規則で書く。
+`context/` の文書、`design/` の文書、コードの隣に置いた Design Doc の frontmatter は、次の規則で書く。
 
 - `governs` には、その文書が説明する契約の実装の場所をすべて挙げる。文書を置いた package だけでなく、本文が記録する値の出所（build の定義、wrapper の properties）も含める。
 - コードに直接ひも付かない文書は、説明する対象の設定ファイルを `governs` に挙げる。
 - `verified_commit` には、実装と本文を読み比べた作業のコミットを書く。読み比べていない文書は `unverified` と書く。
   - すべての文書に一律で HEAD を書かない。すべての文書が実装と一致しているという、事実と違う宣言になる。
+- 複数の文書の `governs` は重なってよい。重なった範囲を変えたときは、重なるすべての文書を見直す。
 
 ## Shared Configuration
 
@@ -124,6 +124,7 @@ Core の共有の設定は、Go の標準のコマンドを優先し、専用の
 Git のフックで動かすコマンドは `lefthook.yml` にある。  
 チェックの内容と直し方は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。  
 lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数のコマンドは `&&` でつなぐ。  
+`hooks/` には、lefthook が呼ぶフックのスクリプト（保護するブランチの確認、commit-msg の issue 番号の付与）を置く。  
 `lefthook.yml` を書くときのほかの注意（`stage_fixed`、depguard の glob）は、`lefthook.yml` のコメントにある。
 
 ## Check Exclusions
@@ -133,7 +134,10 @@ lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数
 - `list-drift.mjs` による文書の鮮度のチェックは、CI で一覧を出すだけにし、失敗にしない。
   - `governs` の範囲が変わっても文書が正しいままのことはよくある。失敗にすると、内容を読まずに `verified_commit` だけを進めて通すことになる。
   - コミットをまたいで初めて意味を持つチェックなので、コミットの前のフックには入れない。
+- `scripts/check-specs-residue.sh` は、閉じた issue の spec が残っていないかを確かめる。pull request のチェックにはしない。
+  - issue を閉じてから spec を消す pull request を取り込むまでの間、関係のない pull request が失敗するためである。
+  - CI の `spec-residue.yml` が、既定のブランチへの push と週ごとの schedule で実行する。
 - prettier は、`.prettierignore` で次を除く。
-  - apm が配置して書き換えるファイル。整形すると、次の `apm install` で差分が出る。
+  - apm が配置して書き換えるファイルと、pnpm が書き換える `pnpm-lock.yaml`。整形すると、次の `apm install` か `pnpm install` で差分が出る。
   - Gradle の fixture の build の生成物
 - 文章の長さのチェック（`sentence-length`）は、段落と箇条書きに掛け、表のセルには掛からない。`.textlintrc.json` で除外の設定を足さず、この動きのまま使う。

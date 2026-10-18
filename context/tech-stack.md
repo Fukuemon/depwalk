@@ -12,7 +12,8 @@ governs:
   - analyzers/java/settings.gradle.kts
   - analyzers/java/model-provider/build.gradle.kts
   - analyzers/java/gradle/wrapper/gradle-wrapper.properties
-verified_commit: c71318f06f5d42e2b73a2eb3aa81d6d926282d30
+  - .github/workflows/ci.yml
+verified_commit: 5dad40d699e6c0eb1c9c50dc3de02dabaa2240b4
 ---
 
 # 技術スタック
@@ -25,14 +26,14 @@ verified_commit: c71318f06f5d42e2b73a2eb3aa81d6d926282d30
 - `core/go.mod`: Core の Go のバージョンと、モジュールと依存。CI の Go もこのバージョンを使う。
 - `analyzers/java/build.gradle.kts`: Java Analyzer の依存のライブラリ、Shadow のプラグイン、Analyzer が動く JDK の toolchain
 - `analyzers/java/model-provider/build.gradle.kts`: Gradle の custom model provider が compile に使う Gradle API と Java の release
-- `analyzers/java/settings.gradle.kts`: JDK の toolchain を解決する foojay のプラグイン
+- `analyzers/java/settings.gradle.kts`: Gradle の toolchain の JDK を取得する foojay のプラグイン
 - `analyzers/java/gradle/wrapper/gradle-wrapper.properties`: Java Analyzer を build する Gradle
 - `scripts/golangci-lint.sh`: golangci-lint
 - `package.json`: 文書の整形とチェック、コミットのメッセージのチェック、Git のフックのツールと、`packageManager` の pnpm
-- `.github/workflows/ci.yml`: CI の JDK（setup-java の `java-version`）。`mise.toml` を読まないので、`mise.toml` と揃える。
+- `.github/workflows/ci.yml`: CI の JDK（setup-java の `java-version`）。Java の job は `mise.toml` を読まないので、`mise.toml` と揃える。
 
 Core の実装の基盤は ADR が持つ。  
-ADR-0002: [Core 実装基盤](../adr/0002-core-implementation-foundation.md)
+ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準ライブラリに絞る](../adr/0002-core-implementation-foundation.md)
 
 Core（`core/`）のツールの役割は次のとおり。
 
@@ -54,11 +55,11 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - JavaParser: ソースを構文木にする。
 - SymbolSolver: 呼び出しの型を解決する。
 - SootUp: 型の階層と、override と interface の実装の候補を引く。使う範囲は [Java Analyzer の Design Doc の「解析の 3 段」](../analyzers/java/DesignDoc.md#解析の-3-段) にある。
-  - ADR-0005: [SootUp と Spring DI の解決](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
+  - ADR-0005: [Java Analyzer に SootUp による型階層の補完と Spring DI の解決を 1 つの feature として導入する](../adr/0005-adopt-sootup-and-spring-di-resolution.md)
 - Gradle Tooling API: source root を自動で discovery するときに、対象の build の model を取得する。
-  - ADR-0006: [Gradle Tooling API による discovery](../adr/0006-adopt-gradle-tooling-api-discovery.md)
+  - ADR-0006: [source root を指定しない request では、Gradle Tooling API で build の実効 model から解析 context を discovery する](../adr/0006-adopt-gradle-tooling-api-discovery.md)
 - slf4j-nop: Tooling API が slf4j に出す log を捨て、Analyzer の stdout と stderr に Gradle の log を出さない。
-- foojay のプラグイン: `gradleCompatibilityTest` が daemon の JVM に使う JDK を、toolchain として取得する。
+- foojay のプラグイン: Gradle の toolchain の JDK を取得する。`gradleCompatibilityTest` が daemon の JVM に使う JDK も、これで取得する。
 - Jackson（jackson-databind）: Protocol の JSONL の request を読み、record を書く。
 - custom model provider（`analyzers/java/model-provider`）: Gradle の daemon の上で読み込まれ、build の model を返す。古い Gradle の daemon でも読み込めるよう、Java 8 の classfile にする。
 - JUnit: Java Analyzer の unit テストを実行する。
@@ -121,8 +122,10 @@ Gradle の対応範囲、Tooling API、custom model provider のバージョン�
   - [discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md)
   - `GradleVersionSupport` の対象の範囲と、同梱する Gradle のバージョン（`BUNDLED_GRADLE_VERSION`）
   - `GradleCompatibilityMatrixTest` の `@CsvSource` の anchor（Gradle と daemon の JDK の組）
+  - `GradleVersionSupportTest` の `@CsvSource`（対象の範囲の境界と、daemon の JVM との互換の判定表）
   - `analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の `matrixJdkMajors` と `description`
-  - ADR は決定した時点の記録で、現在の対象の範囲は Design Doc が持つ。
+  - `analyzers/java/build.gradle.kts` の `gradle-tooling-api` のバージョン。`BUNDLED_GRADLE_VERSION` と同じ値にする。
+- ADR は決定した時点の記録で、現在の対象の範囲は Design Doc が持つ。
 - `cd analyzers/java && ./gradlew gradleCompatibilityTest` で、anchor ごとの Gradle と daemon の JVM の組み合わせを確かめる。
   - 確かめる観点は、provider が読み込めること、model のフィールド、task を実行しないこと、出力の隔離、固定した Graph である。
 - provider が呼んでよい Gradle API は、対応範囲の下限の Gradle に存在し、上限までの Gradle で削除されていないものに限る。

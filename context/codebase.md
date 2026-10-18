@@ -9,7 +9,7 @@ governs:
   - core/.golangci.yml
   - analyzers/java/src/main
   - analyzers/java/src/test/java/com/fukuemon/depwalk/javaanalyzer/ArchitectureTest.java
-verified_commit: c71318f06f5d42e2b73a2eb3aa81d6d926282d30
+verified_commit: 5dad40d699e6c0eb1c9c50dc3de02dabaa2240b4
 ---
 
 # コードベースの構造
@@ -45,7 +45,7 @@ ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェッ�
 - `core/internal/graph/graphtest`: graph のテストを支える sub-package。本番のコードから import しない。
 
 Java Analyzer の `javaanalyzer` の下は、解析の段階ごとの package（`analysis/` の下）と、入出力と起動の package（`protocol`、`io`、`preflight`、`discovery`）で作る。  
-`javaanalyzer` の直下には、起動の `Main` と、Protocol に出す code の定義（`JavaErrorCode`、`JavaDiagnosticCode`）がある。  
+`javaanalyzer` の直下には、どの段階の package にも属さないもの（プロセスを起動する main の class と、Protocol に出す code の定義）だけを置く。  
 解析の段の実行の順は、`analysis/pipeline` の Runner が持つ。Runner を呼ぶまでの順は、解析の context の組み立てを含めて `Main` が持つ。  
 ADR-0016: [Java Analyzer の実行の順を、解析の段は AnalysisRunner に、context の組み立てまでは Main に持たせる](../adr/0016-split-execution-order-between-main-and-runner.md)
 
@@ -80,6 +80,9 @@ Core の規則は、golangci-lint の depguard でチェックする。
 - 設定は `core/.golangci.yml` にある。規則を変えるときは、先にこの節を直し、次に設定を直す。
 - ルールは、package の glob（`files`）、許す import（`allow`）、禁止する import（`deny`）、違反の理由（`desc`）で書く。違反したときに `desc` が表示され、開発者もコーディングエージェントもメッセージから直せる。
   - `allow` は、規則にない import を拒む。`deny` は、既知の禁止の import に理由を添える。`allow` がないと、新しい package を足したときに `deny` の列挙から漏れた import が通る。
+  - 例外は、`allow` を持たずに `deny` だけで書く 2 つのルールである。どちらも、特定の import を拒むことだけが目的で、許す import を列挙しない。
+    - `no-graphtest-in-production`: テストを除いた本番のファイルから `graph/graphtest` を拒む。
+    - `unknown-internal-package`: 規則のない package から `internal` の全体を拒む。
 - `deny` の `pkg` は、末尾の `$` で完全一致にする。前方一致にすると、`analyze` の規則が `analyzer` まで巻き込む。また、black-box テストの package が自分の package を import できなくなる。
   - 規則のない package を拒む catch-all のルールだけは、`internal` の全体を禁じるために前方一致にする。
 - CI の Go の job は、`go list -deps ./...` に `github.com/Fukuemon/depwalk/analyzers/` が含まれないことを確かめ、Core が Analyzer に依存していないことを見る。設定は `.github/workflows/ci.yml` にある。

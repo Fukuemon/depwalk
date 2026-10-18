@@ -84,6 +84,9 @@ Core は Analyzer の内部（使うライブラリと言語のランタイム�
 Core が解析の要求を渡し、Analyzer が graph model（`MethodSymbol`、`CallEdge`）と `diagnostic` と `error` の record を JSONL で 1 行 1 レコードで返す。  
 ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 
+例外は、異常終了した Analyzer の stderr から heap の不足を案内することだけである。  
+ADR-0019: [Analyzer が error の record を出さずに異常終了したとき、Core は stderr の OutOfMemoryError から heap の不足を案内する](../adr/0019-oom-hint-from-analyzer-stderr.md)
+
 ## Components
 
 Core は、呼び出しグラフの構築、探索、出力に責務を限り、解析の処理を持たない。  
