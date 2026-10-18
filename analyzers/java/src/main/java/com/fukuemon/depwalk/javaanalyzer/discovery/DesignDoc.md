@@ -65,7 +65,7 @@ provider は、project ごとに次の値を返す。
 - preview の有無
 
 provider は、build の全体の値として、included build の root の directory も返す。  
-project の directory と included build の root の directory は、外部の build の除外の判定と warning に使う。  
+project の directory と included build の root の directory は、workspace の外の project、または included build の除外の判定と warning に使う。  
 使い方は「root の正規化と検証」の節にある。  
 ADR-0014: [discovery の custom model provider が返す値に、project の directory と included build の root を足す](../../../../../../../../../../adr/0014-extend-discovery-model-with-build-directories.md)
 

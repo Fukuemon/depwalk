@@ -37,7 +37,9 @@ ADR-0007 のほかの決定（package の構成、外部のライブラリの 3 
 
 1. `analysis/pipeline` の `AnalysisRunner` は、解析の段の実行の順を持つ。
    - 解析の段は、組み立て済みの context を受け取った後の、scope の列挙から完全性の gate までを指す。
+   - context の組み立ては、`analysis/context` の `AnalysisContextFactory` が行うが、解析の段に含めない。
 2. `Main` は、request の読み取りから、`AnalysisContextFactory` による解析の context の組み立てまでの順を持つ。
+   - `Main` は、`AnalysisContextFactory` を直接呼んでよい。context の組み立ては解析の段ではない。
    - `Main` は、その後に `AnalysisRunner.run` を呼ぶ。
    - `Main` は、各段の失敗を error record と終了コードへ写す。
 
@@ -67,4 +69,4 @@ ADR-0007 のほかの決定（package の構成、外部のライブラリの 3 
 
 - 実行の全体の順を知るには、`Main` と `AnalysisRunner` の 2 か所を読む必要がある。
 - ArchUnit のテストは、実行の順の持ち主を確かめない。
-  - `Main` が解析の段を直接呼ぶ変更は、レビューで止める。
+  - `Main` が解析の段（scope の列挙から完全性の gate まで）を直接呼ぶ変更は、レビューで止める。

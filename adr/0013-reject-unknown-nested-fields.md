@@ -31,20 +31,24 @@ Core の parser は、次の object の中の未知の field を、invalid recor
 
 - `sourceLocation`
 - `callSite`
-- `entrypoints[]` の各要素
 - `details[]` の各要素と、その要素の `sourceLocation`
 
 field 名の大文字と小文字だけが違う key も、未知の field として拒否する。  
 `metadata` の中身は opaque な値なので、Core は中の field を確かめない。  
 入れ子の object で未知の field を無視すると、Analyzer の field 名の誤りを Core が成功として扱うためである。
 
+`entrypoints[]` は `analysisRequest` にだけある field で、Core は `analysisRequest` の受信者にならない。  
+Core の parser は `entrypoints[]` の各要素の未知の field も拒否するが、これは Core 自身の検証のためである。  
+この拒否は、互換性の規則に含めない。
+
 この ADR は、ADR-0001 の決定のうち次の 2 つを狭める。
 
 - 「受信者は未知の field を無視する」は、Core が受信者のときは record の最上位の field に限る。
 - 「任意の field の追加は互換の変更とする」は、record の最上位への追加と `metadata` の中への追加に限る。
-  - `sourceLocation`、`callSite`、`entrypoints[]`、`details[]` へ field を足す変更は、互換性を壊す変更として扱い、major バージョンを上げる。
+  - `sourceLocation`、`callSite`、`details[]` へ field を足す変更は、互換性を壊す変更として扱い、major バージョンを上げる。
 
-Analyzer が `analysisRequest` を受け取るときの扱いは、ADR-0001 のまま変えない。
+`analysisRequest` の受信者は Analyzer である。  
+Analyzer は、ADR-0001 のとおり、入れ子の object の中の未知の field も無視する。
 
 ## Considered Options
 

@@ -34,7 +34,8 @@ broadcast の意味論の専用の規則を使うこと、Spring DI の規則を
 2. generics で過剰に一致しうる listener。listener の parameter の型が型変数か、型引数の付いた型のものを指す。
 
 - 2 つ目の listener への edge は、`resolution: ambiguous` にする。
-  - 実行時の条件ではないため、`conditional` と `conditionTypes` は付けない。
+  - generics による過剰な一致は実行時の条件ではないため、条件がなければ `conditional` と `conditionTypes` を付けない。
+  - 条件もある listener への edge には、1 つ目と同じく `conditional` と `conditionTypes` を付ける。
 - どちらにも当たらない listener への edge は、ADR-0009 のとおり、複数でもどれも `resolution: unique` にする。
 - 出典: [EventListenerIndex.java の rawApproximation の判定](https://github.com/Fukuemon/depwalk/blob/8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333/analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring/EventListenerIndex.java#L68-L70)
 - 出典: [EventEdgeEmitter.java の resolution の決定](https://github.com/Fukuemon/depwalk/blob/8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333/analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph/EventEdgeEmitter.java#L130-L138)
