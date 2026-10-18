@@ -167,6 +167,38 @@ class ReferenceSuperRescueTest {
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
+    @Test
+    @DisplayName("scope 外の親への super(...) 呼び出しで constructor も見つからないとき、救済されず external として除外される")
+    void classifiesExplicitSuperToOutOfScopeParentAsExternal() throws Exception {
+        // 親の型は classes にだけあり、source 宣言の索引に無い。引数の個数が合う constructor が無いので
+        // solver の解決は失敗する。
+        Path classes = compileFixture("ext-base-src", "ext-base-classes", "com/example/ext/ExtBase.java", """
+                package com.example.ext;
+                public class ExtBase {
+                    public ExtBase(String id) {}
+                }
+                """);
+        Path workspace = temp.resolve("ext-super-workspace");
+        write(workspace, "com/example/Child.java", """
+                package com.example;
+                import com.example.ext.ExtBase;
+                public class Child extends ExtBase {
+                    Child(String id) { super(id, 1); }
+                }
+                """);
+
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(
+                workspace, AnalysisTestSupport.classpathMetadata(classes.toString()), null, null, null, null);
+
+        assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
+        assertTrue(ran.byType("diagnostic").isEmpty(), () -> "expected external exclusion, got: " + ran.byType("diagnostic"));
+        assertTrue(ran.byType("callEdge").stream()
+                        .noneMatch(e -> String.valueOf(e.get("calleeMethodId")).startsWith("java:com.example.ext.ExtBase#")),
+                () -> "explicit super to an out-of-scope parent must not be rescued: " + ran.byType("callEdge"));
+        assertTrue(ran.stderr().contains("excluded[external-target]="),
+                () -> "ledger summary must count the external exclusion: " + ran.stderr());
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     @DisplayName("bytecode にしか無い自 class constructor への this(...) 呼び出しは、救済されて呼び出し関係 (edge) になる")

@@ -63,10 +63,10 @@ import java.util.function.Supplier;
  * ({@link BinaryNames#forTypeLikeNode(Node)}) は、ファイルの visit 順序に依存しない純粋な構造計算で
  * 実装しているため、ファイル単位で 1 パス (declare + call-edge を同時に処理) で完結できる。
  *
- * <p>symbol 生成は {@link MethodSymbolFactory}、解決失敗時の bytecode 救済と external 分類は
- * {@link BytecodeRescue}、Spring DI 照合は {@link SpringInjectionMatcher}、Spring イベントの
- * 突合と edge 生成は {@link EventEdgeEmitter}、診断は {@link UnresolvedDiagnostics} が担い、
- * 本クラスは走査と各経路の調停に専念する。
+ * <p>symbol 生成は {@link MethodSymbolFactory}、解決失敗時の bytecode 救済と external 分類の判定は
+ * {@link BytecodeRescue}、その判定を試す順は {@link UnresolvedCallClassifier}、Spring DI 照合は
+ * {@link SpringInjectionMatcher}、Spring イベントの突合と edge 生成は {@link EventEdgeEmitter}、診断は
+ * {@link UnresolvedDiagnostics} が担い、本クラスは走査と各経路の調停に専念する。
  *
  * <p>以下の各経路は、call site 1 件につき必ず 1 つの終端 (emitted / excluded / diagnostic)
  * を ledger へ記録し、完全性 gate から漏らさない。
@@ -79,6 +79,7 @@ public final class CallGraphBuilder {
     private final SootUpTypeHierarchyIndex sootUpIndex;
     private final MethodSymbolFactory methodSymbols;
     private final BytecodeRescue bytecodeRescue;
+    private final UnresolvedCallClassifier unresolvedCallClassifier;
     private final SpringInjectionMatcher springInjections;
     private final EventEdgeEmitter eventEdges;
     private final CallablePassIndex callablePassIndex;
@@ -86,7 +87,6 @@ public final class CallGraphBuilder {
     private final UnresolvedDiagnostics diagnostics;
     private final CallSiteOutcomeLedger ledger;
     private final AnalysisGapLedger gapLedger;
-    private final WorkspaceSourceDeclarationIndex declIndex;
     /** 現在処理中 CU の workspace 相対 path ({@link #process} が設定する)。 */
     private String currentPath;
 
@@ -127,7 +127,7 @@ public final class CallGraphBuilder {
         this.bytecodeRescue = new BytecodeRescue(sootUpIndex, declIndex, bytecodeIndex, reachableOwners);
         this.ledger = ledger;
         this.gapLedger = gapLedger;
-        this.declIndex = declIndex;
+        this.unresolvedCallClassifier = new UnresolvedCallClassifier(bytecodeRescue);
         this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
         this.eventEdges = new EventEdgeEmitter(
@@ -353,67 +353,18 @@ public final class CallGraphBuilder {
             // resolve に失敗した call は callable invocation 追跡の対象外
             // (emitCallableInvocationEdges は解決済み宣言を前提とする)。
             rethrowUnlessIsolableResolutionFailure(e);
-            BytecodeRescue.Rescue rescue = bytecodeRescue.methodRescue(mce, ctx.enclosingTypeNode());
-            if (rescue != null) {
-                emitBytecodeOnlyCall(mce, ctx, rescue, false);
-                commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                return;
-            }
-            // receiver 型を (bytecode field 補完込みで) 特定できて、その型が
-            // scope 内 source に存在しない場合、callee は scope 外であり
-            // 理由付き external-target として分類する。
-            // 例: Lombok @Slf4j の log field 経由の Logger#info 呼び出し。
-            String receiverOwner = bytecodeRescue.bytecodeRescueOwner(mce, ctx.enclosingTypeNode());
-            if (receiverOwner != null && declIndex.find(receiverOwner).isEmpty()) {
-                commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                return;
-            }
-            // 解決失敗した receiver chain を bytecode candidate の戻り値型
-            // (classfile 由来) で前進解決し、復元した owner で救済 / external
-            // 分類を試みる。根拠のない型推測は行わない。
-            if (receiverOwner == null && mce.getScope().isPresent()) {
-                String forwardOwner =
-                        bytecodeRescue.chainForwardOwner(mce.getScope().get(), ctx.enclosingTypeNode());
-                if (forwardOwner == null) {
-                    // erasure の前進解決で辿れない JDK stream / collection 連鎖と
-                    // lambda parameter は、generic 前進導出で owner を復元する。
-                    forwardOwner = bytecodeRescue.genericChainOwner(mce.getScope().get());
-                }
-                if (forwardOwner != null) {
-                    if (declIndex.find(forwardOwner).isEmpty()) {
-                        commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                        return;
-                    }
-                    BytecodeRescue.Rescue forwardRescue = bytecodeRescue.methodRescueWithOwner(mce, forwardOwner);
-                    if (forwardRescue != null) {
-                        emitBytecodeOnlyCall(mce, ctx, forwardRescue, false);
-                        commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                        return;
-                    }
-                }
-            }
-            // receiver 型が取れない call でも、
-            // (i) chain 起点の静的型が scope 外、または (ii) lambda parameter の
-            // 引数先 functional interface が scope 外なら external-target へ分類
-            // する。scope 内型が根拠に現れる場合は保守的に diagnostic に残す。
-            if (receiverOwner == null
-                    && (bytecodeRescue.chainRootIsExternal(mce, ctx.enclosingTypeNode())
-                            || bytecodeRescue.lambdaParamReceiverIsExternal(mce))) {
-                commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                return;
-            }
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mce.getScope().orElse(null), "implicit-this");
-            diagnostics.reportUnresolved(mce, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                    "unresolved-method-call", mce.getNameAsString(), metadata);
+            recordResolutionFailure(
+                    mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                    unresolvedCallClassifier.classifyMethodCall(mce, ctx.enclosingTypeNode()),
+                    new PendingDiagnostic(
+                            "unresolved-method-call", mce.getNameAsString(),
+                            () -> diagnostics.metadataOf(
+                                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mce.getScope().orElse(null),
+                                    "implicit-this")));
             return;
         }
         emitCallableInvocationEdges(mce, ctx, resolved);
 
-        // AST へ注入した bytecode-only member と solver が合成した bytecode-only member は、
-        // 既存の bytecode-only member と同じ出力契約 (sourceLocation 省略 + owner metadata
-        // + calleeOrigin edge) で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
         if (bytecodeOnly != null) {
             // 型名 scope の static call を instance の合成 / 注入 member で解決しない
@@ -421,24 +372,15 @@ public final class CallGraphBuilder {
             // 型名 scope で検査しないため、emit 前にここで検査する)。
             if (!bytecodeOnly.isStatic() && mce.getScope().isPresent()
                     && BytecodeRescue.isTypeNameScope(mce.getScope().get())) {
-                Map<String, Object> guardMetadata = diagnostics.metadataOf(
-                        UnresolvedDiagnostics.PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null);
-                diagnostics.reportUnresolved(mce, ctx.callerMethodIds(), guardMetadata);
-                commitDiagnostic(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
-                        "unresolved-method-call", mce.getNameAsString(), guardMetadata);
+                reportAndCommitUnresolved(mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                        "unresolved-method-call", mce.getNameAsString(),
+                        diagnostics.metadataOf(
+                                UnresolvedDiagnostics.PHASE_SYNTHESIS_STATIC_GUARD, null, mce.getScope().get(), null));
                 return;
             }
-            BytecodeRescue.Rescue rescue =
-                    bytecodeOnlyRescue(bytecodeOnly, bytecodeOnly.methodName(), "method");
-            if (rescue == null) {
-                // owner が scope (include/exclude 適用後) の外にある場合、解決は solver
-                // 越しに成功していても callee は scope 外であり、fatal でなく external
-                // 分類にする (帰属規則)。
-                commitExcludedExternal(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
-                return;
-            }
-            emitBytecodeOnlyCall(mce, ctx, rescue, false);
-            commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+            emitBytecodeOnlyMember(
+                    mce, CallSiteId.CallKind.METHOD_CALL, ctx,
+                    bytecodeOnly, bytecodeOnly.methodName(), "method");
             return;
         }
 
@@ -452,15 +394,10 @@ public final class CallGraphBuilder {
         }
 
         MethodSymbol calleeSymbol = methodSymbols.buildMethodSymbol(attribution, resolved);
-        accumulator.addNode(calleeSymbol);
-
         String dispatch = AttributionSites.dispatchOf(resolved);
-        Map<String, Object> metadata = CallEdgeMetadata.forCall(dispatch, ctx.viaLambda());
-        SourceLocation callSite = sourceLocations.sourceLocationOf(mce);
-        for (String callerId : edgeCallers(mce, ctx)) {
-            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
-        }
-        commitEmitted(mce, CallSiteId.CallKind.METHOD_CALL, ctx);
+        SourceLocation callSite = emitResolvedEdge(
+                mce, CallSiteId.CallKind.METHOD_CALL, ctx, calleeSymbol,
+                CallEdgeMetadata.forCall(dispatch, ctx.viaLambda()));
         emitDispatchCandidateEdges(
                 resolved,
                 dispatch,
@@ -477,17 +414,13 @@ public final class CallGraphBuilder {
             resolved = oce.resolve();
         } catch (RuntimeException e) {
             rethrowUnlessIsolableResolutionFailure(e);
-            BytecodeRescue.Rescue rescue = bytecodeRescue.constructorRescue(oce);
-            if (rescue != null) {
-                emitBytecodeOnlyCall(oce, ctx, rescue, false);
-                commitEmitted(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx);
-                return;
-            }
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, oce.getScope().orElse(null), "none");
-            diagnostics.reportUnresolved(oce, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
-                    "unresolved-constructor-call", oce.getTypeAsString(), metadata);
+            recordResolutionFailure(
+                    oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
+                    unresolvedCallClassifier.classifyObjectCreation(oce),
+                    new PendingDiagnostic(
+                            "unresolved-constructor-call", oce.getTypeAsString(),
+                            () -> diagnostics.metadataOf(
+                                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, oce.getScope().orElse(null), "none")));
             return;
         }
         emitConstructorCall(resolved, oce, ctx, CallSiteId.CallKind.OBJECT_CREATION);
@@ -499,24 +432,13 @@ public final class CallGraphBuilder {
             resolved = ecis.resolve();
         } catch (RuntimeException e) {
             rethrowUnlessIsolableResolutionFailure(e);
-            // 明示 super(...) / this(...) の解決先 (親 / 自クラスの
-            // 生成 constructor) を bytecode 救済してから diagnostic 化する。
-            BytecodeRescue.Rescue rescue = bytecodeRescue.explicitCtorRescue(ecis, ctx.enclosingTypeNode());
-            if (rescue != null) {
-                emitBytecodeOnlyCall(ecis, ctx, rescue, false);
-                commitEmitted(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx);
-                return;
-            }
-            String ctorOwner = bytecodeRescue.explicitCtorOwner(ecis, ctx.enclosingTypeNode());
-            if (ctorOwner != null && declIndex.find(ctorOwner).isEmpty()) {
-                commitExcludedExternal(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx);
-                return;
-            }
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, null, ecis.isThis() ? "this" : "super");
-            diagnostics.reportUnresolved(ecis, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
-                    "unresolved-constructor-call", ecis.isThis() ? "this" : "super", metadata);
+            recordResolutionFailure(
+                    ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
+                    unresolvedCallClassifier.classifyExplicitConstructorInvocation(ecis, ctx.enclosingTypeNode()),
+                    new PendingDiagnostic(
+                            "unresolved-constructor-call", ecis.isThis() ? "this" : "super",
+                            () -> diagnostics.metadataOf(
+                                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, null, ecis.isThis() ? "this" : "super")));
             return;
         }
         emitConstructorCall(resolved, ecis, ctx, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION);
@@ -532,28 +454,14 @@ public final class CallGraphBuilder {
             commitExcluded(callNode, kind, ctx, attribution);
             return;
         }
-        // AST 注入の bytecode-only constructor は method 側と同じ出力契約で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolved);
         if (injectedCtor != null) {
-            BytecodeRescue.Rescue rescue =
-                    bytecodeOnlyRescue(injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
-            if (rescue == null) {
-                commitExcludedExternal(callNode, kind, ctx);
-                return;
-            }
-            emitBytecodeOnlyCall(callNode, ctx, rescue, false);
-            commitEmitted(callNode, kind, ctx);
+            emitBytecodeOnlyMember(
+                    callNode, kind, ctx, injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
             return;
         }
         MethodSymbol calleeSymbol = methodSymbols.buildConstructorSymbol(attribution, resolved);
-        accumulator.addNode(calleeSymbol);
-
-        Map<String, Object> metadata = CallEdgeMetadata.forCall(null, ctx.viaLambda());
-        SourceLocation callSite = sourceLocations.sourceLocationOf(callNode);
-        for (String callerId : edgeCallers(callNode, ctx)) {
-            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
-        }
-        commitEmitted(callNode, kind, ctx);
+        emitResolvedEdge(callNode, kind, ctx, calleeSymbol, CallEdgeMetadata.forCall(null, ctx.viaLambda()));
     }
 
     /** {@code Foo::new} の source 上の識別子 ({@code getIdentifier()} が返す値)。 */
@@ -576,44 +484,21 @@ public final class CallGraphBuilder {
             resolved = mre.resolve();
         } catch (RuntimeException e) {
             rethrowUnlessIsolableResolutionFailure(e);
-            // method call と同等に bytecode 救済 → external-target
-            // 分類を試みてから diagnostic 化する。
-            BytecodeRescue.Rescue rescue =
-                    bytecodeRescue.methodReferenceRescue(mre, () -> inferFunctionalInterfaceArity(mre));
-            if (rescue != null) {
-                emitBytecodeOnlyCall(mre, ctx, rescue, true);
-                commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
-                return;
-            }
-            String referenceOwner = bytecodeRescue.methodReferenceOwner(mre);
-            if (referenceOwner != null && declIndex.find(referenceOwner).isEmpty()) {
-                commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
-                return;
-            }
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mre.getScope(), null);
-            diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-method-reference", mre.getIdentifier(), metadata);
+            recordResolutionFailure(
+                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    unresolvedCallClassifier.classifyMethodReference(mre, () -> inferFunctionalInterfaceArity(mre)),
+                    new PendingDiagnostic(
+                            "unresolved-method-reference", mre.getIdentifier(),
+                            () -> diagnostics.metadataOf(
+                                    UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mre.getScope(), null)));
             return;
         }
 
-        // solver が合成した bytecode-only member への reference は、method call の synthesized 経路と
-        // 同じ出力契約 (sourceLocation 省略 + owner metadata + calleeOrigin edge)
-        // で emit する (従来この経路は通常 symbol として emit され、
-        // この出力契約から漏れていた)。
         SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
         if (bytecodeOnly != null) {
-            BytecodeRescue.Rescue rescue =
-                    bytecodeOnlyRescue(bytecodeOnly, bytecodeOnly.methodName(), "method");
-            if (rescue == null) {
-                // method call 側と同じ扱い: scope 外 owner の合成 / 注入 member への
-                // 参照は external 分類にする。
-                commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
-                return;
-            }
-            emitBytecodeOnlyCall(mre, ctx, rescue, true);
-            commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+            emitBytecodeOnlyMember(
+                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    bytecodeOnly, bytecodeOnly.methodName(), "method");
             return;
         }
 
@@ -626,15 +511,10 @@ public final class CallGraphBuilder {
         }
 
         MethodSymbol calleeSymbol = methodSymbols.buildMethodSymbol(attribution, resolved);
-        accumulator.addNode(calleeSymbol);
-
         String dispatch = AttributionSites.dispatchOf(resolved);
-        Map<String, Object> metadata = CallEdgeMetadata.forMethodReference(dispatch, ctx.viaLambda());
-        SourceLocation callSite = sourceLocations.sourceLocationOf(mre);
-        for (String callerId : edgeCallers(mre, ctx)) {
-            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
-        }
-        commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+        SourceLocation callSite = emitResolvedEdge(
+                mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, calleeSymbol,
+                CallEdgeMetadata.forMethodReference(dispatch, ctx.viaLambda()));
         emitDispatchCandidateEdges(
                 resolved,
                 dispatch,
@@ -657,28 +537,16 @@ public final class CallGraphBuilder {
         try {
             ResolvedType scopeType = mre.getScope().calculateResolvedType();
             if (!scopeType.isReferenceType()) {
-                Map<String, Object> metadata = diagnostics.metadataOf(
-                        UnresolvedDiagnostics.PHASE_SOLVER_RESOLVE, null, mre.getScope(), null);
-                diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
-                commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString(), metadata);
+                reportUnresolvedConstructorReferenceScope(mre, ctx, null);
                 return;
             }
             scopeDecl = scopeType.asReferenceType().getTypeDeclaration().orElse(null);
             if (scopeDecl == null) {
-                Map<String, Object> metadata = diagnostics.metadataOf(
-                        UnresolvedDiagnostics.PHASE_SOLVER_RESOLVE, null, mre.getScope(), null);
-                diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
-                commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                        "unresolved-constructor-reference", mre.getScope().toString(), metadata);
+                reportUnresolvedConstructorReferenceScope(mre, ctx, null);
                 return;
             }
         } catch (RuntimeException | LinkageError e) {
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_SOLVER_RESOLVE, e, mre.getScope(), null);
-            diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "unresolved-constructor-reference", mre.getScope().toString(), metadata);
+            reportUnresolvedConstructorReferenceScope(mre, ctx, e);
             return;
         }
 
@@ -697,41 +565,35 @@ public final class CallGraphBuilder {
             BytecodeRescue.Rescue rescue =
                     bytecodeRescue.constructorReferenceRescue(scopeDecl, () -> inferFunctionalInterfaceArity(mre));
             if (rescue != null) {
-                emitBytecodeOnlyCall(mre, ctx, rescue, true);
-                commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+                emitBytecodeOnlyCall(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, rescue);
                 return;
             }
-            Map<String, Object> metadata = diagnostics.metadataOf(
-                    UnresolvedDiagnostics.PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null);
-            diagnostics.reportUnresolved(mre, ctx.callerMethodIds(), metadata);
-            commitDiagnostic(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
-                    "ambiguous-constructor-reference", mre.getScope().toString(), metadata);
+            reportAndCommitUnresolved(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    "ambiguous-constructor-reference", mre.getScope().toString(),
+                    diagnostics.metadataOf(
+                            UnresolvedDiagnostics.PHASE_CONSTRUCTOR_REFERENCE_SELECTION, null, mre.getScope(), null));
             return;
         }
 
-        // 選択結果が AST 注入の bytecode-only constructor なら、call 側と同じ出力契約で emit する。
         SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolvedCtor);
         if (injectedCtor != null) {
-            BytecodeRescue.Rescue rescue =
-                    bytecodeOnlyRescue(injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
-            if (rescue == null) {
-                commitExcludedExternal(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
-                return;
-            }
-            emitBytecodeOnlyCall(mre, ctx, rescue, true);
-            commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+            emitBytecodeOnlyMember(
+                    mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                    injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
             return;
         }
 
         MethodSymbol calleeSymbol = methodSymbols.buildConstructorSymbol(attribution, resolvedCtor);
-        accumulator.addNode(calleeSymbol);
+        emitResolvedEdge(
+                mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, calleeSymbol,
+                CallEdgeMetadata.forMethodReference(null, ctx.viaLambda()));
+    }
 
-        Map<String, Object> metadata = CallEdgeMetadata.forMethodReference(null, ctx.viaLambda());
-        SourceLocation callSite = sourceLocations.sourceLocationOf(mre);
-        for (String callerId : edgeCallers(mre, ctx)) {
-            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, metadata);
-        }
-        commitEmitted(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx);
+    /** constructor reference の参照先の型を solver が決められなかったことを診断と ledger に残す。 */
+    private void reportUnresolvedConstructorReferenceScope(MethodReferenceExpr mre, WalkContext ctx, Throwable failure) {
+        reportAndCommitUnresolved(mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
+                "unresolved-constructor-reference", mre.getScope().toString(),
+                diagnostics.metadataOf(UnresolvedDiagnostics.PHASE_SOLVER_RESOLVE, failure, mre.getScope(), null));
     }
 
     /**
@@ -852,6 +714,57 @@ public final class CallGraphBuilder {
         }
     }
 
+    /**
+     * 解決できた callee を node として積み、caller ごとの edge を足して emitted を記録する。
+     *
+     * @return edge に付けた call site の位置。dispatch の候補の edge にも同じ位置を使う
+     */
+    private SourceLocation emitResolvedEdge(
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx, MethodSymbol calleeSymbol,
+            Map<String, Object> edgeMetadata) {
+        accumulator.addNode(calleeSymbol);
+        SourceLocation callSite = sourceLocations.sourceLocationOf(callNode);
+        for (String callerId : edgeCallers(callNode, ctx)) {
+            accumulator.addEdge(callerId, calleeSymbol.methodId(), callSite, edgeMetadata);
+        }
+        commitEmitted(callNode, kind, ctx);
+        return callSite;
+    }
+
+    /** 解決できなかった call site を、streaming する diagnostic と ledger の終端の両方に記録する。 */
+    private void reportAndCommitUnresolved(
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target,
+            Map<String, Object> diagnosticMetadata) {
+        diagnostics.reportUnresolved(callNode, ctx.callerMethodIds(), diagnosticMetadata);
+        commitDiagnostic(callNode, kind, ctx, reason, target, diagnosticMetadata);
+    }
+
+    /**
+     * 分類が救済にも external にも至らなかったときに、diagnostic と ledger に残す内容。
+     *
+     * @param reason ledger の reason
+     * @param target ledger の target
+     * @param metadata 診断の metadata。diagnostic に残すときだけ評価する
+     */
+    private record PendingDiagnostic(String reason, String target, Supplier<Map<String, Object>> metadata) {
+    }
+
+    /**
+     * resolve できなかった call site を、分類の結果に応じて救済した member の edge、external の除外、
+     * diagnostic のどれかで記録する。
+     */
+    private void recordResolutionFailure(
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx,
+            UnresolvedCallClassifier.Classification classification, PendingDiagnostic pending) {
+        switch (classification) {
+            case UnresolvedCallClassifier.Rescued rescued ->
+                    emitBytecodeOnlyCall(callNode, kind, ctx, rescued.rescue());
+            case UnresolvedCallClassifier.External _ -> commitExcludedExternal(callNode, kind, ctx);
+            case UnresolvedCallClassifier.Unresolved _ -> reportAndCommitUnresolved(
+                    callNode, kind, ctx, pending.reason(), pending.target(), pending.metadata().get());
+        }
+    }
+
     private void commitDiagnostic(
             Node callNode, CallSiteId.CallKind kind, WalkContext ctx, String reason, String target,
             Map<String, Object> diagnosticMetadata) {
@@ -871,14 +784,31 @@ public final class CallGraphBuilder {
     // ------------------------------------------------------------------
 
     /**
-     * 合成 / 注入の bytecode-only member を、救済経路と同じ出力契約へ載せる。
-     * owner が scope 外 (include/exclude で除外された file の型など、solver からは
-     * 見えるが宣言索引に載らない型) の場合は null を返し、呼び出し側で external
-     * 分類へ落とす (fatal にしない)。
+     * solver が合成した、または AST へ注入した bytecode-only member に解決した call site を、
+     * 救済した member と同じ出力契約 (sourceLocation を省き、owner の位置を metadata に置き、
+     * edge に calleeOrigin を付ける) で emit する。owner が scope の外なら external として除外する。
      *
      * @param nameToken method は candidate の method 名、constructor は
      *     {@link MethodIds#CONSTRUCTOR_TOKEN}
      * @param symbolKind {@code "method"} または {@code "constructor"}
+     */
+    private void emitBytecodeOnlyMember(
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx,
+            SootUpTypeHierarchyIndex.MethodCandidate candidate, String nameToken, String symbolKind) {
+        BytecodeRescue.Rescue rescue = bytecodeOnlyRescue(candidate, nameToken, symbolKind);
+        if (rescue == null) {
+            // solver からは見えても宣言索引に載らない owner は、include と exclude で外した file の型であり、
+            // 解析の失敗ではないので fatal にしない。
+            commitExcludedExternal(callNode, kind, ctx);
+            return;
+        }
+        emitBytecodeOnlyCall(callNode, kind, ctx, rescue);
+    }
+
+    /**
+     * 合成 / 注入の bytecode-only member を、救済した member と同じ形の {@link BytecodeRescue.Rescue} にする。
+     * owner が scope 外 (include/exclude で除外された file の型など、solver からは
+     * 見えるが宣言索引に載らない型) の場合は null を返す。
      */
     private BytecodeRescue.Rescue bytecodeOnlyRescue(
             SootUpTypeHierarchyIndex.MethodCandidate candidate, String nameToken, String symbolKind) {
@@ -918,9 +848,9 @@ public final class CallGraphBuilder {
         return null;
     }
 
-    /** 救済で採用した bytecode-only member を node + edge として出力する (出力契約)。 */
+    /** 救済で採用した bytecode-only member を node と edge として出力し、emitted を記録する。 */
     private void emitBytecodeOnlyCall(
-            Node callNode, WalkContext ctx, BytecodeRescue.Rescue rescue, boolean viaMethodReference) {
+            Node callNode, CallSiteId.CallKind kind, WalkContext ctx, BytecodeRescue.Rescue rescue) {
         String signature = MethodIds.signature(
                 rescue.declaringType(), rescue.methodNameToken(), rescue.parameterTypes());
         String methodId = MethodIds.methodId(signature);
@@ -946,13 +876,14 @@ public final class CallGraphBuilder {
         if (ctx.viaLambda()) {
             metadata.put("viaLambda", true);
         }
-        if (viaMethodReference) {
+        if (kind == CallSiteId.CallKind.METHOD_REFERENCE) {
             metadata.put("viaMethodReference", true);
         }
         SourceLocation callSite = sourceLocations.sourceLocationOf(callNode);
         for (String callerId : edgeCallers(callNode, ctx)) {
             accumulator.addEdge(callerId, methodId, callSite, metadata);
         }
+        commitEmitted(callNode, kind, ctx);
     }
 
     /**

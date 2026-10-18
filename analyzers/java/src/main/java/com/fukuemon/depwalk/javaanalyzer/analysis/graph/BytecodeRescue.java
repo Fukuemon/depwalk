@@ -46,7 +46,8 @@ import java.util.function.IntSupplier;
  * 一意 member へ救済できるかを判定し、採用する member を返す。あわせて receiver の owner 型復元と、
  * 救済不能な site を external-target と分類できるかの根拠付き判定を担う。
  *
- * <p>判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。
+ * <p>判定はすべて classfile 上の根拠に基づき、根拠のない型推測は行わない。owner の型が scope の外かどうかの
+ * 判定もここに置く。判定を試す順は {@link UnresolvedCallClassifier} が持つ。
  */
 final class BytecodeRescue {
 
@@ -75,6 +76,11 @@ final class BytecodeRescue {
         this.bytecodeIndex = bytecodeIndex;
         this.reachableOwners = reachableOwners;
         this.genericChainTypes = new GenericChainTypes(bytecodeIndex);
+    }
+
+    /** owner の型が workspace の source 宣言の索引に無ければ、scope の外にあるとみなす。 */
+    boolean isOutsideScope(String ownerBinaryName) {
+        return declIndex.find(ownerBinaryName).isEmpty();
     }
 
     /**
@@ -562,7 +568,7 @@ final class BytecodeRescue {
         while (cursor != null && guard++ < 64) {
             String erasure = tryTypeErasureOf(cursor);
             if (erasure != null) {
-                if (declIndex.find(erasure).isPresent()) {
+                if (!isOutsideScope(erasure)) {
                     return false;
                 }
                 return forwardVerifyExternalChain(erasure, links);
@@ -595,7 +601,7 @@ final class BytecodeRescue {
                     return false;
                 }
                 String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
-                if (fieldType == null || declIndex.find(fieldType).isPresent()) {
+                if (fieldType == null || !isOutsideScope(fieldType)) {
                     return false;
                 }
                 return forwardVerifyExternalChain(fieldType, links);
@@ -603,7 +609,7 @@ final class BytecodeRescue {
             if (cursor instanceof FieldAccessExpr fieldAccess
                     && fieldAccess.getScope() instanceof ThisExpr) {
                 String fieldType = enclosingBytecodeFieldType(fieldAccess.getNameAsString(), enclosingTypeNode);
-                if (fieldType == null || declIndex.find(fieldType).isPresent()) {
+                if (fieldType == null || !isOutsideScope(fieldType)) {
                     return false;
                 }
                 return forwardVerifyExternalChain(fieldType, links);
@@ -643,7 +649,7 @@ final class BytecodeRescue {
             if (ERASED_TYPE_VARIABLE_BOUND.equals(returnType)) {
                 return false;
             }
-            if (declIndex.find(returnType).isPresent()) {
+            if (!isOutsideScope(returnType)) {
                 return false;
             }
             currentOwner = returnType;
@@ -715,7 +721,7 @@ final class BytecodeRescue {
             if (parent instanceof VariableDeclarator declarator) {
                 try {
                     String owner = BinaryNames.erasureOf(declarator.getType().resolve());
-                    return declIndex.find(owner).isEmpty();
+                    return isOutsideScope(owner);
                 } catch (RuntimeException | LinkageError e) {
                     return false;
                 }
