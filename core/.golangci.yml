@@ -1,10 +1,10 @@
-# 依存方向の機械検査 (判断の正本は ADR-0007)。
+# 依存方向と、export した識別子の doc の機械検査。
 #
-# 依存規則の正本は context/codebase.md の Dependency Rules。ここは
-# それを package 単位の deny ルールへ機械的に写したもので、規則を変える
-# ときは codebase.md を先に直す。
+# depguard のルールは、package の間の依存の規則を package 単位の deny ルールへ
+# 機械的に写したもの。revive は exported のルールだけを使い、export した識別子に
+# doc がないことを指摘する。
 #
-# 有効化するのは depguard のみ (他の linter は必要になった時点で判断する)。
+# 有効化するのは depguard と revive のみ (他の linter は必要になった時点で判断する)。
 #
 # 記法の約束:
 #   - `pkg` 末尾の `$` は完全一致 (既定は前方一致)。付けないと
@@ -24,8 +24,13 @@ linters:
   default: none
   enable:
     - depguard
+    - revive
 
   settings:
+    revive:
+      rules:
+        - name: exported
+
     depguard:
       rules:
         # graph は domain の最内層。他の internal package に依存しない。
@@ -226,8 +231,7 @@ linters:
         # depguard は「ルールが宣言された package だけ」を検査する default-allow
         # なので、新しい package を足すとどの deny にも当たらず何でも import
         # できてしまう。既知 package を除外した catch-all を置いて、新 package が
-        # 無検査のまま入るのを防ぐ (このルールに引っかかったら、上に専用ルールを
-        # 追加し、同時に context/codebase.md の Dependency Rules へ追記する)。
+        # 無検査のまま入るのを防ぐ。
         #
         # cli はコンポジションルートとして全 package を import してよいため
         # 除外する (依存性ルールの例外ではなく最外層の役割)。

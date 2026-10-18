@@ -47,7 +47,7 @@ git ls-files -z '*.md' | xargs -0 pnpm exec textlint
 
 - 保護するブランチへの直接のコミットと push を止める。
 - ステージしたファイルを prettier で整形し、Markdown に textlint を掛ける。
-- Go のコードや依存のルールを変えたときは、依存の向きのチェック（golangci-lint の depguard）と、依存図の生成し直しを行う。
+- Go のコードや依存のルールを変えたときは、golangci-lint のチェック（depguard の依存の向きと、revive の export した識別子の doc）と、依存図の生成し直しを行う。
 - commit-msg のフックで、commitlint がメッセージの形式を確かめる。規則は `commitlint.config.mjs` にある。
 - `feature/<issue 番号>` のブランチでは、commit-msg のフックが、要約に `#<issue 番号>` がなければ末尾に足す。ほかのブランチでは足さない。
 

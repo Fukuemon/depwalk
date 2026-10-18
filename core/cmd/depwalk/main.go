@@ -1,3 +1,5 @@
+// Command depwalk は、ソースコードの呼び出しグラフを Analyzer で作り、メソッドの
+// caller と callee を辿る CLI である。
 package main
 
 import (

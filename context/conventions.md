@@ -78,7 +78,7 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 この節の規約は、スキル write-comments より優先する。スキルとの違いは次の 3 つ。
 
 - write-comments は残してよい実装のコメントを 3 種類に限る。このリポジトリでは、採らなかった方法とその理由、冗長に見える処理が要る理由、破ると動かなくなる不変条件も書いてよい。
-- write-comments は文書コメントの有無を lint で確かめるとするが、このリポジトリでは lint（Go の revive の exported、Java の Checkstyle）を入れていない。
+- write-comments は文書コメントの有無を lint で確かめるとする。このリポジトリでは、Go は revive の exported で確かめるが、Java には Checkstyle を入れていない。
 - write-comments は外部の制約のコメントに issue や仕様へのリンクを添えるとするが、このリポジトリでは添えない。
 
 ## Documents
@@ -112,7 +112,7 @@ ADR は、決定した時点の記録として書き換えない。
 
 Core の共有の設定は、Go の標準のコマンドを優先し、専用の設定ファイルを増やさない。
 
-- golangci-lint の設定は `core/.golangci.yml` に置き、depguard だけを有効にする。
+- golangci-lint の設定は `core/.golangci.yml` に置き、depguard と、revive の exported のルールだけを有効にする。
 - golangci-lint は `scripts/golangci-lint.sh` からだけ実行し、lefthook と CI は同じスクリプトを呼ぶ。
 
 リポジトリのタスクは、それぞれのディレクトリの標準のコマンドで実行する。

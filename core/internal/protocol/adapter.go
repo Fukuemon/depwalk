@@ -20,10 +20,19 @@ type Adapter struct {
 	command analyzer.Command
 }
 
+// NewAdapter は command で Analyzer を起動する [Adapter] を返す。
 func NewAdapter(command analyzer.Command) *Adapter {
 	return &Adapter{command: command}
 }
 
+// Run は request から analysisRequest を組み立てて Analyzer を 1 回動かし、
+// methodSymbol と callEdge の record を domain 値へ変換して届いた順に onNode と
+// onEdge へ渡す。graph の値を使わない呼び出し側は nil を渡してよい。
+//
+// 要求が protocol の検証に通らないときは、process を起動せずに
+// [analyze.InputError] を返す。process を起動できないときと stdio が失敗したときも
+// error を返す。Analyzer が報告した失敗と stdout の検証の失敗は error ではなく
+// [analyze.Outcome] に入れて返す。
 func (a *Adapter) Run(
 	request analyze.Request,
 	onNode func(graph.Node),

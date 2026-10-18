@@ -16,6 +16,7 @@ type Client struct {
 	command analyzer.Command
 }
 
+// NewClient は command で Analyzer を起動する [Client] を返す。
 func NewClient(command analyzer.Command) Client {
 	return Client{command: command}
 }
