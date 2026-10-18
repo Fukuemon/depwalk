@@ -79,7 +79,7 @@ class AnalysisContextFactoryTest {
         try {
             Files.createSymbolicLink(link, outside);
         } catch (UnsupportedOperationException | java.io.IOException e) {
-            return; // platform without symlink support
+            return; // symlink を作れない platform では確かめない
         }
 
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
@@ -103,7 +103,6 @@ class AnalysisContextFactoryTest {
     @Test
     @DisplayName("NUL 文字を含み path として解釈できない source root は、InvalidPathException を漏らさず不正な要求 (JAVA_INVALID_REQUEST) として拒否する")
     void rejectsUnparseableSourceRootAsInvalidRequest() {
-        // NUL を含む値は InvalidPathException を漏らさず invalid request にする。
         AnalyzerFatalException e = assertThrows(AnalyzerFatalException.class,
                 () -> AnalysisContextFactory.explicitContext(
                         workspace, List.of("src\0bad"), List.of(), metadata("17")));

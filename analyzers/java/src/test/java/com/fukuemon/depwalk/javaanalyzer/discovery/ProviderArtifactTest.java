@@ -14,9 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 同梱 provider artifact の binary 境界を検証する: Gradle 7.6.x daemon の
- * Java 8 で load できる classfile major 52 のみで構成され、Analyzer 本体の
- * JDK 25 class を含まない。
+ * provider の jar は、Gradle 7.6.x の daemon の Java 8 で load できる classfile major 52 だけで構成し、
+ * Analyzer 本体の JDK 25 の class を含めない。
  */
 @DisplayName("同梱 provider jar の binary 境界")
 class ProviderArtifactTest {

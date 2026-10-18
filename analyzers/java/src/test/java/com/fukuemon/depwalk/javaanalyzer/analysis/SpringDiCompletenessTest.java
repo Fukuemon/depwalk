@@ -10,12 +10,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Spring DI の索引の失敗は graph の欠けとして完全性 gate で {@code JAVA_INCOMPLETE_ANALYSIS} にし、
- * 候補のない注入点は宣言型への edge が残るため gate に入れないことを検証する。
+ * 候補のない注入点は、宣言型への edge が残るので、完全性の検査に入れない。
  */
 @DisplayName("Spring DI の索引の失敗と候補のない注入点の、完全性 gate (JAVA_INCOMPLETE_ANALYSIS) での扱い")
 class SpringDiCompletenessTest {
@@ -23,7 +23,6 @@ class SpringDiCompletenessTest {
     @TempDir
     Path workspace;
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Spring DI の索引で例外が起きた file があるとき、索引の失敗を details に載せて解析を fatal にする")
     void springDiIndexFailureFailsTheRequest() throws Exception {
@@ -36,19 +35,19 @@ class SpringDiCompletenessTest {
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", errors.get(0).get("code"));
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         Map<String, Object> detail = details.stream()
                 .filter(d -> "spring-di-index-failed".equals(metadataOf(d).get("reason")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("expected a spring-di-index-failed detail: " + details));
         assertEquals("JAVA_UNRESOLVED_SYMBOL", detail.get("code"));
         assertEquals("com/example/AppConfig.java",
-                ((Map<String, Object>) detail.get("sourceLocation")).get("path"));
+                ((Map<?, ?>) detail.get("sourceLocation")).get("path"));
         assertTrue(((String) metadataOf(detail).get("exceptionClass")).matches("[\\w.$]+"),
                 () -> "exceptionClass must be a bare class name: " + detail);
 
-        Map<String, Object> metadata = (Map<String, Object>) errors.get(0).get("metadata");
-        Map<String, Object> reasonCounts = (Map<String, Object>) metadata.get("reasonCounts");
+        Map<String, Object> metadata = AnalysisTestSupport.field(errors.get(0), "metadata");
+        Map<String, Object> reasonCounts = AnalysisTestSupport.field(metadata, "reasonCounts");
         assertEquals(1, ((Number) reasonCounts.get("JAVA_UNRESOLVED_SYMBOL:spring-di-index-failed")).intValue());
         assertEquals(details.size(), ((Number) metadata.get("total")).intValue());
     }
@@ -133,11 +132,6 @@ class SpringDiCompletenessTest {
                     Missing missing() { return null; }
                 }
                 """);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> metadataOf(Map<String, Object> detail) {
-        return (Map<String, Object>) detail.get("metadata");
     }
 
     private void write(String relative, String source) throws Exception {

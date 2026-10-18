@@ -14,9 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * {@code callEdge.metadata.dispatch} の値 (static / virtual / interface / abstract) を検証する。
- */
 @DisplayName("呼び出し種別 (callEdge.metadata.dispatch) の記録")
 class DispatchTest {
 

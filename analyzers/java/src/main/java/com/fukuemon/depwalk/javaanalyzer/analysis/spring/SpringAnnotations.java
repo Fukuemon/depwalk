@@ -34,9 +34,8 @@ final class SpringAnnotations {
             CONFIGURATION);
 
     /**
-     * Framework entry point annotations: methods the framework may invoke directly.
-     * The marker semantics and the composed-annotation detection live in
-     * {@link EntryPointIndex}; this set is the single source of the FQNs.
+     * framework が直接起動しうる method に付く entry point アノテーションの FQN。
+     * 標識の意味と合成アノテーションの検出は {@link EntryPointIndex} が持ち、FQN の一覧はこの集合だけに置く。
      */
     static final Set<String> ENTRY_POINT_ANNOTATIONS = Set.of(
             "org.springframework.scheduling.annotation.Scheduled",

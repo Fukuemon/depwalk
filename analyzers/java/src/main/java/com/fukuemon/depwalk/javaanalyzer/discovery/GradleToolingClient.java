@@ -26,7 +26,7 @@ public final class GradleToolingClient implements ToolingClient {
      * 通常経路: wrapper があれば build distribution、なければ同梱 version。
      *
      * @param daemonJavaHome Gradle daemon に使う JVM の java home (明示 override)。
-     *     null なら選択を Gradle に委ねる (従来挙動)。request の
+     *     null なら選択を Gradle に委ねる。request の
      *     {@code metadata.gradleJavaHome} に対応する
      */
     public GradleToolingClient(Path daemonJavaHome) {

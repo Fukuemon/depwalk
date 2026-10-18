@@ -15,16 +15,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * cross-module 救済の検証: 依存 project の classes output にしか存在しない生成 member への
- * cross-module 呼び出しが、bytecode-only member の出力契約で edge になる。
- * BytecodeOnlyMemberTest と同じく generator 非依存 (完全 source を compile した
- * classes + member を削った解析対象 source) で、Lombok 等の生成 member を模擬する。
+ * fixture は、完全な source を compile した classes と、member を削った解析対象の source の組で、
+ * Lombok のような generator が生成した member を模す。
  */
 @DisplayName("module を跨いだ bytecode-only member の救済")
 class CrossModuleBytecodeRescueTest {
-
-    /** SootUp 2.0 が読める classfile 範囲に合わせる (BytecodeOnlyMemberTest と同じ)。 */
-    private static final String FIXTURE_CLASSFILE_RELEASE = "25";
 
     @TempDir
     Path temp;
@@ -44,7 +39,6 @@ class CrossModuleBytecodeRescueTest {
         appClasses = Files.createDirectories(workspace.resolve("app/classes"));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("依存 module の bytecode にしか存在しない getter への module 跨ぎ呼び出しが、救済されて呼び出し関係 (edge) になる")
     void rescuesCrossModuleCallToBytecodeOnlyGetter() throws Exception {
@@ -75,11 +69,10 @@ class CrossModuleBytecodeRescueTest {
 
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#getName()");
-        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("依存 module の bytecode にしか存在しない constructor への module 跨ぎ呼び出しも、同じ出力契約で救済される")
     void rescuesCrossModuleCallToBytecodeOnlyConstructor() throws Exception {
@@ -109,19 +102,16 @@ class CrossModuleBytecodeRescueTest {
 
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#<init>(java.lang.String)");
-        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("依存 module が jar として classpath に載る場合でも、model の project 依存関係を根拠にして救済される")
     void rescuesCrossModuleCallWhenDependencyAppearsAsJarOnClasspath() throws Exception {
-        // Gradle model は依存 project を jar として classpath へ返すことがある。
-        // その場合 classpath 照合では :lib の output と分からず、model の
-        // project 依存関係からの解決だけが cross-module 救済の根拠になる。
-        // classes directory 直載せのケースでは退行を検知できない、この解決
-        // 経路そのものを固定する。
+        // Gradle の model は、依存 project を jar として classpath へ返すことがある。
+        // そのとき classpath を照合しても :lib の output と分からず、model の project の依存関係だけが
+        // 救済の根拠になる。classes directory を直に載せる場合では、この経路の退行を検出できない。
         compile(libClasses, List.of(), "lib-full", "com/example/lib/LibModel.java", """
                 package com.example.lib;
                 public class LibModel {
@@ -155,12 +145,12 @@ class CrossModuleBytecodeRescueTest {
 
         assertEquals(0, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         Map<String, Object> edge = edgeTo(ran, "java:com.example.lib.LibModel#getName()");
-        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
     /**
-     * :app が :lib に依存する 2 context 構成 (E2E の multi-module fixture の最小形)。
+     * :app が :lib に依存する 2 つの context の構成を返す。
      *
      * @param appClasspathEntry :app の compile classpath に載せる :lib の成果物。
      *     classes directory を渡すと classpath 照合でも project output と分かる形、
@@ -197,7 +187,7 @@ class CrossModuleBytecodeRescueTest {
         Path build = temp.resolve(srcDirName);
         write(build, relative, source);
         List<String> args = new ArrayList<>(
-                List.of("--release", FIXTURE_CLASSFILE_RELEASE, "-d", classesDir.toString()));
+                List.of("--release", AnalysisTestSupport.FIXTURE_RELEASE, "-d", classesDir.toString()));
         if (!classpath.isEmpty()) {
             args.add("-cp");
             args.add(String.join(java.io.File.pathSeparator, classpath.stream().map(Path::toString).toList()));

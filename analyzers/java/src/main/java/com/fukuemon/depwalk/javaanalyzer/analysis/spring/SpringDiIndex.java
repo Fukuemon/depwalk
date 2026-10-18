@@ -674,9 +674,9 @@ public final class SpringDiIndex {
     /**
      * 解決済み宣言の ancestor のうち、宣言を引ける型の binary name を best-effort で
      * 収集する。直接 ancestor を許容モードで辿る BFS とし、解決できない枝は skip
-     * する。かつては getAllAncestors の一括取得だったため、外部基底 1 つの解決
-     * 失敗で workspace interface への代入可能性ごと失われ、「Bean 候補なし」の誤
-     * 診断になっていた。
+     * する。getAllAncestors による一括取得は採らない。理由は、外部基底 1 つの解決に
+     * 失敗すると workspace interface への代入可能性まで失われ、「Bean 候補なし」と
+     * 誤って診断するため。
      */
     private static void addAncestorTypes(ResolvedReferenceTypeDeclaration declaration, Set<String> types) {
         java.util.ArrayDeque<ResolvedReferenceTypeDeclaration> queue = new java.util.ArrayDeque<>();

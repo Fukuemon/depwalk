@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * SootUp 2.0.0 の bytecode view を使い、interface / abstract / virtual dispatch の実装候補と
+ * SootUp の bytecode view を使い、interface / abstract / virtual dispatch の実装候補と
  * bytecode 上の constructor を引くための run-local index。
  *
  * <p>view と type hierarchy は最初の問い合わせまで生成しない。SootUp の
@@ -52,7 +52,7 @@ public final class SootUpTypeHierarchyIndex {
             parameterTypes = List.copyOf(parameterTypes);
         }
 
-        /** 戻り値型・static 性を使わない照会用の互換 constructor。 */
+        /** 戻り値型と static 性を使わない照会のための constructor。戻り値型は void、static でないものとして扱う。 */
         public MethodCandidate(String declaringType, String methodName, List<String> parameterTypes) {
             this(declaringType, methodName, parameterTypes, "void", false);
         }
@@ -196,9 +196,6 @@ public final class SootUpTypeHierarchyIndex {
             List<String> parameterTypes) {
         List<String> bounds = receiverTypes.stream().distinct().toList();
         if (bounds.size() == 1) {
-            // 上限が 1 つなら積集合を取る余地がなく単一 receiver 版と同じ意味論になる。
-            // 委譲することで結果キャッシュと interface default の実効候補判定を共有する
-            // (交差境界だけが本メソッド固有の処理)。
             return resolveMethod(declaringType, bounds.get(0), methodName, parameterTypes);
         }
         IntersectionKey key = new IntersectionKey(declaringType, bounds, methodName, parameterTypes);

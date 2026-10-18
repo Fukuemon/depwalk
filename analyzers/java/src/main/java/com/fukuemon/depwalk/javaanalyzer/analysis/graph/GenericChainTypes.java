@@ -38,7 +38,7 @@ import java.util.Set;
  * </ul>
  *
  * <p>lambda parameter の型は、lambda を受ける呼び出しの receiver 要素型から導出する。
- * 導出できない式は null を返し、呼び出し側が従来の分類 (diagnostic) に残す。
+ * 導出できない式は null を返し、呼び出し側はその call site を diagnostic に残す。
  */
 final class GenericChainTypes {
 
@@ -283,10 +283,10 @@ final class GenericChainTypes {
         return new Model(model.binaryName(), List.copyOf(args));
     }
 
-    // ------------------------------------------------------------------
-    // JDK コレクション / Stream / Optional / Map の宣言済み generic 意味論
-    // ------------------------------------------------------------------
-
+    /**
+     * JDK のコレクション / Stream / Optional / Map の宣言済み generic 意味論で、member 呼び出しの
+     * 戻り値 model を返す。固定表に無い member は null。
+     */
     private Model jdkResultModel(
             Model receiver, MethodCallExpr call, Map<String, Model> lambdaBindings, int depth) {
         String owner = receiver.binaryName();
@@ -470,7 +470,6 @@ final class GenericChainTypes {
                 }
                 return instanceBytecodeReturnModel(owner, reference.getIdentifier(), 0);
             }
-            // bound method reference (式 scope): receiver 式の model に入力 1 個を適用する。
             Model receiver = typeOf(scope, lambdaBindings, depth + 1);
             if (receiver == null) {
                 return null;
@@ -509,10 +508,6 @@ final class GenericChainTypes {
         MethodCallExpr probe = new MethodCallExpr(reference.getIdentifier(), new NameExpr("arg0"));
         return memberResultModel(receiver, probe, lambdaBindings, depth + 1);
     }
-
-    // ------------------------------------------------------------------
-    // AST 上の宣言の探索 (型解決を伴わない)
-    // ------------------------------------------------------------------
 
     /** 名前を parameter として宣言している最内の lambda。無ければ null。 */
     private static LambdaExpr declaringLambda(NameExpr name) {

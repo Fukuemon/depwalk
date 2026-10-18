@@ -15,9 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ステップ 1: {@code JarTypeSolver}（classpath の依存 jar）を経由した型解決の疎通確認。
- * jackson-databind は本プロジェクトの既存依存であり、test classpath 上の実 jar path を
- * リフレクション経由で取得して {@code analysisRequest.metadata.classpath} に渡す。
+ * jackson-databind はこの project の既存の依存なので、test の classpath にある実際の jar の path を
+ * reflection で取り出して {@code analysisRequest.metadata.classpath} に渡す。
  */
 @DisplayName("依存 jar (JarTypeSolver) を経由した型解決")
 class JarTypeSolverTest {

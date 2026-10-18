@@ -22,12 +22,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 複数 context (依存 project 関係) を要する unit test 用の実行ヘルパー。
- * 実 Gradle / Tooling API を起動せず、in-memory の fake build model から
- * production の {@link AnalysisContextFactory#discoveredContexts} で context を
- * 構築し、{@link AnalysisRunner#run} を駆動する。model 取得 (Tooling API /
- * daemon / provider 配布) だけが検証範囲から外れ、その部分は required E2E
- * ({@code core/e2e}) が実 Gradle で担う。
+ * 依存し合う project の context を複数要する test のための補助。
+ * 実際の Gradle と Tooling API を起動せず、メモリの上の偽の build model から
+ * {@link AnalysisContextFactory#discoveredContexts} で context を組み立て、{@link AnalysisRunner#run} を動かす。
+ * model の取得 (Tooling API、daemon、provider の配布) は範囲の外で、実際の Gradle を使う E2E のテストが確かめる。
  */
 final class MultiContextAnalysisTestSupport {
 
@@ -175,7 +173,7 @@ final class MultiContextAnalysisTestSupport {
         List<Map<String, Object>> records = new ArrayList<>();
         for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, Map.class));
+                records.add(mapper.readValue(line, AnalysisTestSupport.JSON_OBJECT));
             }
         }
         return new AnalysisTestSupport.Ran(exitCode, records, summary);

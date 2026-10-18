@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 匿名クラス / ローカルクラスの binary name 採番が JVM (javac) と互換であることを検証する。
+ * javac の採番の規則は次のとおりである。
  * <ul>
  *   <li>匿名クラス: 直近の enclosing class ごとに 1 始まりのソース出現順
  *       ({@code Outer$Nested} 内の最初の匿名クラスは、{@code Outer} 直下に先行する匿名クラスが
@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>ローカルクラス: {@code Outer$<n><Name>} 形式。n は同名ローカルクラスの enclosing class 内
  *       出現順。</li>
  * </ul>
- * javac が実際に生成する class ファイル名と突合して互換性を確認する。
  */
 @DisplayName("匿名クラス / ローカルクラスの binary name 採番の JVM 互換性")
 class BinaryNameNumberingTest {

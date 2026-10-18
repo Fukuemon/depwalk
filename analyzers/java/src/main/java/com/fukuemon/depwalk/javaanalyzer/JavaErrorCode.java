@@ -2,12 +2,11 @@ package com.fukuemon.depwalk.javaanalyzer;
 
 /**
  * Java Analyzer 固有の {@code error} code (fatal / 非ゼロ exit)。
- * {@code JAVA_UNRESOLVED_SYMBOL} / {@code JAVA_PARSE_ERROR} / {@code JAVA_ENTRYPOINT_NOT_FOUND} は
- * 解析を継続できる diagnostic であるため、fatal error を表す本 enum には含めない。
+ * 解析を継続できる問題の code は {@link JavaDiagnosticCode} が持つ。
  */
 public enum JavaErrorCode {
 
-    /** analysisRequest.metadata に classpath の key が無い。 */
+    /** 明示の sourceRoots の analysisRequest で、metadata に classpath の key が無い。 */
     JAVA_MISSING_CLASSPATH,
 
     /** classpath に指定された jar / classes dir が存在しない・読めない。 */

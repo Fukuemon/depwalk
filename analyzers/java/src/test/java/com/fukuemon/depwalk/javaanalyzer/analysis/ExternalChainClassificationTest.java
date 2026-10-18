@@ -10,14 +10,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * receiver 型が取れない call の external-target 分類を検証する。
- * (i) chain 起点遡及 — 起点の静的型が scope 外なら後続 call を external
- * へ、scope 内型が現れたら diagnostic のまま。(ii) lambda parameter — 引数先
- * functional interface が scope 外型なら external へ。
+ * receiver の型が取れない呼び出しを external とみなす根拠は 2 つに限る。
+ * chain の起点の静的型が scope 外であること (途中で scope 内の型が現れたら diagnostic のまま残す) と、
+ * lambda を代入した先の functional interface が scope 外の型であることである。
  */
 @DisplayName("receiver 型が取れない呼び出しの external 分類 (chain 起点の遡及と lambda 引数)")
 class ExternalChainClassificationTest {
@@ -28,13 +28,10 @@ class ExternalChainClassificationTest {
     @Test
     @DisplayName("chain の起点が scope 外型のとき、解決に失敗した後続の呼び出しも external として除外され、診断は出ない")
     void chainWithExternalRootIsClassifiedExternal() throws Exception {
-        // Ext.make() は自己境界 generic 戻り値型 (<T extends Ext> T) で、target-type
-        // context が無い chain 途中の呼び出しでは JavaParser が解決に失敗する
-        // (実測パターンと同型: メソッド自体は classfile 上に実在する)。chain 起点
-        // e (Ext = scope 外 classes-only 型) から、forwardVerifyExternalChain が
-        // make() を classfile 上で一意に確認できるため、両 call とも
-        // external-target 除外になる (存在しないメソッド名で解決失敗を模擬すると forward 検証が前進できず
-        // 別の分類になるため、実在するメソッドで解決だけが失敗する形にした)。
+        // Ext.make() の戻り値は自己境界の generic (<T extends Ext> T) なので、target type のない
+        // chain の途中では JavaParser が解決に失敗する。存在しないメソッド名で失敗を模すと、
+        // classfile での前進の検証が進めず別の分類になるので、classfile に実在するメソッドで
+        // 解決だけが失敗する形にする。
         Path classes = compile("ext-src", "ext-classes",
                 Map.of("com/example/ext/Ext.java", """
                         package com.example.ext;
@@ -66,14 +63,10 @@ class ExternalChainClassificationTest {
                 () -> "both chain links must be external-target: " + ran.stderr());
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("chain の起点が scope 外型でも、途中の呼び出しを classfile 上で確認できないとき、後続は診断のまま残る")
     void chainWithExternalRootStaysDiagnosticWhenIntermediateLinkNotOnClasspath() throws Exception {
-        // root が external というだけで
-        // 中間 link を無条件に external とみなさない。intermediate link
-        // (missingLink) が Ext の classfile に存在しない場合、forward 検証が前進
-        // できず diagnostic を維持することを確認する (false exclusion の回帰ガード)。
+        // missingLink は Ext の classfile にないので、classfile での前進の検証が進めない。
         Path classes = compile("ext2-src", "ext2-classes",
                 Map.of("com/example/ext/Ext.java", """
                         package com.example.ext;
@@ -96,21 +89,18 @@ class ExternalChainClassificationTest {
         assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "unverifiable intermediate link must keep text() as a diagnostic, not silently excluded: "
                         + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("chain の起点が scope 内型で前進解決の候補を 1 つに確定できないとき、external へ倒さず診断のまま残る")
     void chainWithInScopeRootStaysDiagnosticWhenForwardResolutionIsAmbiguous() throws Exception {
-        // Holder は scope 内 source 型。make(String) / make(Integer) の同名同
-        // arity overload により bytecode 候補が一意に決まらず、chain の前進解決
-        // は行えない。chain 起点 h (Holder = scope 内) のため external へ
-        // 倒さず、make / text とも diagnostic に残す (保守側)。
+        // Holder は scope 内の source の型で、同名・同 arity の make(String) と make(Integer) があるので、
+        // bytecode の候補が 1 つに決まらない。
         Path classes = compile("holder-src", "holder-classes",
                 Map.of(
                         "com/example/Dep.java", """
@@ -147,22 +137,18 @@ class ExternalChainClassificationTest {
         assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "ambiguous forward resolution must keep the diagnostic for text(): " + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("scope 外メソッドへ渡した lambda の引数への呼び出しは、受け手の型が scope 外の場合でも診断のまま残る")
     void lambdaPassedToExternalMethodStaysDiagnosticEvenWhenReceiverIsExternal() throws Exception {
-        // PR review 指摘反映 (2026-07-22, 規則 (ii) 撤回の回帰ガード): 受け手
-        // method (ExtApi.each) の receiver 型が external (classes-only) でも、
-        // それだけを根拠に lambda parameter (value) の型を external と決め付け
-        // ない。value の実際の型 (functional interface の型引数) は不明なため、
-        // 保守的に diagnostic を維持する (in-scope 型を引数に取る external API
-        // の呼び出しで false exclusion を起こさないことの確認)。
+        // 受け手のメソッド (ExtApi.each) の receiver の型が scope 外であることは、lambda の parameter
+        // (value) を external とみなす根拠にしない。理由は、value の型は functional interface の
+        // 型引数で決まり、scope 内の型を引数に取る外部の API では誤って除外するからである。
         Path classes = compile("extfn-src", "extfn-classes",
                 Map.of("com/example/ext/ExtApi.java", """
                         package com.example.ext;
@@ -189,21 +175,18 @@ class ExternalChainClassificationTest {
         assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "lambda param passed to an external method must keep the diagnostic for text(): " + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("scope 外の functional interface 型変数へ代入した lambda の引数への呼び出しは、external として除外される")
     void lambdaAssignedToExternalFunctionalInterfaceIsClassifiedExternal() throws Exception {
-        // 規則 (ii) の維持範囲: lambda 自体が代入される変数の宣言型
-        // (functional interface 型そのもの) が external なら、lambda parameter
-        // の型もその関数型が定義する型引数で決まるため、external 判定の根拠として
-        // 使ってよい (受け手 method の receiver 型を見る旧経路とは異なり、
-        // functional interface 自体の宣言を直接見ている)。
+        // lambda を代入する変数の宣言型 (functional interface そのもの) が scope 外なら、lambda の
+        // parameter の型はその型の型引数で決まるので、external とみなす根拠に使える。受け手の
+        // メソッドの receiver の型と違い、functional interface の宣言を直接見ている。
         Path classes = compile("extfn2-src", "extfn2-classes",
                 Map.of("com/example/ext/ExtConsumer.java", """
                         package com.example.ext;
@@ -231,12 +214,10 @@ class ExternalChainClassificationTest {
                 () -> "lambda assigned to an external functional interface type must be excluded: " + ran.stderr());
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("scope 内 functional interface の lambda 引数の型が解決できないとき、診断のまま残る")
     void lambdaParamOfInScopeFunctionalInterfaceStaysDiagnostic() throws Exception {
-        // scope 内 functional interface (引数型が classpath に無く param 型不明) の
-        // lambda は、受け手が暗黙 this (scope 内) のため diagnostic に残す。
+        // 引数の型が classpath にないので parameter の型が分からず、受け手は scope 内の暗黙の this である。
         Path workspace = temp.resolve("infn-workspace");
         write(workspace, "com/example/Caller.java", """
                 package com.example;
@@ -257,19 +238,17 @@ class ExternalChainClassificationTest {
         assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "mystery".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                        "mystery".equals(metadataOf(d).get("target"))),
                 () -> "in-scope functional interface must keep the diagnostic: " + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("scope 内 chain の各呼び出しを classfile の戻り値型で前進解決し、bytecode にしか無い member への呼び出しを呼び出し関係 (edge) として救済する")
     void forwardResolvesChainThroughBytecodeReturnTypes() throws Exception {
-        // scope 内 chain の各 link を classfile の戻り値型で前進
-        // 解決する。Holder.make() / Dep.text() とも source に無い bytecode-only
-        // member で、make の戻り値型 Dep (classfile 由来) から text() を救済する。
+        // Holder.make() と Dep.text() はどちらも source にない bytecode-only member で、
+        // classfile にある make の戻り値型 Dep から text() を救済する。
         Path classes = compile("fwd-src", "fwd-classes",
                 Map.of(
                         "com/example/Dep.java", """
@@ -313,7 +292,6 @@ class ExternalChainClassificationTest {
                 () -> "chain forward resolution must rescue text(): " + edges);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("lambda 引数が同名の field を隠しているとき、field の型を owner として採用せず、除外もせずに診断のまま残る")
     void shadowedFieldNameStaysDiagnosticInsteadOfAdoptingFieldType() throws Exception {
@@ -366,9 +344,9 @@ class ExternalChainClassificationTest {
         assertEquals(1, ran.exitCode(), () -> ran.records().toString() + ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<String, Object>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "shadowed lambda parameter must keep text() as a diagnostic, not excluded via the field type: "
                         + details);
     }
@@ -382,7 +360,7 @@ class ExternalChainClassificationTest {
         }
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
-        List<String> args = new java.util.ArrayList<>(List.of("--release", "25", "-d", classes.toString()));
+        List<String> args = new java.util.ArrayList<>(List.of("--release", AnalysisTestSupport.FIXTURE_RELEASE, "-d", classes.toString()));
         args.addAll(files);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
         assertEquals(0, rc, "fixture compile failed");

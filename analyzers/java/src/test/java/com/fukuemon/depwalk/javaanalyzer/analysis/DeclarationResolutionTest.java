@@ -9,22 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}、{@code constructorCallerIdsFor} 含む) の
- * 解決失敗は、その宣言だけを skip して {@code JAVA_UNRESOLVED_SYMBOL} (warning) を出し、完全性 gate で
- * {@code JAVA_INCOMPLETE_ANALYSIS} にする。{@code allowIncompleteAnalysis} のときは解析全体を継続する
- * (exit 0、他の宣言 / edge は出力される)。
- */
 @DisplayName("宣言列挙側の解決失敗の扱い")
 class DeclarationResolutionTest {
 
     private static final Path FIXTURE = Path.of("src/test/resources/fixtures/declrecovery");
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("解決できないメソッド / constructor 宣言があるとき、field の初期化子の caller としても失敗した constructor を含め、宣言ごとに 1 件の details を載せて解析を fatal にする")
     void unresolvableMethodAndConstructorDeclarationsFailTheRequest() throws Exception {
@@ -36,25 +30,25 @@ class DeclarationResolutionTest {
         assertEquals(1, errors.size());
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", errors.get(0).get("code"));
 
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         List<Map<String, Object>> declarationDetails = details.stream()
-                .filter(d -> "unresolved-declaration".equals(((Map<String, Object>) d.get("metadata")).get("reason")))
+                .filter(d -> "unresolved-declaration".equals(metadataOf(d).get("reason")))
                 .toList();
         assertEquals(List.of("broken", "BadDecl"), declarationDetails.stream()
-                        .map(d -> ((Map<String, Object>) d.get("metadata")).get("target"))
+                        .map(d -> metadataOf(d).get("target"))
                         .toList(),
                 () -> "each unresolvable declaration must be reported once, in source order: " + details);
         for (Map<String, Object> detail : declarationDetails) {
             assertEquals("JAVA_UNRESOLVED_SYMBOL", detail.get("code"));
             assertEquals("com/example/BadDecl.java",
-                    ((Map<String, Object>) detail.get("sourceLocation")).get("path"));
-            Object exceptionClass = ((Map<String, Object>) detail.get("metadata")).get("exceptionClass");
+                    ((Map<?, ?>) detail.get("sourceLocation")).get("path"));
+            Object exceptionClass = metadataOf(detail).get("exceptionClass");
             assertTrue(((String) exceptionClass).matches("[\\w.$]+"),
                     () -> "exceptionClass must be a bare class name: " + exceptionClass);
         }
 
-        Map<String, Object> metadata = (Map<String, Object>) errors.get(0).get("metadata");
-        Map<String, Object> reasonCounts = (Map<String, Object>) metadata.get("reasonCounts");
+        Map<String, Object> metadata = AnalysisTestSupport.field(errors.get(0), "metadata");
+        Map<String, Object> reasonCounts = AnalysisTestSupport.field(metadata, "reasonCounts");
         // field の初期化子の呼び出しは、caller の constructor を resolve できないため unresolved-caller で残る。
         assertEquals(Map.of(
                         "JAVA_UNRESOLVED_SYMBOL:unresolved-caller", 1L,

@@ -93,7 +93,7 @@ public final class ContextScope {
                         continue;
                     }
                     // root 相対 path が source binary name の近似。異なる context の
-                    // 同一 binary name は現行 methodId で区別できないため fatal にする。
+                    // 同一 binary name は methodId で区別できないため fatal にする。
                     String binaryName = RelativePaths.toRecordPath(root.relativize(absolute).toString());
                     String owner = binaryNameOwners.putIfAbsent(binaryName, context.id());
                     if (owner != null && !owner.equals(context.id())) {

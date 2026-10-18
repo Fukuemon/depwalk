@@ -11,14 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * 帰属型の決定規則 (宣言サイト scope 内 (override あり / なし)、scope 外宣言の引き上げ、
- * 除外 package (既定値 / liftExcludePackages による置き換え、segment 単位 prefix 一致)、
- * this / super / static / new の各形。
- *
- * <p>「出力しない」条 (IF) は「出力する」条 (WHEN/WHERE) に優先する例外であるため、
- * テスト名で明示する ({@code ...IsOmitted...} / {@code doesNotEmit...} 系)。
- */
 @DisplayName("呼び出し先メソッドの帰属型の決定規則")
 class AttributionTest {
 
@@ -118,9 +110,6 @@ class AttributionTest {
 
         assertFalse(edges.stream().anyMatch(e -> "java:com.example.UserRepository#invokeFind()".equals(e.get("callerMethodId"))),
                 "com.example.lib is excluded by the overridden liftExcludePackages, so it must not be lifted: " + edges);
-
-        // 既定値 (java/javax/jakarta) は liftExcludePackages 指定で「置き換え」られるため、
-        // 既定除外が効かなくなる副作用が無いことは他テストの java.lang.Object 呼び出しで別途確認する。
     }
 
     @Test
@@ -159,11 +148,7 @@ class AttributionTest {
         assertNoUnresolvedDiagnostic(ran, "scope-external constructor omission must not raise an unresolved diagnostic");
     }
 
-    /**
-     * 無修飾 static import ({@code import static com.example.lib.StaticUtils.util; util();})
-     * は「参照した型」= 宣言型 (StaticUtils) そのものであり、enclosing class (UserService) へは
-     * 引き上げない。宣言型・参照型ともに scope 外のため出力しない (diagnostic も出さない)。
-     */
+    // 無修飾の static import が参照する型は宣言型そのものなので、囲んでいる class へ引き上げる根拠がない。
     @Test
     @DisplayName("scope 外の static import を無修飾で呼ぶとき、囲んでいる class へは引き上げず、呼び出し関係 (edge) も未解決診断も出力されない")
     void unqualifiedStaticImportOutOfScopeIsOmittedWithoutLiftToEnclosingOrDiagnostic() throws Exception {
@@ -178,11 +163,6 @@ class AttributionTest {
         assertNoUnresolvedDiagnostic(ran, "scope-external static import must not raise an unresolved diagnostic");
     }
 
-    /**
-     * 無修飾 static import でも宣言型 (MathUtils) が scope 内であれば、通常の
-     * 「宣言サイトが scope 内」規則により、そのまま宣言型へ帰属する (enclosing への引き上げは
-     * 発生しない、そもそも発生させる必要がない)。
-     */
     @Test
     @DisplayName("scope 内の static import を無修飾で呼ぶとき、呼び出し先は宣言している型へそのまま帰属する")
     void unqualifiedStaticImportInScopeAttributesToTheDeclaringType() throws Exception {
@@ -197,13 +177,9 @@ class AttributionTest {
                 .anyMatch(diagnostic -> "JAVA_UNRESOLVED_SYMBOL".equals(diagnostic.get("code"))), message);
     }
 
-    /**
-     * 無修飾呼び出しでも、宣言型が enclosing class の継承階層内 (基底 library class から継承した
-     * static メンバ) の場合は、従来どおり enclosing class への引き上げを維持する (static import 由来
-     * ではなく、通常の継承メンバ参照であるため)。
-     */
+    // static import と違い、継承した static メンバの参照は囲んでいる型の階層の中にあるので、引き上げの対象になる。
     @Test
-    @DisplayName("継承した static メンバを無修飾で呼ぶとき、従来どおり囲んでいる派生型へ引き上げられる")
+    @DisplayName("継承した static メンバを無修飾で呼ぶとき、囲んでいる派生型へ引き上げられる")
     void unqualifiedInheritedStaticCallStillLiftsToEnclosingSubtype() throws Exception {
         AnalysisTestSupport.Ran ran = runDefault();
         List<Map<String, Object>> edges = ran.byType("callEdge");

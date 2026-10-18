@@ -13,8 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code fullGraph} / {@code reachableFromEntrypoints} の node 母集合 (宣言列挙 ∪ call site 由来、
- * entrypoints 空は analysisMode によらず全体扱い)。
+ * 母集合は、宣言を列挙したメソッドと、call site から得たメソッドの和である。
  */
 @DisplayName("analysisMode ごとの出力対象メソッドの母集合")
 class AnalysisModeTest {

@@ -10,14 +10,13 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * method reference / explicit constructor invocation の resolve
- * 失敗時に、method call と同等の bytecode 救済と external-target 分類を
- * 試みてから diagnostic 化する。BytecodeOnlyMemberTest と同じく generator
- * 非依存 (完全 source の classes + member を削った解析対象 source) で検証する。
+ * method reference と explicit constructor invocation の resolve に失敗したときも、method call と同じく
+ * bytecode の救済と external の分類を試みてから diagnostic にする。
  */
 @DisplayName("method reference / 明示 constructor 呼び出しの bytecode 救済")
 class ReferenceSuperRescueTest {
@@ -25,7 +24,6 @@ class ReferenceSuperRescueTest {
     @TempDir
     Path temp;
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("bytecode にしか無い member へのメソッド参照は、救済されて calleeOrigin が \"project-bytecode-member\" の呼び出し関係 (edge) になる")
     void rescuesMethodReferenceToBytecodeOnlyMember() throws Exception {
@@ -57,7 +55,7 @@ class ReferenceSuperRescueTest {
                 .filter(e -> "java:com.example.Owner#getName()".equals(e.get("calleeMethodId")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("method reference was not rescued: " + ran.byType("callEdge")));
-        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
         assertEquals(Boolean.TRUE, metadata.get("viaMethodReference"));
     }
@@ -65,8 +63,7 @@ class ReferenceSuperRescueTest {
     @Test
     @DisplayName("scope 外型へのメソッド参照で member も見つからないとき、診断ではなく external として除外される")
     void classifiesMethodReferenceToOutOfScopeOwnerAsExternal() throws Exception {
-        // 参照先型が scope 外 (source 宣言索引に無い classes-only 型) で member も
-        // 見つからない場合、diagnostic ではなく external-target 除外へ分類する。
+        // 参照先の型は classes にだけあり、source の宣言の索引にない。
         Path classes = compileFixture("ext-src", "ext-classes", "com/example/ext/Ext.java", """
                 package com.example.ext;
                 public class Ext {
@@ -91,7 +88,6 @@ class ReferenceSuperRescueTest {
                 () -> "ledger summary must count the external exclusion: " + ran.stderr());
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("代入先の functional interface 型が解決できず引数の個数を検証できないとき、メソッド参照は救済せず診断のまま fatal になる")
     void doesNotRescueMethodReferenceWhenSamArityIsUnknown() throws Exception {
@@ -125,14 +121,13 @@ class ReferenceSuperRescueTest {
         assertEquals(1, errors.size(), () -> errors.toString());
         Map<String, Object> error = errors.get(0);
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", error.get("code"));
-        List<Map<String, Object>> details = (List<Map<String, Object>>) error.get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(error, "details");
         assertTrue(details.stream().anyMatch(detail ->
                         "unresolved-method-reference".equals(
-                                ((Map<String, Object>) detail.get("metadata")).get("reason"))),
+                                metadataOf(detail).get("reason"))),
                 () -> "method reference must stay diagnostic when SAM arity is unknown: " + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("bytecode にしか無い親 constructor への super(...) 呼び出しは、救済されて calleeOrigin が \"project-bytecode-member\" の呼び出し関係 (edge) になる")
     void rescuesExplicitSuperToBytecodeOnlyConstructor() throws Exception {
@@ -163,7 +158,7 @@ class ReferenceSuperRescueTest {
                 .filter(e -> "java:com.example.Base#<init>(java.lang.String)".equals(e.get("calleeMethodId")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("explicit super was not rescued: " + ran.byType("callEdge")));
-        Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
         assertEquals("project-bytecode-member", metadata.get("calleeOrigin"));
     }
 
@@ -199,7 +194,6 @@ class ReferenceSuperRescueTest {
                 () -> "ledger summary must count the external exclusion: " + ran.stderr());
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("bytecode にしか無い自 class constructor への this(...) 呼び出しは、救済されて呼び出し関係 (edge) になる")
     void rescuesExplicitThisToBytecodeOnlyConstructor() throws Exception {
@@ -234,7 +228,7 @@ class ReferenceSuperRescueTest {
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve(relative).toString());
         assertEquals(0, rc, "fixture compile failed");
         return classes;

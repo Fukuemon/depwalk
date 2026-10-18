@@ -11,10 +11,6 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * signature / methodId 正規化 (overload / erasure / varargs / nested class ($) /
- * constructor (&lt;init&gt;) / static initializer (&lt;clinit&gt;) / 匿名クラス採番の決定性)。
- */
 @DisplayName("signature / methodId の正規化")
 class NormalizationTest {
 

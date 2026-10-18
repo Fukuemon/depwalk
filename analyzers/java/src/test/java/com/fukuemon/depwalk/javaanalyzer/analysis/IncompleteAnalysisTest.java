@@ -9,20 +9,17 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * 未解決 in-scope call を全件 details 付きで fatal 化する契約を検証する。
- */
 @DisplayName("未解決の scope 内呼び出しの fatal 化 (JAVA_INCOMPLETE_ANALYSIS)")
 class IncompleteAnalysisTest {
 
     @TempDir
     Path workspace;
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("未解決の呼び出しがあるとき、全件を決定順・自己完結の details に載せて解析を fatal にする")
     void unresolvedCallsFailTheRequestWithOrderedSelfContainedDetails() throws Exception {
@@ -48,23 +45,23 @@ class IncompleteAnalysisTest {
         Map<String, Object> error = errors.get(0);
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", error.get("code"));
 
-        List<Map<String, Object>> details = (List<Map<String, Object>>) error.get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(error, "details");
         assertEquals(3, details.size(), "all primary diagnostics must be reported without truncation");
         // 決定順 (workspace 相対 path → 位置)。
         assertEquals("com/example/A.java",
-                ((Map<String, Object>) details.get(0).get("sourceLocation")).get("path"));
+                ((Map<?, ?>) details.get(0).get("sourceLocation")).get("path"));
         assertEquals("com/example/B.java",
-                ((Map<String, Object>) details.get(1).get("sourceLocation")).get("path"));
+                ((Map<?, ?>) details.get(1).get("sourceLocation")).get("path"));
         for (Map<String, Object> detail : details) {
             assertEquals("JAVA_UNRESOLVED_SYMBOL", detail.get("code"));
-            Map<String, Object> metadata = (Map<String, Object>) detail.get("metadata");
+            Map<String, Object> metadata = AnalysisTestSupport.field(detail, "metadata");
             assertTrue(metadata.containsKey("callKind"));
             assertTrue(metadata.containsKey("reason"));
             // 診断 metadata (解決段階 / 例外クラス名 / receiver 式種別 /
             // receiver 型取得成否) は call 解決の失敗段階を表すため、caller 宣言側の
             // 失敗 (unresolved-caller) には載らない。exceptionClass はクラス名のみで、
             // message や source 断片を含む自由文であってはならない (他 field は
-            // 既存の安定値契約 (reason / target / callKind) が sanitize を担保する)。
+            // 安定値の契約 (reason / target / callKind) が sanitize を担保する)。
             if (!"unresolved-caller".equals(metadata.get("reason"))) {
                 assertTrue(metadata.containsKey("resolutionPhase"), () -> "resolutionPhase missing: " + metadata);
                 assertTrue(metadata.containsKey("receiverKind"), () -> "receiverKind missing: " + metadata);
@@ -79,9 +76,9 @@ class IncompleteAnalysisTest {
             assertFalse(serialized.contains(workspace.toString()), "no absolute paths in details");
         }
 
-        Map<String, Object> metadata = (Map<String, Object>) error.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(error, "metadata");
         assertEquals(3, ((Number) metadata.get("total")).intValue());
-        Map<String, Object> reasonCounts = (Map<String, Object>) metadata.get("reasonCounts");
+        Map<String, Object> reasonCounts = AnalysisTestSupport.field(metadata, "reasonCounts");
         int sum = reasonCounts.values().stream().mapToInt(v -> ((Number) v).intValue()).sum();
         assertEquals(3, sum, "reasonCounts must agree with total");
         // fatal は先行 warning を無効化するため、SootUp 未利用 (source-only) の
@@ -98,7 +95,6 @@ class IncompleteAnalysisTest {
                 "fatal path must not print the ledger summary: " + ran.stderr());
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("caller の宣言自体が解決できないとき、その配下の呼び出しも完全性 gate に残って fatal になる")
     void callsUnderUnresolvableCallerDeclarationsRemainInTheCompletenessGate() throws Exception {
@@ -120,17 +116,15 @@ class IncompleteAnalysisTest {
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", errors.get(0).get("code"));
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "unresolved-caller".equals(((Map<String, Object>) d.get("metadata")).get("reason"))),
+                        "unresolved-caller".equals(metadataOf(d).get("reason"))),
                 () -> "expected an unresolved-caller primary diagnostic: " + details);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("callKind ごとに、失敗した解決段階と receiver の情報が診断 metadata に載る")
     void diagnosticMetadataIdentifiesFailedStagePerCallKind() throws Exception {
-        // callKind ごとに失敗段階と receiver 情報が details へ載る。
         write("com/example/D.java", """
                 package com.example;
                 public class D {
@@ -152,7 +146,7 @@ class IncompleteAnalysisTest {
         assertEquals(1, ran.exitCode(), ran.stderr());
         List<Map<String, Object>> errors = ran.byType("error");
         assertEquals(1, errors.size());
-        List<Map<String, Object>> details = (List<Map<String, Object>>) errors.get(0).get("details");
+        List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
 
         Map<String, Object> methodCall = detailByCallKind(details, "method-call");
         assertEquals("bytecode-rescue", metadataOf(methodCall).get("resolutionPhase"));
@@ -160,8 +154,8 @@ class IncompleteAnalysisTest {
         assertEquals(Boolean.FALSE, metadataOf(methodCall).get("receiverTypeResolved"));
         assertTrue(((String) metadataOf(methodCall).get("exceptionClass")).matches("[\\w.$]+"));
 
-        // method reference / explicit super の救済追加後は、これらも
-        // bytecode 救済を試みてから diagnostic 化するため phase は bytecode-rescue。
+        // method reference と explicit super も、diagnostic にする前に bytecode の救済を試みるので、
+        // phase は bytecode-rescue になる。
         Map<String, Object> methodReference = detailByCallKind(details, "method-reference");
         assertEquals("bytecode-rescue", metadataOf(methodReference).get("resolutionPhase"));
         assertEquals("TypeExpr", metadataOf(methodReference).get("receiverKind"));
@@ -176,26 +170,16 @@ class IncompleteAnalysisTest {
         assertEquals("super", metadataOf(explicitSuper).get("receiverKind"));
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> detailByCallKind(List<Map<String, Object>> details, String callKind) {
         return details.stream()
-                .filter(d -> callKind.equals(((Map<String, Object>) d.get("metadata")).get("callKind")))
+                .filter(d -> callKind.equals(metadataOf(d).get("callKind")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no detail for callKind " + callKind + ": " + details));
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> metadataOf(Map<String, Object> detail) {
-        return (Map<String, Object>) detail.get("metadata");
-    }
-
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("allowIncompleteAnalysis を有効にしたとき、fatal にせず解決済みの graph と残った診断を公開する")
     void allowIncompleteAnalysisPublishesPartialGraphInsteadOfFatal() throws Exception {
-        // metadata.allowIncompleteAnalysis=["true"] のとき、primary
-        // diagnostic が残っても request を fatal にせず、解決済み graph (edge /
-        // node) と診断を公開する。graph の部分性は診断で観測可能なまま。
         write("com/example/A.java", """
                 package com.example;
                 public class A {
@@ -223,11 +207,10 @@ class IncompleteAnalysisTest {
                 .orElseThrow(() -> new AssertionError(
                         "the remaining unresolved call must stay visible as a diagnostic: " + diagnostics));
 
-        // allowIncompleteAnalysis 成功時でも診断 4 項目 (resolutionPhase /
-        // exceptionClass / receiverKind / receiverTypeResolved) が streaming される
-        // diagnostic record に乗ること (従来は fatal 経路の error.details にしか
-        // 乗らず、緩和時は要因分類ができなかった)。
-        Map<String, Object> diagnosticMetadata = (Map<String, Object>) unresolvedDiagnostic.get("metadata");
+        // allowIncompleteAnalysis で成功したときも要因を分類できるように、診断の 4 項目
+        // (resolutionPhase、exceptionClass、receiverKind、receiverTypeResolved) を
+        // streaming する diagnostic record に載せる。
+        Map<String, Object> diagnosticMetadata = AnalysisTestSupport.field(unresolvedDiagnostic, "metadata");
         assertTrue(diagnosticMetadata != null && diagnosticMetadata.containsKey("resolutionPhase"),
                 () -> "diagnostic metadata must carry resolutionPhase even in the opt-in success path: "
                         + unresolvedDiagnostic);

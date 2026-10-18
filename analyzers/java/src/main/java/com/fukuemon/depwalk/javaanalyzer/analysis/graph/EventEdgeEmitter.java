@@ -41,8 +41,8 @@ final class EventEdgeEmitter {
     private final UnresolvedDiagnostics diagnostics;
     /**
      * edge 出力に使える caller の解決 ({@link CallGraphBuilder} の edgeCallers)。
-     * caller 不在時に {@code <clinit>} node を保証する副作用を含む。評価は切り出し前の
-     * 実装と同じく突合結果の判定より先に行う (順序を変えると出力の node 集合が変わる)。
+     * caller 不在時に {@code <clinit>} node を保証する副作用を含む。評価は突合結果の判定より
+     * 先に行う (順序を変えると出力の node 集合が変わる)。
      */
     private final BiFunction<MethodCallExpr, CallGraphBuilder.WalkContext, List<String>> edgeCallers;
 

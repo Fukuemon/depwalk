@@ -11,16 +11,16 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * 外部ライブラリの隔離境界の機械検査。
+ * SootUp、Gradle Tooling API、JavaParser と SymbolSolver が、それぞれ使ってよい package の外から使われていないことを検査する。
  *
  * <p>隔離は 3 段階で、適用レベルはライブラリごとに異なる。SootUp は adapter package へ完全封じ込め、
  * Gradle Tooling API は discovery へ完全隔離、JavaParser / SymbolSolver は解析エンジンの中核として
  * {@code analysis} 配下では自由に使ってよく、禁止するのは {@code analysis} の外への漏れのみ。
  *
  * <p>ArchUnit の JUnit5 TestEngine ではなく core API を Jupiter の {@code @Test} から呼ぶ。
- * 本 project は JUnit Platform 6 系を使うため、engine のバージョン整合を持ち込まない。
+ * この project は JUnit Platform 6 系を使うため、engine のバージョン整合を持ち込まない。
  */
-@DisplayName("外部ライブラリの隔離境界 (ADR-0007) の機械検査")
+@DisplayName("外部ライブラリの隔離境界の機械検査")
 class ArchitectureTest {
 
     private static final String ROOT_PACKAGE = "com.fukuemon.depwalk.javaanalyzer";
@@ -35,7 +35,7 @@ class ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("..javaanalyzer.analysis.sootup..")
                 .should().dependOnClassesThat().resideInAPackage("sootup..")
-                .because("SootUp は analysis/sootup の facade に封じ込め、自前型で公開する (ADR-0007)");
+                .because("SootUp は analysis/sootup の facade に封じ込め、自前型で公開する");
 
         rule.check(PRODUCTION_CLASSES);
     }
@@ -48,7 +48,7 @@ class ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("..javaanalyzer.discovery..")
                 .should().dependOnClassesThat().resideInAPackage("org.gradle..")
-                .because("Gradle Tooling API による project 構造取得は discovery に隔離する (ADR-0007)");
+                .because("Gradle Tooling API による project 構造取得は discovery に隔離する");
 
         rule.check(PRODUCTION_CLASSES);
     }
@@ -60,7 +60,7 @@ class ArchitectureTest {
                 .that().resideOutsideOfPackage("..javaanalyzer.analysis..")
                 .should().dependOnClassesThat().resideInAPackage("com.github.javaparser..")
                 .because("JavaParser / SymbolSolver は analysis 配下の解析エンジン内部に留め、"
-                        + "io / protocol / preflight / discovery / Main へ漏らさない (ADR-0007)");
+                        + "io / protocol / preflight / discovery / Main へ漏らさない");
 
         rule.check(PRODUCTION_CLASSES);
     }

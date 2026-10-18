@@ -14,12 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Spring の event publish から listener への edge (broadcast 意味論) の検証。
- * 合致する listener は各々確定 callee ({@code resolution: unique}) で、条件付き
- * listener だけが ambiguous になる。event 引数型が解決できない場合は完全性 gate の
- * 外側で advisory の {@code JAVA_EVENT_UNRESOLVED} 診断を出す。
- */
 @DisplayName("event publish から listener への呼び出し関係 (edge) の生成")
 class EventEdgeTest {
 
@@ -59,8 +53,6 @@ class EventEdgeTest {
     @DisplayName("@TransactionalEventListener への呼び出し関係 (edge) は、transaction phase に依存するため曖昧 (ambiguous) になる")
     void transactionalListenerIsConditionalOnTheTransactionPhase() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
-        // @TransactionalEventListener は transaction が設定 phase へ達したときだけ
-        // 実行されるので、broadcast の確定性が成立しない。
         Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, AFTER_COMMIT).orElseThrow());
         assertEquals("ambiguous", metadata.get("resolution"));
         assertEquals(true, metadata.get("conditional"));
@@ -83,8 +75,7 @@ class EventEdgeTest {
     @DisplayName("@EventListener の condition (SpEL) 属性付き listener への呼び出し関係 (edge) は、実行時にしか評価できない条件のため曖昧 (ambiguous) になる")
     void conditionAttributeListenerIsAmbiguous() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
-        // condition 属性は実行時に評価される SpEL であり、静的解析は真偽を決められない。
-        // 条件の出所として listener annotation 自身の FQN を conditionTypes に積む。
+        // 条件の出所として、listener の annotation 自身の FQN を conditionTypes に積む。
         Map<String, Object> metadata = metadataOf(eventEdge(ran, PUBLISH_ORDER, ON_ORDER_EXPR).orElseThrow());
         assertEquals("ambiguous", metadata.get("resolution"));
         assertEquals(true, metadata.get("conditional"));
@@ -110,7 +101,6 @@ class EventEdgeTest {
     @DisplayName("subtype の event を publish するとき、supertype を受ける listener にも呼び出し関係 (edge) が届く")
     void subtypeEventReachesSupertypeListeners() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
-        // SpecialOrderEvent は自身の listener と OrderEvent の listener の両方に合致する。
         assertTrue(eventEdge(ran, PUBLISH_SPECIAL, ON_SPECIAL).isPresent());
         assertTrue(eventEdge(ran, PUBLISH_SPECIAL, ON_ORDER).isPresent());
     }

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ステップ 1: 3 TypeSolver 構成での型解決 + AST 逐次走査の疎通確認。
+ * TypeSolver を 3 つ組み合わせた構成で、型を解決しながら AST を走査できることを確かめる。
  */
 @DisplayName("型解決と AST 走査の基本的な疎通")
 class BasicAnalysisTest {

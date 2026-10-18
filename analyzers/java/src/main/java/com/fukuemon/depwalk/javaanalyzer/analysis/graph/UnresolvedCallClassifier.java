@@ -55,8 +55,6 @@ final class UnresolvedCallClassifier {
             return EXTERNAL;
         }
         if (receiverOwner == null && mce.getScope().isPresent()) {
-            // 解決できなかった receiver の chain を、classfile にある戻り値の型で前に辿って owner を
-            // 復元する。根拠のない型の推測はしない。
             String forwardOwner = bytecodeRescue.chainForwardOwner(mce.getScope().get(), enclosingTypeNode);
             if (forwardOwner == null) {
                 // erasure だけでは辿れない JDK の stream と collection の連鎖と lambda の parameter は、

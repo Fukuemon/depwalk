@@ -82,7 +82,7 @@ final class BytecodeRescue {
         GenericChainTypes.Model model = genericChainTypes.typeOf(scope);
         if (model == null || ERASED_TYPE_VARIABLE_BOUND.equals(model.binaryName())) {
             // Object は「型変数 / raw / 欠落の erasure」の可能性があり owner の根拠に
-            // ならない (既存の chain 前進解決と同じ打ち切り規則。false exclusion 防止)。
+            // ならない。owner にすると false exclusion を生むので、chain の前進検証と同じくここで打ち切る。
             return null;
         }
         return model.binaryName();
@@ -358,8 +358,8 @@ final class BytecodeRescue {
             return chainForwardOwner(enclosed.getInner(), enclosingTypeNode, depth + 1);
         }
         if (expr instanceof NameExpr nameExpr) {
-            // 型が取れない local 変数は、宣言の initializer 式を同じ規則で前進
-            // 解決する (var / 失敗 chain 由来の変数への波及を classfile 根拠で辿る)。
+            // var の変数や、解決に失敗した chain を代入した変数は、変数の型を取れない。
+            // 型を推測せず、initializer の式を classfile の根拠で前進解決する。
             try {
                 ResolvedValueDeclaration value = nameExpr.resolve();
                 Node ast = value.toAst().orElse(null);
@@ -374,7 +374,7 @@ final class BytecodeRescue {
                 // `var` の型推論が壊れていると resolve() 自体が失敗するので、AST 上で
                 // 見つかる local の宣言の initializer を確定 AST として前進解決する。
                 // local に該当が無ければ囲み型の bytecode field 型で補完する
-                // (既存の receiver 補完経路と同じ classfile 根拠)。
+                // (bytecodeFieldReceiverType と同じ classfile 根拠)。
                 Expression initializer =
                         LocalDeclarations.initializerOf(LocalDeclarations.precedingInEnclosingBlocks(nameExpr));
                 if (initializer != null) {
@@ -396,8 +396,8 @@ final class BytecodeRescue {
         Expression scope = link.getScope().orElse(null);
         String receiverOwner;
         if (scope == null) {
-            // 暗黙 this の link は囲み型の classfile candidate で前進する
-            // (継承 member は declared methods に現れないため、その場合は null)。
+            // 継承した member は囲み型の declared methods に現れないため、暗黙の this で
+            // 継承した member を呼ぶ link は前進できず null になる。
             receiverOwner = enclosingTypeNode != null ? tryBinaryNameOfEnclosing(enclosingTypeNode) : null;
         } else {
             receiverOwner = chainForwardOwner(scope, enclosingTypeNode, depth + 1);
@@ -452,7 +452,7 @@ final class BytecodeRescue {
     }
 
     /**
-     * chain 起点遡及 (external 分類規則 (i))。receiver が method call chain の
+     * chain の起点を遡って external と判定する。receiver が method call chain の
      * とき、chain を遡って最初に静的型が取れる式を探し、その型が scope 外
      * (source 宣言索引に無い) なら、root から現在の call までの中間 link を
      * {@link #forwardVerifyExternalChain} で classfile 根拠 (project 限定でない
@@ -465,8 +465,7 @@ final class BytecodeRescue {
     }
 
     /**
-     * 式の起点型を遡及し、根拠を伴って scope 外と判定できる場合だけ true
-     * (規則 (i) の実体)。
+     * 式の起点型を遡及し、根拠を伴って scope 外と判定できる場合だけ true。
      */
     private boolean rootIsExternal(Expression start, Node enclosingTypeNode) {
         List<MethodCallExpr> links = new ArrayList<>();
@@ -487,7 +486,7 @@ final class BytecodeRescue {
             if (cursor instanceof MethodCallExpr link) {
                 Expression inner = link.getScope().orElse(null);
                 if (inner == null) {
-                    // 暗黙 this 起点 = 囲み型 (scope 内) → 保守的に diagnostic。
+                    // 暗黙の this の起点は囲み型で scope の内にあるため、external の根拠にならない。
                     return false;
                 }
                 // root 側 (先頭) が先に来るよう、遡る順とは逆に挿入する。
@@ -496,14 +495,11 @@ final class BytecodeRescue {
                 continue;
             }
             if (cursor instanceof NameExpr nameExpr) {
-                // var 等の型が取れない変数は、確定 AST の initializer を起点として
-                // 遡及を続ける (規則 (i) の「chain 起点」を代入 chain へ拡張)。
                 Expression initializer = declaredInitializerOf(nameExpr);
                 if (initializer != null) {
                     cursor = initializer;
                     continue;
                 }
-                // local に該当が無ければ囲み型の bytecode field 型で判定する。
                 if (LocalDeclarations.sameNameDeclaredInMember(nameExpr)) {
                     return false;
                 }
@@ -551,7 +547,7 @@ final class BytecodeRescue {
             // には project 限定の bytecodeIndex.genericReturnType 相当の generic Signature
             // 読み取りが無く、境界なし type variable の戻り値は descriptor erasure で
             // Object になる。in-scope な実際の型引数を見失ったまま前進すると false
-            // exclusion を再発するため、Object を「型変数の疑いあり、根拠不足」として
+            // exclusion になるため、Object を「型変数の疑いあり、根拠不足」として
             // 前進を打ち切る (保守側)。
             if (ERASED_TYPE_VARIABLE_BOUND.equals(returnType)) {
                 return false;
@@ -596,17 +592,17 @@ final class BytecodeRescue {
     }
 
     /**
-     * lambda parameter 起点の external 判定 (external 分類規則 (ii))。
+     * lambda parameter 起点の external 判定。
      * receiver が lambda parameter で、
      * lambda 自体が代入される変数の宣言型 (= functional interface 型そのもの)
      * が scope 外なら true。scope 内 functional interface / 判定不能は false。
      *
-     * <p>lambda を直接 method の引数として渡す形 (受け手 method call の
-     * receiver 型を根拠にする案) は撤回した: 受け手 method の receiver 型
+     * <p>lambda を直接 method の引数として渡す形で、受け手 method call の receiver 型を
+     * 根拠にする方法は採らない。理由は、受け手 method の receiver 型
      * (例 {@code externalApi.each(...)} の {@code externalApi}) と、その
      * method の functional interface parameter が実際に instantiate される型
-     * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできない
-     * (external な receiver を持つ method が in-scope 型を引数に取り得るため、
+     * (lambda parameter の型) は独立した情報であり、前者を後者の根拠にできないため
+     * (external な receiver を持つ method が in-scope 型を引数に取り得るので、
      * false exclusion の原因になる)。unqualified static import 経由で lambda を
      * 直接引数に渡す形も同じ理由で対象外とする。
      */

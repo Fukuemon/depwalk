@@ -11,10 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * symbolKind の割り当て (インスタンス初期化子 / フィールド初期化子の constructor への畳み込み、
- * lambda 内呼び出しの囲みメソッド帰属 + viaLambda: true)。
- */
 @DisplayName("symbolKind の割り当てと初期化子・lambda の帰属")
 class SymbolKindTest {
 
@@ -39,7 +35,6 @@ class SymbolKindTest {
                     "instance initializer call should fold into " + ctor + ": " + edges);
         }
 
-        // インスタンス初期化ブロック / フィールド初期化子は独立 node 化しない
         List<Map<String, Object>> nodes = ran.byType("methodSymbol");
         assertFalse(nodes.stream().anyMatch(n -> "initializer".equals(n.get("symbolKind"))
                         && ((String) n.get("qualifiedName")).contains("<clinit>") == false
@@ -66,7 +61,6 @@ class SymbolKindTest {
         assertTrue(metadata != null && Boolean.TRUE.equals(metadata.get("viaLambda")),
                 "call inside lambda body should carry viaLambda: true: " + edge);
 
-        // lambda 本体は独立 node 化しない
         List<Map<String, Object>> nodes = ran.byType("methodSymbol");
         assertFalse(nodes.stream().anyMatch(n -> ((String) n.get("qualifiedName")).contains("lambda")),
                 "lambda body must not become its own node: " + nodes);
