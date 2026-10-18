@@ -171,6 +171,8 @@ flowchart TB
     main --> preflight
     main --> discovery
     main --> pipeline
+    main -->|"context: AnalysisContextFactory"| stages
+    stages -->|"discovery.model"| discovery
     GradleAPI["Gradle Tooling API"] --> discovery
     SootUpLib["SootUp"] --> sootup
     pipeline --> stages
@@ -178,6 +180,7 @@ flowchart TB
     stages --> normalize
 ```
 
+- 図は、`io` と `protocol` への矢印を省く。
 - 直下の `protocol`（wire の DTO）、`io`（JSONL の入出力）、`preflight`（入力の検証）、`discovery`（Gradle Tooling API の隔離）は、入出力と起動を担う。
 - `analysis` の下は、解析の pipeline の段階ごとの package で作る。
   - **解析の段の実行の順は `analysis/pipeline`（`AnalysisRunner`）が持つ。**
@@ -193,7 +196,7 @@ flowchart TB
     - facade が自前の型で公開し、他の package から `sootup.*` を import しない。
   - Gradle Tooling API は `discovery` に完全に隔離する。
   - JavaParser と SymbolSolver は、解析エンジンの中核として `analysis` の下では自由に使い、`analysis` の外へは漏らさない。
-  - ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械チェックで固定する](../../adr/0007-layered-architecture-refactor.md)
+  - ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェックで固定し、Core はフラットな package 構成のまま保つ](../../adr/0007-layered-architecture-refactor.md)
 - 依存の境界は ArchUnit の JUnit のテストで機械的にチェックする。
   - import してよい範囲とチェックの実行点は [codebase.md の Dependency Rules](../../context/codebase.md#dependency-rules) にある。
 
@@ -335,7 +338,7 @@ flowchart TD
 SootUp は edge を直接作らず、候補の索引だけを提供する。  
 Spring の絞り込みの後に、JavaParser の側で候補の edge を作り、同じ候補の provenance を統合する。  
 宣言型 edge は、どの分岐でも残す。  
-注入点が Bean の候補を持つ場合は Bean の候補だけを出し、注入点がないか Bean の候補が 0 件の場合は SootUp の候補を出す。
+注入点が Bean の候補を持つ場合は Bean の候補だけを出す。注入点がないか、Bean の定義が見つからない（unresolved）場合は SootUp の候補を出す。runtime-provided の型では、候補の edge を出さない。
 
 ### 解析の手段の範囲
 

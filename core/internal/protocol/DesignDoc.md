@@ -231,14 +231,15 @@ flowchart TD
         RC["recordCollector<br/>ParseRecord と参照の完全性の検査"]
         Tr["Translator<br/>NodeFromMethodSymbol / EdgeFromCallEdge"]
         Adapter -->|"検証した AnalysisRequest"| PR
-        RC -->|"methodSymbol / callEdge を届いた順に"| Tr
+        RC -->|"onRecord: methodSymbol / callEdge を届いた順に"| Adapter
+        Adapter -->|"変換を呼ぶ"| Tr
         RC -.->|"diagnostic / error / 検証のエラー"| PR
         PR -->|"RunResult (終了コードと stderr を含む)"| Adapter
     end
     PR -->|"analysisRequest の JSONL の 1 行"| AR["analyzer.Runner"]
     AR <-->|"stdin / stdout / stderr"| Proc["Analyzer process"]
     AR -->|"stdout の 1 行ずつ"| RC
-    Tr -->|"graph.Node / graph.Edge"| UC
+    Adapter -->|"onNode / onEdge: graph.Node / graph.Edge"| UC
     Adapter -->|"analyze.Outcome"| UC
     UC --> Graph["staging の graph.Graph"]
 ```

@@ -15,7 +15,7 @@ request の読み取りから解析の context の組み立て（`AnalysisContex
 | --- | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
 | 1   | workspaceRoot の real path 化と scope の列挙                            | `analysis/context`（`ContextScope`）/ `analysis/scope`         |
 | 2   | bytecode の索引の構築（SootUp の型の階層と project の bytecode member） | `analysis/sootup` / `analysis/completeness`                    |
-| 3   | context の構築（TypeSolver、parser、AST の injector）                   | `analysis/context` / `analysis/augment`                        |
+| 3   | parser の構築（context ごとの TypeSolver、parser、AST の injector）     | `analysis/context` / `analysis/augment`                        |
 | 4   | parse の pre-flight と、成功した後の context の warning の出力          | `analysis/context`（`ParsePreflight`）/ `io`                   |
 | 5   | attribution の準備                                                      | `analysis/attribution`                                         |
 | 6   | first pass（索引の構築と Spring DI の diagnostic）                      | `analysis/completeness` / `analysis/spring` / `analysis/graph` |

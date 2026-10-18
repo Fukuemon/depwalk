@@ -151,7 +151,7 @@ sequenceDiagram
     participant Output as Output Engine
 
     CLI->>UseCase: analyze 実行
-    UseCase->>Graph: methodSymbol / callEdge を登録
+    UseCase->>Graph: protocol が graph の値型へ変換した node / edge を staging Graph に登録
     UseCase->>Traversal: Traverse(graph, request)
     Traversal->>Graph: 起点 node を取得
     Graph-->>Traversal: node found / not found

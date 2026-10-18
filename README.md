@@ -15,6 +15,8 @@ depwalk は、メソッドの呼び出し元（caller）と呼び出し先（cal
 mise install
 ```
 
+`mise install` の後は、`mise activate` を設定したシェルか、`mise exec --` を前に付けて、以下のコマンドを実行する。
+
 ## 使い方
 
 コマンドはリポジトリのルートで実行する。
@@ -39,22 +41,24 @@ mise install
 
 主な flag は次のとおり。全体は `./dist/depwalk analyze --help` で確かめる。
 
-| flag             | 意味                                                                    |
-| ---------------- | ----------------------------------------------------------------------- |
-| `--method`       | 起点のメソッド。`<binary-type>#<method>[(<argument-types>)]` の形で書く |
-| `--direction`    | `caller`（既定）か `callee`                                             |
-| `--max-depth`    | 辿る深さの上限。既定は上限なし                                          |
-| `--format`       | `console`（既定）か `json`                                              |
-| `--source-root`  | 解析する source root。繰り返して指定できる                              |
-| `--analyzer-cmd` | Analyzer の起動のコマンド。環境変数 `DEPWALK_ANALYZER_CMD` でも渡せる   |
+| flag             | 意味                                                                            |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `--language`     | 解析する言語。必須で、現在は `java` だけを受け付ける                            |
+| `--method`       | 起点のメソッド。`<binary-type>#<method>[(<argument-types>)]` の形で書く         |
+| `--direction`    | `caller`（既定）か `callee`                                                     |
+| `--max-depth`    | 辿る深さの上限。既定は上限なし                                                  |
+| `--format`       | `console`（既定）か `json`                                                      |
+| `--source-root`  | 解析する source root。`<workspace-root>` からの相対で書き、繰り返して指定できる |
+| `--analyzer-cmd` | Analyzer の起動のコマンド。環境変数 `DEPWALK_ANALYZER_CMD` でも渡せる           |
 
-`--source-root` を省くと、Java Analyzer は Gradle の build model から source root と classpath を取得する。このとき、解析する workspace の build のロジックが動き、ネットワークへのアクセスと Gradle の cache の更新が起きることがある。`--source-root` を指定すると、build model を使わない。このときは、classpath と Java の言語のレベルを `--analyzer-meta classpath=<path>` と `--analyzer-meta javaLanguageLevel=<version>` で渡す。classpath がないときは `--analyzer-meta classpath=` と空の値を渡す。
+`--source-root` を省くと、Java Analyzer は Gradle の build model から source root と classpath を取得する。このとき、解析する workspace の build のロジックが動き、ネットワークへのアクセスと Gradle の cache の更新が起きることがある。`--source-root` を指定すると、build model を使わない。このときは、classpath と Java の言語のレベルを `--analyzer-meta classpath=<path>` と `--analyzer-meta javaLanguageLevel=<version>` で渡す。classpath の entry が複数あるときは、entry ごとに `--analyzer-meta classpath=<path>` を繰り返す。相対パスは、コマンドを実行したディレクトリから解決される。classpath がないときは `--analyzer-meta classpath=` と空の値を渡す。
 
 ## 文書
 
 - [PRD.md](PRD.md): depwalk が解く課題、目標、作らないもの
 - [design/DesignDoc.md](design/DesignDoc.md): 全体の構成とモジュールの責務
 - [context/index.md](context/index.md): 規約と設計の文書の目次
+- [adr/](adr/): 選択肢を比べて決めた判断の記録
 
 ## 開発に参加する
 
