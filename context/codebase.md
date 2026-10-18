@@ -26,14 +26,9 @@ Core を言語非依存に保ち、言語ごとの差を Analyzer の側に閉�
 - Core は Go のランタイムで動く CLI のバイナリにする。Analyzer は対象の言語のランタイムで動く。Java Analyzer は JVM で動く。
 - 解析は静的解析だけで行い、実行時の情報と runtime trace に依存しない。
   - 対象外にする範囲は [Design Doc の Non-Goals](../design/DesignDoc.md#non-goals) にある。
-- Java Analyzer が source root を自動で discovery するときだけ、次の 3 つが動く。
-  - Gradle Tooling API
-  - 対象の build の Gradle daemon
-  - workspace の外に置く一時の custom model provider
-- 自動 discovery では、Gradle の build logic が利用者の権限で評価され、network、credential provider、cache、任意の副作用を持ちうる。
-- source root を明示すると、Gradle Tooling API、Gradle daemon、custom model provider のどれも動かない。
+- Java Analyzer が source root を自動で discovery するときだけ、Gradle のランタイムが動き、対象の build logic が利用者の権限で評価される。
+  - 動くものと副作用の前提は [operations.md の Environments](operations.md#environments) にある。
 - 自動 discovery のときも、Core と Analyzer の Protocol の境界は言語非依存のまま変えない。
-  - 副作用の扱いは [operations.md](operations.md#environments) にある。
 - Core と Analyzer が共有してよいのは、Protocol の文書、ADR、JSONL の fixture、contract テストの観点だけにする。Go の package と Java のコードは共有しない。
 
 Core の `core/internal` は、責務の名前を付けたフラットな package で作る。  
@@ -97,12 +92,9 @@ ArchUnit のテスト `ArchitectureTest` でチェックし、`./gradlew test` �
 ## State Ownership
 
 - Analyzer は、解析の対象のソースを読み取り専用で扱う。depwalk は対象のリポジトリを書き換えない。
-  - 自動 discovery では、対象の build logic の評価に伴う Gradle のランタイム全体の副作用を、depwalk の読み取り専用の契約とは別の境界として扱う。
+  - 自動 discovery で Gradle のランタイムが起こす副作用は、この読み取り専用の契約の外にある。前提は [operations.md の Environments](operations.md#environments) にある。
 - 解析の途中の状態は、request ごとの非公開の staging Graph として Core のプロセスの中に持つ。永続的なストアは持たない。
-  - `analyze` の use case は、port から受け取った domain の値を staging Graph へ 1 回の走査で登録する。
-  - stream 全体の参照の完全性は、wire の record を見る `protocol`（ACL）が確かめる。
-  - use case は、参照の完全性のチェックと Analyzer のプロセスの成功を確かめたときだけ Graph を公開する。fatal か非ゼロの終了のときは、Graph と先に受け取った diagnostic をまとめて捨てる。
-  - 公開までの原子性は [Graph の Design Doc](../core/internal/graph/DesignDoc.md#構築と公開の原子性) にある。
+  - staging Graph への登録、参照の完全性の確認、公開と破棄の条件は [Graph の Design Doc](../core/internal/graph/DesignDoc.md#構築と公開の原子性) にある。
 - graph は、wire の DTO と、wire にだけあるフィールド（`schemaVersion`、`recordType`）を持たない。node と edge が持つ属性は [Graph の Design Doc](../core/internal/graph/DesignDoc.md) にある。
 
 ## Placement Rules

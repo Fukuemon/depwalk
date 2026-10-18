@@ -104,11 +104,8 @@ Core の共有の設定は、Go の標準のコマンドを優先し、専用の
 - リポジトリ全体のラッパー（make のようなもの）は置かない。複数の module、Analyzer の build、CI の matrix、リリースのコマンドを 1 つのコマンドにまとめる必要が出たときに、入れるかを決める。
 
 Git のフックで動かすコマンドは `lefthook.yml` にある。  
-チェックの内容と直し方は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。
-
-- 整形した結果は、lefthook の `stage_fixed` で staging へ戻す。`git add` を書くと、一部だけ stage したファイルの、stage していない変更までコミットに入る。
-- 複数のコマンドを続けて実行するときは、`&&` でつなぐ。lefthook の `run` は `sh -c` で動き、`set -e` が働かない。複数の行に分けると最後のコマンドの終了コードだけが残り、前のコマンドの失敗を見逃す。
-- depguard は、Go のコードかその設定を変えたときだけ動かす。ファイルを消しただけのコミットでは動かないため、CI の Go の job の同じチェックで補う。
+チェックの内容と直し方は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。  
+`lefthook.yml` を書くときの注意（`stage_fixed`、`&&` でつなぐこと、depguard の glob）は、`lefthook.yml` のコメントにある。
 
 ## Check Exclusions
 

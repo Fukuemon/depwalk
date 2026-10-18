@@ -28,6 +28,7 @@ depwalk は、hosted service と depwalk 専用の外部の基盤に依存しな
 Java の source root を自動で discovery するときは、利用者の環境で次の前提で動く。
 
 - source root を明示したときは、Analyzer は対象のソースと classpath を読み取り専用で扱い、Gradle のランタイムを起動しない。
+- 自動 discovery のときだけ、Gradle Tooling API、対象の build の Gradle daemon、workspace の外に置く一時の custom model provider が動く。
 - 自動 discovery では、Gradle の build logic を利用者の権限で評価する。Gradle の repository、credential provider、network、cache、daemon の JVM を使いうる。
 - 自動 discovery は、信頼できる build を前提にし、任意の build logic の副作用を sandbox に閉じ込めない。Analyzer 自身の読み取り専用の契約と、Gradle のランタイム全体の副作用を分けて扱う。
   - ADR-0006: [Gradle Tooling API による discovery](../adr/0006-adopt-gradle-tooling-api-discovery.md)
@@ -43,9 +44,9 @@ Java の source root を自動で discovery するときは、利用者の環境
 - 中規模の multi-project（目安は call site が 5 万件）では、既定の heap だと Analyzer が `OutOfMemoryError` になりうる。`--analyzer-cmd`（または `DEPWALK_ANALYZER_CMD`）の java の起動に `-Xmx` を明示する。
   - 測った例では、`-Xmx8g` で 7 つの project、52,411 件の call site を解析できた。
   - OOM を検知したときに Core が返すエラーと終了コードは [CLI の Design Doc](../core/internal/cli/DesignDoc.md) にある。
-- Analyzer の JVM が Gradle の daemon に引き継がれ、対象の Gradle が古いと、daemon の JVM が互換の範囲を外れる。
-  - このとき discovery は `JAVA_GRADLE_MODEL_ERROR`（`daemon-jvm-incompatible`）で失敗する。
-  - `--analyzer-meta gradleJavaHome=<互換のある JDK の path>` で daemon の JVM を指定して避ける。規則は [discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md) にある。
+- discovery が `JAVA_GRADLE_MODEL_ERROR`（`daemon-jvm-incompatible`）で失敗したら、daemon の JVM を指定して避ける。
+  - 指定は `--analyzer-meta gradleJavaHome=<互換のある JDK の path>` で行う。
+  - 規則は [discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#daemon-の-jvm-の明示の指定) にある。
 
 ## Deployment Conditions
 
