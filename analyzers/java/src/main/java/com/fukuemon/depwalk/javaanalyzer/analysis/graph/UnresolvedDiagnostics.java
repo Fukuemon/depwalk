@@ -89,7 +89,7 @@ final class UnresolvedDiagnostics {
     /**
      * 宣言列挙側 ({@code md.resolve()} / {@code cd.resolve()}) の解決失敗。呼び出し式側の
      * {@link #reportUnresolved} と異なり、宣言そのものが対象のため
-     * {@code relatedMethodId} は付けない。その宣言だけ skip し、解析全体は継続する。
+     * {@code relatedMethodId} は付けない。その宣言だけ skip する。完全性 gate の判定は ledger 側が担う。
      */
     void reportUnresolvedDeclaration(Node declNode, String message) {
         accumulator.incrementUnresolved();

@@ -1,5 +1,8 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.completeness;
 
+import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
+
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,7 +10,8 @@ import java.util.TreeMap;
 
 /**
  * inventory の各 {@link CallSiteId} へ primary 終端種別をちょうど 1 件対応付ける
- * 内部台帳。
+ * 内部台帳。call site に属さない解析の欠け ({@link AnalysisGap}) も併せて記録し、
+ * primary diagnostic と同じく完全性 gate の対象にする。
  * ID の欠落・重複・未分類・二重分類は
  * {@link IllegalStateException} とし、Analyzer が {@code JAVA_INTERNAL_ERROR} の
  * fatal に変換する。Protocol へは出力しない。
@@ -28,6 +32,10 @@ public final class CallSiteOutcomeLedger {
     public static final String REASON_EXTERNAL_TARGET = "external-target";
     /** 帰属型が引き上げ除外 package ({@code LiftExcludePackages}) に属する場合の除外理由。 */
     public static final String REASON_LIFT_EXCLUDED_PACKAGE = "lift-excluded-package";
+    /** method / constructor の宣言を resolve できず、その宣言の node を出せなかった場合の reason。 */
+    public static final String REASON_UNRESOLVED_DECLARATION = "unresolved-declaration";
+    /** Spring DI の索引で例外が起き、その file の索引を見送った場合の reason。 */
+    public static final String REASON_SPRING_DI_INDEX_FAILED = "spring-di-index-failed";
 
     /**
      * 1 entry の primary outcome。
@@ -66,7 +74,38 @@ public final class CallSiteOutcomeLedger {
         }
     }
 
+    /**
+     * call site に属さない解析の欠け。primary diagnostic と同じく完全性 gate の対象になる。
+     *
+     * @param code 元 diagnostic code
+     * @param reason {@link #REASON_UNRESOLVED_DECLARATION} または {@link #REASON_SPRING_DI_INDEX_FAILED}
+     * @param sourceLocation 位置が判明している場合のみ: 欠けた箇所
+     * @param target 判明している場合のみ: 欠けた宣言の名前
+     * @param metadata sanitize 済み診断項目 (例外のクラス名など)
+     */
+    public record AnalysisGap(
+            String code,
+            String reason,
+            SourceLocation sourceLocation,
+            String target,
+            Map<String, Object> metadata) {
+    }
+
+    private record GapKey(String path, int line, String reason, String target) implements Comparable<GapKey> {
+
+        private static final Comparator<GapKey> ORDER = Comparator.comparing(GapKey::path)
+                .thenComparingInt(GapKey::line)
+                .thenComparing(GapKey::reason)
+                .thenComparing(GapKey::target);
+
+        @Override
+        public int compareTo(GapKey other) {
+            return ORDER.compare(this, other);
+        }
+    }
+
     private final Map<CallSiteId, Outcome> outcomes = new LinkedHashMap<>();
+    private final Map<GapKey, AnalysisGap> gaps = new TreeMap<>();
     private final CallSiteInventory inventory;
 
     /**
@@ -130,6 +169,47 @@ public final class CallSiteOutcomeLedger {
         commit(id, Outcome.diagnostic(code, reason, target, candidates, diagnosticMetadata));
     }
 
+    /**
+     * method / constructor の宣言の resolve の失敗を記録する。同じ宣言を複数回記録しても 1 件にまとめる。
+     *
+     * @param code 元 diagnostic code
+     * @param sourceLocation 宣言の位置 (不明なら {@code null})
+     * @param declarationName 宣言の名前
+     * @param failure resolve が投げた例外。クラス名だけを記録し、message は含めない
+     */
+    public void recordUnresolvedDeclaration(
+            String code, SourceLocation sourceLocation, String declarationName, Throwable failure) {
+        recordGap(code, REASON_UNRESOLVED_DECLARATION, sourceLocation, declarationName, failure);
+    }
+
+    /**
+     * Spring DI の索引の失敗を記録する。
+     *
+     * @param code 元 diagnostic code
+     * @param sourceLocation 索引を見送った file の位置
+     * @param failure 索引が投げた例外。クラス名だけを記録し、message は含めない
+     */
+    public void recordSpringDiIndexFailure(String code, SourceLocation sourceLocation, Throwable failure) {
+        recordGap(code, REASON_SPRING_DI_INDEX_FAILED, sourceLocation, "", failure);
+    }
+
+    private void recordGap(
+            String code, String reason, SourceLocation sourceLocation, String target, Throwable failure) {
+        GapKey key = new GapKey(
+                sourceLocation == null ? "" : sourceLocation.path(),
+                sourceLocation == null ? 0 : sourceLocation.startLine(),
+                reason,
+                target);
+        gaps.putIfAbsent(key, new AnalysisGap(
+                code, reason, sourceLocation, target.isEmpty() ? null : target,
+                Map.of("exceptionClass", failure.getClass().getName())));
+    }
+
+    /** call site に属さない解析の欠けを、path、行、reason、target の順で返す。 */
+    public List<AnalysisGap> analysisGaps() {
+        return List.copyOf(gaps.values());
+    }
+
     private void commit(CallSiteId id, Outcome outcome) {
         if (!inventory.contains(id)) {
             throw new IllegalStateException("outcome committed for a call site missing from the inventory: " + id);
@@ -178,7 +258,7 @@ public final class CallSiteOutcomeLedger {
         return result;
     }
 
-    /** production stderr 用の総数と終端種別・理由別の集計。 */
+    /** production stderr 用の総数と終端種別・理由別の集計。call site に属さない欠けは {@code gap[...]} で数える。 */
     public String summary() {
         long emitted = 0;
         Map<String, Long> excludedByReason = new TreeMap<>();
@@ -190,6 +270,10 @@ public final class CallSiteOutcomeLedger {
                 case DIAGNOSTIC -> diagnosticByReason.merge(outcome.code() + ":" + outcome.reason(), 1L, Long::sum);
             }
         }
+        Map<String, Long> gapByReason = new TreeMap<>();
+        for (AnalysisGap gap : gaps.values()) {
+            gapByReason.merge(gap.code() + ":" + gap.reason(), 1L, Long::sum);
+        }
         long silentOmission = inventory.ids().size() - outcomes.size();
         StringBuilder text = new StringBuilder("callSites=").append(inventory.ids().size())
                 .append(" emitted=").append(emitted);
@@ -197,6 +281,8 @@ public final class CallSiteOutcomeLedger {
                 text.append(" excluded[").append(reason).append("]=").append(count));
         diagnosticByReason.forEach((reason, count) ->
                 text.append(" diagnostic[").append(reason).append("]=").append(count));
+        gapByReason.forEach((reason, count) ->
+                text.append(" gap[").append(reason).append("]=").append(count));
         return text.append(" silentOmission=").append(silentOmission).toString();
     }
 }

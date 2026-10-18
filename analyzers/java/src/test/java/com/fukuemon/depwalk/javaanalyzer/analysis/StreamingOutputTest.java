@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * B の {@code JAVA_UNRESOLVED_SYMBOL} diagnostic は B 自身の解析直後に flush されるため、
  * C の {@code methodSymbol} より先に書き出される。バッチ実装 (全 node → 全 edge → 全 diagnostic の順)
  * ではこの関係が逆転する (diagnostic は常に最後) ため、この順序で streaming か batch かを判別できる。
+ * B の宣言の解決失敗は完全性 gate に掛かるため、{@code allowIncompleteAnalysis} で成功させて順序だけを見る。
  */
 @DisplayName("fullGraph のファイル単位 streaming 出力")
 class StreamingOutputTest {
@@ -35,7 +36,8 @@ class StreamingOutputTest {
         String requestJson = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"" + jsonPath(FIXTURE) + "\","
                 + "\"language\":\"java\",\"sourceRoots\":[\".\"],"
-                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"]}}";
+                + "\"metadata\":{\"classpath\":[],\"javaLanguageLevel\":[\"25\"],"
+                + "\"allowIncompleteAnalysis\":[\"true\"]}}";
 
         RecordCapturingOutputStream stdout = new RecordCapturingOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

@@ -114,7 +114,8 @@ public final class AnalysisRunner {
      * @throws IOException source の列挙・読み込みまたは protocol record の出力に失敗した場合
      * @throws AnalyzerFatalException scope の binary name 衝突または parse pre-flight 失敗
      * @throws IncompleteAnalysisException {@code allowIncompleteAnalysis} が false のまま、
-     *     全救済後も primary diagnostic として残る in-scope call site があった場合 (完全性 gate)
+     *     全救済後も primary diagnostic として残る in-scope call site か、resolve できない宣言か、
+     *     Spring DI の索引を見送った file があった場合 (完全性 gate)
      */
     public static RunStats run(
             AnalysisRequest request,
@@ -211,15 +212,18 @@ public final class AnalysisRunner {
             try {
                 springDiIndex.accept(unit);
             } catch (RuntimeException | LinkageError e) {
+                SourceLocation fileLocation = SourceLocation.of(
+                        RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString()), 1);
                 accumulator.incrementUnresolved();
                 accumulator.addDiagnostic(Diagnostic.of(
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.severity(),
                         JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
                         "failed to index Spring DI metadata: " + e.getMessage(),
-                        SourceLocation.of(
-                                RelativePaths.toRecordPath(workspaceRoot.relativize(file).toString()), 1),
+                        fileLocation,
                         null,
                         null));
+                ledger.recordSpringDiIndexFailure(
+                        JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(), fileLocation, e);
                 // Spring DI 索引に失敗した unit は source method 索引も見送る (従来の挙動)。
                 continue;
             }
@@ -281,24 +285,26 @@ public final class AnalysisRunner {
             writeReachableRecords(accumulator, request.entrypoints(), writer);
         }
 
-        // 完全性 gate: 全 entry の分類を検査し、primary
-        // diagnostic が残れば全件 details 付きで request 全体を fatal にする。
+        // 完全性 gate: 全 entry の分類を検査し、primary diagnostic か call site に属さない
+        // 欠けが残れば全件 details 付きで request 全体を fatal にする。
         ledger.validateComplete();
         Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary = ledger.primaryDiagnostics();
-        if (!primary.isEmpty() && !allowIncompleteAnalysis) {
+        List<CallSiteOutcomeLedger.AnalysisGap> gaps = ledger.analysisGaps();
+        if ((!primary.isEmpty() || !gaps.isEmpty()) && !allowIncompleteAnalysis) {
             // fatal は先行 warning record を無効化するため、SootUp を利用できず
             // source-only で解析した context 数を upstream cause として error
             // metadata へ自己完結に保持する (bytecode 救済欠如が原因の診断補助)。
             long sootUpUnavailableContexts = contexts.stream()
                     .filter(SourceSetAnalysisContext::sootUpUnavailable)
                     .count();
-            throw incompleteAnalysis(primary, sootUpUnavailableContexts);
+            throw incompleteAnalysis(primary, gaps, sootUpUnavailableContexts);
         }
         // allowIncompleteAnalysis=true: primary diagnostic が残っても
         // request を fatal にせず success として完了する。解決済み edge / 明示除外は
         // 通常どおり公開され、残存 primary diagnostic は各 call site の検出時点で
         // 既に streaming 済みの diagnostic record (reportUnresolved 経由) と、
-        // callSiteSummary の diagnostic[...] 集計で確認できる。graph が部分的で
+        // callSiteSummary の diagnostic[...] 集計で確認できる。call site に属さない欠けも、
+        // 検出時点の diagnostic record と gap[...] 集計で確認できる。graph が部分的で
         // あることを隠さない。
 
         return new RunStats(
@@ -516,7 +522,9 @@ public final class AnalysisRunner {
     }
 
     private static IncompleteAnalysisException incompleteAnalysis(
-            Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary, long sootUpUnavailableContexts) {
+            Map<CallSiteId, CallSiteOutcomeLedger.Outcome> primary,
+            List<CallSiteOutcomeLedger.AnalysisGap> gaps,
+            long sootUpUnavailableContexts) {
         List<FailureDetail> details = new ArrayList<>();
         Map<String, Long> reasonCounts = new TreeMap<>();
         for (Map.Entry<CallSiteId, CallSiteOutcomeLedger.Outcome> entry : primary.entrySet()) {
@@ -544,6 +552,16 @@ public final class AnalysisRunner {
                     metadata));
             reasonCounts.merge(outcome.code() + ":" + outcome.reason(), 1L, Long::sum);
         }
+        for (CallSiteOutcomeLedger.AnalysisGap gap : gaps) {
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("reason", gap.reason());
+            if (gap.target() != null) {
+                metadata.put("target", gap.target());
+            }
+            metadata.putAll(gap.metadata());
+            details.add(new FailureDetail(gap.code(), gap.reason(), gap.sourceLocation(), metadata));
+            reasonCounts.merge(gap.code() + ":" + gap.reason(), 1L, Long::sum);
+        }
         Map<String, Object> topMetadata = new LinkedHashMap<>();
         topMetadata.put("total", (long) details.size());
         topMetadata.put("reasonCounts", reasonCounts);
@@ -551,7 +569,8 @@ public final class AnalysisRunner {
             topMetadata.put("sootUpUnavailableContexts", sootUpUnavailableContexts);
         }
         return new IncompleteAnalysisException(
-                "unresolved in-scope call sites remain after all resolvers and bytecode recovery",
+                "unresolved in-scope call sites, declarations, or Spring DI indexes remain"
+                        + " after all resolvers and bytecode recovery",
                 details,
                 topMetadata);
     }

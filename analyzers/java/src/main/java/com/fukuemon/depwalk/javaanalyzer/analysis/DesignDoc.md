@@ -219,6 +219,15 @@ solver の前に、resolution と独立した visitor で、call を inventory �
 allowlist の外の resolver の failure は、`JAVA_INTERNAL_ERROR` の request fatal にする。  
 1 つの call の symbol、edge、ledger の更新は原子的に行い、中途半端な record を出さない。
 
+call site に属さない次の 2 つの失敗も、同じ ledger に call site の外の欠けとして記録する。
+
+- メソッドか constructor の宣言の resolve の失敗。その宣言の node を出さず、reason を `unresolved-declaration` にする。
+  - 同じ宣言を複数の箇所から記録しても、1 件にまとめる。
+- first pass の Spring DI の索引で起きた例外。その file の索引を見送り、reason を `spring-di-index-failed` にする。
+
+Spring DI の注入点の候補が 0 件のときは、この欠けに数えない。  
+宣言型への edge が残り、graph から edge が欠けないためである。
+
 initializer の call は、意味論に合わせて展開する。  
 instance initializer と field initializer は各 constructor の caller へ、static initializer は `<clinit>` の caller へ展開する。  
 展開した後の各 call は、独立した `CallSiteId` として数える。
@@ -233,23 +242,28 @@ index は、generator に固有の annotation の名前に依存せず、compile
 - 索引の対象の外は 2 つある。
   - owner の source type が scope の中にない生成 type の全体と、source の call site から直接参照されない JVM の内部の member である。
 
-すべての救済の後にも primary diagnostic outcome が残る場合、何も指定しないときは成功の graph を返さず、`JAVA_INCOMPLETE_ANALYSIS` の request fatal にする。
+すべての救済の後にも、primary diagnostic outcome か call site の外の欠けが残ることがある。  
+このとき、何も指定しなければ成功の graph を返さず、`JAVA_INCOMPLETE_ANALYSIS` の request fatal にする。
 
 - 未解決の call は内部の `CallSiteId` の順で並べるが、ID そのものは Protocol へ出力しない。
 - 各共通の `error.details` には、source location、元の diagnostic の code と message、opaque な metadata を自己完結の形で含める。
   - opaque な metadata が持つのは、reason、call kind、判明済みの target、candidate である。
   - この内容は、top-level の metadata の total と reasonCounts と一致させる。
+- call site の外の欠けは、未解決の call の後に、path、行、reason、target の順で並べる。
+  - opaque な metadata が持つのは、reason、判明済みの target（宣言の名前）、例外のクラスの名前である。
+  - total と reasonCounts には、この欠けも数える。
 - `silentOmission` は常に 0 でなければならない。
 
 ### 未解決を許して結果を返す（opt-in）
 
-`metadata.allowIncompleteAnalysis` が `true` の場合、primary diagnostic が残っても request を fatal にしない。  
+`metadata.allowIncompleteAnalysis` が `true` の場合、primary diagnostic か call site の外の欠けが残っても request を fatal にしない。  
 このときは、解決済みの edge と明示の除外を含む graph を成功として公開する。
 
 - graph が部分的であることは隠さない。
-  - 残った primary diagnostic は、検出した時点で `diagnostic` record（`JAVA_UNRESOLVED_SYMBOL` の warning）として streaming 済みである。
+  - 残った primary diagnostic と call site の外の欠けは、検出した時点で streaming 済みである。
+    - その record は、`JAVA_UNRESOLVED_SYMBOL` の warning の `diagnostic` である。
 - stderr の call-site summary（`callSiteSummary`）には、終端の種別と理由ごとの集計を常に出力する。
-  - 集計は `emitted`、`excluded[...]`、`diagnostic[...]` である。
+  - 集計は `emitted`、`excluded[...]`、`diagnostic[...]`、call site の外の欠けの `gap[...]` である。
 - `silentOmission == 0` の不変条件は、緩和したときも保つ。
 - 既定値は `false` にし、fatal にする挙動を既定に置く。
 

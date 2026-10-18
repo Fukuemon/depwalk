@@ -181,6 +181,7 @@ public final class CallGraphBuilder {
                     () -> methodSymbols.buildMethodSymbol(
                             AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
                             md.resolve()),
+                    md.getNameAsString(),
                     "failed to resolve method declaration: " + md.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.methodCallerId(ctx.enclosingTypeNode(), md, currentPath));
             return;
@@ -196,6 +197,7 @@ public final class CallGraphBuilder {
                     () -> methodSymbols.buildConstructorSymbol(
                             AttributionResult.scopeInternal(BinaryNames.forTypeLikeNode(ctx.enclosingTypeNode())),
                             cd.resolve()),
+                    cd.getNameAsString(),
                     "failed to resolve constructor declaration: " + cd.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.constructorCallerId(
                             ctx.enclosingTypeNode(), cd, currentPath));
@@ -210,6 +212,7 @@ public final class CallGraphBuilder {
                     node,
                     ctx,
                     () -> methodSymbols.buildCompactConstructorSymbol(ctx.enclosingTypeNode(), ccd),
+                    ccd.getNameAsString(),
                     "failed to resolve compact constructor declaration: " + ccd.getNameAsString(),
                     () -> CallSiteInventory.CallerIdentities.compactConstructorCallerId(
                             ctx.enclosingTypeNode(), ccd, currentPath));
@@ -267,25 +270,37 @@ public final class CallGraphBuilder {
     /**
      * 宣言 (method / constructor / compact constructor) を 1 件処理する。{@code symbolFactory} が
      * symbol を作れたら node として積み、その methodId を caller に子を辿る。例外で失敗した場合は
-     * {@code failureMessage} の診断を出し、{@code fallbackCallerId} (失敗時のみ評価する。宣言を解決
-     * できない site も完全性 gate から漏らさないための識別子) を caller に子を辿る。
+     * {@code failureMessage} の診断を出して宣言の欠けを ledger へ記録し、{@code fallbackCallerId}
+     * (失敗時のみ評価する。宣言を解決できない site も完全性 gate から漏らさないための識別子) を
+     * caller に子を辿る。
      */
     private void walkCallableDeclaration(
             Node node,
             WalkContext ctx,
             Supplier<MethodSymbol> symbolFactory,
+            String declarationName,
             String failureMessage,
             Supplier<String> fallbackCallerId) {
         MethodSymbol symbol;
         try {
             symbol = symbolFactory.get();
         } catch (RuntimeException | LinkageError e) {
-            diagnostics.reportUnresolvedDeclaration(node, failureMessage);
+            reportUnresolvedDeclaration(node, declarationName, failureMessage, e);
             recurseChildren(node, ctx.withCaller(List.of(fallbackCallerId.get())));
             return;
         }
         accumulator.addNode(symbol);
         recurseChildren(node, ctx.withCaller(List.of(symbol.methodId())));
+    }
+
+    /** 宣言の resolve の失敗を、warning の診断と、完全性 gate の対象になる ledger の欠けの両方に記録する。 */
+    private void reportUnresolvedDeclaration(Node declNode, String declarationName, String message, Throwable failure) {
+        diagnostics.reportUnresolvedDeclaration(declNode, message);
+        ledger.recordUnresolvedDeclaration(
+                JavaDiagnosticCode.JAVA_UNRESOLVED_SYMBOL.code(),
+                sourceLocations.sourceLocationOf(declNode),
+                declarationName,
+                failure);
     }
 
     /**
@@ -992,7 +1007,8 @@ public final class CallGraphBuilder {
                 String signature = MethodIds.signature(declaringBinaryName, MethodIds.CONSTRUCTOR_TOKEN, paramTypes);
                 ids.add(MethodIds.methodId(signature));
             } catch (RuntimeException | LinkageError e) {
-                diagnostics.reportUnresolvedDeclaration(cd, "failed to resolve constructor declaration: " + cd.getNameAsString());
+                reportUnresolvedDeclaration(
+                        cd, cd.getNameAsString(), "failed to resolve constructor declaration: " + cd.getNameAsString(), e);
                 ids.add(CallSiteInventory.CallerIdentities.constructorCallerId(enclosingType, cd, currentPath));
             }
         }
