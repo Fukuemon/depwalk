@@ -35,13 +35,11 @@ import com.github.javaparser.ast.expr.LambdaExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
-import com.github.javaparser.ast.expr.SuperExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.MethodUsage;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
-import com.github.javaparser.resolution.types.ResolvedIntersectionType;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserConstructorDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
@@ -49,11 +47,9 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.Supplier;
 
 /**
@@ -76,12 +72,11 @@ public final class CallGraphBuilder {
     private final SourceLocations sourceLocations;
     private final AttributionResolver attributionResolver;
     private final GraphAccumulator accumulator;
-    private final SootUpTypeHierarchyIndex sootUpIndex;
     private final MethodSymbolFactory methodSymbols;
     private final BytecodeRescue bytecodeRescue;
     private final UnresolvedCallClassifier unresolvedCallClassifier;
-    private final SpringInjectionMatcher springInjections;
     private final EventEdgeEmitter eventEdges;
+    private final DispatchCandidateEdgeEmitter dispatchCandidates;
     private final CallablePassIndex callablePassIndex;
     private final ReachableOwners reachableOwners;
     private final UnresolvedDiagnostics diagnostics;
@@ -120,7 +115,6 @@ public final class CallGraphBuilder {
         this.sourceLocations = new SourceLocations(workspaceRoot);
         this.attributionResolver = attributionResolver;
         this.accumulator = accumulator;
-        this.sootUpIndex = sootUpIndex;
         this.reachableOwners = new ReachableOwners(declIndex, reachableContextIds);
         this.methodSymbols =
                 new MethodSymbolFactory(accumulator, sourceLocations, sourceMethodIndex, reachableOwners);
@@ -128,7 +122,6 @@ public final class CallGraphBuilder {
         this.ledger = ledger;
         this.gapLedger = gapLedger;
         this.unresolvedCallClassifier = new UnresolvedCallClassifier(bytecodeRescue);
-        this.springInjections = new SpringInjectionMatcher(springResult);
         this.diagnostics = new UnresolvedDiagnostics(accumulator, sourceLocations);
         this.eventEdges = new EventEdgeEmitter(
                 accumulator,
@@ -136,6 +129,13 @@ public final class CallGraphBuilder {
                 sourceLocations,
                 eventListenerIndex,
                 reachableOwners,
+                diagnostics,
+                this::edgeCallers);
+        this.dispatchCandidates = new DispatchCandidateEdgeEmitter(
+                accumulator,
+                sootUpIndex,
+                new SpringInjectionMatcher(springResult),
+                methodSymbols,
                 diagnostics,
                 this::edgeCallers);
         this.callablePassIndex = callablePassIndex;
@@ -398,7 +398,7 @@ public final class CallGraphBuilder {
         SourceLocation callSite = emitResolvedEdge(
                 mce, CallSiteId.CallKind.METHOD_CALL, ctx, calleeSymbol,
                 CallEdgeMetadata.forCall(dispatch, ctx.viaLambda()));
-        emitDispatchCandidateEdges(
+        dispatchCandidates.emit(
                 resolved,
                 dispatch,
                 receiverSite,
@@ -515,7 +515,7 @@ public final class CallGraphBuilder {
         SourceLocation callSite = emitResolvedEdge(
                 mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx, calleeSymbol,
                 CallEdgeMetadata.forMethodReference(dispatch, ctx.viaLambda()));
-        emitDispatchCandidateEdges(
+        dispatchCandidates.emit(
                 resolved,
                 dispatch,
                 receiverSite,
@@ -963,94 +963,6 @@ public final class CallGraphBuilder {
         return members;
     }
 
-    private static final class CandidateEdgeInfo {
-        private final SootUpTypeHierarchyIndex.MethodCandidate method;
-        private final Set<String> provenance = new TreeSet<>();
-        private final Set<String> conditionTypes = new TreeSet<>();
-        private boolean ambiguous;
-
-        private CandidateEdgeInfo(SootUpTypeHierarchyIndex.MethodCandidate method) {
-            this.method = method;
-        }
-    }
-
-    /** 型階層と Spring DI の候補を call site 単位で統合し、宣言型 edge とは別に実装候補 edge を追加する。 */
-    private void emitDispatchCandidateEdges(
-            ResolvedMethodDeclaration resolved,
-            String dispatch,
-            TypeSite receiverSite,
-            Node callNode,
-            WalkContext ctx,
-            SourceLocation callSite,
-            String declarationMethodId) {
-        if ("static".equals(dispatch) || isExplicitSuperDispatch(callNode)) {
-            return;
-        }
-        String declaringType = BinaryNames.forResolvedDeclaration(resolved.declaringType());
-        List<String> parameterTypes = AttributionSites.paramBinaryNames(resolved);
-        String receiverType = receiverSite == null ? declaringType : receiverSite.binaryName();
-        List<String> receiverTypes = receiverTypeConstraints(callNode, receiverType);
-        SootUpTypeHierarchyIndex.Resolution sootResolution = sootUpIndex.resolveMethod(
-                declaringType,
-                receiverTypes,
-                resolved.getName(),
-                parameterTypes);
-        if (!sootResolution.isAvailable()) {
-            diagnostics.reportSootUnavailable(sootResolution, declaringType, callNode, ctx.callerMethodIds());
-            return;
-        }
-
-        Map<String, CandidateEdgeInfo> merged = new LinkedHashMap<>();
-        Set<String> sootCandidateKeys = new LinkedHashSet<>();
-        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : sootResolution.candidates()) {
-            sootCandidateKeys.add(candidateKey(candidate));
-        }
-
-        SpringDiIndex.InjectionResolution springResolution =
-                springInjections.resolutionFor(callNode, ctx.enclosingTypeNode());
-        if (springResolution == null
-                || springResolution.status() == SpringDiIndex.ResolutionStatus.UNRESOLVED) {
-            addSootCandidates(merged, sootResolution.candidates());
-        } else if (springResolution.status() == SpringDiIndex.ResolutionStatus.UNIQUE
-                || springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS) {
-            boolean ambiguous = springResolution.status() == SpringDiIndex.ResolutionStatus.AMBIGUOUS;
-            for (SpringDiIndex.BeanCandidate beanCandidate : springResolution.candidates()) {
-                SootUpTypeHierarchyIndex.Resolution implementation = sootUpIndex.resolveImplementationMethod(
-                        beanCandidate.bean().implementationType(),
-                        resolved.getName(),
-                        parameterTypes);
-                if (!implementation.isAvailable()) {
-                    diagnostics.reportSootUnavailable(
-                            implementation, beanCandidate.bean().implementationType(), callNode,
-                            ctx.callerMethodIds());
-                    continue;
-                }
-                for (SootUpTypeHierarchyIndex.MethodCandidate candidate : implementation.candidates()) {
-                    CandidateEdgeInfo info = merged.computeIfAbsent(
-                            candidateKey(candidate), key -> new CandidateEdgeInfo(candidate));
-                    info.provenance.addAll(beanCandidate.provenance());
-                    if (sootCandidateKeys.contains(candidateKey(candidate))) {
-                        info.provenance.add("sootup");
-                    }
-                    info.conditionTypes.addAll(beanCandidate.bean().conditionTypes());
-                    info.ambiguous |= ambiguous;
-                }
-            }
-        }
-
-        for (CandidateEdgeInfo info : merged.values()) {
-            MethodSymbol candidateSymbol = methodSymbols.buildCandidateMethodSymbol(info.method);
-            if (declarationMethodId.equals(candidateSymbol.methodId())) {
-                continue;
-            }
-            accumulator.addNode(candidateSymbol);
-            Map<String, Object> metadata = candidateEdgeMetadata(info);
-            for (String callerId : edgeCallers(callNode, ctx)) {
-                accumulator.addEdge(callerId, candidateSymbol.methodId(), callSite, metadata);
-            }
-        }
-    }
-
     /**
      * functional interface の invocation site から、渡された callable 実体への edge を
      * 生成する。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
@@ -1267,105 +1179,6 @@ public final class CallGraphBuilder {
             }
         }
         return false;
-    }
-
-    private static void addSootCandidates(
-            Map<String, CandidateEdgeInfo> merged,
-            List<SootUpTypeHierarchyIndex.MethodCandidate> candidates) {
-        boolean ambiguous = candidates.size() != 1;
-        for (SootUpTypeHierarchyIndex.MethodCandidate candidate : candidates) {
-            CandidateEdgeInfo info = merged.computeIfAbsent(
-                    candidateKey(candidate),
-                    key -> new CandidateEdgeInfo(candidate));
-            info.provenance.add("sootup");
-            info.ambiguous = ambiguous;
-        }
-    }
-
-    /**
-     * {@code super.method()} と {@code super::method} は JVM の {@code invokespecial} に相当し、
-     * 実行時のレシーバー型によるオーバーライド選択を行わない。そのため宣言先への通常 edge は保持しつつ、
-     * 型階層由来の実装候補 edge だけを生成対象外とする。
-     */
-    private static boolean isExplicitSuperDispatch(Node callNode) {
-        if (callNode instanceof MethodCallExpr methodCall) {
-            return methodCall.getScope().filter(SuperExpr.class::isInstance).isPresent();
-        }
-        return callNode instanceof MethodReferenceExpr methodReference
-                && methodReference.getScope() instanceof SuperExpr;
-    }
-
-    /**
-     * call siteのreceiverが同時に満たす静的型を返す。
-     *
-     * <p>通常のreference typeはfallbackの1型だけを返す。型変数またはintersection typeでは
-     * 全extends境界を返し、SootUp側で候補の積集合を取れるようにする。型解決に失敗した場合も
-     * erasure済みfallbackを保持する。返す列は重複なし。
-     */
-    private static List<String> receiverTypeConstraints(Node callNode, String fallback) {
-        Expression scope = CallScopes.scopeOf(callNode);
-        if (scope == null) {
-            return List.of(fallback);
-        }
-        try {
-            ResolvedType receiverType = scope.calculateResolvedType();
-            LinkedHashSet<String> constraints = new LinkedHashSet<>();
-            collectReceiverTypeConstraints(receiverType, constraints, new LinkedHashSet<>());
-            return constraints.isEmpty() ? List.of(fallback) : List.copyOf(constraints);
-        } catch (RuntimeException | LinkageError e) {
-            return List.of(fallback);
-        }
-    }
-
-    /**
-     * 型変数・intersection・上限wildcardを再帰展開し、最終的なreference型境界を収集する。
-     * 間接境界 ({@code T extends U}, {@code U extends A & B}) でもAとBの両方を保持する。
-     *
-     * @param visiting 展開中の型変数名。循環参照を停止するために呼び出し間で引き回す
-     */
-    private static void collectReceiverTypeConstraints(
-            ResolvedType type,
-            Set<String> constraints,
-            Set<String> visiting) {
-        if (type.isTypeVariable()) {
-            String variableName = type.asTypeVariable().qualifiedName();
-            if (!visiting.add(variableName)) {
-                return;
-            }
-            type.asTypeVariable().asTypeParameter().getBounds().stream()
-                    .filter(bound -> bound.isExtends())
-                    .forEach(bound -> collectReceiverTypeConstraints(bound.getType(), constraints, visiting));
-            visiting.remove(variableName);
-            return;
-        }
-        if (type instanceof ResolvedIntersectionType intersectionType) {
-            intersectionType.getElements()
-                    .forEach(element -> collectReceiverTypeConstraints(element, constraints, visiting));
-            return;
-        }
-        if (type.isWildcard() && type.asWildcard().isExtends()) {
-            collectReceiverTypeConstraints(type.asWildcard().getBoundedType(), constraints, visiting);
-            return;
-        }
-        ResolvedType erased = type.erasure();
-        if (erased.isReferenceType()) {
-            constraints.add(BinaryNames.erasureOf(erased));
-        }
-    }
-
-    private static Map<String, Object> candidateEdgeMetadata(CandidateEdgeInfo info) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("resolution", info.ambiguous ? "ambiguous" : "unique");
-        metadata.put("provenance", List.copyOf(info.provenance));
-        if (!info.conditionTypes.isEmpty()) {
-            metadata.put("conditional", true);
-            metadata.put("conditionTypes", List.copyOf(info.conditionTypes));
-        }
-        return metadata;
-    }
-
-    private static String candidateKey(SootUpTypeHierarchyIndex.MethodCandidate candidate) {
-        return MethodIds.signature(candidate.declaringType(), candidate.methodName(), candidate.parameterTypes());
     }
 
 }
