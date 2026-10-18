@@ -38,6 +38,7 @@
    - 擬似の caller の node は合成せず、runtime-provided のマーカーの既存の設計を踏襲する。
 3. **イベントの edge は、broadcast の意味論の専用の規則で表す**。
    - 合致した listener への edge は、複数でも、どれも確定（`resolution: unique`）にする。曖昧として扱うのは、条件つきの listener だけにする。
+     - この判断のうち、曖昧として扱う listener の範囲は [ADR-0015](0015-ambiguous-generic-event-listeners.md) で置き換えた。
    - Spring DI の「複数の候補は曖昧」とは意味論が違うため、流用しない。
 4. **callable の invocation の edge は、method reference なら参照先のメソッドへ、lambda なら定義した側の囲むメソッド（標識つき）へ張る**。
    - lambda の本体を独立した node にしない既存の決定を保ち、囲むメソッドへの edge を「invoker はそのメソッドの中で定義されたコードを実行する」の意味で使う。

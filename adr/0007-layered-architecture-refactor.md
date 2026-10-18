@@ -82,6 +82,7 @@ package の移動に伴う機械的な追随だけは行う。
 
 - `javaanalyzer` の直下（`protocol`、`io`、`preflight`、`discovery`）はそのままにする。
 - `analysis` の下は段階ごとの package で作り、実行の順は `analysis/pipeline` だけが知る。
+  - この判断のうち、実行の順の持ち主は [ADR-0016](0016-split-execution-order-between-main-and-runner.md) で置き換えた。
 - 外部ライブラリの隔離は 3 段にする。
   - SootUp は `analysis/sootup`（自前の型で公開する adapter の facade）へ完全に閉じ込める。
   - Gradle Tooling API は `discovery` へ完全に隔離する。

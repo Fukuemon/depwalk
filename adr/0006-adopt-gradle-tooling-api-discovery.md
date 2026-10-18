@@ -32,6 +32,7 @@ Java Analyzer は、Gradle Tooling API を使い、対象の build の実効の 
   - project の依存
   - 実効の source language level
   - preview の有無
+- provider が返す項目を 7 つに限る判断は、[ADR-0014](0014-extend-discovery-model-with-build-directories.md) で置き換えた。
 - Gradle の task と source の生成は実行しない。
 - `test` と名前付きの source set は、自動 discovery の対象にしない。
 - 各 project の `main` ごとに解析 context を作り、project の依存で到達できる context と classpath だけを型解決へつなぐ。
@@ -39,6 +40,7 @@ Java Analyzer は、Gradle Tooling API を使い、対象の build の実効の 
 ### 3. 解析するのは root build の project 階層だけにし、除外を観測できるようにする
 
 - composite build と included build の project は model の対象にせず、root build の project 階層だけを解析する。
+  - この判断のうち、解析する root build の project の範囲は [ADR-0014](0014-extend-discovery-model-with-build-directories.md) で置き換えた。
 - 除外した build と project は warning で報告し、報告せずに除外することはしない。
 - 解決済みの artifact は、外部の依存として使ってよい。
 - 採用した source root と file の realpath が workspace の外へ出るときは、fatal にする。

@@ -16,6 +16,8 @@ Core と Analyzer の結合点を protocol に限定する必要がある。
 
 Core と Analyzer は別プロセスとし、Analyzer SPI は JSONL over STDIN/STDOUT を共通の protocol とする。
 
+この判断のうち、Analyzer を足しても Core を変更しない範囲は [ADR-0017](0017-limit-core-change-to-language-value.md) で、Core が言語のランタイムを知らない範囲は [ADR-0019](0019-oom-hint-from-analyzer-stderr.md) で置き換えた。
+
 ### プロセスと入出力
 
 - Core は 1 `analysisRequest` ごとに Analyzer process を 1 つ起動する。
@@ -29,6 +31,7 @@ Core と Analyzer は別プロセスとし、Analyzer SPI は JSONL over STDIN/S
 - 全 record の `schemaVersion` は protocol 全体の major version を表す。
   - Phase1 は `"1"` とする。
 - record の受信者は、対応済み major version の未知 field を無視し、未対応 major version を拒否する。
+  - この判断のうち、Core が受け取る record に埋め込まれた object の未知 field の扱いは [ADR-0013](0013-reject-unknown-nested-fields.md) で置き換えた。
 - 任意 field の追加は互換変更とする。
 - 必須 field の追加と削除、field の型変更、field の意味論変更、record type の削除は breaking change とする。
 
