@@ -226,7 +226,7 @@ func assertDiagnosticCode(t *testing.T, diagnostics []protocol.Diagnostic, code 
 // diagnostic の期待値と突き合わせる。要求の組み立てと Analyzer 起動の経路は
 // `depwalk analyze` (core/internal/analyze) と同じものを通る。
 //
-// analyze の Result ではなく、1 層下の protocol.Runner を直接叩いている。
+// analyze の Result ではなく、1 層下の protocol.Client を直接叩いている。
 // Result.Graph は callEdge.metadata を運ばないためである (現行の Traversal が
 // 必要としないので graph.Edge に Metadata field が無い)。本テストは
 // callEdge.metadata の dispatch と viaLambda を見る必要がある。
@@ -261,9 +261,9 @@ func TestJavaAnalyzerFixtureE2E(t *testing.T) {
 		t.Fatalf("fixture analysisRequest is invalid: %v", err)
 	}
 
-	runner := protocol.NewRunner(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
+	client := protocol.NewClient(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
 	var records []protocol.Record
-	result, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
+	result, err := client.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
 		t.Fatalf("failed to run the analyzer process: %v", err)
 	}

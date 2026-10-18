@@ -41,9 +41,9 @@ func TestJavaAnalyzerSpringFixtureE2E(t *testing.T) {
 	if err := request.Validate(); err != nil {
 		t.Fatalf("Spring fixture analysisRequest is invalid: %v", err)
 	}
-	runner := protocol.NewRunner(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
+	client := protocol.NewClient(analyzer.Command{Path: javaPath, Args: []string{"-jar", jarPath}})
 	var records []protocol.Record
-	runResult, err := runner.Run(request, func(record protocol.Record) { records = append(records, record) })
+	runResult, err := client.Run(request, func(record protocol.Record) { records = append(records, record) })
 	if err != nil {
 		t.Fatalf("run Spring fixture analyzer: %v", err)
 	}

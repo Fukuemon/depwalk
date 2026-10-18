@@ -11,7 +11,7 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/graph"
 )
 
-// Adapter は ACL の Adapter 側。wire の analysisRequest を組み立て、[Runner] で
+// Adapter は ACL の Adapter 側。wire の analysisRequest を組み立て、[Client] で
 // Analyzer process を動かし、Translator (translate.go) で wire record を domain 値へ
 // 変換することで analyze.Source port を実装する。
 //
@@ -52,7 +52,7 @@ func (a *Adapter) Run(
 	if len(request.Exclude) > 0 {
 		wireRequest.Exclude = request.Exclude
 	}
-	// [Runner.Run] 側でも要求を検証する (record レベルの E2E などが直接使うため)。
+	// [Client.Run] 側でも要求を検証する (record レベルの E2E などが直接使うため)。
 	// Adapter が先に検証するのは、port 経由の不正な要求を process 起動前に入力
 	// エラー (exit code 2) として分類するためである。後段に任せると型のない
 	// 実行時失敗として表に出る。
@@ -60,7 +60,7 @@ func (a *Adapter) Run(
 		return analyze.Outcome{}, &analyze.InputError{Err: fmt.Errorf("invalid analysis request: %w", err)}
 	}
 
-	runResult, err := NewRunner(a.command).Run(wireRequest, func(record Record) {
+	runResult, err := NewClient(a.command).Run(wireRequest, func(record Record) {
 		switch typed := record.(type) {
 		case MethodSymbol:
 			if onNode != nil {

@@ -50,16 +50,16 @@ type MethodQuery struct {
 	Result  traversal.Result
 }
 
-// Runner は注入された [Source] に対して analyze の use case を実行する。
+// UseCase は注入された [Source] を通して depwalk analyze を実行する。
 //
 // interface ではなく struct として公開する。抽象が要る呼び出し側が自分で
 // interface を定義すればよく、提供側が先回りして抽象を作ると使われない抽象が残る。
-type Runner struct {
+type UseCase struct {
 	source Source
 }
 
-func New(source Source) Runner {
-	return Runner{source: source}
+func New(source Source) UseCase {
+	return UseCase{source: source}
 }
 
 // Run は port 経由で Analyzer を実行し、その record から呼び出しグラフを構築する。
@@ -67,8 +67,8 @@ func New(source Source) Runner {
 // error を返すのは、要求を組めない / 検証に通らない、Analyzer の stdout が
 // protocol 検証に失敗する、Analyzer が致命的な失敗 ("error" record または非ゼロ
 // exit) を報告した場合。いずれも呼び出し側が非ゼロ exit として伝播すべき失敗である。
-func (r Runner) Run(opts Options) (Result, error) {
-	if r.source == nil {
+func (u UseCase) Run(opts Options) (Result, error) {
+	if u.source == nil {
 		return Result{}, errors.New("analyze: a Source is required")
 	}
 
@@ -91,7 +91,7 @@ func (r Runner) Run(opts Options) (Result, error) {
 	// 要求を原子的に扱うためである。
 	stagingGraph := graph.New()
 	methodCount, callEdgeCount := 0, 0
-	outcome, err := r.source.Run(request,
+	outcome, err := u.source.Run(request,
 		func(node graph.Node) {
 			stagingGraph.AddNode(node)
 			methodCount++

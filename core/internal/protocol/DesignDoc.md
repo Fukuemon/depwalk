@@ -229,11 +229,11 @@ Analyzer の stderr は、Protocol の record として parse しない。
 
 ```mermaid
 flowchart TD
-    CLI["cli<br/>protocol.Adapter を use case へ注入"] --> UC["analyze.Runner<br/>use case"]
+    CLI["cli<br/>protocol.Adapter を use case へ注入"] --> UC["analyze.UseCase<br/>use case"]
     UC -->|"Source.Run(Request)"| Adapter
     subgraph protocol["protocol (ACL)"]
         Adapter["Adapter<br/>analyze.Source の実装"]
-        PR["Runner"]
+        PR["Client"]
         RC["recordCollector<br/>ParseRecord と参照の完全性の検査"]
         Tr["Translator<br/>NodeFromMethodSymbol / EdgeFromCallEdge"]
         Adapter -->|"検証した AnalysisRequest"| PR
@@ -250,7 +250,7 @@ flowchart TD
     UC --> Graph["staging の graph.Graph"]
 ```
 
-`cli` は `protocol.Adapter` を `analyze.Runner` へ注入し、use case は `analyze.Source` の port だけを知る。  
+`cli` は `protocol.Adapter` を `analyze.UseCase` へ注入し、use case は `analyze.Source` の port だけを知る。  
 `analyzer.Runner` は JSONL の中身を解釈せず、Protocol の parse と検証は `protocol` だけが持つ。  
 Core は、Analyzer の内部のライブラリと言語のランタイムに依存しない。
 
@@ -315,7 +315,7 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
 ### 置くファイル
 
 - `core/internal/protocol/types.go`、`validate.go`、`parser.go`: record の型、検証、厳格な JSONL の parse
-- `core/internal/protocol/runner.go`: Analyzer を 1 回動かし、record を集めて参照の完全性を確かめる
+- `core/internal/protocol/client.go`: Analyzer を 1 回動かし、record を集めて参照の完全性を確かめる
 - `core/internal/protocol/translate.go`: wire の record を graph の値へ変換する
 - `core/internal/protocol/adapter.go`: `analyze` の port を実装する
 - `core/internal/analyzer/runner.go`: プロセスの起動、stdin、stdout、stderr、終了コード
