@@ -12,10 +12,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * generic の推論が壊れた式の型は、local 変数の名前から AST 上の宣言を探して導く。
+ * 探すのは、使う位置から外側へスコープを辿って最初に見える宣言である。
  * 推論を壊すために、走査する source の getter を除き、bytecode にだけ getter を置く。
  */
 @DisplayName("generic の推論が壊れた式で、local 変数の宣言を探す")
@@ -159,34 +161,33 @@ class LocalDeclarationLookupTest {
     }
 
     @Test
-    @DisplayName("兄弟の block に同名の local があると、宣言を採らず、型を導けない呼び出しを diagnostic に残す")
-    void siblingBlockWithTheSameNameLeavesDiagnostic() {
+    @DisplayName("兄弟の block に同名の local があっても、使う位置から見える宣言の型から呼び出し関係 (edge) を作る")
+    void siblingBlockWithTheSameNameIsNotAdopted() {
         String caller = "java:com.example.SiblingBlockUse#run(java.util.List,java.util.List)";
-        assertTrue(edge(caller, ITEM_GET_CODE).isEmpty(), () -> "edges: " + ran.byType("callEdge"));
-        assertTrue(hasUnresolved(caller), () -> "diagnostics: " + ran.byType("diagnostic"));
+        assertTrue(edge(caller, ITEM_GET_CODE).isPresent(), () -> "edges: " + ran.byType("callEdge"));
+        assertFalse(hasUnresolved(caller), () -> "diagnostics: " + ran.byType("diagnostic"));
     }
 
     @Test
-    @DisplayName("lambda の中から外側の local を使うと、宣言を採らず、型を導けない呼び出しを diagnostic に残す")
-    void outerLocalUsedInsideLambdaLeavesDiagnostic() {
+    @DisplayName("lambda の中から外側の local を使うと、外側の宣言の型から呼び出し関係 (edge) を作る")
+    void outerLocalUsedInsideLambdaIsAdopted() {
         String caller = "java:com.example.LambdaCaptureUse#run(java.util.List,java.util.List)";
-        assertTrue(edge(caller, ITEM_GET_CODE).isEmpty(), () -> "edges: " + ran.byType("callEdge"));
-        assertTrue(hasUnresolved(caller), () -> "diagnostics: " + ran.byType("diagnostic"));
-    }
-
-    @Test
-    @DisplayName("宣言より前で同名の field を使うと、後ろの local の型から呼び出し関係 (edge) を作る")
-    void fieldUsedBeforeTheLocalAdoptsTheLaterLocal() {
-        String caller = "java:com.example.FieldBeforeLocalUse#run(java.util.List,java.util.List)";
         assertTrue(edge(caller, ITEM_GET_CODE).isPresent(), () -> "edges: " + ran.byType("callEdge"));
     }
 
     @Test
-    @DisplayName("instance initializer の中で使うと、ファイル全体の同名の宣言が数に入り、宣言を採らずに diagnostic に残す")
-    void initializerUseCountsDeclarationsInTheWholeFile() {
-        String caller = "java:com.example.InitializerUse#<init>()";
+    @DisplayName("宣言より前で同名の field を使うと、後ろの local を採らず、local の型から呼び出し関係 (edge) を作らない")
+    void fieldUsedBeforeTheLocalDoesNotAdoptTheLaterLocal() {
+        String caller = "java:com.example.FieldBeforeLocalUse#run(java.util.List,java.util.List)";
         assertTrue(edge(caller, ITEM_GET_CODE).isEmpty(), () -> "edges: " + ran.byType("callEdge"));
-        assertTrue(hasUnresolved(caller), () -> "diagnostics: " + ran.byType("diagnostic"));
+    }
+
+    @Test
+    @DisplayName("instance initializer の中で使うと、ほかの member の同名の宣言を数に入れず、initializer の宣言の型から呼び出し関係 (edge) を作る")
+    void initializerUseAdoptsItsOwnDeclaration() {
+        String caller = "java:com.example.InitializerUse#<init>()";
+        assertTrue(edge(caller, ITEM_GET_CODE).isPresent(), () -> "edges: " + ran.byType("callEdge"));
+        assertFalse(hasUnresolved(caller), () -> "diagnostics: " + ran.byType("diagnostic"));
     }
 
     private static Optional<Map<String, Object>> edge(String callerMethodId, String calleeMethodId) {

@@ -10,6 +10,7 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
@@ -27,7 +28,7 @@ import java.util.function.BiFunction;
 /**
  * functional interface の SAM を呼ぶ call site から、receiver に入っている callable の実体への edge を足す。
  *
- * <p>receiver の実体は、同じメソッドの local 変数の initializer と、workspace のメソッドの parameter
+ * <p>receiver の実体は、使う位置から見える local 変数の initializer と、workspace のメソッドの parameter
  * への引数渡し 1 段からだけ決める。実体を決められない SAM の呼び出しは advisory 診断に残す。
  * SAM の呼び出しそのものの解決、宣言型への edge の出力、call site の終端の ledger への記録はしない。
  * それは {@link CallGraphBuilder} が受け持つ。
@@ -210,13 +211,15 @@ final class CallableInvocationEdgeEmitter {
     }
 
     /**
-     * 同一メソッド内: lambda / method reference を直接 initializer に持ち、再代入の
-     * ない local 変数の invocation。再代入がある場合は追跡しない (根拠のない実体を
-     * 推測しない)。
+     * 使う位置から見える local の宣言が、lambda か method reference を initializer に直接持つときの実体。
+     * callable の実体は呼び出す時点の値で決まるので、再代入のある変数は追跡しない。
      */
     private List<CallablePassIndex.CallableTarget> callablesForLocal(String variableName, MethodCallExpr mce) {
-        Expression initializer = LocalDeclarations.initializerOf(
-                LocalDeclarations.uniqueUnreassignedBefore(mce, variableName));
+        VariableDeclarator declarator = LocalDeclarations.visibleAt(mce, variableName);
+        if (declarator == null || LocalDeclarations.reassigned(declarator)) {
+            return List.of();
+        }
+        Expression initializer = LocalDeclarations.initializerOf(declarator);
         if (initializer == null) {
             return List.of();
         }
