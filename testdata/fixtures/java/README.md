@@ -2,11 +2,11 @@
 
 `core/e2e` の Go の E2E は、ここにある fixture に対して、実際の `analyzers/java` の fat jar を動かし、出力を期待値と比べる。どの fixture も Analyzer の解析の対象として作ったもので、動くアプリケーションではない。業務のロジックを足さない。
 
-| fixture                        | 使うテスト                                                                                | 確かめること                                                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `project/`                     | `java_fixture_test.go`                                                                    | interface、継承、jar の型の引き上げ、lambda の 4 つの場面の caller と callee                                       |
-| `spring-project/`              | `java_spring_fixture_test.go`                                                             | Spring の DI と framework の暗黙の呼び出しを、実際の framework の jar を classpath にして解く                      |
-| `multi-module-spring-project/` | `gradle_multiproject_cli_test.go`、`cli_query_test.go`、`unresolved_patterns_cli_test.go` | Gradle の multi-project の自動 discovery と明示の source root、CLI の出力の golden、未解決だった呼び出しの型の救済 |
+| fixture                        | 使うテスト                                                                               | 確かめること                                                                                                       |
+| ------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `project/`                     | `java_fixture_test.go`                                                                   | interface、継承、jar の型の引き上げ、lambda の 4 つの場面の caller と callee                                       |
+| `spring-project/`              | `java_spring_fixture_test.go`                                                            | Spring の DI と framework の暗黙の呼び出しを、実際の framework の jar を classpath にして解く                      |
+| `multi-module-spring-project/` | `gradle_multiproject_cli_test.go`、`cli_query_test.go`、`hard_call_patterns_cli_test.go` | Gradle の multi-project の自動 discovery と明示の source root、CLI の出力の golden、未解決だった呼び出しの型の救済 |
 
 ## project/
 
@@ -70,4 +70,4 @@ root と 3 つの subproject（`:app`、`:service`、`:repository`）を持つ G
 
 classes の出力と classpath の manifest は、テストが `writeDepwalkClasspath` で作る。manifest がすでにあれば、作り直さない。
 
-`patterns/` は、root の `settings.gradle` に含めない別の build である。かつて解決できなかった 5 つの呼び出しの型を、最小の形で再現する。5 つは fluent chain、method reference、明示の `super` の呼び出し、generics 付きの `var`、module をまたぐ Lombok の member である。`unresolved_patterns_cli_test.go` が自動 discovery で解析し、5 つがすべて bytecode-only の member への edge として救済されることを確かめる。classes の出力がないときは、テストが `writeDepwalkClasspath` で作る。
+`patterns/` は、root の `settings.gradle` に含めない別の build である。かつて解決できなかった 5 つの呼び出しの型を、最小の形で再現する。5 つは fluent chain、method reference、明示の `super` の呼び出し、generics 付きの `var`、module をまたぐ Lombok の member である。`hard_call_patterns_cli_test.go` が自動 discovery で解析し、5 つがすべて bytecode-only の member への edge として救済されることを確かめる。classes の出力がないときは、テストが `writeDepwalkClasspath` で作る。

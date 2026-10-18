@@ -32,7 +32,7 @@
   },
   "cases": [
     {
-      "name": "S2: maxDepth 2 keeps convergent n2 (shortest path) and cuts n2 -> n3",
+      "name": "maxDepth 2 keeps convergent n2 (shortest path) and cuts n2 -> n3",
       "start": "method:o",
       "direction": "callee",
       "maxDepth": 2,
@@ -45,7 +45,7 @@
       }
     },
     {
-      "name": "S2: maxDepth 0 keeps only the start and cuts all adjacent edges",
+      "name": "maxDepth 0 keeps only the start and cuts all adjacent edges",
       "start": "method:o",
       "direction": "callee",
       "maxDepth": 0,
@@ -61,7 +61,7 @@
       }
     },
     {
-      "name": "S2: unlimited depth reaches everything without cutoffs",
+      "name": "unlimited depth reaches everything without cutoffs",
       "start": "method:o",
       "direction": "callee",
       "expected": {
@@ -79,7 +79,7 @@
       }
     },
     {
-      "name": "S1: caller from n3 with maxDepth 1 cuts upstream edges",
+      "name": "caller from n3 with maxDepth 1 cuts upstream edges",
       "start": "method:n3",
       "direction": "caller",
       "maxDepth": 1,

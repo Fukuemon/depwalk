@@ -549,7 +549,7 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - パターンは、lambda や generic を含む fluent chain、`var` と generic メソッドの戻り値、method reference である。
   - 明示の `super(...)` と、cross-module の Lombok が生成した member の呼び出しもパターンに含む。
   - 各パターンは、bytecode にだけある member の契約の下で edge になる。
-  - この成功の期待は、required の E2E（`core/e2e/unresolved_patterns_cli_test.go`）が守る。
+  - この成功の期待は、required の E2E（`core/e2e/hard_call_patterns_cli_test.go`）が守る。
   - `JAVA_INCOMPLETE_ANALYSIS` のときの診断の metadata の 4 項目（sanitize の制約を含む）の期待値は、Java の unit テストの側が検証する。
 - **metadata の透過の表出の CLI での比較**: Analyzer が付けた metadata が、欠けずに CLI の出力まで届くことを、次の 3 本で比べる。
   - `core/e2e/event_edges_cli_test.go`、`core/e2e/callable_edges_cli_test.go`、`core/e2e/entrypoint_metadata_cli_test.go`

@@ -27,7 +27,7 @@
   },
   "cases": [
     {
-      "name": "S2: callee from o keeps all convergent edges without cycle annotation",
+      "name": "callee from o keeps all convergent edges without cycle annotation",
       "start": "method:o",
       "direction": "callee",
       "expected": {
@@ -39,7 +39,7 @@
       }
     },
     {
-      "name": "S1: caller from m reaches both arms",
+      "name": "caller from m reaches both arms",
       "start": "method:m",
       "direction": "caller",
       "expected": {
