@@ -164,14 +164,9 @@ jobs:
       # docs のチェックは apm の配置先にあり、Git で追跡しない
       - run: apm install --frozen
 
-      # 既存の文書の指摘は残っている。pull request で変えた Markdown だけを見る
+      # prh.yml に規則を足すと、変えていない文書にも指摘が出る。全文書を見る
       - name: textlint
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          git diff --name-only --diff-filter=ACMR "origin/$BASE_REF...HEAD" -- '*.md' > changed.txt
-          if [ -s changed.txt ]; then xargs pnpm exec textlint < changed.txt; fi
+        run: git ls-files -z '*.md' | xargs -0 pnpm exec textlint
 
       - run: node .claude/hooks/docs/hooks/check-history.mjs
       - run: node .claude/hooks/docs/hooks/check-links.mjs

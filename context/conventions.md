@@ -2,7 +2,7 @@
 type: context
 title: コードと文書の規約
 description: Go と JUnit のテストの命名、コメントに書くこと、文書の置き場と frontmatter、golangci-lint と lefthook の設定、チェックの除外。lint で検出できる規則は書かない
-status: draft
+status: stable
 governs:
   - package.json
   - lefthook.yml
@@ -11,6 +11,8 @@ governs:
   - commitlint.config.mjs
   - core/.golangci.yml
   - scripts/golangci-lint.sh
+  - scripts/check-specs-residue.sh
+  - hooks
   - .github/workflows
 verified_commit: unverified
 ---
@@ -21,8 +23,6 @@ verified_commit: unverified
 
 - Go の package の名前は、小文字の短い単語で、責務を表す名前にする。`core/internal/core` のように、親と同じ名前を重ねない。
 - 識別子、型、API の名前は、日本語に訳さずに原語のまま使う。
-- 利用者に見える文字列リテラルは、コメントや文書を日本語にするときにも変えない。CLI の出力、エラーメッセージ、JSONL の値が当たる。
-  - これらは観測できる契約で、golden テストが固定している。
 
 Go のテストは、名前で仕様と具体例を絞り込めるように分ける。
 
@@ -64,12 +64,23 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 
 - 設計の文書が日本語なので、同じ語で意味を書くほうが読み手の切り替えが少ない。
 - 文書、コミット、pull request も日本語で書く。
+- 利用者に見える文字列は訳さない。CLI の出力、エラーの文言、JSONL の値が当たる。
+  - これらは golden テストが固定する、観測できる契約である。コメントや文書で引くときも、原文のまま書く。
 
 コメントから、他の文書を参照しない。
 
 - spec、issue、ADR、Design Doc、context のどれも参照しない。理由はコメントの中に平易な日本語で書き切り、リンクで説明に代えない。
 - どの文書がそのコードを説明するかは、文書の frontmatter の `governs` でたどる。決定の経緯は Git の履歴と pull request でたどる。
 - 名前で書けば伝わる内容を、`(S5)` のような符号だけで指さない。
+- 外部の制約を書くコメントにも、issue や仕様のリンクを添えない。外部のライブラリの公式の文書の URL も添えない。
+  - 今のコードのコメントは URL を持たず、制約の内容をコメントの中に書いている。この書き方に揃える。
+
+この節の規約は、スキル write-comments より優先する。スキルとの違いは次の 2 つ。
+
+- write-comments は残してよい実装のコメントを 3 種類に限るが、このリポジトリでは、採らなかった方法とその理由も書いてよい。
+- write-comments は外部の制約のコメントに issue や仕様へのリンクを添えるとするが、このリポジトリでは添えない。
+
+文書コメントの有無を確かめる lint（Go の revive の exported、Java の Checkstyle）は入れていない。
 
 ## Documents
 
@@ -80,7 +91,14 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 - 機能ごとの設計は、対象のコードのディレクトリに `DesignDoc.md` として置く。1 つの機能の文書を分けるときは、下位の package のディレクトリに `DesignDoc.md` を置く。
 - issue ごとの作業の文書は `specs/<issue 番号>-<slug>/` に置き、issue を閉じるときに消す。
 
+目次の `context/index.md` は手で保ち、生成のスクリプトは使わない。  
+生成のスクリプトは、コードの隣の Design Doc、PRD、ADR を集めないためである。
+
+- 目次の各行の説明は、その文書の frontmatter の `description` と同じ文にする。frontmatter を持たない ADR は、題を説明にする。
+- 文書を足すか、`description` を変えたときは、同じ変更で目次を直す。
+
 ADR は、決定した時点の記録として書き換えない。  
+ただし、用語を揃えるための語の置き換えと、移った文書へのリンクの修正は、決定を変えないので行ってよい。  
 対応するバージョンの範囲のように、決定の後に変わる値は、context か Design Doc に書き、ADR からはリンクする。
 
 `context/` と `design/` の文書の frontmatter は、次の規則で書く。
@@ -110,11 +128,12 @@ lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数
 
 ## Check Exclusions
 
-- CI の textlint は、pull request で変えた Markdown にだけ掛ける。既存の文書に textlint の指摘が残っているためである。
+- CI の textlint は、Git で追跡するすべての Markdown に掛ける。`prh.yml` に規則を足すと、変えていない文書にも指摘が出るためである。
+  - コミットの前のフックは、ステージした Markdown にだけ掛ける。
 - `list-drift.mjs` による文書の鮮度のチェックは、CI で一覧を出すだけにし、失敗にしない。
   - `governs` の範囲が変わっても文書が正しいままのことはよくある。失敗にすると、内容を読まずに `verified_commit` だけを進めて通すことになる。
   - コミットをまたいで初めて意味を持つチェックなので、コミットの前のフックには入れない。
 - prettier は、`.prettierignore` で次を除く。
   - apm が配置して書き換えるファイル。整形すると、次の `apm install` で差分が出る。
   - Gradle の fixture の build の生成物
-- 文章の長さのチェックから、表と箇条書きを除くかは未定。
+- 文章の長さのチェック（`sentence-length`）は、段落と箇条書きに掛け、表のセルには掛からない。`.textlintrc.json` で除外の設定を足さず、この動きのまま使う。
