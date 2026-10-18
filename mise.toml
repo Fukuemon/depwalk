@@ -4,6 +4,6 @@ java = "temurin-25.0.4+101.0.LTS"
 # 文書のチェックとコミットのメッセージのチェックに使う
 node = "24"
 pnpm = "10.27.0"
-# apm は agent-harness のスキルとフックを配置する
+# apm は agent-harness のスキルとフックと、agent-playbooks の playbook を配置する
 uv = "0.12"
 "pipx:apm-cli" = "0.32.0"

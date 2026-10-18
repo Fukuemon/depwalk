@@ -1,6 +1,6 @@
 # 開発の準備
 
-必要なものは mise である。Go、Java、Node.js、pnpm、apm のバージョンは `mise.toml` にある。
+必要なものは mise と、OS の `python3` である。Go、Java、Node.js、pnpm、apm のバージョンは `mise.toml` にある。`python3` は保護するブランチのフックが使い、`mise.toml` では入れない。
 
 ```sh
 mise install
@@ -31,7 +31,7 @@ node .claude/hooks/docs/hooks/check-history.mjs
 node .claude/hooks/docs/hooks/check-links.mjs
 ```
 
-既存の文書には textlint の指摘が残っている。直した文書だけに掛け、CI も pull request で変えた Markdown だけを見る。
+textlint は直した文書だけに掛ける。CI も pull request で変えた Markdown だけを見る。
 
 `verified_commit` の後に実装が変わった文書は、`node .claude/hooks/docs/hooks/list-drift.mjs` で一覧する。実装と読み比べてから `verified_commit` を進める。
 
@@ -43,6 +43,7 @@ node .claude/hooks/docs/hooks/check-links.mjs
 - ステージしたファイルを prettier で整形し、Markdown に textlint を掛ける。
 - Go のコードや依存のルールを変えたときは、依存の向きのチェック（golangci-lint の depguard）と、依存図の生成し直しを行う。
 - commit-msg のフックで、commitlint がメッセージの形式を確かめる。規則は `commitlint.config.mjs` にある。
+- `feature/<issue 番号>` のブランチでは、commit-msg のフックが、要約に `#<issue 番号>` がなければ末尾に足す。ほかのブランチでは足さない。
 
 - 変更の分け方とメッセージの書き方は、スキル write-commit に従う。
 
@@ -51,7 +52,7 @@ node .claude/hooks/docs/hooks/check-links.mjs
 ブランチは、`main`、`develop`、issue ごとの作業用のブランチにする。
 
 - `main` はリリース済みの状態を指す。v1 をリリースするまでは、初期のコミットのまま置く。`develop` は次のリリースに向けて変更を集め、既定のブランチである。
-- 作業用のブランチは `develop` から切る。名前は `feature/<issue 番号>` にし、不具合は `fix/<issue 番号>` にする。`develop` へは、pull request を通して取り込む。
+- 作業用のブランチは `develop` から切る。名前は `feature/<issue 番号>` にし、不具合は `fix/<issue 番号>`、文書だけの変更は `docs/<issue 番号>`、それ以外の保守は `chore/<issue 番号>` にする。spec を消す pull request のために `spec-closeout.yml` が作るブランチだけは、`chore/closeout-<issue 番号>` になる。`develop` へは、pull request を通して取り込む。
 - リリースは、`develop` を `main` へ pull request で取り込み、`main` のコミットにタグを付ける。バージョンはセマンティック バージョニングに従う。
 - リリース後の緊急の修正は、`main` から `hotfix/<issue 番号>` を切り、`main` と `develop` の両方へ取り込む。
 - 保護するブランチは `main`、`develop` である。直接はコミットせず、pull request を通して取り込む。直接コミットを許す場面があれば、この行の下に場面と理由を書く。

@@ -9,7 +9,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/augment
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/spring
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/completeness
-verified_commit: 4455e86
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Java Analyzer: 解析エンジン
@@ -45,11 +45,18 @@ Java Analyzer の全体は [Java Analyzer の Design Doc](../../../../../../../.
 
 ### 型の解決
 
-JavaParser（AST の解析）と SymbolSolver（型の解決）を使い、次の 3 つの `TypeSolver` を組む。
+JavaParser（AST の解析）と SymbolSolver（型の解決）を使い、次の 4 種類の `TypeSolver` をこの順に登録する。
 
 - `ReflectionTypeSolver`（JDK の標準の型）
-- `JavaParserTypeSolver`（対象のプロジェクトの source root）
-- `JarTypeSolver`（依存の jar）
+  - JDK の型は、Analyzer が動く JVM の型を使う。
+- `JavaParserTypeSolver`（対象のプロジェクトの source root ごとに 1 つ）
+  - bytecode member の索引があるときは、`MemberAugmentingTypeSolver` で包む。
+- `JarTypeSolver`（classpath の jar ごとに 1 つ）
+- `ClassLoaderTypeSolver`（classpath の classes directory）
+  - classpath に classes directory が 1 つでもあるときだけ登録する。
+  - classpath の全 entry を 1 つの `URLClassLoader` で共有し、module をまたぐ型の参照でも class の load が失敗しないようにする。
+
+source root の solver を classpath の solver より先に登録し、ソースの宣言を bytecode より優先する。
 
 明示の `sourceRoots` の方式では、`analysisRequest.metadata.classpath` の key を**必須**にする（空の配列でもよい）。  
 自動 discovery の方式では、custom tooling model が project ごとの compile classpath と classes output を提供する。  
@@ -320,23 +327,41 @@ SAM の arity も、functional interface の bytecode から導く（例: `java.
 - 手段 2（chain link の generic signature）は、規則 1（chain の前進の解決）の適用の拡大である。
 - 手段 3（lambda parameter の型引数）は、規則 3（lambda parameter の規則）の前段の型の導出である。
 
-順は「手段 1 → 規則 1 と手段 2 → 手段 3 → 規則 2 → 規則 3 → diagnostic」にし、導けた型は bytecode の救済と external の分類へそのまま渡す。  
+solver が解決できない method の呼び出しは、次の順で救済と分類を試みる。
+
+1. receiver の型が取れれば、その型を owner にして project の bytecode の一意な member へ救済する。
+   - receiver の型は、receiver の静的な型か、暗黙の this では囲む型である。
+   - 静的な型が取れないときは、囲む型の bytecode の field の型で補う。
+2. 救済できず、receiver の型がソースの宣言の索引にない場合は、`external-target` の除外へ分類する。
+3. receiver の型が取れない場合は、規則 1（chain の前進の解決）で owner の型を導く。
+4. 規則 1 で導けない場合は、手段 1〜3 を 1 回の generic の前進の導出でまとめて行い、owner の型を導く。
+5. 導いた owner の型がソースの宣言の索引になければ `external-target` へ分類し、あればその型で bytecode の救済を試みる。
+6. まだ分類できず、receiver の型が取れていない場合は、規則 2 か規則 3 で `external-target` に当たるかを判定する。
+7. どれにも当たらなければ、diagnostic に残す。
+
+手段 1〜3 は別々の段にならず、規則 1 の後の 1 つの段で動く。  
 次の図は、この順と、各段から救済、除外、diagnostic へ分かれる先を示す。
 
 ```mermaid
 flowchart TD
-    Fail["receiver 型が解決できない call"] --> M1["手段 1: local 変数の宣言・初期化子"]
-    M1 -- "導出できない" --> R1M2["規則 1 + 手段 2: chain の前進解決と generic 型引数の伝播"]
-    R1M2 -- "導出できない" --> M3["手段 3: lambda parameter の型引数"]
-    M3 -- "導出できない" --> R2["規則 2: 起点遡及の external 判定"]
-    R2 -- "起点が scope 内 / 型不明" --> R3["規則 3: lambda parameter 規則"]
-    R3 -- "external と判定できない" --> D["diagnostic に残す"]
+    Fail["receiver 型が解決できない call"] --> Owner{"receiver 型が取れる?<br/>(静的型 / 囲む型 / bytecode の field 型)"}
+    Owner -- "取れる" --> Direct["receiver 型を owner に bytecode 救済"]
+    Direct -- "救済できない" --> OwnerScope{"receiver 型は scope 内?"}
+    OwnerScope -- "scope 外" --> Ext["external-target 除外"]
+    OwnerScope -- "scope 内" --> D["diagnostic に残す"]
+    Owner -- "取れない" --> R1["規則 1: chain の前進解決"]
+    R1 -- "導出できない" --> M123["手段 1〜3: generic の前進導出<br/>(local 変数 / generic 型引数 / lambda parameter)"]
+    R1 -- "型を導出できた" --> Forward{"導いた owner は scope 内?"}
+    M123 -- "型を導出できた" --> Forward
+    Forward -- "scope 外" --> Ext
+    Forward -- "scope 内" --> ForwardRescue["導いた owner で bytecode 救済"]
+    ForwardRescue -- "救済できない" --> R23
+    M123 -- "導出できない" --> R23["規則 2 / 規則 3: 起点遡及と lambda parameter の external 判定"]
+    R23 -- "起点か宣言型が scope 外" --> Ext
+    R23 -- "external と判定できない" --> D
 
-    M1 -- "型を導出できた" --> Rescue["bytecode 救済 / external 分類"]
-    R1M2 -- "型を導出できた" --> Rescue
-    M3 -- "型を導出できた" --> Rescue
-    R2 -- "起点が scope 外" --> Ext["external-target 除外"]
-    R3 -- "宣言型が scope 外" --> Ext
+    Direct -- "救済できた" --> Rescue["bytecode 救済の edge"]
+    ForwardRescue -- "救済できた" --> Rescue
 ```
 
 ### framework 由来の暗黙の呼び出しの解決

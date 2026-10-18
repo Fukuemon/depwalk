@@ -38,7 +38,7 @@ Core を言語非依存に保ち、言語ごとの差を Analyzer の側に閉�
 
 Core の `core/internal` は、責務の名前を付けたフラットな package で作る。  
 層（domain、app、platform）は概念としてだけ持ち、ディレクトリにしない。  
-ADR-0007: [層の依存境界を ACL と機械のチェックで固定する](../adr/0007-layered-architecture-refactor.md)
+ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェックで固定し、Core はフラットな package 構成のまま保つ](../adr/0007-layered-architecture-refactor.md)
 
 - domain: `graph`、`traversal`
 - app: `analyze`。`depwalk analyze` の use case をまとめ、use case が使う port の interface を定義する。
@@ -50,7 +50,7 @@ ADR-0007: [層の依存境界を ACL と機械のチェックで固定する](..
 - `core/internal/graph/graphtest`: graph のテストを支える sub-package。本番のコードから import しない。
 
 Java Analyzer の `javaanalyzer` の下は、解析の段階ごとの package（`analysis/` の下）と、入出力と起動の package（`protocol`、`io`、`preflight`、`discovery`）で作る。  
-段階の実行の順を知るのは、`analysis/pipeline` の Runner だけにする。  
+解析の段の実行の順は、`analysis/pipeline` の Runner が持つ。Runner を呼ぶまでの順は、解析の context の組み立てを含めて `Main` が持つ。  
 package の構成は [Java Analyzer の Design Doc](../analyzers/java/DesignDoc.md#内部の-package-構成と外部ライブラリの隔離) にある。
 
 ## Dependency Rules

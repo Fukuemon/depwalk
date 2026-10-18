@@ -8,7 +8,7 @@ governs:
   - core/internal/analyze
   - core/internal/analyzer
   - testdata
-verified_commit: 4cae142
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Analyzer Protocol / SPI
@@ -219,23 +219,33 @@ Analyzer の stderr は、Protocol の record として parse しない。
 
 ### コンポーネントの構成
 
-次の図は、Core が Analyzer のプロセスから Model と diagnostics を受け取るまでの L3 を示す。
+次の図は、use case が `analyze.Source` の port を通して、Analyzer のプロセスから graph の値と diagnostics を受け取るまでの L3 を示す。
 
 ```mermaid
 flowchart TD
-    CLI["CLI"] --> Core["Core"]
-    Core --> SPI["Analyzer SPI"]
-    SPI --> Request["analysisRequest writer"]
-    SPI --> Validator["JSONL parser / validator"]
-    SPI --> Process["Analyzer process"]
-    Process --> Stdout["stdout JSONL records"]
-    Process --> Stderr["stderr diagnostics"]
-    Validator --> Model["MethodSymbol / CallEdge"]
-    Validator --> Diagnostics["diagnostic / error"]
-    Model --> Graph["Graph Engine"]
+    CLI["cli<br/>protocol.Adapter を use case へ注入"] --> UC["analyze.Runner<br/>use case"]
+    UC -->|"Source.Run(Request)"| Adapter
+    subgraph protocol["protocol (ACL)"]
+        Adapter["Adapter<br/>analyze.Source の実装"]
+        PR["Runner"]
+        RC["recordCollector<br/>ParseRecord と参照の完全性の検査"]
+        Tr["Translator<br/>NodeFromMethodSymbol / EdgeFromCallEdge"]
+        Adapter -->|"検証した AnalysisRequest"| PR
+        RC -->|"onRecord: methodSymbol / callEdge を届いた順に"| Adapter
+        Adapter -->|"変換を呼ぶ"| Tr
+        RC -.->|"diagnostic / error / 検証のエラー"| PR
+        PR -->|"RunResult (終了コードと stderr を含む)"| Adapter
+    end
+    PR -->|"analysisRequest の JSONL の 1 行"| AR["analyzer.Runner"]
+    AR <-->|"stdin / stdout / stderr"| Proc["Analyzer process"]
+    AR -->|"stdout の 1 行ずつ"| RC
+    Adapter -->|"onNode / onEdge: graph.Node / graph.Edge"| UC
+    Adapter -->|"analyze.Outcome"| UC
+    UC --> Graph["staging の graph.Graph"]
 ```
 
-Core は Analyzer のプロセスを起動し、Protocol の parser と validator を通して、Model と diagnostics だけを受け取る。  
+`cli` は `protocol.Adapter` を `analyze.Runner` へ注入し、use case は `analyze.Source` の port だけを知る。  
+`analyzer.Runner` は JSONL の中身を解釈せず、Protocol の parse と検証は `protocol` だけが持つ。  
 Core は、Analyzer の内部のライブラリと言語のランタイムに依存しない。
 
 ### 解析の流れ

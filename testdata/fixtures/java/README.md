@@ -1,78 +1,73 @@
-# Java Analyzer E2E fixture
+# Java Analyzer の E2E の fixture
 
-`project/` is a small Java/Spring-style source tree used by the Go E2E test
-(`core/e2e`) to run the real `analyzers/java` fat jar through
-`depwalk analyze` and check its output against known caller/callee sets.
-This fixture is designed as an analyzer test target, not a working
-application — do not add real business logic here.
+`core/e2e` の Go の E2E は、ここにある fixture に対して、実際の `analyzers/java` の fat jar を動かし、出力を期待値と比べる。どの fixture も Analyzer の解析の対象として作ったもので、動くアプリケーションではない。業務のロジックを足さない。
 
-## Structure (4 covered scenarios)
+| fixture                        | 使うテスト                                                                                | 確かめること                                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `project/`                     | `java_fixture_test.go`                                                                    | interface、継承、jar の型の引き上げ、lambda の 4 つの場面の caller と callee                                       |
+| `spring-project/`              | `java_spring_fixture_test.go`                                                             | Spring の DI と framework の暗黙の呼び出しを、実際の framework の jar を classpath にして解く                      |
+| `multi-module-spring-project/` | `gradle_multiproject_cli_test.go`、`cli_query_test.go`、`unresolved_patterns_cli_test.go` | Gradle の multi-project の自動 discovery と明示の source root、CLI の出力の golden、未解決だった呼び出しの型の救済 |
 
-| Scenario                                              | File(s)                                                                   |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| Interface injection (`dispatch: interface`)           | `project/.../Greeter.java`, `EnglishGreeter.java`, `GreetingService.java` |
-| Inheritance, override vs. no override                 | `project/.../Animal.java`, `Dog.java`, `Cat.java`, `AnimalCaller.java`    |
-| Jar-derived method lifted to a scope-internal subtype | `project/.../WidgetUsingLib.java` + `lib/fixture-lib.jar`                 |
-| Lambda call (`viaLambda: true`)                       | `project/.../LambdaUser.java`                                             |
+## project/
 
-Parse errors and unresolved in-scope calls are no longer covered as
-"continue with a partial graph" scenarios: since the parse pre-flight and completeness gate (java-analyzer feature doc, "Parse・resolution・call 完全性"), an
-unparseable file fails the whole request with `JAVA_PARSE_ERROR` and an
-unresolved in-scope call fails it with `JAVA_INCOMPLETE_ANALYSIS`. Those
-fatal paths are asserted by the Java Analyzer's own tests, so this fixture
-holds only cleanly analyzable sources and `expected/diagnostics.json` is
-an empty array.
+場面ごとのファイルは次のとおり。
 
-Known caller/callee expectations live in `expected/call-edges.json` and
-`expected/diagnostics.json`, loaded and checked by the Go E2E test. These
-list the specific edges/diagnostics each scenario must produce; the test
-checks that the required entries are present (a subset check), not full
-graph equality, since declared-but-uncalled methods and other structural
-detail are not part of what this fixture is asserting.
+| 場面                                           | ファイル                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------- |
+| interface の注入（`dispatch: interface`）      | `project/.../Greeter.java`、`EnglishGreeter.java`、`GreetingService.java` |
+| 継承。override するものとしないもの            | `project/.../Animal.java`、`Dog.java`、`Cat.java`、`AnimalCaller.java`    |
+| jar の型のメソッドを、範囲の中の子へ引き上げる | `project/.../WidgetUsingLib.java` と `lib/fixture-lib.jar`                |
+| lambda の中の呼び出し（`viaLambda: true`）     | `project/.../LambdaUser.java`                                             |
 
-## classpath
+期待値は `expected/call-edges.json` と `expected/diagnostics.json` にある。テストは、期待値の edge と diagnostic が出力に含まれるかだけを確かめ、graph の全体が一致するかは確かめない。呼ばれないメソッドの宣言は、この fixture が確かめる対象ではないからである。
 
-`analysisRequest.metadata.classpath` is a required key (Analyzer Protocol
-pre-flight), but its value may be an empty array. This fixture uses a
-**minimal pre-built jar** (`lib/fixture-lib.jar`) rather than an empty
-classpath, because the "jar 由来メソッドの引き上げ対象" scenario needs a
-class the fixture project can extend without owning its source.
+`expected/diagnostics.json` には、`JAVA_SOOTUP_UNAVAILABLE` の warning が 1 件ある。明示の source root で解析すると、classpath に classes の directory がないので、Analyzer は source だけで解析を続け、この warning を出す。テストは、Core がこの diagnostic を成功の結果へ渡すことを確かめる。
 
-`lib/fixture-lib.jar` contains one class, `com.example.lib.LibBase`
-(source kept at `lib/src/com/example/lib/LibBase.java` for audit /
-reproducibility). To rebuild it:
+parse できないファイルと、範囲の中の解決できない呼び出しは、この fixture に置かない。どちらも request の全体を失敗にする（`JAVA_PARSE_ERROR`、`JAVA_INCOMPLETE_ANALYSIS`）。この 2 つの失敗は、Java Analyzer の unit テストが確かめる。
+
+### classpath
+
+`lib/fixture-lib.jar` は、`com.example.lib.LibBase` の 1 つのクラスだけを持つ jar である。jar の型のメソッドを引き上げる場面には、fixture が source を持たずに継承できるクラスが要るので、空の classpath ではなくこの jar を使う。source は `lib/src/com/example/lib/LibBase.java` にある。作り直すときは次を実行する。
 
 ```sh
-cd lib
+cd testdata/fixtures/java/lib
 javac -d /tmp/depwalk-fixture-lib-classes src/com/example/lib/LibBase.java
 jar --create --file fixture-lib.jar -C /tmp/depwalk-fixture-lib-classes .
 ```
 
-The rest of the fixture project does not need any classpath entry — it only
-resolves against its own scope files and the JDK's own reflection-based
-type solver.
+### workspace root
 
-## workspaceRoot
+`depwalk analyze` の path の引数には、`project/` ではなく `project/src/main/java` を渡す。source root `.` は、package の階層がそのまま並ぶ directory を指す必要がある。`project/` を渡すと、範囲の中の型が 1 つも解決できない。
 
-Pass `project/src/main/java` as `workspaceRoot`/the `depwalk analyze` path
-argument, **not** `project/`. `JavaParserTypeSolver` indexes a source root
-directly as a package hierarchy (`<root>/com/example/Foo.java` for
-`com.example.Foo`); pointing it at `project/` (one level above `src/main/
-java`) leaves every scope-internal type unresolvable, which surfaces as an
-`UnsolvedSymbolException` thrown out of the Analyzer process rather than a
-diagnostic (confirmed by running the real jar against this fixture).
+### 実際の jar で動かす
 
-## Running against the real jar
+リポジトリのルートで、[ルートの README の「使い方」](../../../README.md#使い方)の手順で jar と CLI を作ってから、次を実行する。
 
 ```sh
-depwalk analyze testdata/fixtures/java/project/src/main/java \
+./dist/depwalk analyze testdata/fixtures/java/project/src/main/java \
   --language java \
   --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" \
-  --analyzer-meta classpath=testdata/fixtures/java/lib/fixture-lib.jar
+  --source-root . \
+  --analyzer-meta classpath=testdata/fixtures/java/lib/fixture-lib.jar \
+  --analyzer-meta javaLanguageLevel=25
 ```
 
-The Go E2E test (`core/e2e`) does the equivalent through
-`core/internal/analyze` and `core/internal/analyzer` directly, using an
-absolute path to the fixture-lib.jar and to whichever JDK 25 `java`
-executable it discovers (see `core/e2e` package doc for the discovery /
-skip rule).
+`core/e2e` は、同じ request を `core/internal/analyze` と `core/internal/analyzer` から直接に組み立てる。fixture-lib.jar と JDK 25 の `java` には、絶対パスを使う。`java` の探し方と、見つからないときに skip する規則は、`core/e2e` の package の doc comment にある。
+
+## spring-project/
+
+実際の Spring の jar を classpath に入れて、DI と framework の暗黙の呼び出しを解く。classpath は、fixture の Gradle の task `writeDepwalkClasspath` が `build/depwalk-classpath.txt` に書く。CI は E2E の前にこの task を実行する。手元では次を実行する。
+
+```sh
+./analyzers/java/gradlew -p testdata/fixtures/java/spring-project writeDepwalkClasspath
+```
+
+`build/depwalk-classpath.txt` がないと、テストは skip する。環境変数 `DEPWALK_E2E_REQUIRED=1` を設定すると、skip せずに失敗する。
+
+## multi-module-spring-project/
+
+root と 3 つの subproject（`:app`、`:service`、`:repository`）を持つ Gradle の build である。root は Java の source を持たない。`:service` は project の directory を変え、`:repository` は main の source の directory を変える。期待値は `expected/` にあり、`graph.json` は graph の全体、`cli-query-*` は CLI の出力の golden である。
+
+classes の出力と classpath の manifest は、テストが `writeDepwalkClasspath` で作る。manifest がすでにあれば、作り直さない。
+
+`patterns/` は、root の `settings.gradle` に含めない別の build である。かつて解決できなかった 5 つの呼び出しの型を、最小の形で再現する。5 つは fluent chain、method reference、明示の `super` の呼び出し、generics 付きの `var`、module をまたぐ Lombok の member である。`unresolved_patterns_cli_test.go` が自動 discovery で解析し、5 つがすべて bytecode-only の member への edge として救済されることを確かめる。classes の出力がないときは、テストが `writeDepwalkClasspath` で作る。

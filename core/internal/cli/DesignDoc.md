@@ -6,7 +6,7 @@ status: stable
 governs:
   - core/internal/cli
   - core/cmd/depwalk
-verified_commit: 4cae142
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # CLI Interface
@@ -74,7 +74,7 @@ CLI は glob と path の意味を解釈せず、値をそのまま渡すだけ�
 
 - 括弧をつけると、signature を完全に指定する。例は `com.example.UserService#findById(java.lang.Long)` である。
 - 括弧を省くと、メソッドの名前だけを指定する。例は `com.example.UserService#findById` である。
-- method selector は graph の node の symbol の情報（`QualifiedName`、`Signature`）を走査して一致を探し、Core は methodId の文字列の形式に依存しない（言語によらない）。
+- method selector は graph の node の `Signature` だけを走査して一致を探し、Core は methodId の文字列の形式に依存しない（言語によらない）。
 - signature を省いて同じ名前のメソッドが複数一致したときは、候補の完全な signature の一覧を stderr に出してエラーで終わる。自動では選ばない。一致が 1 件ならそれを使う。
 - signature を省いたときは、node の正規化した `Signature` から引数の部分を除いた `<型の binary name>#<メソッド名>` と完全一致させる。Core は nested class の `$` を、`QualifiedName` のための `.` へ変換しない。
 
@@ -85,7 +85,8 @@ CLI は glob と path の意味を解釈せず、値をそのまま渡すだけ�
   - package の依存の規則は [context/codebase.md](../../../context/codebase.md#dependency-rules) にある。
 - analyze の use case（`core/internal/analyze`）は、解析の要求の組み立て、port を通した実行、`traversal.Traverse` の呼び出しを担う。
   - graph を作った後に、method selector に一致する node を探す。
-  - 一致が曖昧か、一致しないときは、候補の一覧を含む種別つきのエラーで CLI の層へ返す。
+  - 一致が曖昧なときは、候補の signature の一覧を含む入力エラーで CLI の層へ返す。
+  - 一致しないときは、selector を含む入力エラーで CLI の層へ返す。候補の一覧は付けない。
 - ACL（`core/internal/protocol`）は、wire の表現を組み立てる。
   - `analysisRequest` の schemaVersion と requestId、常に `fullGraph` の AnalysisMode、空の `Entrypoints` は、ここで決める。
 - 探索の方向に関わらず常に `fullGraph` で解析し、方向による挙動の分岐を持たない。
@@ -95,7 +96,7 @@ CLI は glob と path の意味を解釈せず、値をそのまま渡すだけ�
 合成ルートは、解決した起動コマンドの文字列を、shell を介さずに次の字句の規則で語に分割する。  
 実装と contract test は `splitAnalyzerCommand` にある。  
 起動コマンドを解決する順序は [Java Analyzer の Design Doc の起動の契約](../../../analyzers/java/DesignDoc.md#起動の契約) にある。  
-ADR-0003: [Analyzer の起動コマンドの解決](../../../adr/0003-analyzer-command-resolution.md)
+ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非依存の文字列として解決する](../../../adr/0003-analyzer-command-resolution.md)
 
 - 空白（space、tab、newline）を語の区切りとする。
 - single quote と double quote は、語の結合に使える。quote の中の空白は区切りにならない。
@@ -126,9 +127,10 @@ ADR-0003: [Analyzer の起動コマンドの解決](../../../adr/0003-analyzer-c
 ### 置くファイル
 
 - `core/cmd/depwalk/main.go`: `main` の関数。`cli` だけに依存する。
-- `core/internal/cli/root.go`、`analyze.go`: コマンドと flag の定義、入力の検証
+- `core/internal/cli/root.go`: root のコマンドと、終了コードの判別（`ExitCode`）
+- `core/internal/cli/analyze.go`: `analyze` コマンドと flag の定義、入力の検証、package の配線、Analyzer の失敗の表示（`renderAnalyzerFailure`）
 - `core/internal/cli/analyzerlaunch.go`: Analyzer の起動コマンドの解決
-- `core/internal/cli/errors.go`: エラーの表示と終了コードの判別
+- `core/internal/cli/errors.go`: flag の入力エラーの型（`inputError`）
 
 ## Verification
 

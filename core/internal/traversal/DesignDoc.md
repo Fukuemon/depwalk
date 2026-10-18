@@ -5,7 +5,7 @@ description: 呼び出しグラフの探索の API、到達集合の定義（min
 status: stable
 governs:
   - core/internal/traversal
-verified_commit: 4455e86
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Traversal（Caller / Callee の探索）
@@ -140,23 +140,26 @@ flowchart TD
     L -- "No" --> M["到達 node 集合 / 到達 edge 集合 /<br/>cycle 注釈 / depthLimit cutoff を返す"]
 ```
 
-次の図は、use case が Graph を作ってから Traversal の結果を Output へ渡すまでの呼び出しの順を示す。
+次の図は、use case が Graph を作って探索し、CLI が Traversal の結果を Output へ渡すまでの呼び出しの順を示す。
 
 ```mermaid
 sequenceDiagram
+    participant CLI as CLI
     participant UseCase as Analyze Use Case
     participant Graph as Graph Engine
     participant Traversal as Traversal Engine
     participant Output as Output Engine
 
-    UseCase->>Graph: methodSymbol / callEdge を登録
+    CLI->>UseCase: analyze 実行
+    UseCase->>Graph: protocol が graph の値型へ変換した node / edge を staging Graph に登録
     UseCase->>Traversal: Traverse(graph, request)
     Traversal->>Graph: 起点 node を取得
     Graph-->>Traversal: node found / not found
     Traversal->>Graph: 方向に応じた隣接 edge を取得
     Graph-->>Traversal: caller / callee edges
     Traversal-->>UseCase: Traversal result
-    UseCase->>Output: result を出力形式へ渡す
+    UseCase-->>CLI: Graph と Traversal result
+    CLI->>Output: result を出力形式へ渡す
 ```
 
 - 呼び出す側は、起点のメソッド、探索の方向、深さの上限、探索順序を指定して Traversal Engine を呼ぶ。探索順序が未指定なら BFS、深さの上限が未指定なら無制限として扱う。
