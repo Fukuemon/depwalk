@@ -41,6 +41,9 @@ final class AnalysisTestSupport {
      */
     static final String FIXTURE_RELEASE = "25";
 
+    /** JSON の object を {@code Map<String, Object>} として読むための Jackson の型。 */
+    static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
+
     static Ran run(Path workspaceRoot, Map<String, Object> metadata) throws Exception {
         return run(workspaceRoot, metadata, null, null, null, null);
     }
@@ -86,7 +89,7 @@ final class AnalysisTestSupport {
         String stdoutText = stdout.toString(StandardCharsets.UTF_8);
         for (String line : stdoutText.split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, new TypeReference<Map<String, Object>>() { }));
+                records.add(mapper.readValue(line, JSON_OBJECT));
             }
         }
         return new Ran(exitCode, records, stderr.toString(StandardCharsets.UTF_8));
@@ -142,7 +145,7 @@ final class AnalysisTestSupport {
         Files.writeString(file, source);
     }
 
-    /** edge / node record の {@code metadata} を返す。無ければ空の Map を返す。 */
+    /** record の {@code metadata} を返す。無ければ空の Map を返す。 */
     static Map<String, Object> metadataOf(Map<String, Object> record) {
         Map<String, Object> metadata = field(record, "metadata");
         return metadata == null ? Map.of() : metadata;
@@ -150,10 +153,10 @@ final class AnalysisTestSupport {
 
     /**
      * record の {@code key} の値を、代入先の型として返す。値が無ければ null を返す。
-     * 値が代入先の型でなければ、使った時点で {@link ClassCastException} になる。
+     * 値の型が違えば代入した時点で、型引数が違えば要素を使った時点で {@link ClassCastException} になる。
      */
-    // Jackson は JSON の object と array を型引数のない Map と List で返すので、
-    // 型引数を付ける cast は検査できない。抑制はこのメソッドだけに置く。
+    // 値は Object として入っており、型引数の付いた型への cast は erasure のため実行時に検査できない。
+    // 抑制はこのメソッドだけに置く。
     @SuppressWarnings("unchecked")
     static <T> T field(Map<?, ?> record, String key) {
         return (T) record.get(key);

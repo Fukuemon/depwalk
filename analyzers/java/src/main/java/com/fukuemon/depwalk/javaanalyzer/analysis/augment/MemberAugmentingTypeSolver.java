@@ -16,8 +16,9 @@ import java.util.Map;
  * class 宣言へ同一 context の classes output にしかない callable member を
  * 解決時に合成する。
  * source 宣言と帰属規則は変更せず、source AST に無い member の解決だけを bytecode で補う。
- * 合成は {@link AugmentedJavaParserClassDeclaration} の method 解決の fallback と
- * 宣言一覧で行い、source に同じ name と arity の member があれば合成しない。
+ * 合成は {@link AugmentedJavaParserClassDeclaration} の 2 つの経路で行う。
+ * method の解決では、source で解決できなかったときだけ合成した member を使う。
+ * 宣言の一覧では、source に同じ name と arity の member があれば合成しない。
  */
 public final class MemberAugmentingTypeSolver implements TypeSolver {
 

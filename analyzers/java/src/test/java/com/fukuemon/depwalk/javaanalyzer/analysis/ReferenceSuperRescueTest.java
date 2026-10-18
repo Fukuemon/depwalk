@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -123,7 +124,7 @@ class ReferenceSuperRescueTest {
         List<Map<String, Object>> details = AnalysisTestSupport.field(error, "details");
         assertTrue(details.stream().anyMatch(detail ->
                         "unresolved-method-reference".equals(
-                                ((Map<?, ?>) detail.get("metadata")).get("reason"))),
+                                metadataOf(detail).get("reason"))),
                 () -> "method reference must stay diagnostic when SAM arity is unknown: " + details);
     }
 
@@ -227,7 +228,7 @@ class ReferenceSuperRescueTest {
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve(relative).toString());
         assertEquals(0, rc, "fixture compile failed");
         return classes;

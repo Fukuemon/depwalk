@@ -6,7 +6,7 @@ package com.fukuemon.depwalk.javaanalyzer;
  */
 public enum JavaErrorCode {
 
-    /** analysisRequest.metadata に classpath の key が無い。 */
+    /** 明示の sourceRoots の analysisRequest で、metadata に classpath の key が無い。 */
     JAVA_MISSING_CLASSPATH,
 
     /** classpath に指定された jar / classes dir が存在しない・読めない。 */

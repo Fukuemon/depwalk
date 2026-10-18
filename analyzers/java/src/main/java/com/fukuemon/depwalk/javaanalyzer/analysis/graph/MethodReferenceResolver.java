@@ -193,9 +193,8 @@ final class MethodReferenceResolver {
 
         ResolvedConstructorDeclaration resolvedCtor = selectConstructor(scopeDecl.getConstructors(), mre);
         if (resolvedCtor == null) {
-            // source 側の候補選択で決まらない場合、SAM arity の一意
-            // bytecode constructor (生成 constructor 含む) を救済してから
-            // diagnostic 化する。
+            // Lombok などが生成した constructor は source の constructor の一覧に無いため、
+            // source で決まらなくても bytecode の一意な constructor で決まることがある。
             BytecodeRescue.Rescue rescue =
                     bytecodeRescue.constructorReferenceRescue(scopeDecl, () -> inferFunctionalInterfaceArity(mre));
             if (rescue != null) {

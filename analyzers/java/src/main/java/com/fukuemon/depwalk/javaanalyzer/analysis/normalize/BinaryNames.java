@@ -15,14 +15,14 @@ import java.util.List;
  * 型名を JVM binary name、generics erasure、配列・varargs の規則で正規化する。
  *
  * <p>JavaParser の {@code ResolvedReferenceTypeDeclaration#getQualifiedName()} は匿名クラスに対して
- * 呼び出しごとに異なるランダム UUID を返す (非決定的、実測で確認済み)。本クラスはこれに依存せず、
+ * 呼び出しごとに異なるランダム UUID を返す (非決定的)。本クラスはこれに依存せず、
  * {@code toAst()} で得られる AST ノードからソース構造 (パッケージ宣言 + 型宣言の入れ子 + 匿名/ローカル
  * クラスのソース出現順) を辿って自前で binary name を計算することで、決定性を担保する。scope 外
  * (JDK reflection / jar 由来で AST を持たない) 宣言のみ、シンボルソルバの
  * {@code getPackageName()} / {@code getClassName()} にフォールバックする。
  *
  * <p>匿名クラス / ローカルクラスの採番は javac の JVM binary name 規則と互換である
- * (javac の出力で確認済み):
+ *:
  * <ul>
  *   <li>匿名クラス: 直近の enclosing class ごとに 1 始まりのソース出現順 ({@code Outer$Nested} 内の
  *       最初の匿名クラスは、{@code Outer} 直下に先行する匿名クラスがあっても {@code Outer$Nested$1})。</li>

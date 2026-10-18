@@ -358,8 +358,8 @@ final class BytecodeRescue {
             return chainForwardOwner(enclosed.getInner(), enclosingTypeNode, depth + 1);
         }
         if (expr instanceof NameExpr nameExpr) {
-            // 型が取れない local 変数は、宣言の initializer 式を同じ規則で前進
-            // 解決する (var / 失敗 chain 由来の変数への波及を classfile 根拠で辿る)。
+            // var の変数や、解決に失敗した chain を代入した変数は、変数の型を取れない。
+            // 型を推測せず、initializer の式を classfile の根拠で前進解決する。
             try {
                 ResolvedValueDeclaration value = nameExpr.resolve();
                 Node ast = value.toAst().orElse(null);
@@ -396,8 +396,8 @@ final class BytecodeRescue {
         Expression scope = link.getScope().orElse(null);
         String receiverOwner;
         if (scope == null) {
-            // 暗黙 this の link は囲み型の classfile candidate で前進する
-            // (継承 member は declared methods に現れないため、その場合は null)。
+            // 継承した member は囲み型の declared methods に現れないため、暗黙の this で
+            // 継承した member を呼ぶ link は前進できず null になる。
             receiverOwner = enclosingTypeNode != null ? tryBinaryNameOfEnclosing(enclosingTypeNode) : null;
         } else {
             receiverOwner = chainForwardOwner(scope, enclosingTypeNode, depth + 1);
@@ -486,7 +486,7 @@ final class BytecodeRescue {
             if (cursor instanceof MethodCallExpr link) {
                 Expression inner = link.getScope().orElse(null);
                 if (inner == null) {
-                    // 暗黙 this 起点 = 囲み型 (scope 内) → 保守的に diagnostic。
+                    // 暗黙の this の起点は囲み型で scope の内にあるため、external の根拠にならない。
                     return false;
                 }
                 // root 側 (先頭) が先に来るよう、遡る順とは逆に挿入する。
@@ -495,14 +495,11 @@ final class BytecodeRescue {
                 continue;
             }
             if (cursor instanceof NameExpr nameExpr) {
-                // var 等の型が取れない変数は、確定 AST の initializer を chain の起点として
-                // 遡及を続ける。
                 Expression initializer = declaredInitializerOf(nameExpr);
                 if (initializer != null) {
                     cursor = initializer;
                     continue;
                 }
-                // local に該当が無ければ囲み型の bytecode field 型で判定する。
                 if (LocalDeclarations.sameNameDeclaredInMember(nameExpr)) {
                     return false;
                 }

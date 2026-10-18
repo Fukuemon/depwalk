@@ -191,8 +191,8 @@ public final class CallGraphBuilder {
         if (node instanceof MethodDeclaration md) {
             if (InjectedDeclarations.isInjected(md)) {
                 // 注入宣言を source 宣言として emit すると、生成 member が source 由来の
-                // methodSymbol (位置付き) を偽装する。caller として扱わず、呼び出し側の
-                // bytecode-only member 出力契約 (processMethodCall の bytecode-only 分岐) だけに載せる。
+                // methodSymbol (位置付き) を偽装する。caller として扱わず、呼び出し側から
+                // emitBytecodeOnlyMember が出す bytecode-only member の出力の契約だけに載せる。
                 return;
             }
             walkCallableDeclaration(

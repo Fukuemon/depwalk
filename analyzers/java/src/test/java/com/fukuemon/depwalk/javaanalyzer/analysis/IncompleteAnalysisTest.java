@@ -61,7 +61,7 @@ class IncompleteAnalysisTest {
             // receiver 型取得成否) は call 解決の失敗段階を表すため、caller 宣言側の
             // 失敗 (unresolved-caller) には載らない。exceptionClass はクラス名のみで、
             // message や source 断片を含む自由文であってはならない (他 field は
-            // 既存の安定値契約 (reason / target / callKind) が sanitize を担保する)。
+            // 安定値の契約 (reason / target / callKind) が sanitize を担保する)。
             if (!"unresolved-caller".equals(metadata.get("reason"))) {
                 assertTrue(metadata.containsKey("resolutionPhase"), () -> "resolutionPhase missing: " + metadata);
                 assertTrue(metadata.containsKey("receiverKind"), () -> "receiverKind missing: " + metadata);
@@ -118,7 +118,7 @@ class IncompleteAnalysisTest {
         assertEquals("JAVA_INCOMPLETE_ANALYSIS", errors.get(0).get("code"));
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "unresolved-caller".equals(((Map<?, ?>) d.get("metadata")).get("reason"))),
+                        "unresolved-caller".equals(metadataOf(d).get("reason"))),
                 () -> "expected an unresolved-caller primary diagnostic: " + details);
     }
 
@@ -172,7 +172,7 @@ class IncompleteAnalysisTest {
 
     private static Map<String, Object> detailByCallKind(List<Map<String, Object>> details, String callKind) {
         return details.stream()
-                .filter(d -> callKind.equals(((Map<?, ?>) d.get("metadata")).get("callKind")))
+                .filter(d -> callKind.equals(metadataOf(d).get("callKind")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no detail for callKind " + callKind + ": " + details));
     }

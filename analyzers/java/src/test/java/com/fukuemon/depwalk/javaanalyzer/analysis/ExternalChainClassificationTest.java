@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,7 +91,7 @@ class ExternalChainClassificationTest {
         assertEquals(1, errors.size());
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<?, ?>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "unverifiable intermediate link must keep text() as a diagnostic, not silently excluded: "
                         + details);
     }
@@ -138,7 +139,7 @@ class ExternalChainClassificationTest {
         assertEquals(1, errors.size());
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<?, ?>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "ambiguous forward resolution must keep the diagnostic for text(): " + details);
     }
 
@@ -176,7 +177,7 @@ class ExternalChainClassificationTest {
         assertEquals(1, errors.size());
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<?, ?>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "lambda param passed to an external method must keep the diagnostic for text(): " + details);
     }
 
@@ -239,7 +240,7 @@ class ExternalChainClassificationTest {
         assertEquals(1, errors.size());
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "mystery".equals(((Map<?, ?>) d.get("metadata")).get("target"))),
+                        "mystery".equals(metadataOf(d).get("target"))),
                 () -> "in-scope functional interface must keep the diagnostic: " + details);
     }
 
@@ -345,7 +346,7 @@ class ExternalChainClassificationTest {
         assertEquals(1, errors.size());
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         assertTrue(details.stream().anyMatch(d ->
-                        "text".equals(((Map<?, ?>) d.get("metadata")).get("target"))),
+                        "text".equals(metadataOf(d).get("target"))),
                 () -> "shadowed lambda parameter must keep text() as a diagnostic, not excluded via the field type: "
                         + details);
     }
@@ -359,7 +360,7 @@ class ExternalChainClassificationTest {
         }
         Path classes = temp.resolve(classesDir);
         Files.createDirectories(classes);
-        List<String> args = new java.util.ArrayList<>(List.of("--release", "25", "-d", classes.toString()));
+        List<String> args = new java.util.ArrayList<>(List.of("--release", AnalysisTestSupport.FIXTURE_RELEASE, "-d", classes.toString()));
         args.addAll(files);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
         assertEquals(0, rc, "fixture compile failed");

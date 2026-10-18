@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -122,7 +121,7 @@ class MultiModuleFixtureEquivalenceTest {
         List<Map<String, Object>> records = new ArrayList<>();
         for (String line : stdout.split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, new TypeReference<Map<String, Object>>() { }));
+                records.add(mapper.readValue(line, AnalysisTestSupport.JSON_OBJECT));
             }
         }
         return new Run(exit, records, stderr);
@@ -206,7 +205,7 @@ class MultiModuleFixtureEquivalenceTest {
 
     private void assertExpectedGraph(Run run) throws Exception {
         Map<String, Object> expected = new ObjectMapper()
-                .readValue(fixture.resolve("expected/graph.json").toFile(), new TypeReference<Map<String, Object>>() { });
+                .readValue(fixture.resolve("expected/graph.json").toFile(), AnalysisTestSupport.JSON_OBJECT);
         Map<String, Map<String, Object>> methodsById = methodSet(run).stream()
                 .collect(Collectors.toMap(m -> (String) m.get("methodId"), m -> m));
         List<Map<String, Object>> expectedMethods = AnalysisTestSupport.field(expected, "methods");

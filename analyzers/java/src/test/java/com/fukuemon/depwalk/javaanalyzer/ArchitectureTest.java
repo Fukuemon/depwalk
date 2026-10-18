@@ -11,7 +11,9 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * 隔離は 3 段階で、適用レベルはライブラリごとに異なる。SootUp は adapter package へ完全封じ込め、
+ * SootUp、Gradle Tooling API、JavaParser と SymbolSolver が、それぞれ使ってよい package の外から使われていないことを検査する。
+ *
+ * <p>隔離は 3 段階で、適用レベルはライブラリごとに異なる。SootUp は adapter package へ完全封じ込め、
  * Gradle Tooling API は discovery へ完全隔離、JavaParser / SymbolSolver は解析エンジンの中核として
  * {@code analysis} 配下では自由に使ってよく、禁止するのは {@code analysis} の外への漏れのみ。
  *

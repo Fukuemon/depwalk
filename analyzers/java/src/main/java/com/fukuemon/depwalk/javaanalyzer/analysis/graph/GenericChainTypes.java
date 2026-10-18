@@ -470,7 +470,6 @@ final class GenericChainTypes {
                 }
                 return instanceBytecodeReturnModel(owner, reference.getIdentifier(), 0);
             }
-            // bound method reference (式 scope): receiver 式の model に入力 1 個を適用する。
             Model receiver = typeOf(scope, lambdaBindings, depth + 1);
             if (receiver == null) {
                 return null;

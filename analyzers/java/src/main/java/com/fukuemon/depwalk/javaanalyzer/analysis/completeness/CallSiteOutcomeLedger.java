@@ -18,7 +18,7 @@ public final class CallSiteOutcomeLedger {
     public enum OutcomeKind {
         /** edge を出力した。 */
         EMITTED,
-        /** 決めた除外理由のどれかで明示除外した。 */
+        /** {@link CallSiteOutcomeLedger#commitExcluded} が受け付ける除外理由のどれかで明示除外した。 */
         EXCLUDED,
         /** primary diagnostic として終端した (完全性 gate の対象)。 */
         DIAGNOSTIC

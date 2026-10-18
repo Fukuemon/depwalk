@@ -60,7 +60,7 @@ public final class ProviderWorkspace implements AutoCloseable {
         }
     }
 
-    /** Groovy DSL init script。対応する 7.6.5〜9.7.x の全系列で有効な構文だけを使う。 */
+    /** Groovy DSL init script。{@link GradleVersionSupport} が対応とする範囲の全系列で有効な構文だけを使う。 */
     static String initScriptContent(Path providerJar) {
         String escapedPath = providerJar.toString().replace("\\", "\\\\").replace("'", "\\'");
         return "initscript {\n"

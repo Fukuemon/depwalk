@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.fukuemon.depwalk.javaanalyzer.analysis.AnalysisTestSupport.metadataOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,17 +32,17 @@ class DeclarationResolutionTest {
 
         List<Map<String, Object>> details = AnalysisTestSupport.field(errors.get(0), "details");
         List<Map<String, Object>> declarationDetails = details.stream()
-                .filter(d -> "unresolved-declaration".equals(((Map<?, ?>) d.get("metadata")).get("reason")))
+                .filter(d -> "unresolved-declaration".equals(metadataOf(d).get("reason")))
                 .toList();
         assertEquals(List.of("broken", "BadDecl"), declarationDetails.stream()
-                        .map(d -> ((Map<?, ?>) d.get("metadata")).get("target"))
+                        .map(d -> metadataOf(d).get("target"))
                         .toList(),
                 () -> "each unresolvable declaration must be reported once, in source order: " + details);
         for (Map<String, Object> detail : declarationDetails) {
             assertEquals("JAVA_UNRESOLVED_SYMBOL", detail.get("code"));
             assertEquals("com/example/BadDecl.java",
                     ((Map<?, ?>) detail.get("sourceLocation")).get("path"));
-            Object exceptionClass = ((Map<?, ?>) detail.get("metadata")).get("exceptionClass");
+            Object exceptionClass = metadataOf(detail).get("exceptionClass");
             assertTrue(((String) exceptionClass).matches("[\\w.$]+"),
                     () -> "exceptionClass must be a bare class name: " + exceptionClass);
         }

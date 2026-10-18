@@ -89,9 +89,9 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
         List<File> classesOutputDirectories =
                 new ArrayList<File>(main.getOutput().getClassesDirs().getFiles());
 
-        // ProjectDependency.getDependencyProject() は Gradle 9.0 で削除された
-        // ため、対応する 7.6.5〜9.7.x の全系列で使える resolution result の
-        // ProjectComponentIdentifier から project 依存を収集する。
+        // ProjectDependency.getDependencyProject() は Gradle 9.0 で削除された。
+        // analyzer の GradleVersionSupport が対応とする範囲の全系列で使える
+        // resolution result の ProjectComponentIdentifier から project 依存を収集する。
         List<String> projectDependencyPaths = new ArrayList<String>();
         Configuration configuration =
                 project.getConfigurations().findByName(main.getCompileClasspathConfigurationName());

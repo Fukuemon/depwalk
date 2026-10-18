@@ -36,10 +36,8 @@ class BytecodeOnlyMemberTest {
                 """);
         Path classes = temp.resolve("classes");
         Files.createDirectories(classes);
-        // Analyzer の runtime と同じ Java 25 で compile する。SootUp 3.x が新しい classfile を
-        // 読めなくなると、救済が例外を出さずに無効になるので、その回帰をここで検出する。
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 
@@ -94,7 +92,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("chain-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 
@@ -140,7 +138,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("inherit-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25", "-d", classes.toString(),
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE, "-d", classes.toString(),
                 build.resolve("com/example/Base.java").toString(),
                 build.resolve("com/example/Child.java").toString());
         assertEquals(0, rc, "fixture compile failed");
@@ -193,7 +191,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("generic-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25", "-d", classes.toString(),
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE, "-d", classes.toString(),
                 build.resolve("com/example/Item.java").toString(),
                 build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
@@ -263,7 +261,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("jar-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
         Path jar = temp.resolve("stale-owner.jar");
@@ -310,7 +308,7 @@ class BytecodeOnlyMemberTest {
         Path classes = temp.resolve("static-classes");
         Files.createDirectories(classes);
         int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "--release", "25",
+                "--release", AnalysisTestSupport.FIXTURE_RELEASE,
                 "-d", classes.toString(), build.resolve("com/example/Owner.java").toString());
         assertEquals(0, rc, "fixture compile failed");
 

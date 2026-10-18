@@ -1,6 +1,5 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.Main;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.IncompleteAnalysisException;
@@ -174,7 +173,7 @@ final class MultiContextAnalysisTestSupport {
         List<Map<String, Object>> records = new ArrayList<>();
         for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, new TypeReference<Map<String, Object>>() { }));
+                records.add(mapper.readValue(line, AnalysisTestSupport.JSON_OBJECT));
             }
         }
         return new AnalysisTestSupport.Ran(exitCode, records, summary);

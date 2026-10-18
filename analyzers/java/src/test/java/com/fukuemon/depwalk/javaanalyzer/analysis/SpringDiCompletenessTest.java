@@ -134,7 +134,6 @@ class SpringDiCompletenessTest {
                 """);
     }
 
-
     private void write(String relative, String source) throws Exception {
         Path file = workspace.resolve(relative);
         Files.createDirectories(file.getParent());
