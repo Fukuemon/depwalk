@@ -2,7 +2,7 @@
 
 ソースコードの静的解析でメソッド間の **呼び出し関係 (caller / callee)** を抽出し、**変更影響調査**を支援する CLI ツール。「あるメソッドを直したいが、どこから呼ばれ・どこを呼んでいるか」を手作業で追う負荷を自動化し、CI 上でも実行できる形で提供する。
 
-> **Status: Java / Spring Boot 向けの中核機能まで実装済み。** Core (Go) と Java Analyzer が動作し、CI で unit / E2E テストが回っている。次に進める対象は Design Doc の「Future Work (Rollout Plan)」節が定める。
+> **Status: Java / Spring Boot 向けの中核機能まで実装済み。** Core (Go) と Java Analyzer が動作し、CI で unit / E2E テストが回っている。次に進める対象は GitHub の issue で管理する。
 
 ## なぜ作るか (Why)
 
@@ -33,14 +33,15 @@ Runtime Trace / APM などの実行時計測、Reflection / AspectJ Runtime / �
 
 ## 使い方
 
-Java Analyzer の jar をビルドしてから、Core CLI に解析させる。
+Java Analyzer の jar と Core CLI をビルドしてから、Core CLI に解析させる。コマンドはリポジトリのルートで実行する。
 
 ```sh
-# Analyzer の jar をビルド
-cd analyzers/java && ./gradlew shadowJar
+# Analyzer の jar と Core CLI をビルドする
+(cd analyzers/java && ./gradlew shadowJar)
+(cd core && go build -o ../dist/depwalk ./cmd/depwalk)
 
 # 呼び出し元を探索する
-depwalk analyze <workspace-root> \
+./dist/depwalk analyze <workspace-root> \
   --language java \
   --analyzer-cmd "java -jar analyzers/java/build/libs/java-analyzer.jar" \
   --method "com.example.UserService#findById(java.lang.Long)" \
@@ -85,7 +86,7 @@ C4 の L2 の図、モジュールの責務、Core の package の依存図は D
 Design Doc と context は、frontmatter に `governs`（その文書が語る実装の範囲）と `verified_commit`（最後に実装と読み比べたコミット）を持つ。
 書き方の規則は [context/conventions.md](context/conventions.md#documents) にあり、文書のチェックの実行方法は [CONTRIBUTING.md](CONTRIBUTING.md) にある。
 
-> AI エージェントの規約とスキルは agent-harness を apm で導入する（`apm.yml`）。配置先は Git で追跡しない。手順は [CONTRIBUTING.md](CONTRIBUTING.md) にある。
+> AI エージェントの規約、スキル、playbook は、agent-harness と agent-playbooks を apm で導入する（`apm.yml`）。配置先は Git で追跡しない。手順は [CONTRIBUTING.md](CONTRIBUTING.md) にある。
 
 ## ディレクトリ
 

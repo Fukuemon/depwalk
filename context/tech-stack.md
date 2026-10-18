@@ -65,7 +65,7 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - pnpm: ルートの `package.json` のツールを入れる。ルートの `package.json` は文書とコミットのメッセージのチェックのツールだけを持つ。
 - lefthook: Git のフックからチェックを実行する。
 - prettier、textlint、commitlint: Markdown と設定ファイルを整形し、文書とコミットのメッセージをチェックする。
-- apm: agent-harness のスキルとフックを配置する。
+- apm: agent-harness のスキルとフックと、agent-playbooks の playbook を配置する。
 
 依存を足すときは、次の条件に従う。
 
