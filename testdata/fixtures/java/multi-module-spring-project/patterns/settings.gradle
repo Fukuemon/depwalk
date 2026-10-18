@@ -1,5 +1,5 @@
 // 解決が難しい 5 つの呼び出しの型を最小の形で再現する、独立した build である。
 // root の settings.gradle に含めないので、ほかの E2E の期待値は変わらない。
 // TestHardToResolveCallPatternsCLI が自動 discovery で解析し、どの型も edge になることを確かめる。
-rootProject.name = 'unresolved-call-patterns'
+rootProject.name = 'hard-to-resolve-call-patterns'
 include ':lib', ':consumer'
