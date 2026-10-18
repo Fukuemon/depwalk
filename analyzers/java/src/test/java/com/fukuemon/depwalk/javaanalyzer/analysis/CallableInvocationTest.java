@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 追跡する範囲は、同じメソッドの中の local と、workspace のメソッドの parameter へ 1 hop で渡した
+ * 追跡する範囲は、使う位置から見える local と、workspace のメソッドの parameter へ 1 hop で渡した
  * callable に限る。範囲の外の functional interface の呼び出しは、呼び出し先を推測せず、info の
  * {@code JAVA_CALLABLE_UNRESOLVED} で表に出す。
  */
@@ -29,6 +29,10 @@ class CallableInvocationTest {
     private static final String USE_LOCAL_REFERENCE = "java:com.example.LocalUse#useLocalReference()";
     private static final String USE_REASSIGNED = "java:com.example.LocalUse#useReassigned()";
     private static final String STATIC_HELPER = "java:com.example.LocalUse#staticHelper()";
+    private static final String USE_FROM_LAMBDA = "java:com.example.LocalUse#useFromLambda()";
+    private static final String USE_AFTER_SIBLING_BLOCK = "java:com.example.LocalUse#useAfterSiblingBlock()";
+    private static final String INITIALIZER_USE_INIT = "java:com.example.InitializerUse#<init>()";
+    private static final String INITIALIZER_USE_STATIC_HELPER = "java:com.example.InitializerUse#staticHelper()";
 
     @Test
     @DisplayName("parameter へ 1 hop で渡された callable を呼び出すとき、渡された全ての callable への呼び出し関係 (edge) が、受け取り側メソッド内の呼び出し位置を位置情報 (anchor) として生成される")
@@ -63,6 +67,32 @@ class CallableInvocationTest {
                 "local lambda invocation must self-link: " + ran.byType("callEdge"));
         assertTrue(callableEdge(ran, USE_LOCAL_REFERENCE, STATIC_HELPER).isPresent(),
                 "local reference invocation must link to the referenced method: " + ran.byType("callEdge"));
+    }
+
+    @Test
+    @DisplayName("lambda の中から外側の local の callable を呼び出すとき、外側の宣言の参照先メソッドへの呼び出し関係 (edge) になる")
+    void outerLocalUsedInsideLambdaLinksToTheReferencedMethod() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
+        assertTrue(callableEdge(ran, USE_FROM_LAMBDA, STATIC_HELPER).isPresent(),
+                "outer local used inside a lambda must link to the referenced method: " + ran.byType("callEdge"));
+    }
+
+    @Test
+    @DisplayName("兄弟の block に同名の local があっても、使う位置から見える宣言の参照先メソッドへの呼び出し関係 (edge) になる")
+    void siblingBlockLocalWithTheSameNameIsNotAdopted() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
+        assertTrue(callableEdge(ran, USE_AFTER_SIBLING_BLOCK, STATIC_HELPER).isPresent(),
+                "the visible declaration must be adopted: " + ran.byType("callEdge"));
+        assertTrue(callableEdge(ran, USE_AFTER_SIBLING_BLOCK, USE_AFTER_SIBLING_BLOCK).isEmpty(),
+                "the sibling block's lambda must not be adopted: " + ran.byType("callEdge"));
+    }
+
+    @Test
+    @DisplayName("instance initializer の中の local に入れた callable を呼び出すとき、参照先メソッドへの呼び出し関係 (edge) になる")
+    void initializerLocalLinksToTheReferencedMethod() throws Exception {
+        AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
+        assertTrue(callableEdge(ran, INITIALIZER_USE_INIT, INITIALIZER_USE_STATIC_HELPER).isPresent(),
+                "initializer locals must link to the referenced method: " + ran.byType("callEdge"));
     }
 
     @Test

@@ -190,7 +190,7 @@ final class GenericChainTypes {
         if (lambda != null) {
             return lambdaParamModel(lambda, name.getNameAsString(), lambdaBindings, depth);
         }
-        VariableDeclarator declarator = LocalDeclarations.uniqueVisible(name, name.getNameAsString());
+        VariableDeclarator declarator = LocalDeclarations.visibleAt(name, name.getNameAsString());
         if (declarator != null) {
             Model declared = declaredTypeModel(declarator.getType());
             if (declared != null) {
@@ -490,7 +490,7 @@ final class GenericChainTypes {
         if (bound != null) {
             return bound;
         }
-        VariableDeclarator declarator = LocalDeclarations.uniqueVisible(reference, name);
+        VariableDeclarator declarator = LocalDeclarations.visibleAt(reference, name);
         if (declarator != null) {
             Model declared = declaredTypeModel(declarator.getType());
             if (declared != null) {

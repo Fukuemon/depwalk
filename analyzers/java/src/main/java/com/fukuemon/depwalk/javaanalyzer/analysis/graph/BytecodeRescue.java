@@ -376,7 +376,7 @@ final class BytecodeRescue {
                 // local に該当が無ければ囲み型の bytecode field 型で補完する
                 // (bytecodeFieldReceiverType と同じ classfile 根拠)。
                 Expression initializer =
-                        LocalDeclarations.initializerOf(LocalDeclarations.precedingInEnclosingBlocks(nameExpr));
+                        LocalDeclarations.initializerOf(LocalDeclarations.visibleAt(nameExpr, nameExpr.getNameAsString()));
                 if (initializer != null) {
                     return chainForwardOwner(initializer, enclosingTypeNode, depth + 1);
                 }
@@ -577,7 +577,7 @@ final class BytecodeRescue {
         return matches.size() == 1 ? matches.get(0) : null;
     }
 
-    /** NameExpr の宣言 (resolve または使う位置より前の block 直下の宣言) の initializer。 */
+    /** NameExpr の宣言 (resolve か、使う位置から見える local の宣言) の initializer。 */
     private static Expression declaredInitializerOf(NameExpr nameExpr) {
         try {
             ResolvedValueDeclaration value = nameExpr.resolve();
@@ -587,7 +587,7 @@ final class BytecodeRescue {
             }
             return null;
         } catch (RuntimeException | LinkageError e) {
-            return LocalDeclarations.initializerOf(LocalDeclarations.precedingInEnclosingBlocks(nameExpr));
+            return LocalDeclarations.initializerOf(LocalDeclarations.visibleAt(nameExpr, nameExpr.getNameAsString()));
         }
     }
 

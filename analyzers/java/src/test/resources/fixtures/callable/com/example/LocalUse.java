@@ -18,6 +18,20 @@ class LocalUse {
         action.run();
     }
 
+    void useFromLambda() {
+        Action action = LocalUse::staticHelper;
+        Action outer = () -> action.run();
+        outer.run();
+    }
+
+    void useAfterSiblingBlock() {
+        {
+            Action action = () -> helper();
+        }
+        Action action = LocalUse::staticHelper;
+        action.run();
+    }
+
     void helper() {
     }
 

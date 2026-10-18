@@ -291,10 +291,9 @@ receiver の型を取れない call は、次の順で分類を試みてから d
    - 候補が一意でない link、primitive や配列の戻り値、project の外の classfile の link では前進しない。
    - 暗黙の this の link は、囲む型で補う。
    - 型の分からない単純名は、確定した AST の initializer か、囲む型の bytecode の field の型で補う。
-   - initializer は、使う位置を含む block から外へ辿り、使う位置より前にある block の直下の宣言から採る。辿るのは、囲む callable か lambda の境界までである。
-   - field の型で補うのは、囲む member の中に同じ名前の local の宣言（parameter とパターン変数を含む）が見えない場合に限る。
-   - block の直下以外（for のヘッダ、try-resource、catch 節など）で宣言された local が、field を shadowing していることがある。
-   - そのときに field の型で誤って判定する（false exclusion）のを避けるためである。
+   - initializer は、使う位置から外へスコープを辿り、最初に見える local の宣言から採る。兄弟の block の宣言と、使う位置より後ろの宣言は採らない。辿るのは、囲む member の境界までである。
+   - field の型で補うのは、囲む member の中に、同じ名前の local の宣言（parameter とパターン変数を含む）が位置によらず 1 つもない場合に限る。上の「見える」宣言の判定とは別の、より広い判定である。
+   - 宣言を探す規則は、parameter とパターン変数を宣言として返さない。これらが field を shadowing しているときに、field の型で誤って判定する（false exclusion）のを避けるためである。
 2. **起点をさかのぼる external の判定**: 前進して解決できない場合、chain、変数の initializer、`this.field` をさかのぼって、最初に静的な型が取れる起点を探す。
    - その型が scope の外（ソースの宣言の索引にない）なら、`external-target` の除外へ分類する。
    - 起点が scope の中の型か暗黙の this の場合と、起点の型も取れない場合は、保守的に diagnostic に残す。
@@ -316,6 +315,7 @@ SAM の arity を推論できない method reference は、救済せず diagnost
 ADR-0009: [framework 由来の暗黙の呼び出しと型伝播救済](../../../../../../../../../../adr/0009-implicit-call-resolution-and-type-propagation-rescue.md)
 
 1. **local 変数の宣言と初期化子**: receiver が local 変数（var の宣言を含む）のとき、宣言の型か初期化子の式の解決した型から、receiver の型を導く。
+   - 宣言は、規則 1 の initializer と同じく、使う位置から外へスコープを辿って最初に見えるものを採る。
 2. **chain link の generic signature**: 規則 1（chain の前進の解決）の適用を広げる。
    - bytecode の generic Signature が型引数を持つ場合は、型引数を伝播して要素の型を復元する。
    - JDK のコレクション、Stream、Optional、Map の link は、classfile の Signature と等価な「宣言済みの generic の意味論の固定表」で伝播する。
@@ -454,8 +454,9 @@ lambda の本体は独立した node にしない。
 
 静的に追う範囲は、次の 2 つに限る。
 
-- 同じメソッドの中の local 変数を経由するもの。
+- 使う位置から見える local 変数を経由するもの。宣言は、「呼び出し元の型が分からないとき」の規則 1 と同じく探す。
   - lambda か method reference を直接 initializer に持ち、再代入がない場合だけにする。
+  - 再代入は、宣言のスコープの中で、宣言より後ろにある同じ名前への代入で判定する。
 - workspace のメソッドの functional interface の parameter への、引数渡し 1 段
 
 invocation の対象は、receiver が単純名（parameter か local）の SAM の呼び出しに限る。  
