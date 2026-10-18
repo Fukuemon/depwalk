@@ -178,8 +178,8 @@ interface を注入している箇所では、実装クラスのメソッドが�
   - 確認の方法: 各形式で parse できる出力が得られる。形式ごとに比べる規則は [Output の Design Doc](core/internal/output/DesignDoc.md) が定め、CLI の出力の水準の比較は CLI の層の E2E が担う。
 - Spring の DI を経由する呼び出し先を、実体まで解決できる。
   - 確認の方法: interface の注入を含むサンプルで、実装クラスのメソッドが呼び出し先として現れる。
-- 新しい言語の Analyzer を足すときに、Core を変えずに済む。
-  - 確認の方法: 2 つ目以降の言語の Analyzer を足しても、Core のモジュールに差分が出ない（Protocol だけで結合する）。
+- 新しい言語の Analyzer を足すときに、Core の変更が `language` の値の追加だけで済む。
+  - 確認の方法: 2 つ目以降の言語の Analyzer を足したとき、Core の差分が `core/internal/protocol` の許す `language` の値 1 つの追加だけになる（Protocol だけで結合する）。
   - 初号機の Java を入れるときの、言語に依存しない最初の配線（`depwalk analyze` のコマンドと、Analyzer の起動のコマンドの解決）は対象外とする。
 
 ## Open Questions / Risks
