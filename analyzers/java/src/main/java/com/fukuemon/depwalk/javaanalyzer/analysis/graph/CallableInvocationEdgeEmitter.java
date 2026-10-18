@@ -8,22 +8,17 @@ import com.fukuemon.depwalk.javaanalyzer.protocol.SourceLocation;
 
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
-import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.AssignExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
-import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedParameterDeclaration;
 
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -220,35 +215,8 @@ final class CallableInvocationEdgeEmitter {
      * 推測しない)。
      */
     private List<CallablePassIndex.CallableTarget> callablesForLocal(String variableName, MethodCallExpr mce) {
-        Node enclosing = mce.findAncestor(MethodDeclaration.class).map(Node.class::cast)
-                .or(() -> mce.findAncestor(ConstructorDeclaration.class).map(Node.class::cast))
-                .orElse(null);
-        if (enclosing == null) {
-            return List.of();
-        }
-        boolean reassigned = enclosing
-                .findAll(AssignExpr.class).stream()
-                .anyMatch(assign -> assign.getTarget() instanceof NameExpr name
-                        && name.getNameAsString().equals(variableName));
-        if (reassigned) {
-            return List.of();
-        }
-        // invocation より字句的に前に宣言され、囲み block が invocation を含む declarator
-        // だけを候補にする。複数一致は推測なしに 1 つへ絞れないため追跡を諦める。
-        List<VariableDeclarator> candidates = new ArrayList<>();
-        for (VariableDeclarator declarator
-                : enclosing.findAll(VariableDeclarator.class)) {
-            if (!declarator.getNameAsString().equals(variableName)
-                    || !beginsBefore(declarator, mce)
-                    || !enclosingBlockContains(declarator, mce)) {
-                continue;
-            }
-            candidates.add(declarator);
-        }
-        if (candidates.size() != 1) {
-            return List.of();
-        }
-        Expression initializer = candidates.get(0).getInitializer().orElse(null);
+        Expression initializer = LocalDeclarations.initializerOf(
+                LocalDeclarations.uniqueUnreassignedBefore(mce, variableName));
         if (initializer == null) {
             return List.of();
         }
@@ -258,24 +226,5 @@ final class CallableInvocationEdgeEmitter {
         } catch (RuntimeException | LinkageError e) {
             return List.of();
         }
-    }
-
-    private static boolean beginsBefore(Node first, Node second) {
-        return first.getBegin().isPresent() && second.getBegin().isPresent()
-                && first.getBegin().get().isBefore(second.getBegin().get());
-    }
-
-    /** declarator の直近ブロックが invocation を字句的に包含するかを判定する。 */
-    private static boolean enclosingBlockContains(Node declarator, Node invocation) {
-        Node block = declarator.findAncestor(BlockStmt.class).orElse(null);
-        if (block == null) {
-            return false;
-        }
-        for (Node ancestor = invocation; ancestor != null; ancestor = ancestor.getParentNode().orElse(null)) {
-            if (ancestor == block) {
-                return true;
-            }
-        }
-        return false;
     }
 }

@@ -9,12 +9,6 @@ import com.fukuemon.depwalk.javaanalyzer.analysis.sootup.SootUpTypeHierarchyInde
 
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.ConstructorDeclaration;
-import com.github.javaparser.ast.body.FieldDeclaration;
-import com.github.javaparser.ast.body.InitializerDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.Parameter;
-import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.EnclosedExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -26,12 +20,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.expr.TypeExpr;
-import com.github.javaparser.ast.expr.TypePatternExpr;
-import com.github.javaparser.ast.expr.VariableDeclarationExpr;
-import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
-import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
@@ -382,16 +371,16 @@ final class BytecodeRescue {
                 }
                 return null;
             } catch (RuntimeException | LinkageError e) {
-                // `var` の型推論が壊れていると resolve() 自体が失敗する。囲み
-                // callable 内で同名宣言が一意なら、その initializer を確定 AST
-                // として前進解決する (一意でなければ shadowing の誤追跡を避けて
-                // 不採用)。local に該当が無ければ囲み型の bytecode field 型で
-                // 補完する (既存の receiver 補完経路と同じ classfile 根拠)。
-                Expression initializer = uniqueLocalInitializer(nameExpr);
+                // `var` の型推論が壊れていると resolve() 自体が失敗するので、AST 上で
+                // 見つかる local の宣言の initializer を確定 AST として前進解決する。
+                // local に該当が無ければ囲み型の bytecode field 型で補完する
+                // (既存の receiver 補完経路と同じ classfile 根拠)。
+                Expression initializer =
+                        LocalDeclarations.initializerOf(LocalDeclarations.precedingInEnclosingBlocks(nameExpr));
                 if (initializer != null) {
                     return chainForwardOwner(initializer, enclosingTypeNode, depth + 1);
                 }
-                if (sameNameLocalDeclared(nameExpr)) {
+                if (LocalDeclarations.sameNameDeclaredInMember(nameExpr)) {
                     return null;
                 }
                 return enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
@@ -430,88 +419,6 @@ final class BytecodeRescue {
             return null;
         }
         return returnType;
-    }
-
-    /**
-     * 囲み callable (method / constructor / initializer / lambda body を含む
-     * 最内の宣言) の中で同名の local 宣言が一意なら、その initializer を返す。
-     */
-    private static Expression uniqueLocalInitializer(NameExpr nameExpr) {
-        String name = nameExpr.getNameAsString();
-        Node child = nameExpr;
-        Node parent = child.getParentNode().orElse(null);
-        while (parent != null) {
-            if (parent instanceof BlockStmt block) {
-                Expression initializer = declaratorBeforeInBlock(block, child, name);
-                if (initializer != null) {
-                    return initializer;
-                }
-            }
-            if (parent instanceof MethodDeclaration
-                    || parent instanceof ConstructorDeclaration
-                    || parent instanceof InitializerDeclaration
-                    || parent instanceof LambdaExpr) {
-                // callable / lambda 境界。ここまでで見つからなければ不採用
-                // (字句スコープ外の同名宣言を誤って結びつけない、保守側)。
-                return null;
-            }
-            child = parent;
-            parent = parent.getParentNode().orElse(null);
-        }
-        return null;
-    }
-
-    /**
-     * {@code block} 直下の文のうち、{@code child} (を祖先に持つ文) より前にある
-     * 同名 {@code VariableDeclarator} の initializer (前方参照は無効、かつ use を
-     * 含まない兄弟文の宣言は対象にしない)。
-     */
-    private static Expression declaratorBeforeInBlock(BlockStmt block, Node child, String name) {
-        for (Statement statement : block.getStatements()) {
-            if (statement == child || statement.isAncestorOf(child)) {
-                break;
-            }
-            if (statement instanceof ExpressionStmt exprStmt
-                    && exprStmt.getExpression()
-                            instanceof VariableDeclarationExpr varDecl) {
-                for (VariableDeclarator declarator : varDecl.getVariables()) {
-                    if (declarator.getNameAsString().equals(name)) {
-                        return declarator.getInitializer().orElse(null);
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 囲み member 内に同名の local 宣言 (変数宣言・for ヘッダ・try-resource・
-     * catch 節・パターン変数・parameter) が存在するか。field フォールバックの
-     * 前提検査に使う: {@link #uniqueLocalInitializer} は block 直下の宣言文しか
-     * 見ないため、それ以外の位置で宣言された同名 local が field を shadowing
-     * していると、local への呼び出しを field 型で誤判定して false exclusion に
-     * 倒れる余地がある。use 位置で実際に shadowing しているかまでは判定しない
-     * (過剰検出は diagnostic 残留にしか倒れない保守側)。
-     */
-    private static boolean sameNameLocalDeclared(NameExpr nameExpr) {
-        String name = nameExpr.getNameAsString();
-        Node member = nameExpr;
-        Node parent = nameExpr.getParentNode().orElse(null);
-        while (parent != null && !(parent instanceof TypeDeclaration)) {
-            member = parent;
-            parent = parent.getParentNode().orElse(null);
-        }
-        // FieldDeclaration 直下の declarator は field であり local ではない
-        // (field initializer 内からの遡上や、member 内の local class の field を
-        // 同名 local として誤検出しない)。
-        return member.findAll(VariableDeclarator.class).stream()
-                        .filter(declarator ->
-                                !(declarator.getParentNode().orElse(null) instanceof FieldDeclaration))
-                        .anyMatch(declarator -> declarator.getNameAsString().equals(name))
-                || member.findAll(Parameter.class).stream()
-                        .anyMatch(parameter -> parameter.getNameAsString().equals(name))
-                || member.findAll(TypePatternExpr.class).stream()
-                        .anyMatch(pattern -> pattern.getNameAsString().equals(name));
     }
 
     /** 囲み型の bytecode field 型 (classfile 根拠の receiver 補完)。 */
@@ -597,7 +504,7 @@ final class BytecodeRescue {
                     continue;
                 }
                 // local に該当が無ければ囲み型の bytecode field 型で判定する。
-                if (sameNameLocalDeclared(nameExpr)) {
+                if (LocalDeclarations.sameNameDeclaredInMember(nameExpr)) {
                     return false;
                 }
                 String fieldType = enclosingBytecodeFieldType(nameExpr.getNameAsString(), enclosingTypeNode);
@@ -674,7 +581,7 @@ final class BytecodeRescue {
         return matches.size() == 1 ? matches.get(0) : null;
     }
 
-    /** NameExpr の宣言 (resolve または囲み callable 内の一意宣言) の initializer。 */
+    /** NameExpr の宣言 (resolve または使う位置より前の block 直下の宣言) の initializer。 */
     private static Expression declaredInitializerOf(NameExpr nameExpr) {
         try {
             ResolvedValueDeclaration value = nameExpr.resolve();
@@ -684,7 +591,7 @@ final class BytecodeRescue {
             }
             return null;
         } catch (RuntimeException | LinkageError e) {
-            return uniqueLocalInitializer(nameExpr);
+            return LocalDeclarations.initializerOf(LocalDeclarations.precedingInEnclosingBlocks(nameExpr));
         }
     }
 
@@ -764,7 +671,7 @@ final class BytecodeRescue {
 
     /**
      * scope が単純名 / this.field で、囲み型の bytecode-only field なら field 型を返す。
-     * 単純名は {@link #sameNameLocalDeclared} が偽の場合だけ field とみなす。
+     * 単純名は {@link LocalDeclarations#sameNameDeclaredInMember} が偽の場合だけ field とみなす。
      * この経路は救済 owner の復元に使われ、誤認は偽 edge に倒れうる。
      * this.field 形は shadowing され得ないため検査しない。
      */
@@ -775,7 +682,7 @@ final class BytecodeRescue {
         String fieldName = null;
         var scope = mce.getScope().get();
         if (scope instanceof NameExpr nameExpr) {
-            if (sameNameLocalDeclared(nameExpr)) {
+            if (LocalDeclarations.sameNameDeclaredInMember(nameExpr)) {
                 return null;
             }
             fieldName = nameExpr.getNameAsString();

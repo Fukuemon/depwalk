@@ -190,7 +190,7 @@ final class GenericChainTypes {
         if (lambda != null) {
             return lambdaParamModel(lambda, name.getNameAsString(), lambdaBindings, depth);
         }
-        VariableDeclarator declarator = uniqueLocalDeclarator(name, name.getNameAsString());
+        VariableDeclarator declarator = LocalDeclarations.uniqueVisible(name, name.getNameAsString());
         if (declarator != null) {
             Model declared = declaredTypeModel(declarator.getType());
             if (declared != null) {
@@ -491,7 +491,7 @@ final class GenericChainTypes {
         if (bound != null) {
             return bound;
         }
-        VariableDeclarator declarator = uniqueLocalDeclarator(reference, name);
+        VariableDeclarator declarator = LocalDeclarations.uniqueVisible(reference, name);
         if (declarator != null) {
             Model declared = declaredTypeModel(declarator.getType());
             if (declared != null) {
@@ -557,41 +557,6 @@ final class GenericChainTypes {
             return receiver.arg(0);
         }
         return null;
-    }
-
-    /** 囲み callable 内で同名の local 宣言が一意かつ anchor から可視ならその declarator。 */
-    private static VariableDeclarator uniqueLocalDeclarator(Node anchor, String name) {
-        Node scope = anchor;
-        Node parent = scope.getParentNode().orElse(null);
-        while (parent != null && !(parent instanceof com.github.javaparser.ast.body.CallableDeclaration<?>)
-                && !(parent instanceof LambdaExpr)) {
-            scope = parent;
-            parent = scope.getParentNode().orElse(null);
-        }
-        Node root = parent != null ? parent : scope;
-        List<VariableDeclarator> matches = root.findAll(VariableDeclarator.class).stream()
-                .filter(declarator -> declarator.getNameAsString().equals(name))
-                .toList();
-        if (matches.size() != 1) {
-            return null;
-        }
-        return visibleFrom(matches.get(0), anchor) ? matches.get(0) : null;
-    }
-
-    /**
-     * 宣言の可視範囲 (宣言文を含む block、for 系は statement 自体) が anchor を
-     * 含むかを検査する。兄弟 block や内側の匿名 class の同名宣言を、名前だけの
-     * 一致で採用すると誤った型 → 誤 owner に繋がるため。
-     */
-    private static boolean visibleFrom(VariableDeclarator declarator, Node anchor) {
-        var statement = declarator.findAncestor(com.github.javaparser.ast.stmt.Statement.class).orElse(null);
-        if (statement == null) {
-            return false;
-        }
-        Node visibilityRoot = statement instanceof ExpressionStmt
-                ? statement.getParentNode().orElse(null)
-                : statement;
-        return visibilityRoot != null && (visibilityRoot == anchor || visibilityRoot.isAncestorOf(anchor));
     }
 
     /** 囲み callable の parameter で同名のもの (lambda parameter を除く)。 */

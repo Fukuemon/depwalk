@@ -289,7 +289,7 @@ receiver の型を取れない call は、次の順で分類を試みてから d
    - owner の型を復元できたら、ふつうの救済と external の分類を当てる。
    - 候補が一意でない link、primitive や配列の戻り値、project の外の classfile の link では前進しない。
    - 暗黙の this の link は、囲む型で補う。
-   - 型の分からない単純名は、確定した AST の initializer（囲む callable の中で同じ名前の宣言が一意の場合だけ）か、囲む型の bytecode の field の型で補う。
+   - 型の分からない単純名は、確定した AST の initializer（使う位置を含む block から外へ辿り、使う位置より前にある block の直下の宣言）か、囲む型の bytecode の field の型で補う。
    - field の型で補うのは、囲む member の中に同じ名前の local の宣言（parameter とパターン変数を含む）が見えない場合に限る。
    - block の直下以外（for のヘッダ、try-resource、catch 節など）で宣言された local が、field を shadowing していることがある。
    - そのときに field の型で誤って判定する（false exclusion）のを避けるためである。
