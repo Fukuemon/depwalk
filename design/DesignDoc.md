@@ -19,8 +19,10 @@ depwalk は、静的解析でメソッド間の呼び出し関係を抽出し、
 
 言語ごとの解析の差は、独立したプロセスの Analyzer に閉じ込める。  
 呼び出しグラフの構築、探索、出力を担う Core は、言語に依存させない。  
-この分離により、Kotlin、TypeScript、Vue、Go の解析を足すとき、Core では `core/internal/protocol` の許す `language` の値を 1 つ足すだけで済む。  
-ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
+この分離により、Kotlin、TypeScript、Vue、Go の解析を足すとき、Core では `core/internal/protocol` の許す `language` の値を 1 つ足すだけで済む。
+
+- ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
+- ADR-0017: [2 つ目以降の言語の Analyzer を足すとき、Core の変更を protocol の許す language の値の追加に限る](../adr/0017-limit-core-change-to-language-value.md)
 
 Core は Go で実装し、Go modules と Go の標準のコマンドで build する。  
 ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準ライブラリに絞る](../adr/0002-core-implementation-foundation.md)

@@ -1,5 +1,10 @@
 package protocol
 
+import (
+	"slices"
+	"strings"
+)
+
 // SchemaVersion は現行の Analyzer Protocol の版。
 const SchemaVersion = "1"
 
@@ -26,6 +31,21 @@ const (
 	// LanguageJava は現行で唯一対応する言語。
 	LanguageJava Language = "java"
 )
+
+// supportedLanguages は Core が受け付ける language の値。言語の Analyzer を
+// 足すときは、ここに値を足す。
+var supportedLanguages = []Language{LanguageJava}
+
+func validateLanguage(language Language) error {
+	if slices.Contains(supportedLanguages, language) {
+		return nil
+	}
+	names := make([]string, len(supportedLanguages))
+	for i, supported := range supportedLanguages {
+		names[i] = string(supported)
+	}
+	return invalid("language", "must be one of: "+strings.Join(names, ", "))
+}
 
 // AnalysisMode は要求する呼び出しグラフの範囲を指定する。
 type AnalysisMode string

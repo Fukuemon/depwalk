@@ -482,3 +482,12 @@ func validAnalyzerError() protocol.AnalyzerError {
 		Message:       "analyzer failed",
 	}
 }
+
+func TestMethodSymbolValidateRejectsUnsupportedLanguage(t *testing.T) {
+	t.Parallel()
+
+	symbol := validMethodSymbol()
+	symbol.Language = "go"
+
+	assertValidateError(t, symbol.Validate)
+}

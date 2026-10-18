@@ -96,10 +96,11 @@ path の区切りは `/` に正規化し、絶対 path、空文字、`..` を含
 Protocol に module や root の ID は足さない。  
 言語に固有の metadata の必須の条件と discovery の方式は、Analyzer ごとの Design Doc が定める。
 
-`core/internal/protocol` は、`language` に許す値の一覧を持つ。  
+`core/internal/protocol` は、`language` に許す値の一覧（`supportedLanguages`）を持つ。  
 Core は、`analysisRequest.language` と `methodSymbol.language` が一覧にない record を invalid にする。  
 新しい言語の Analyzer を足すときは、この一覧に値を 1 つ足す。  
-Core のほかの package は変えない。
+Core のほかの package は変えない。  
+ADR-0017: [2 つ目以降の言語の Analyzer を足すとき、Core の変更を protocol の許す language の値の追加に限る](../../../adr/0017-limit-core-change-to-language-value.md)
 
 `entrypoints` の各要素は method selector の object とし、`qualifiedName` を必須、`signature` を任意にする。  
 `entrypoints` が未指定か空の配列のとき、Analyzer は scope 全体の call graph の生成の要求として扱う。  
@@ -299,9 +300,11 @@ record の受信者は、対応している major バージョンの record だ�
 | field の意味の変更                     | 非互換 | major バージョンを上げる                                                              |
 | record の種類の削除                    | 非互換 | major バージョンを上げる                                                              |
 
-入れ子の object は、`sourceLocation`、`callSite`、`entrypoints[]` の各要素、`details[]` の各要素とその `sourceLocation` を指す。  
+入れ子の object は、`sourceLocation`、`callSite`、`details[]` の各要素とその `sourceLocation` を指す。  
 Core は、これらの object の中で、field 名の大文字と小文字だけが違う key も未知の field として拒否する。  
 `metadata` の中身は opaque な値なので、Core は中の field を確かめない。  
+`entrypoints[]` は `analysisRequest` にだけあり、受信者の Analyzer は中の未知の field も無視する。  
+Core の parser は `entrypoints[]` の各要素の未知の field も拒否するが、これは Core 自身の検証のためで、互換性の規則に含めない。  
 ADR-0013: [Core は record の最上位の未知の field を無視し、入れ子の object の未知の field を invalid にする](../../../adr/0013-reject-unknown-nested-fields.md)
 
 Handshake と capability negotiation は採用しない。  
