@@ -5,7 +5,7 @@ description: Gradle の build model から source root と classpath を得る�
 status: stable
 governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery
-verified_commit: 70e70c5
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Java Analyzer: Source root discovery
@@ -156,7 +156,8 @@ CLI の help は、この副作用の境界と明示の override を常に説明
 定型文は、run をまたいで同じ文面にする。  
 定型文が伝える内容と非漏洩の境界は [operations.md の Environments](../../../../../../../../../../context/operations.md#environments) にある。
 
-discovery の開始と終了、使った Gradle の version、project と root の件数、失敗の安定した category も stderr へ出す。  
+discovery の開始と終了、使った Gradle の version、project と root と除外した source set の件数、discovery の所要時間も stderr へ出す。  
+失敗の安定した category は、stderr ではなく error record の message と metadata に載せる。  
 Gradle から来た自由な文は出力しない。
 
 Gradle の stdout と stderr は、Protocol と CLI の出力へ渡さずに捨てる。  
@@ -164,13 +165,24 @@ Gradle の stdout と stderr は、Protocol と CLI の出力へ渡さずに捨�
 非漏洩を保証する範囲は、depwalk が生成して渡す Protocol、CLI、log、test の artifact に限る。  
 Gradle 自身と利用者の build logic の出力と副作用は含めない。
 
-### 互換の範囲の外のときの失敗
+### discovery の失敗の reason
 
-次の 3 つは、どれも `JAVA_GRADLE_MODEL_ERROR` の fatal にし、安定した reason で区別する。
+discovery の失敗は、どれも `JAVA_GRADLE_MODEL_ERROR` の fatal にし、次の 6 つの安定した reason で区別する。  
+error record の metadata は、`reason` と、失敗した段階の `phase` を持つ。
 
-- `unsupported-gradle-version`: 範囲の外か、version を判定できない custom distribution
-- `provider-incompatible`: provider の load の失敗
-- `daemon-jvm-incompatible`: daemon の JVM が互換でない
+| `reason`                     | `phase`         | 出る場面                                                                                       |
+| ---------------------------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| `connection-failed`          | `connect`       | 対象の build の environment を Tooling API で読めない                                          |
+| `unsupported-gradle-version` | `version-check` | Gradle の version が範囲の外か、version を判定できない custom distribution                     |
+| `daemon-jvm-incompatible`    | `version-check` | daemon の JVM の version が互換の範囲の外か、判定できない                                      |
+| `provider-incompatible`      | `model-request` | 同梱の provider を一時の directory へ用意できないか、provider が不完全な model を返した        |
+| `model-request-failed`       | `model-request` | model の取得の Tooling API の呼び出しが失敗した。daemon の上での provider の load の失敗を含む |
+| `no-java-source-roots`       | `model-request` | model の全 project を通じて、main の Java source root が 1 件もない                            |
+
+daemon の上での provider の load の失敗は、原因を特定できないため、`model-request-failed` として報告する。  
+ADR-0006: [source root を指定しない request では、Gradle Tooling API で build の実効 model から解析 context を discovery する](../../../../../../../../../../adr/0006-adopt-gradle-tooling-api-discovery.md)
+
+model が source root を返した後に、除外と検証を経て有効な root が 0 件になった場合は、`JAVA_NO_SOURCE_ROOTS` の fatal にする。
 
 ## Interface
 
@@ -181,7 +193,8 @@ Gradle 自身と利用者の build logic の出力と副作用は含めない。
 
 ### 出す値
 
-- stderr: 安全の通知の定型文、discovery の開始と終了、Gradle の version、project と root の件数、失敗の category
+- stderr: 安全の通知の定型文、discovery の開始と終了、Gradle の version、project と root と除外した source set の件数、discovery の所要時間
+- `JAVA_GRADLE_MODEL_ERROR` の error record の metadata: `reason` と `phase`
 - `JAVA_SOURCE_ROOT_EXCLUDED`（warning）と、`JAVA_INVALID_SOURCE_ROOTS`、`JAVA_NO_SOURCE_ROOTS`、`JAVA_GRADLE_MODEL_ERROR`（fatal）
   - 意味は [Protocol への写像の文書](../protocol/DesignDoc.md#diagnostic--error-code-体系) にある。
 

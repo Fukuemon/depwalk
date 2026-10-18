@@ -9,7 +9,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/graph
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/protocol
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/io
-verified_commit: 4455e86
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Java Analyzer: Protocol への写像
@@ -195,8 +195,9 @@ DI の解決を行わない場合では、宣言型で止まるのが仕様で�
 | `conditional`    | boolean  | 条件アノテーションの付いた候補なら `true`。条件がなければ key を省略する                                                      |
 | `conditionTypes` | string[] | 検出した条件アノテーションの FQN を、重複なしの辞書順で入れる。`conditional: true` のときは必須                               |
 
-edge の重複の判定は、caller、callee、call site から作る既存の `edgeId` の単位で行う。  
-同じ edge を複数の解析器が報告した場合は、edge を 1 件に統合し、`provenance` を和集合にする。
+1 つの call site の実装の候補は、候補のメソッドの signature（宣言型、メソッド名、parameter の型）を key にして 1 件にまとめる。  
+SootUp と Spring DI の両方が同じ候補を挙げた場合は、`provenance` を和集合にする。  
+`edgeId` は解析の実行の中で振る連番（`java-edge-<連番>`）で、edge の重複の判定には使わない。
 
 #### 暗黙の呼び出しの標識
 
@@ -262,17 +263,17 @@ Core は `code` を不透明な文字列として扱うため、code を増や�
 
 `error`（fatal、非ゼロの exit）の code は次のとおり。
 
-| code                        | 出る場面                                                                                                                                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JAVA_MISSING_CLASSPATH`    | 明示の `sourceRoots` の request の `metadata` に classpath の key がない（空の配列は正当な入力）                                                   |
-| `JAVA_MISSING_JAR`          | classpath に指定された jar か classes directory が存在しないか、読めない                                                                           |
-| `JAVA_INVALID_REQUEST`      | `analysisRequest` を Java Analyzer として処理できない（対応しない `language` など）                                                                |
-| `JAVA_INTERNAL_ERROR`       | 上のどれでもない、続けられない内部のエラー                                                                                                         |
-| `JAVA_PARSE_ERROR`          | parse の pre-flight で 1 件以上の file が失敗した                                                                                                  |
-| `JAVA_INCOMPLETE_ANALYSIS`  | すべての救済の後も primary diagnostic outcome が残り、完全な成功の graph を保証できない                                                            |
-| `JAVA_INVALID_SOURCE_ROOTS` | 明示か discovery の root の欠落、directory でない、読み取れない、root の包含の関係の曖昧さ、realpath の workspace の外への脱出、binary name の重複 |
-| `JAVA_NO_SOURCE_ROOTS`      | discovery と除外の後に、有効な source root が 0 件                                                                                                 |
-| `JAVA_GRADLE_MODEL_ERROR`   | model の非互換、必須の field の欠落、classpath の解決、context の対応、build の評価に失敗した                                                      |
+| code                        | 出る場面                                                                                                                                            |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JAVA_MISSING_CLASSPATH`    | 明示の `sourceRoots` の request の `metadata` に classpath の key がない（空の配列は正当な入力）                                                    |
+| `JAVA_MISSING_JAR`          | classpath に指定された jar か classes directory が存在しないか、読めない                                                                            |
+| `JAVA_INVALID_REQUEST`      | `analysisRequest` を Java Analyzer として処理できない（対応しない `language` など）                                                                 |
+| `JAVA_INTERNAL_ERROR`       | 上のどれでもない、続けられない内部のエラー                                                                                                          |
+| `JAVA_PARSE_ERROR`          | parse の pre-flight で 1 件以上の file が失敗した                                                                                                   |
+| `JAVA_INCOMPLETE_ANALYSIS`  | すべての救済の後も primary diagnostic outcome が残り、完全な成功の graph を保証できない                                                             |
+| `JAVA_INVALID_SOURCE_ROOTS` | 明示か discovery の root の欠落、directory でない、読み取れない、root の包含の関係の曖昧さ、realpath の workspace の外への脱出、binary name の重複  |
+| `JAVA_NO_SOURCE_ROOTS`      | discovery と除外の後に、有効な source root が 0 件。Gradle の model が main の source root を 1 件も返さないときは `JAVA_GRADLE_MODEL_ERROR` になる |
+| `JAVA_GRADLE_MODEL_ERROR`   | model の非互換、必須の field の欠落、classpath の解決、context の対応、build の評価に失敗した                                                       |
 
 language level の欠落、invalid、曖昧、JavaParser が対応しない（preview を含む）ものは、`JAVA_INVALID_REQUEST` として拒否し、専用の code は設けない。
 

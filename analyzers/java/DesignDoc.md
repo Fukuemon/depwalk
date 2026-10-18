@@ -7,7 +7,7 @@ governs:
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/pipeline
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/analysis/scope
   - analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/preflight
-verified_commit: 4cae142
+verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 ---
 
 # Java Analyzer
@@ -155,18 +155,22 @@ classpath が欠けると、型の分からない呼び出しが増え、edge �
 ```mermaid
 flowchart TB
     subgraph ja["javaanalyzer"]
+        main["Main<br/>(起動から context の組み立てまでの順)"]
         io["io<br/>(JSONL 入出力)"]
         protocol["protocol<br/>(wire DTO)"]
         preflight["preflight<br/>(入力検証)"]
         discovery["discovery<br/>(Gradle Tooling API を隔離)"]
         subgraph analysis["analysis (JavaParser / SymbolSolver はこの中でだけ使う)"]
-            pipeline["pipeline<br/>(段階の実行順を知る唯一の package)"]
+            pipeline["pipeline<br/>(解析の段の実行順を持つ)"]
             stages["段階別 package<br/>(scope / context / augment / spring / attribution / graph / completeness)"]
             sootup["sootup<br/>(SootUp を封じ込める adapter)"]
             normalize["normalize<br/>(段階横断の naming util)"]
         end
     end
 
+    main --> preflight
+    main --> discovery
+    main --> pipeline
     GradleAPI["Gradle Tooling API"] --> discovery
     SootUpLib["SootUp"] --> sootup
     pipeline --> stages
@@ -176,7 +180,13 @@ flowchart TB
 
 - 直下の `protocol`（wire の DTO）、`io`（JSONL の入出力）、`preflight`（入力の検証）、`discovery`（Gradle Tooling API の隔離）は、入出力と起動を担う。
 - `analysis` の下は、解析の pipeline の段階ごとの package で作る。
-  - **段階の実行の順は `analysis/pipeline`（AnalysisRunner）だけが知る。**
+  - **解析の段の実行の順は `analysis/pipeline`（`AnalysisRunner`）が持つ。**
+  - `AnalysisRunner.run` を呼ぶまでの順は、`Main` が持つ。
+    - 順は、request の読み取り、pre-flight、自動 discovery での language の metadata の拒否、discovery である。
+    - その後に、解析の context を `AnalysisContextFactory` で組み立てる。
+  - 段階別の package のうち、`graph` と `spring` は互いに import する。
+    - `graph` は `spring` の索引（`SpringDiIndex`、`EventListenerIndex`、`EntryPointIndex`）を読む。
+    - `spring` の `SpringDiagnosticEmitter` は、`graph` の `GraphAccumulator` へ diagnostic を足す。
   - `normalize` は、段階を横断する naming の util である。
 - 外部のライブラリは 3 段に分けて隔離する。
   - SootUp は `analysis/sootup` の adapter に完全に封じ込める。
@@ -289,13 +299,24 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Parse["JavaParser: call site と宣言型 edge を生成"] --> Hierarchy["SootUp: 型階層と override 候補を索引化"]
-    Hierarchy --> Beans["Spring: 型で Bean 候補を列挙"]
+    Parse["JavaParser: call site と宣言型 edge を生成"] --> Form{"static 呼び出しか<br/>super.m() / super::m?"}
+    Form -->|はい| Output["methodSymbol / callEdge / diagnostic を JSONL 出力"]
+    Form -->|いいえ| Hierarchy["SootUp: receiver 型の override 候補を引く<br/>(型変数と intersection は全境界で絞る)"]
+    Hierarchy --> Available{"SootUp を使える?"}
+    Available -->|いいえ| SootDiag["JAVA_SOOTUP_UNAVAILABLE diagnostic<br/>(候補 edge を作らない)"]
+    SootDiag --> Output
+    Available -->|はい| Injection{"call site に対応する<br/>注入点がある?"}
+    Injection -->|なし| SootOnly["SootUp の候補をそのまま使う<br/>(1件なら unique、それ以外は ambiguous)"]
+    Injection -->|あり| Beans["Spring: 型で Bean 候補を列挙"]
     Beans --> Qualifier{"@Qualifier 指定あり?"}
     Qualifier -->|あり| Filter["qualifier value / Bean 名 / alias で絞り込み"]
     Qualifier -->|なし| Count
     Filter --> Count{"候補数は?"}
-    Count -->|0件| Unresolved["unresolved または runtime-provided diagnostic"]
+    Count -->|0件| Zero{"既知の runtime-provided の型?"}
+    Zero -->|はい| RuntimeProvided["runtime-provided diagnostic<br/>(候補 edge を作らない)"]
+    Zero -->|いいえ| Unresolved["unresolved diagnostic"]
+    RuntimeProvided --> Output
+    Unresolved --> SootOnly
     Count -->|1件| Unique["resolution=unique"]
     Count -->|複数件| Primary{"@Primary の候補数は?"}
     Primary -->|1件| PrimaryCondition{"唯一の @Primary は<br/>条件付き?"}
@@ -304,14 +325,17 @@ flowchart TD
     Primary -->|0件または複数件| Ambiguous["resolution=ambiguous"]
     Unique --> Conditional{"条件付き候補を含む?"}
     Conditional -->|はい| Ambiguous
-    Conditional -->|いいえ| Merge
-    Ambiguous --> Merge["宣言型 edge を保持し候補 edge を edgeId 単位で統合"]
-    Unresolved --> Merge
-    Merge --> Output["methodSymbol / callEdge / diagnostic を JSONL 出力"]
+    Conditional -->|いいえ| BeanImpl["Bean の実装型ごとに SootUp で実装メソッドを引く<br/>(Bean にない SootUp の候補は捨てる)"]
+    Ambiguous --> BeanImpl
+    BeanImpl --> Merge["候補メソッドの signature で 1 件にまとめ provenance を和集合にする<br/>(宣言型と同じ methodId の候補は出さない)"]
+    SootOnly --> Merge
+    Merge --> Output
 ```
 
 SootUp は edge を直接作らず、候補の索引だけを提供する。  
-Spring の絞り込みの後に、JavaParser の側で候補の edge を作り、同じ edge の provenance を統合する。
+Spring の絞り込みの後に、JavaParser の側で候補の edge を作り、同じ候補の provenance を統合する。  
+宣言型 edge は、どの分岐でも残す。  
+注入点が Bean の候補を持つ場合は Bean の候補だけを出し、注入点がないか Bean の候補が 0 件の場合は SootUp の候補を出す。
 
 ### 解析の手段の範囲
 
@@ -545,7 +569,9 @@ fake analyzer を使い、JVM を要らない。
 ### 性能の計測
 
 明示の single-root、自動の single-project、自動の multi-project の 3 つの方式を、初回の 1 回と warm の 3 回の中央値で測る。  
-discovery、model、parse、resolution、graph の phase ごとの時間を stderr へ記録する。
+stderr へは、discovery の終了の行の `discoveryMs` と、解析の終了の行の `durationMs`、`parsePreflightMs`、`contextBuildMs` を記録する。  
+解析の終了の行は、ほかに `analyzedFiles` と `unresolvedSymbols` を持つ。  
+model、resolution、graph の phase ごとの時間は記録しない。
 
 数値の目標は、計測の結果から次の規則で導く。
 
