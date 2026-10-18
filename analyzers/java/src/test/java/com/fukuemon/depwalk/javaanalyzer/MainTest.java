@@ -125,7 +125,7 @@ class MainTest {
     void stderrNeverContainsProtocolRecords() {
         String request = "{\"schemaVersion\":\"1\",\"recordType\":\"analysisRequest\","
                 + "\"requestId\":\"req-1\",\"workspaceRoot\":\"/workspace/depwalk\","
-                + "\"sourceRoots\":[\".\"],\"language\":\"java\"}"; // triggers JAVA_MISSING_CLASSPATH error on stdout
+                + "\"sourceRoots\":[\".\"],\"language\":\"java\"}"; // metadata がないので stdout に JAVA_MISSING_CLASSPATH の error を書く
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

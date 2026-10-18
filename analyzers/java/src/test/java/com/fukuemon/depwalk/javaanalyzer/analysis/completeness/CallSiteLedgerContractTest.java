@@ -72,8 +72,7 @@ class CallSiteLedgerContractTest {
     @Test
     @DisplayName("qualified super (`expr.super(...)`) の outer 式に含まれるメソッド呼び出しも、脱落せずに inventory へ登録される")
     void registersCallsInsideQualifiedSuperOuterExpression() throws Exception {
-        // qualified super (`expr.super(...)`) の outer 式内の method call も
-        // inventory へ登録される (walk が式を辿らないと黙示の脱落になる)。
+        // walk が outer 式を辿らないと、呼び出しが黙って脱落する。
         CallSiteInventory inventory = inventoryOf("com/example/Qualified.java", """
                 package com.example;
                 public class Qualified {
@@ -142,7 +141,6 @@ class CallSiteLedgerContractTest {
         CallSiteOutcomeLedger ledger = new CallSiteOutcomeLedger(inventory);
 
         ledger.commitDiagnostic(id, "JAVA_UNRESOLVED_SYMBOL", "unresolved-method-call", "toString", null);
-        // 補助 diagnostic の後に edge が出た entry は primary EMITTED へ昇格する。
         ledger.commitEmitted(id);
         ledger.validateComplete();
         assertTrue(ledger.primaryDiagnostics().isEmpty());

@@ -10,10 +10,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * diagnostic の code / severity の契約。parse 不能 file は request 全体の fatal
- * ({@code JAVA_PARSE_ERROR})。未解決 symbol は解析を継続する。
- */
 @DisplayName("diagnostic の code / severity の契約")
 class DiagnosticsTest {
 
@@ -33,7 +29,6 @@ class DiagnosticsTest {
                                 && String.valueOf(e.get("message")).contains("com/example/Broken.java")),
                 "expected a JAVA_PARSE_ERROR fatal error with the workspace-relative path: " + errors);
 
-        // graph record は 1 件も出力しない (partial mode なし)。
         assertEquals(0, ran.byType("methodSymbol").size());
         assertEquals(0, ran.byType("callEdge").size());
         assertEquals(0, ran.byType("diagnostic").size());
@@ -51,12 +46,11 @@ class DiagnosticsTest {
                         "JAVA_UNRESOLVED_SYMBOL".equals(d.get("code")) && "warning".equals(d.get("severity"))),
                 "expected JAVA_UNRESOLVED_SYMBOL/warning diagnostic: " + diagnostics);
 
-        // 未解決の呼び出しに対して callEdge を作らないこと。
         List<Map<String, Object>> edges = ran.byType("callEdge");
         assertTrue(edges.stream().noneMatch(e -> "java:com.example.Ok#run()".equals(e.get("callerMethodId"))),
                 "unresolved call must not produce a callEdge: " + edges);
 
-        // Ok#run() 自体は宣言済み method として列挙され続けること (宣言側の列挙は影響を受けない)。
+        // 宣言の列挙は、呼び出しの解決の失敗に影響されない。
         List<Map<String, Object>> nodes = ran.byType("methodSymbol");
         assertTrue(nodes.stream().anyMatch(n -> "java:com.example.Ok#run()".equals(n.get("methodId"))));
     }

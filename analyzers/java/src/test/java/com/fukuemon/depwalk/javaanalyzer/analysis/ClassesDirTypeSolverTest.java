@@ -19,12 +19,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * metadata 契約は classpath entry として「依存 jar」だけでなく「classes dir (コンパイル済み
- * .class ファイルの directory)」も許容する。{@link javax.tools.JavaCompiler} で小さなクラスを
- * classes dir へコンパイルし、{@link com.fukuemon.depwalk.javaanalyzer.analysis.context.TypeSolverFactory}
- * がそれを解決できることを確認する。
- */
 @DisplayName("classpath entry としての classes directory の型解決")
 class ClassesDirTypeSolverTest {
 
@@ -85,7 +79,6 @@ class ClassesDirTypeSolverTest {
                 null,
                 null);
 
-        // scope 内 call が未解決のまま残る request は成功にしない。
         assertEquals(1, ran.exitCode(), ran.stderr());
         assertTrue(ran.byType("error").stream()
                 .anyMatch(record -> "JAVA_INCOMPLETE_ANALYSIS".equals(record.get("code"))),

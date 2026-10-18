@@ -14,11 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * framework entry point 分類の検証。対象アノテーション付きメソッドは
- * {@code methodSymbol.metadata.entryPoint} (sort 済み FQN 配列) の標識を持ち、
- * edge は増えない。合成アノテーションは meta 1 段までだけ検出する。
- */
 @DisplayName("framework entry point の分類標識")
 class EntryPointClassificationTest {
 
@@ -60,7 +55,6 @@ class EntryPointClassificationTest {
         assertEquals(
                 List.of("org.springframework.web.bind.annotation.PostMapping"),
                 entryPointOf(ran, "java:com.example.Uses#composedEntry()"));
-        // meta 2 段は設計上検出不能: 標識も診断も出ない。
         assertNull(entryPointOf(ran, "java:com.example.Uses#twoLevels()"));
         assertTrue(ran.byType("diagnostic").stream().noneMatch(diagnostic ->
                         "java:com.example.Uses#twoLevels()".equals(diagnostic.get("relatedMethodId"))),
@@ -111,14 +105,13 @@ class EntryPointClassificationTest {
                 "entry point classification must not add edges: " + edgePairs);
     }
 
-    @SuppressWarnings("unchecked")
     private static List<String> entryPointOf(AnalysisTestSupport.Ran ran, String methodId) {
         Map<String, Object> node = ran.byType("methodSymbol").stream()
                 .filter(record -> methodId.equals(record.get("methodId")))
                 .findFirst()
                 .orElse(null);
         assertNotNull(node, "methodSymbol not found: " + methodId);
-        Map<String, Object> metadata = (Map<String, Object>) node.get("metadata");
+        Map<String, Object> metadata = AnalysisTestSupport.field(node, "metadata");
         if (metadata == null) {
             return null;
         }
@@ -127,6 +120,6 @@ class EntryPointClassificationTest {
             return null;
         }
         assertTrue(entryPoint instanceof List, "entryPoint must be a list: " + entryPoint);
-        return (List<String>) entryPoint;
+        return AnalysisTestSupport.field(metadata, "entryPoint");
     }
 }

@@ -13,10 +13,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Spring DI 候補解決の ancestor 収集が best-effort であることの検証。
- * 実装 class の ancestor に解決できないものが混ざっても、解決できた ancestor は
- * 生き残る: 解決不能な外部基底を extends する impl も、workspace の interface の
- * bean 候補になる (module を跨ぐ場合を含む)。
+ * 実装 class の ancestor に解決できないものが混ざっても、解決できた ancestor は捨てない。
  */
 @DisplayName("Spring DI 候補解決における祖先型 (ancestor) 収集の best-effort 動作")
 class DiCandidateAncestorTest {
@@ -43,7 +40,6 @@ class DiCandidateAncestorTest {
         appClasses = Files.createDirectories(workspace.resolve("app/classes"));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("解決できない外部基底を extends する別 module の実装 class でも、workspace の interface の bean 候補のままになる")
     void crossModuleImplWithUnresolvableAncestorBecomesBeanCandidate() throws Exception {
@@ -120,8 +116,8 @@ class DiCandidateAncestorTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError(
                         "candidate edge to the cross-module impl is missing: " + ran.byType("callEdge")));
-        Map<String, Object> metadata = (Map<String, Object>) candidateEdge.get("metadata");
-        assertTrue(((List<String>) metadata.get("provenance")).contains("spring-di"), metadata.toString());
+        Map<String, Object> metadata = AnalysisTestSupport.field(candidateEdge, "metadata");
+        assertTrue(((List<?>) metadata.get("provenance")).contains("spring-di"), metadata.toString());
     }
 
     private List<MultiContextAnalysisTestSupport.Project> projects() {

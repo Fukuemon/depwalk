@@ -10,12 +10,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * record の compact constructor ({@code record User(String name) { User { validate(); } }}) を
- * canonical constructor として扱う。signature は record component の erasure 型列とし、内部の
- * 呼び出しはその {@code <init>} を caller とする。record の通常 ctor (compact constructor なし) /
- * component accessor との整合も確認する。
- */
 @DisplayName("record の compact constructor の canonical constructor としての扱い")
 class RecordConstructorTest {
 

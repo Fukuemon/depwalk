@@ -10,11 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * include / exclude glob の separator 正規化: Windows の {@code \} 区切り相対 path でも
- * {@code com/example/**} 形式の glob と一致するよう、照合前に {@code /} 区切りへ正規化する。
- * (macOS / Linux の {@code /} 区切り入力の挙動は不変。)
- */
 @DisplayName("include / exclude glob 照合前の path separator 正規化")
 class ScopeFilesTest {
 

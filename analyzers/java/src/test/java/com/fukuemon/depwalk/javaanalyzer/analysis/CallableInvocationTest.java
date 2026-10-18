@@ -13,11 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * callable invocation edge の検証。
- * functional interface の呼び出しは、静的追跡スコープ (同一メソッド内の local と、
- * workspace メソッドの parameter への 1 hop 引数渡し) の範囲で、渡された callable
- * へ edge を張る。スコープ外の SAM invocation は全般に、edge を推測せず advisory の
- * {@code JAVA_CALLABLE_UNRESOLVED} (info) で表面化する。
+ * 追跡する範囲は、同じメソッドの中の local と、workspace のメソッドの parameter へ 1 hop で渡した
+ * callable に限る。範囲の外の functional interface の呼び出しは、呼び出し先を推測せず、info の
+ * {@code JAVA_CALLABLE_UNRESOLVED} で表に出す。
  */
 @DisplayName("渡された callable への呼び出し関係 (edge) の生成")
 class CallableInvocationTest {
@@ -39,8 +37,7 @@ class CallableInvocationTest {
         assertEquals(0, ran.exitCode(), ran.stderr());
         assertTrue(ran.stderr().contains("silentOmission=0"), ran.stderr());
 
-        // retry へは 2 つの call site が別々の callable を渡す。invocation はその
-        // 渡された callee だけを列挙し、anchor は retry 内の invocation site になる。
+        // retry へは 2 つの call site が別々の callable を渡す。
         List<Map<String, Object>> retryEdges = ran.byType("callEdge").stream()
                 .filter(edge -> RETRY.equals(edge.get("callerMethodId"))
                         && Boolean.TRUE.equals(metadataOf(edge).get("viaCallableInvocation")))
@@ -50,8 +47,7 @@ class CallableInvocationTest {
                 retryEdges.stream().map(edge -> (String) edge.get("calleeMethodId")).sorted().toList(),
                 "retry must enumerate exactly the passed callables: " + retryEdges);
         for (Map<String, Object> edge : retryEdges) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> callSite = (Map<String, Object>) edge.get("callSite");
+            Map<String, Object> callSite = AnalysisTestSupport.field(edge, "callSite");
             assertEquals("com/example/Retry.java", callSite.get("path"),
                     "the edge anchor is the invocation site inside retry: " + edge);
         }
@@ -62,8 +58,7 @@ class CallableInvocationTest {
     void sameMethodLocalsLinkLambdaToSelfAndReferenceToTarget() throws Exception {
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
 
-        // local lambda の本体は囲みメソッド自身に属するので、invocation は
-        // 標識付きの自己 edge になる (本体 ⊂ この node)。
+        // local の lambda の本体は囲んでいるメソッドの node に含まれるので、呼び出しは自分自身への edge になる。
         assertTrue(callableEdge(ran, USE_LOCAL_LAMBDA, USE_LOCAL_LAMBDA).isPresent(),
                 "local lambda invocation must self-link: " + ran.byType("callEdge"));
         assertTrue(callableEdge(ran, USE_LOCAL_REFERENCE, STATIC_HELPER).isPresent(),
@@ -124,11 +119,10 @@ class CallableInvocationTest {
     @Test
     @DisplayName("functional でない interface の呼び出しは、callable 追跡の対象にも補助診断の対象にもならず、通常の呼び出し関係 (edge) のままになる")
     void plainInterfaceCallsAreNeitherTrackedNorDiagnosed() throws Exception {
-        // functional でない interface (注入された service 等) の呼び出しは、追跡と
-        // advisory 診断のどちらにも入れない (ノイズ回帰の防止)。
+        // 注入した service のような普通の interface の呼び出しを診断に入れると、診断が雑音で埋まる。
         AnalysisTestSupport.Ran ran = AnalysisTestSupport.run(FIXTURE, AnalysisTestSupport.classpathMetadata());
         assertEquals(0, ran.exitCode(), ran.stderr());
-        // 解析自体は動いており、呼び出しは通常 edge として残る (空振り防止の正の検証)。
+        // 解析が動かずに通ってしまう誤りを防ぐため、通常の edge が出ていることも確かめる。
         assertTrue(ran.byType("callEdge").stream().anyMatch(edge ->
                         "java:com.example.PlainInterfaceUse#call()".equals(edge.get("callerMethodId"))
                                 && "java:com.example.NonFunctional#first()".equals(edge.get("calleeMethodId"))

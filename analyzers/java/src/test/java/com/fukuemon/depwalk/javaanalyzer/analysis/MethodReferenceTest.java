@@ -12,10 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * method reference ({@code this::toDto} / {@code Foo::bar} / {@code Foo::new}) の call graph 化。
- * lambda と同じく囲みメソッドへ帰属させ、{@code callEdge.metadata.viaMethodReference: true} で
- * 標識する。constructor reference は通常の object creation と同じ帰属規則を適用し、scope 外参照を
- * 出力しないことも確認する。
+ * method reference は、lambda と同じく囲んでいるメソッドへ帰属させる。constructor reference には、
+ * 通常の object creation と同じ帰属の規則を当てる。
  */
 @DisplayName("method reference の call graph 化 (viaMethodReference 標識)")
 class MethodReferenceTest {

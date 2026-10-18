@@ -10,7 +10,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** daemon JVM major の静的判定 (JVM 非起動) の境界。 */
 @DisplayName("JVM を起動せずに java home から daemon JVM の major を判定する境界")
 class GradleToolingClientJavaHomeTest {
 

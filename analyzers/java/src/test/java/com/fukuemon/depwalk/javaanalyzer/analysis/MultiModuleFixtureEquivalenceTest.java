@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -121,7 +122,7 @@ class MultiModuleFixtureEquivalenceTest {
         List<Map<String, Object>> records = new ArrayList<>();
         for (String line : stdout.split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, Map.class));
+                records.add(mapper.readValue(line, new TypeReference<Map<String, Object>>() { }));
             }
         }
         return new Run(exit, records, stderr);
@@ -186,12 +187,9 @@ class MultiModuleFixtureEquivalenceTest {
         Run run = analyze(request);
 
         assertEquals(0, run.exitCode(), run.stderr());
-        // include glob は workspace 相対 path (module directory を含む) で判定される。
-        // sourceLocation を持たない record (bytecode-only member 等) も methodId の
-        // 所属 package で repository scope 内であることを検証する。
+        // sourceLocation を持たない record (bytecode-only member など) は、methodId の package で確かめる。
         for (Map<String, Object> method : methodSet(run)) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> location = (Map<String, Object>) method.get("sourceLocation");
+            Map<String, Object> location = AnalysisTestSupport.field(method, "sourceLocation");
             if (location != null) {
                 assertTrue(((String) location.get("path")).startsWith("repository/"),
                         "include repository/** must restrict the scope by path: " + method);
@@ -206,15 +204,13 @@ class MultiModuleFixtureEquivalenceTest {
                 methods.toString());
     }
 
-    @SuppressWarnings("unchecked")
     private void assertExpectedGraph(Run run) throws Exception {
-        // 固定期待集合は testdata の expected/graph.json に置く。
         Map<String, Object> expected = new ObjectMapper()
-                .readValue(fixture.resolve("expected/graph.json").toFile(), Map.class);
+                .readValue(fixture.resolve("expected/graph.json").toFile(), new TypeReference<Map<String, Object>>() { });
         Map<String, Map<String, Object>> methodsById = methodSet(run).stream()
                 .collect(Collectors.toMap(m -> (String) m.get("methodId"), m -> m));
-        List<Map<String, Object>> expectedMethods = (List<Map<String, Object>>) expected.get("methods");
-        List<Map<String, Object>> expectedEdges = (List<Map<String, Object>>) expected.get("edges");
+        List<Map<String, Object>> expectedMethods = AnalysisTestSupport.field(expected, "methods");
+        List<Map<String, Object>> expectedEdges = AnalysisTestSupport.field(expected, "edges");
         // expected/graph.json は完全集合。件数一致で包含検査を集合一致へ引き上げる。
         assertEquals(expectedMethods.size(), methodsById.size(), () -> methodsById.keySet().toString());
         assertEquals(expectedEdges.size(), edgeSet(run).size(), () -> edgeSet(run).toString());
@@ -222,7 +218,7 @@ class MultiModuleFixtureEquivalenceTest {
             String methodId = (String) expectedMethod.get("methodId");
             Map<String, Object> actual = methodsById.get(methodId);
             assertTrue(actual != null, () -> "missing " + methodId + " in " + methodsById.keySet());
-            Map<String, Object> location = (Map<String, Object>) actual.get("sourceLocation");
+            Map<String, Object> location = AnalysisTestSupport.field(actual, "sourceLocation");
             assertTrue(location != null, () -> "method without sourceLocation: " + methodId);
             assertEquals(expectedMethod.get("sourceLocation"), location.get("path"), methodId);
         }
@@ -239,8 +235,7 @@ class MultiModuleFixtureEquivalenceTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("missing edge " + caller + " -> " + callee));
         if (resolution != null) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> metadata = (Map<String, Object>) edge.get("metadata");
+            Map<String, Object> metadata = AnalysisTestSupport.field(edge, "metadata");
             assertEquals(resolution, metadata.get("resolution"), edge.toString());
             assertTrue(((List<?>) metadata.get("provenance")).contains("spring-di"), edge.toString());
         }

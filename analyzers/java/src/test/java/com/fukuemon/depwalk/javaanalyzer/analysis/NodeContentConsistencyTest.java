@@ -12,13 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * putIfAbsent (first-wins) 検証: 同一 {@code methodId} の node がどの経路 (宣言列挙 / call site 由来 /
- * synthetic default constructor) から生成されても同一内容になること。
- *
- * <p>fixture は「A.java (path 昇順で先) が {@code new B()} を呼び、B.java は constructor 宣言を持たず
- * field initializer で default constructor node が必要になる」構成。修正前は call site 由来の
- * synthetic default constructor ({@code toAst()} 空) が sourceLocation 無しで先に登録され、
- * B.java 由来の sourceLocation 付き node が first-wins で捨てられていた。
+ * fixture は、path の昇順で先の A.java が {@code new B()} を呼び、B.java は constructor を宣言せず
+ * field initializer を持つ構成である。call site から作る default constructor の node は
+ * ({@code toAst()} が空なので) sourceLocation を持たず、先に登録されると、B.java から作る
+ * sourceLocation 付きの node が first-wins で捨てられる。
  */
 @DisplayName("同一 methodId の node 内容の一貫性 (first-wins 登録)")
 class NodeContentConsistencyTest {

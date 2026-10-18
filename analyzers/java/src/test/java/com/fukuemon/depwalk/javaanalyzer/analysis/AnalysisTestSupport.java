@@ -1,5 +1,6 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fukuemon.depwalk.javaanalyzer.Main;
 
@@ -17,16 +18,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * unit test 用の支援 class。次の 3 役を担う。
- * <ol>
- *   <li>実行: {@code analysisRequest} を組み立てて {@link Main#run} を実行する
- *       ({@link #run})。</li>
- *   <li>fixture compile: fixture source を javac で compile して classes output を
- *       作る ({@link #compileFixture} / {@link #writeSource})。</li>
- *   <li>record 参照: stdout の JSONL を {@code Map} のリストとして返し
- *       ({@link Ran#byType} の判定は {@code recordType} フィールド)、record の
- *       {@code metadata} 取り出し ({@link #metadataOf}) を提供する。</li>
- * </ol>
+ * analysis の test が共有する補助。{@code analysisRequest} を組み立てて {@link Main#run} を実行し、
+ * stdout の JSONL を {@code Map} の record として返す。fixture の source を javac で compile する。
  */
 final class AnalysisTestSupport {
 
@@ -48,7 +41,6 @@ final class AnalysisTestSupport {
      */
     static final String FIXTURE_RELEASE = "25";
 
-    /** include / exclude / entrypoints / analysisMode を使わない基本形。 */
     static Ran run(Path workspaceRoot, Map<String, Object> metadata) throws Exception {
         return run(workspaceRoot, metadata, null, null, null, null);
     }
@@ -66,7 +58,7 @@ final class AnalysisTestSupport {
         request.put("recordType", "analysisRequest");
         request.put("requestId", "test-request");
         request.put("workspaceRoot", workspaceRoot.toAbsolutePath().toString());
-        // unit test は明示 root 経路 (sourceRoots) を使う。
+        // Gradle の discovery を走らせないため、source root を明示する。
         request.put("sourceRoots", List.of("."));
         request.put("language", "java");
         if (include != null) {
@@ -94,7 +86,7 @@ final class AnalysisTestSupport {
         String stdoutText = stdout.toString(StandardCharsets.UTF_8);
         for (String line : stdoutText.split("\n")) {
             if (!line.isBlank()) {
-                records.add(mapper.readValue(line, Map.class));
+                records.add(mapper.readValue(line, new TypeReference<Map<String, Object>>() { }));
             }
         }
         return new Ran(exitCode, records, stderr.toString(StandardCharsets.UTF_8));
@@ -133,8 +125,7 @@ final class AnalysisTestSupport {
             writeSource(buildDir, source.getKey(), source.getValue());
             args.add(buildDir.resolve(source.getKey()).toString());
         }
-        // javac の診断出力を capture し、失敗時に原因 (compile error の本文) が
-        // 見えるようにする (rc だけでは何が壊れたか分からない)。
+        // rc だけでは何が壊れたか分からないので、javac の診断を失敗の message に載せる。
         ByteArrayOutputStream compilerOut = new ByteArrayOutputStream();
         ByteArrayOutputStream compilerErr = new ByteArrayOutputStream();
         int rc = ToolProvider.getSystemJavaCompiler()
@@ -151,10 +142,20 @@ final class AnalysisTestSupport {
         Files.writeString(file, source);
     }
 
-    /** edge / node record の {@code metadata} (無ければ空 Map)。 */
-    @SuppressWarnings("unchecked")
+    /** edge / node record の {@code metadata} を返す。無ければ空の Map を返す。 */
     static Map<String, Object> metadataOf(Map<String, Object> record) {
-        Map<String, Object> metadata = (Map<String, Object>) record.get("metadata");
+        Map<String, Object> metadata = field(record, "metadata");
         return metadata == null ? Map.of() : metadata;
+    }
+
+    /**
+     * record の {@code key} の値を、代入先の型として返す。値が無ければ null を返す。
+     * 値が代入先の型でなければ、使った時点で {@link ClassCastException} になる。
+     */
+    // Jackson は JSON の object と array を型引数のない Map と List で返すので、
+    // 型引数を付ける cast は検査できない。抑制はこのメソッドだけに置く。
+    @SuppressWarnings("unchecked")
+    static <T> T field(Map<?, ?> record, String key) {
+        return (T) record.get(key);
     }
 }
