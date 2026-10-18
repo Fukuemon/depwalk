@@ -31,7 +31,8 @@ func NewAdapter(command analyzer.Command) *Adapter {
 //
 // 要求が protocol の検証に通らないときは、process を起動せずに
 // [analyze.InputError] を返す。process を起動できないときと stdio が失敗したときも
-// error を返す。Analyzer が報告した失敗と stdout の検証の失敗は error ではなく
+// error を返す。requestId を生成できないときも error を返す。error record、
+// error record のない非ゼロの exit、stdout の検証の失敗は、error ではなく
 // [analyze.Outcome] に入れて返す。
 func (a *Adapter) Run(
 	request analyze.Request,

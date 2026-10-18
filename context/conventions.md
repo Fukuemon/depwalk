@@ -125,7 +125,7 @@ Git のフックで動かすコマンドは `lefthook.yml` にある。
 チェックの内容と直し方は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。  
 lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数のコマンドは `&&` でつなぐ。  
 `hooks/` には、lefthook が呼ぶフックのスクリプト（保護するブランチの確認、commit-msg の issue 番号の付与）を置く。  
-`lefthook.yml` を書くときのほかの注意（`stage_fixed`、depguard の glob）は、`lefthook.yml` のコメントにある。
+`lefthook.yml` を書くときのほかの注意（`stage_fixed`、`go-lint` の glob）は、`lefthook.yml` のコメントにある。
 
 ## Check Exclusions
 

@@ -7,7 +7,7 @@ name: Spec closeout
 # 前提: Settings → Actions → General で "Allow GitHub Actions to create and approve pull requests"
 # を有効にする (未設定は Open deletion PR step が検出して案内する)。Workflow permissions
 # (default_workflow_permissions) は Read のままでよい — contents: write は下の permissions 宣言で
-# 足りている (実測)。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
+# 足りている。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
 # マージするまで発火しない。
 #
 # secret CLOSEOUT_PR_TOKEN (任意、contents:write / pull-requests:write を持つ PAT):

@@ -55,9 +55,8 @@ func TestUnresolvedCallPatternsCLI(t *testing.T) {
 	itemGetName := "java:com.example.pat.lib.Item#getName()"
 	baseTaskCtor := "java:com.example.pat.lib.BaseTask#<init>(java.lang.String)"
 
-	// getName には 4 つの caller が到達する (cross-module のコンストラクタ、
-	// generics 付き var、fluent chain の先頭、method reference)。
-	// コンストラクタ側の caller は 2 つ。
+	// getName には 3 つの caller (cross-module、generics 付き var、method reference) が、
+	// コンストラクタには 2 つの caller (cross-module、fluent chain の先頭) が到達する。
 	if got := len(edges[itemCtor]); got < 2 {
 		t.Errorf("Item ctor edges = %d, want >= 2 (cross-module, fluent chain head): %v", got, edges[itemCtor])
 	}
