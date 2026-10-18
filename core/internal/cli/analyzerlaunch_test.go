@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -41,6 +42,9 @@ func TestResolveAnalyzerCommand(t *testing.T) {
 			got, err := resolveAnalyzerCommand(tt.flagValue, getenv)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("resolveAnalyzerCommand() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && !errors.As(err, new(*inputError)) {
+				t.Fatalf("resolveAnalyzerCommand() error = %v, want *inputError", err)
 			}
 			if got != tt.want {
 				t.Fatalf("resolveAnalyzerCommand() = %q, want %q", got, tt.want)
@@ -128,6 +132,9 @@ func TestSplitAnalyzerCommand(t *testing.T) {
 			got, err := splitAnalyzerCommand(tt.command)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("splitAnalyzerCommand() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && !errors.As(err, new(*inputError)) {
+				t.Fatalf("splitAnalyzerCommand() error = %v, want *inputError", err)
 			}
 			if tt.wantErr {
 				return

@@ -12,7 +12,23 @@ func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "depwalk",
 		Short: "Analyze dependency paths in source code",
+		// 未知のサブコマンドを入力の誤りにするため、引数を自前で検証する。
+		// Args を与えると Cobra は未知のサブコマンドを root への引数として渡すので、
+		// 引数なしで呼ばれたときに help を出す RunE も要る。
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return invalidInput("unknown command %q for %q", args[0], cmd.CommandPath())
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
 	}
+	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		cmd.SilenceUsage = true
+		return &inputError{err: err}
+	})
 	root.AddCommand(newAnalyzeCommand())
 	return root
 }

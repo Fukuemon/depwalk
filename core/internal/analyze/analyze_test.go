@@ -139,8 +139,9 @@ func TestRunRejectsInvalidAnalyzerMetaBeforeCallingTheSource(t *testing.T) {
 		Language:      "java",
 		AnalyzerMeta:  []string{"missing-equals"},
 	})
-	if err == nil {
-		t.Fatal("Run() error = nil, want metadata validation error")
+	var inputErr *InputError
+	if !errors.As(err, &inputErr) {
+		t.Fatalf("Run() error = %v, want *InputError", err)
 	}
 	if source.called {
 		t.Fatal("source was called, want validation to fail first")

@@ -1,10 +1,6 @@
 package cli
 
-import (
-	"errors"
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // analyzerCmdEnv は Analyzer 起動コマンドを指定する環境変数。
 // DEPWALK_ 名前空間に置く。
@@ -24,7 +20,7 @@ func resolveAnalyzerCommand(flagValue string, getenv func(string) string) (strin
 			return envValue, nil
 		}
 	}
-	return "", fmt.Errorf("analyzer command is required: set --analyzer-cmd or %s", analyzerCmdEnv)
+	return "", invalidInput("analyzer command is required: set --analyzer-cmd or %s", analyzerCmdEnv)
 }
 
 // isEscapableRune は r が「引用符の外で backslash が escape できる文字」かを返す
@@ -102,12 +98,12 @@ func splitAnalyzerCommand(command string) ([]string, error) {
 	}
 
 	if quote != 0 {
-		return nil, fmt.Errorf("analyzer command has an unterminated %c quote", quote)
+		return nil, invalidInput("analyzer command has an unterminated %c quote", quote)
 	}
 	flush()
 
 	if len(words) == 0 {
-		return nil, errors.New("analyzer command must not be empty")
+		return nil, invalidInput("analyzer command must not be empty")
 	}
 	return words, nil
 }
