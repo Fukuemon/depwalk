@@ -66,13 +66,10 @@ final class CallableInvocationEdgeEmitter {
     }
 
     /**
-     * functional interface の invocation site から、渡された callable 実体への edge を
-     * 生成する。追跡範囲は (1) 同一メソッド内の local 変数 (再代入なし・
-     * lambda / method reference の直接 initializer) と (2) workspace メソッドの
-     * parameter への引数渡し 1 段。field 経由は JAVA_CALLABLE_UNRESOLVED (info) の
-     * advisory 診断に残す。callee は method reference → 参照先、lambda → 定義側の
-     * 囲みメソッドで、`viaCallableInvocation: true` を標識する。到達可能 context の
-     * callee のみ対象 (external / 非依存 context へは張らない)。
+     * local 変数は、再代入がなく initializer が lambda か method reference のものだけを追う。field を
+     * 経由する receiver は追わない。callee は、method reference なら参照先、lambda なら定義した側の
+     * 囲みメソッドとし、edge に {@code viaCallableInvocation: true} を付ける。到達可能な context に
+     * ない callee へは edge を出さない。
      *
      * @param invoked {@code mce} の解決結果。resolve は呼び出し側が 1 回だけ行い、ここでは
      *     再び resolve しない

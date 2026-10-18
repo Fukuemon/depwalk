@@ -29,8 +29,8 @@ import java.util.function.BiFunction;
  * 宣言型への edge を出した call site に、実行時に呼ばれうる実装の候補への edge を足す。
  *
  * <p>候補は、receiver の静的型の制約から引いた型階層の実装と、Spring DI で注入される bean の実装を
- * call site ごとに統合して決める。宣言型への edge の出力と、call site の終端の ledger への記録は
- * しない。それは {@link CallGraphBuilder} が先に済ませている。
+ * call site ごとに統合して決める。宣言型への edge の出力と ledger への記録は、呼び出す側が先に
+ * 済ませている。
  */
 final class DispatchCandidateEdgeEmitter {
 

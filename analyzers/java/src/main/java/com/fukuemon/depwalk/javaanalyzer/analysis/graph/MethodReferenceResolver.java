@@ -31,8 +31,9 @@ import java.util.Map;
 final class MethodReferenceResolver {
 
     /**
-     * call site 1 件の終端を ledger に記録する操作。edge を出す操作は、callee の node と edge も積む。
-     * どの操作も、呼ばれた call site の終端を 1 つだけ記録する。
+     * call site 1 件の終端を ledger に記録する操作。どの操作も、呼ばれた call site の終端を 1 つだけ
+     * 記録する。edge を出す操作は、emitted を記録するときに callee の node と edge も積み、除外を
+     * 記録するときは何も積まない。
      */
     interface CallSiteRecorder {
 
@@ -53,14 +54,17 @@ final class MethodReferenceResolver {
         /** resolve できなかった call site を、分類の結果に応じた終端で記録する。 */
         void recordResolutionFailure(
                 Node callNode, CallSiteId.CallKind kind, CallGraphBuilder.WalkContext ctx,
-                UnresolvedCallClassifier.Classification classification, CallGraphBuilder.PendingDiagnostic pending);
+                UnresolvedCallClassifier.Classification classification, PendingDiagnostic pending);
 
         /** 解決できなかった call site を、diagnostic と ledger の両方に記録する。 */
         void reportAndCommitUnresolved(
                 Node callNode, CallSiteId.CallKind kind, CallGraphBuilder.WalkContext ctx, String reason,
                 String target, Map<String, Object> diagnosticMetadata);
 
-        /** solver が合成した、または AST へ注入した bytecode-only member への edge を足す。 */
+        /**
+         * solver が合成した、または AST へ注入した bytecode-only member への edge を足し、emitted を記録する。
+         * owner が scope の外なら edge を出さず、external の除外を記録する。
+         */
         void emitBytecodeOnlyMember(
                 Node callNode, CallSiteId.CallKind kind, CallGraphBuilder.WalkContext ctx,
                 SootUpTypeHierarchyIndex.MethodCandidate candidate, String nameToken, String symbolKind);
@@ -113,18 +117,18 @@ final class MethodReferenceResolver {
         try {
             resolved = mre.resolve();
         } catch (RuntimeException e) {
-            CallGraphBuilder.rethrowUnlessIsolableResolutionFailure(e);
+            ResolutionFailures.rethrowUnlessIsolable(e);
             recorder.recordResolutionFailure(
                     mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
                     unresolvedCallClassifier.classifyMethodReference(mre, () -> inferFunctionalInterfaceArity(mre)),
-                    new CallGraphBuilder.PendingDiagnostic(
+                    new PendingDiagnostic(
                             "unresolved-method-reference", mre.getIdentifier(),
                             () -> diagnostics.metadataOf(
                                     UnresolvedDiagnostics.PHASE_BYTECODE_RESCUE, e, mre.getScope(), null)));
             return;
         }
 
-        SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = CallGraphBuilder.bytecodeOnlyCandidate(resolved);
+        SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = BytecodeOnlyDeclarations.methodCandidate(resolved);
         if (bytecodeOnly != null) {
             recorder.emitBytecodeOnlyMember(
                     mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,
@@ -206,7 +210,7 @@ final class MethodReferenceResolver {
         }
 
         SootUpTypeHierarchyIndex.MethodCandidate injectedCtor =
-                CallGraphBuilder.injectedConstructorCandidate(resolvedCtor);
+                BytecodeOnlyDeclarations.constructorCandidate(resolvedCtor);
         if (injectedCtor != null) {
             recorder.emitBytecodeOnlyMember(
                     mre, CallSiteId.CallKind.METHOD_REFERENCE, ctx,

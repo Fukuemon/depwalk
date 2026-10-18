@@ -2,7 +2,6 @@ package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
 import com.fukuemon.depwalk.javaanalyzer.JavaDiagnosticCode;
 import com.fukuemon.depwalk.javaanalyzer.analysis.attribution.AttributionResolver;
-import com.fukuemon.depwalk.javaanalyzer.analysis.augment.SynthesizedBytecodeMethodDeclaration;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.AnalysisGapLedger;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteId;
 import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.CallSiteInventory;
@@ -37,8 +36,6 @@ import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
 import com.github.javaparser.resolution.declarations.ResolvedConstructorDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserConstructorDeclaration;
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -171,7 +168,7 @@ public final class CallGraphBuilder {
         walk(cu, new WalkContext(null, List.of(), false));
     }
 
-    // package-private: EventEdgeEmitter が walk の文脈 (囲み型 / caller) をそのまま受け取る。
+    // 呼び出しの種類ごとに処理を分けた class が、walk の文脈をそのまま受け取るため package-private にする。
     record WalkContext(Node enclosingTypeNode, List<String> callerMethodIds, boolean viaLambda) {
         WalkContext withCaller(List<String> callerIds) {
             return new WalkContext(enclosingTypeNode, callerIds, viaLambda);
@@ -370,7 +367,7 @@ public final class CallGraphBuilder {
         } catch (RuntimeException e) {
             // resolve に失敗した call は callable invocation 追跡の対象外
             // (CallableInvocationEdgeEmitter は解決済み宣言を前提とする)。
-            rethrowUnlessIsolableResolutionFailure(e);
+            ResolutionFailures.rethrowUnlessIsolable(e);
             recordResolutionFailure(
                     mce, CallSiteId.CallKind.METHOD_CALL, ctx,
                     unresolvedCallClassifier.classifyMethodCall(mce, ctx.enclosingTypeNode()),
@@ -383,7 +380,7 @@ public final class CallGraphBuilder {
         }
         callableInvocations.emit(mce, ctx, resolved);
 
-        SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = bytecodeOnlyCandidate(resolved);
+        SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnly = BytecodeOnlyDeclarations.methodCandidate(resolved);
         if (bytecodeOnly != null) {
             // 型名 scope の static call を instance の合成 / 注入 member で解決しない
             // (usage 経路は staticOnly を持たず、JavaParser は AST member の static 性を
@@ -431,7 +428,7 @@ public final class CallGraphBuilder {
         try {
             resolved = oce.resolve();
         } catch (RuntimeException e) {
-            rethrowUnlessIsolableResolutionFailure(e);
+            ResolutionFailures.rethrowUnlessIsolable(e);
             recordResolutionFailure(
                     oce, CallSiteId.CallKind.OBJECT_CREATION, ctx,
                     unresolvedCallClassifier.classifyObjectCreation(oce),
@@ -449,7 +446,7 @@ public final class CallGraphBuilder {
         try {
             resolved = ecis.resolve();
         } catch (RuntimeException e) {
-            rethrowUnlessIsolableResolutionFailure(e);
+            ResolutionFailures.rethrowUnlessIsolable(e);
             recordResolutionFailure(
                     ecis, CallSiteId.CallKind.EXPLICIT_CONSTRUCTOR_INVOCATION, ctx,
                     unresolvedCallClassifier.classifyExplicitConstructorInvocation(ecis, ctx.enclosingTypeNode()),
@@ -472,7 +469,7 @@ public final class CallGraphBuilder {
             commitExcluded(callNode, kind, ctx, attribution);
             return;
         }
-        SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = injectedConstructorCandidate(resolved);
+        SootUpTypeHierarchyIndex.MethodCandidate injectedCtor = BytecodeOnlyDeclarations.constructorCandidate(resolved);
         if (injectedCtor != null) {
             emitBytecodeOnlyMember(
                     callNode, kind, ctx, injectedCtor, MethodIds.CONSTRUCTOR_TOKEN, "constructor");
@@ -572,16 +569,6 @@ public final class CallGraphBuilder {
             Map<String, Object> diagnosticMetadata) {
         diagnostics.reportUnresolved(callNode, ctx.callerMethodIds(), diagnosticMetadata);
         commitDiagnostic(callNode, kind, ctx, reason, target, diagnosticMetadata);
-    }
-
-    /**
-     * 分類が救済にも external にも至らなかったときに、diagnostic と ledger に残す内容。
-     *
-     * @param reason ledger の reason
-     * @param target ledger の target
-     * @param metadata 診断の metadata。diagnostic に残すときだけ評価する
-     */
-    record PendingDiagnostic(String reason, String target, Supplier<Map<String, Object>> metadata) {
     }
 
     /**
@@ -704,29 +691,6 @@ public final class CallGraphBuilder {
                 symbolKind);
     }
 
-    /** 解決結果が AST 注入の bytecode-only constructor ならその candidate。 */
-    static SootUpTypeHierarchyIndex.MethodCandidate injectedConstructorCandidate(
-            ResolvedConstructorDeclaration resolved) {
-        if (resolved instanceof JavaParserConstructorDeclaration<?> declaration
-                && InjectedDeclarations.isInjected(declaration.getWrappedNode())) {
-            return declaration.getWrappedNode().getData(InjectedDeclarations.KEY);
-        }
-        return null;
-    }
-
-    /** 解決結果が solver 合成または AST 注入の bytecode-only member ならその candidate。 */
-    static SootUpTypeHierarchyIndex.MethodCandidate bytecodeOnlyCandidate(
-            ResolvedMethodDeclaration resolved) {
-        if (resolved instanceof SynthesizedBytecodeMethodDeclaration synthesized) {
-            return synthesized.candidate();
-        }
-        if (resolved instanceof JavaParserMethodDeclaration declaration
-                && InjectedDeclarations.isInjected(declaration.getWrappedNode())) {
-            return declaration.getWrappedNode().getData(InjectedDeclarations.KEY);
-        }
-        return null;
-    }
-
     /** 救済で採用した bytecode-only member を node と edge として出力し、emitted を記録する。 */
     private void emitBytecodeOnlyCall(
             Node callNode, CallSiteId.CallKind kind, WalkContext ctx, BytecodeRescue.Rescue rescue) {
@@ -763,39 +727,6 @@ public final class CallGraphBuilder {
             accumulator.addEdge(callerId, methodId, callSite, metadata);
         }
         commitEmitted(callNode, kind, ctx);
-    }
-
-    /**
-     * 要素単位に隔離可能と確認済みの resolution failure だけを diagnostic 経路へ
-     * 通し、それ以外の RuntimeException は request fatal (JAVA_INTERNAL_ERROR)
-     * として伝播させる。
-     * LinkageError はここへ来ず
-     * Main の internal error 境界で処理される。
-     */
-    static void rethrowUnlessIsolableResolutionFailure(RuntimeException e) {
-        String packageName = e.getClass().getPackageName();
-        if (packageName.startsWith("com.github.javaparser.resolution")) {
-            return;
-        }
-        // JavaParser 内部 frame を起点とする汎用 RuntimeException
-        // (UnsupportedOperationException / IllegalStateException /
-        // ConcurrentModificationException 等) も、resolve 呼び出し境界で発生する
-        // 限り要素単位に隔離できる library 側 resolution failure として扱う。
-        // JDK collection 内で顕在化するケース (HashMap iterator 等) があるため、
-        // JDK frame を除いた最初の frame で発生元 library を判定する。depwalk
-        // 自身 (合成宣言等) を起点とする例外は analyzer 側バグとして伝播させ、
-        // unresolved diagnostic へ化けさせない。
-        for (StackTraceElement frame : e.getStackTrace()) {
-            String className = frame.getClassName();
-            if (className.startsWith("java.") || className.startsWith("jdk.") || className.startsWith("sun.")) {
-                continue;
-            }
-            if (className.startsWith("com.github.javaparser.")) {
-                return;
-            }
-            break;
-        }
-        throw e;
     }
 
     private List<String> constructorCallerIdsFor(Node enclosingType) {
