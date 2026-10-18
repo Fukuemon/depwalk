@@ -195,7 +195,10 @@ Bean 名は次の規則で導く。
 
 全対象の Java の file を、workspace からの相対 path の決定順で、graph の record を出力する前に parse pre-flight する。  
 1 件でも失敗したら、`JAVA_PARSE_ERROR` を出力して非ゼロで終了する。  
-この record は、最初に失敗した file の location、適用した language level、sanitize した parser の message を持つ。  
+この record は、`message` の 1 つの文字列に、最初に失敗した file の workspace からの相対 path、適用した language level、parser の message を含める。  
+parser が問題の位置を返すときは、parser の message の前に位置を付ける。  
+parser の message は加工せずに含める。  
+この record は `sourceLocation`、`metadata`、`details` を持たない。  
 部分的な parse の mode は v1 では提供しない。  
 pre-flight の AST は file ごとに捨て、成功した後のふつうの解析で再び parse する。
 
@@ -414,6 +417,8 @@ caller は call site を囲むメソッドにし、`provenance` には `spring-e
   - `conditional` と `conditionTypes` で表す。
 - generics を使うイベントの型の突合で、過剰に一致しうる listener（型変数、型引数の付いた parameter）。
   - 突合を raw type の一致で近似するための制約である。
+  - 実行時の条件ではないため、`conditional` と `conditionTypes` は付けない。
+  - ADR-0015: [イベントの edge で、generics で過剰に一致しうる listener も曖昧として扱う](../../../../../../../../../../adr/0015-ambiguous-generic-event-listeners.md)
 - listener の annotation の `condition`（SpEL）属性を持つ listener と、`@TransactionalEventListener` の transaction phase への依存。
   - broadcast の確定性が成り立たないため実行時の条件として扱い、`conditional: true` と `conditionTypes` を付ける。
 

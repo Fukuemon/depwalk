@@ -8,7 +8,7 @@ governs:
   - core/internal/analyze
   - core/internal/analyzer
   - testdata
-verified_commit: d44c349300a64279c33deec4daf393184b19e42c
+verified_commit: 8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333
 ---
 
 # Analyzer Protocol / SPI
@@ -17,7 +17,7 @@ verified_commit: d44c349300a64279c33deec4daf393184b19e42c
 
 Analyzer Protocol / SPI は、Core と Analyzer をつなぐ Analyzer SPI、JSONL の Protocol、Model の schema を定める。  
 Core と Analyzer の唯一の結合点であり、`MethodSymbol`、`CallEdge`、`SourceLocation`、`diagnostic`、`error`、プロセスの契約をここで定義する。  
-新しい言語の Analyzer を足すときに Core を変えずに済むよう、Analyzer の実装者が従う共通の契約を提供する。  
+Analyzer の実装者が従う共通の契約を提供し、新しい言語の Analyzer を足すときの Core の変更を `language` の値の追加に限る。  
 成功条件は [PRD の Success Metrics](../../../PRD.md#success-metrics) にあり、全体の構成は [Design Doc](../../../design/DesignDoc.md#components) にある。  
 ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
 
@@ -75,7 +75,7 @@ sequenceDiagram
 | `recordType`    | 必須      | `analysisRequest`                                                                              |
 | `requestId`     | 必須      | 解析の要求を識別する ID                                                                        |
 | `workspaceRoot` | 必須      | 解析の対象の repository root                                                                   |
-| `language`      | 必須      | 対象の言語。現行は `java` だけ                                                                 |
+| `language`      | 必須      | 対象の言語。Core が許す値の一覧にある値。現行は `java` だけ                                    |
 | `sourceRoots`   | 任意      | `workspaceRoot` からの相対の source root の配列。指定すると Analyzer の discovery を置き換える |
 | `include`       | 任意      | `workspaceRoot` からの相対の path glob の配列                                                  |
 | `exclude`       | 任意      | `workspaceRoot` からの相対の、除外する path glob の配列                                        |
@@ -96,6 +96,12 @@ path の区切りは `/` に正規化し、絶対 path、空文字、`..` を含
 Protocol に module や root の ID は足さない。  
 言語に固有の metadata の必須の条件と discovery の方式は、Analyzer ごとの Design Doc が定める。
 
+`core/internal/protocol` は、`language` に許す値の一覧（`supportedLanguages`）を持つ。  
+Core は、`analysisRequest.language` と `methodSymbol.language` が一覧にない record を invalid にする。  
+新しい言語の Analyzer を足すときは、この一覧に値を 1 つ足す。  
+Core のほかの package は変えない。  
+ADR-0017: [2 つ目以降の言語の Analyzer を足すとき、Core の変更を protocol の許す language の値の追加に限る](../../../adr/0017-limit-core-change-to-language-value.md)
+
 `entrypoints` の各要素は method selector の object とし、`qualifiedName` を必須、`signature` を任意にする。  
 `entrypoints` が未指定か空の配列のとき、Analyzer は scope 全体の call graph の生成の要求として扱う。  
 Core は、Protocol で array や object と定める field を、nil の slice や nil の map から `null` として出力しない。
@@ -114,17 +120,17 @@ Core は、Protocol で array や object と定める field を、nil の slice 
 
 ### methodSymbol
 
-| field            | 必須/任意 | 説明                                               |
-| ---------------- | --------- | -------------------------------------------------- |
-| `schemaVersion`  | 必須      | Protocol のバージョン                              |
-| `recordType`     | 必須      | `methodSymbol`                                     |
-| `methodId`       | 必須      | Analyzer が決定的に生成する stable ID              |
-| `language`       | 必須      | 対象の言語。現行は `java` だけ                     |
-| `symbolKind`     | 必須      | `method`、`constructor`、`function`、`initializer` |
-| `qualifiedName`  | 必須      | 表示と debug のための完全修飾名                    |
-| `signature`      | 必須      | overload を区別できる、正規化した signature        |
-| `sourceLocation` | 任意      | 定義の位置。位置を持てない symbol では省ける       |
-| `metadata`       | 任意      | 言語に固有の情報。Core の graph の構築は依存しない |
+| field            | 必須/任意 | 説明                                                        |
+| ---------------- | --------- | ----------------------------------------------------------- |
+| `schemaVersion`  | 必須      | Protocol のバージョン                                       |
+| `recordType`     | 必須      | `methodSymbol`                                              |
+| `methodId`       | 必須      | Analyzer が決定的に生成する stable ID                       |
+| `language`       | 必須      | 対象の言語。Core が許す値の一覧にある値。現行は `java` だけ |
+| `symbolKind`     | 必須      | `method`、`constructor`、`function`、`initializer`          |
+| `qualifiedName`  | 必須      | 表示と debug のための完全修飾名                             |
+| `signature`      | 必須      | overload を区別できる、正規化した signature                 |
+| `sourceLocation` | 任意      | 定義の位置。位置を持てない symbol では省ける                |
+| `metadata`       | 任意      | 言語に固有の情報。Core の graph の構築は依存しない          |
 
 `methodId` は、次の条件が同じなら決定的に再生成できる ID とする。
 
@@ -283,15 +289,23 @@ flowchart TD
 record の受信者は、対応している major バージョンの record だけを受け付ける。  
 対応していない major バージョンの record を受け取ったら、受信者は schema version mismatch として解析を失敗させる。
 
-| 変更の種類            | 互換性 | 扱い                                                                                |
-| --------------------- | ------ | ----------------------------------------------------------------------------------- |
-| 任意の field の追加   | 互換   | 受信者は未知の field を無視し、既知の field だけで処理を続ける                      |
-| `metadata` の中の追加 | 互換   | 受信者は要る既知の field だけを使い、Core の graph の構築は `metadata` に依存しない |
-| 必須の field の追加   | 非互換 | major バージョンを上げる                                                            |
-| 必須の field の削除   | 非互換 | major バージョンを上げる                                                            |
-| field の型の変更      | 非互換 | major バージョンを上げる                                                            |
-| field の意味の変更    | 非互換 | major バージョンを上げる                                                            |
-| record の種類の削除   | 非互換 | major バージョンを上げる                                                            |
+| 変更の種類                             | 互換性 | 扱い                                                                                  |
+| -------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
+| record の最上位への任意の field の追加 | 互換   | 受信者は未知の field を無視し、既知の field だけで処理を続ける                        |
+| 入れ子の object への field の追加      | 非互換 | Core は入れ子の object の未知の field を invalid にするので、major バージョンを上げる |
+| `metadata` の中の追加                  | 互換   | 受信者は要る既知の field だけを使い、Core の graph の構築は `metadata` に依存しない   |
+| 必須の field の追加                    | 非互換 | major バージョンを上げる                                                              |
+| 必須の field の削除                    | 非互換 | major バージョンを上げる                                                              |
+| field の型の変更                       | 非互換 | major バージョンを上げる                                                              |
+| field の意味の変更                     | 非互換 | major バージョンを上げる                                                              |
+| record の種類の削除                    | 非互換 | major バージョンを上げる                                                              |
+
+入れ子の object は、`sourceLocation`、`callSite`、`details[]` の各要素とその `sourceLocation` を指す。  
+Core は、これらの object の中で、field 名の大文字と小文字だけが違う key も未知の field として拒否する。  
+`metadata` の中身は opaque な値なので、Core は中の field を確かめない。  
+`entrypoints[]` は `analysisRequest` にだけあり、受信者の Analyzer は中の未知の field も無視する。  
+Core の parser は `entrypoints[]` の各要素の未知の field も拒否するが、これは Core 自身の検証のためで、互換性の規則に含めない。  
+ADR-0013: [Core は record の最上位の未知の field を無視し、入れ子の object の未知の field を invalid にする](../../../adr/0013-reject-unknown-nested-fields.md)
 
 Handshake と capability negotiation は採用しない。  
 ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../../../adr/0001-analyzer-protocol-jsonl-spi.md)
@@ -333,7 +347,8 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
 - `methodId` と `edgeId` を、同じ条件で決定的に再生成すること。
 - `schemaVersion` を、Protocol の全体のバージョンとして、すべての record に必須とすること。
 - Analyzer が `analysisRequest` の未知の field を無視できること。
-- Core が Analyzer の応答の record の未知の field を無視できること。
+- Core が Analyzer の応答の record の最上位の未知の field を無視できること。
+- Core が、入れ子の object の中の未知の field と、大文字と小文字だけが違う field 名を、invalid record として拒否すること。
 - 対応していない major バージョンの record を、Core が schema version mismatch として拒否できること。
 - 必須の field の削除、型の変更、意味の変更を、非互換の変更として検出できること。
 - 正しい `diagnostic` を Core が利用者へ伝え、`diagnostic` だけを理由に致命的な失敗にしないこと。

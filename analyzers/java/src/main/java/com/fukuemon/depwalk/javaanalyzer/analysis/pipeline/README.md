@@ -4,10 +4,11 @@
 request の読み取りから解析の context の組み立て（`AnalysisContextFactory`）までの順は、`Main` が持つ。  
 段階別の package のうち、`graph` と `spring` は互いに import する。
 
-設計の説明は次の 2 つにある。
+設計の説明は次の 3 つにある。
 
 - [Java Analyzer の Design Doc の「内部の package 構成と外部ライブラリの隔離」](../../../../../../../../../DesignDoc.md#内部の-package-構成と外部ライブラリの隔離)
 - ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェックで固定し、Core はフラットな package 構成のまま保つ](../../../../../../../../../../../adr/0007-layered-architecture-refactor.md)
+- ADR-0016: [Java Analyzer の実行の順を、解析の段は AnalysisRunner に、context の組み立てまでは Main に持たせる](../../../../../../../../../../../adr/0016-split-execution-order-between-main-and-runner.md)
 
 ## 実行順
 

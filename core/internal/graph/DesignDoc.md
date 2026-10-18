@@ -7,7 +7,7 @@ governs:
   - core/internal/graph
   - core/internal/protocol
   - core/internal/analyze
-verified_commit: 4455e86
+verified_commit: 8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333
 ---
 
 # Graph（呼び出しグラフのデータモデル）
@@ -100,7 +100,7 @@ type Edge struct {
 - `methodSymbol.metadata` と `callEdge.metadata` は、入れ子の map と array を含めて deep copy する。
   - 写す先は、Graph が持つ opaque な属性（`Symbol.Metadata`、`Edge.Metadata`）である。
   - Graph と Traversal は、値の意味を解釈しない。
-  - metadata を持たない record は nil、明示的に空の object を持つ record は空の map として、区別して持つ。この違いは JSON の出力に現れる。
+  - metadata を持たない record は nil、明示的に空の object を持つ record は空の map として、区別して持つ。JSON の出力は、`core/internal/output/json.go` の `omitempty` により、どちらも `metadata` の field ごと省く。
   - JSON の出力へは opaque なまま透過で出す。出す規則は Output の Design Doc が定める。Console など、ほかの出力の表現には自動で出さない。
   - bytecode にだけある symbol のように、`sourceLocation` のない node も正しいものとする。owner の source の位置は metadata が持ち、`sourceLocation` と混同しない。
 

@@ -257,7 +257,7 @@ Core は `code` を不透明な文字列として扱うため、code を増や�
 | `JAVA_RUNTIME_PROVIDED`     | `info`    | Spring Data か MyBatis が実行時に実装を提供するため、意図して解決しない                                                                                                                              |
 | `JAVA_AMBIGUOUS_CANDIDATE`  | `warning` | `@Qualifier` と `@Primary` を当てた後も、候補が複数残る                                                                                                                                              |
 | `JAVA_CONDITIONAL_BEAN`     | `info`    | 条件付きの Bean を評価せず、候補として残す                                                                                                                                                           |
-| `JAVA_SOURCE_ROOT_EXCLUDED` | `warning` | まだ作られていない discovery の source directory、external の included build の project、または composite か included build を除いた                                                                 |
+| `JAVA_SOURCE_ROOT_EXCLUDED` | `warning` | まだ作られていない discovery の source directory、workspace の外の project、または included build を除いた                                                                                           |
 | `JAVA_EVENT_UNRESOLVED`     | `warning` | `publishEvent()` の引数の型を静的に解決できず、イベントの edge を張れない                                                                                                                            |
 | `JAVA_CALLABLE_UNRESOLVED`  | `info`    | callable が静的に追う範囲（同じメソッドの中、引数渡し 1 段）の外にあり、invocation の edge を張れない。設計の上の制約による対象外を表す                                                              |
 

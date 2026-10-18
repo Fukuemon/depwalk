@@ -45,7 +45,7 @@ type SourceLocation struct {
 // Metadata は Analyzer の record から複製した opaque な JSON object で、
 // graph / traversal / output のいずれも key の意味を解釈しない。
 // nil は「record に metadata が無かった」、空 map は「明示的に空の object を
-// 持っていた」を表す。この差は JSON 出力に現れるため潰さない。
+// 持っていた」を表す。JSON の出力ではどちらも省くが、graph の値としては区別する。
 type Symbol struct {
 	QualifiedName string
 	Signature     string

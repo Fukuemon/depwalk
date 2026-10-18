@@ -28,7 +28,7 @@ Java Analyzer は、[PRD の Success Metrics](../../PRD.md#success-metrics) の�
 - 呼び出し元と呼び出し先の探索の網羅性。
   - graph の入力を供給する。
 - Spring の DI を経由する呼び出し先の解決。
-- 2 つ目以降の言語の Analyzer を足すときに、Core を変えずに済むこと。
+- 2 つ目以降の言語の Analyzer を足すときに、Core の変更を `language` の値の追加に限ること。
 
 この文書は、Java Analyzer の全体（実装の基盤、内部の package 構成と外部ライブラリの隔離、起動の契約、性能の方針）を持つ。  
 個別の規則は次の 3 つの文書にある。
@@ -187,6 +187,7 @@ flowchart TB
   - `AnalysisRunner.run` を呼ぶまでの順は、`Main` が持つ。
     - 順は、request の読み取り、pre-flight、自動 discovery での language の metadata の拒否、discovery である。
     - その後に、解析の context を `AnalysisContextFactory` で組み立てる。
+    - ADR-0016: [Java Analyzer の実行の順を、解析の段は AnalysisRunner に、context の組み立てまでは Main に持たせる](../../adr/0016-split-execution-order-between-main-and-runner.md)
   - 段階別の package のうち、`graph` と `spring` は互いに import する。
     - `graph` は `spring` の索引（`SpringDiIndex`、`EventListenerIndex`、`EntryPointIndex`）を読む。
     - `spring` の `SpringDiagnosticEmitter` は、`graph` の `GraphAccumulator` へ diagnostic を足す。
@@ -288,7 +289,7 @@ sequenceDiagram
 - allowlist にある resolution failure は、call outcome ledger に候補と理由を記録して、解析を続ける。
   - ただし、すべての救済の後も primary diagnostic が残る request は、`JAVA_INCOMPLETE_ANALYSIS` で fatal にする。
 - 個別のファイルを parse できないときは、graph の record を 1 件も確定しない。
-  - 決定順で最初の parse failure を、`JAVA_PARSE_ERROR` の location と message として返し、fatal にする。
+  - 決定順で最初の parse failure を、`JAVA_PARSE_ERROR` の message の文字列として返し、fatal にする。
 - 解析を続けられない致命的な問題が起きたときは、`error` record を出力し、非ゼロの exit code で終了する。
 
 各規則の詳細は次の文書にある。
@@ -529,7 +530,7 @@ fake analyzer を使い、JVM を要らない。
     - CLI の出力の水準の比較は CLI の層が担う。
 - interface の注入を含むサンプルで、宣言型（interface）のメソッドが callee に現れ、`dispatch: interface` が立つこと
   - これは Spring の DI の解決の前段に当たる。
-- parse できないファイルを混ぜた fixture で、`JAVA_PARSE_ERROR` が決定順で最初の failure detail を返し、graph と diagnostic を公開しないこと
+- parse できないファイルを混ぜた fixture で、`JAVA_PARSE_ERROR` の message が決定順で最初に失敗した file の相対 path を含み、graph と diagnostic を公開しないこと
 - 未解決の symbol を含む fixture で、救済できない primary outcome が `JAVA_INCOMPLETE_ANALYSIS` の全 detail を返し、不完全な graph を成功させないこと
 - **完全性の gate の opt-in の緩和**。
   - `metadata.allowIncompleteAnalysis=["true"]` のとき、primary diagnostic が残っていても exit 0 で成功すること。

@@ -38,8 +38,8 @@ func (r AnalysisRequest) Validate() error {
 			return err
 		}
 	}
-	if r.Language != LanguageJava {
-		return invalid("language", "must be java")
+	if err := validateLanguage(r.Language); err != nil {
+		return err
 	}
 	if r.Mode() != AnalysisModeFullGraph && r.Mode() != AnalysisModeReachableFromEntrypoints {
 		return invalid("analysisMode", "must be fullGraph or reachableFromEntrypoints")
@@ -77,8 +77,8 @@ func (r MethodSymbol) Validate() error {
 	if err := require("methodId", r.MethodID); err != nil {
 		return err
 	}
-	if r.Language != LanguageJava {
-		return invalid("language", "must be java")
+	if err := validateLanguage(r.Language); err != nil {
+		return err
 	}
 	switch r.SymbolKind {
 	case SymbolKindMethod, SymbolKindConstructor, SymbolKindFunction, SymbolKindInitializer:

@@ -53,15 +53,21 @@ Gradle Tooling API は、外部のプログラムから Gradle に build を評�
 
 自動 discovery は、filesystem の convention や root module の include の記述を独自に解析しない。  
 Gradle Tooling API `9.7.1` と、一時の init script から注入する同梱の custom model provider を使う。  
-provider が返すのは、次の値だけである。
+provider は、project ごとに次の値を返す。
 
 - project identifier
+- project の directory
 - `main` の source roots
 - compile classpath
 - classes output
 - project dependencies
 - 実効の source language level
 - preview の有無
+
+provider は、build の全体の値として、included build の root の directory も返す。  
+project の directory と included build の root の directory は、workspace の外の project、または included build の除外の判定と warning に使う。  
+使い方は「root の正規化と検証」の節にある。  
+ADR-0014: [discovery の custom model provider が返す値に、project の directory と included build の root を足す](../../../../../../../../../../adr/0014-extend-discovery-model-with-build-directories.md)
 
 task の実行と source の生成は行わない。  
 `test` と名前付きの source set は、明示の override で指定された場合を除いて、対象の外にする。  
@@ -126,10 +132,12 @@ root は、`/` で区切る workspace からの相対 path へ正規化する。
 正規化と検証の規則は次のとおり。
 
 - 明示の root、または workspace の中の project の source set として採った root か file の realpath が、workspace の外へ出る場合は fatal にする。
-- Tooling API が workspace の外の external の composite か included build として識別した build の project は、root の検証より先に、解析の scope から外す。
-  - 外したことは、`JAVA_SOURCE_ROOT_EXCLUDED` の warning へ件数をまとめて報告する。
+- project の directory の realpath が workspace の root の realpath の下にない project は、root の検証の前に scope から外す。
+  - realpath を解決できない project も外す。
+  - 外したことは、run あたり 1 件の `JAVA_SOURCE_ROOT_EXCLUDED` の warning へ件数をまとめて報告する。
+  - ADR-0014: [discovery の custom model provider が返す値に、project の directory と included build の root を足す](../../../../../../../../../../adr/0014-extend-discovery-model-with-build-directories.md)
 - root build の project の階層に含まれない composite と included build は、workspace の中のものも含めて、v1 の model の対象の外である。
-  - provider が報告する build root ごとに、1 件の `JAVA_SOURCE_ROOT_EXCLUDED` の warning と、`--source-root` による明示の override の案内を出す。
+  - provider が報告する included build の root ごとに、`JAVA_SOURCE_ROOT_EXCLUDED` の warning を 1 件出し、`--source-root` での明示の override を案内する。
   - 知らせずに抜け落ちることを残さないためである。
 - model が返す解決済みの artifact は、外部の依存として使える。
 - directory の symlink は再帰で追わない。

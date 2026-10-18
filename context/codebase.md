@@ -51,6 +51,8 @@ ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェッ�
 
 Java Analyzer の `javaanalyzer` の下は、解析の段階ごとの package（`analysis/` の下）と、入出力と起動の package（`protocol`、`io`、`preflight`、`discovery`）で作る。  
 解析の段の実行の順は、`analysis/pipeline` の Runner が持つ。Runner を呼ぶまでの順は、解析の context の組み立てを含めて `Main` が持つ。  
+ADR-0016: [Java Analyzer の実行の順を、解析の段は AnalysisRunner に、context の組み立てまでは Main に持たせる](../adr/0016-split-execution-order-between-main-and-runner.md)
+
 package の構成は [Java Analyzer の Design Doc](../analyzers/java/DesignDoc.md#内部の-package-構成と外部ライブラリの隔離) にある。
 
 ## Dependency Rules
@@ -60,7 +62,7 @@ package の構成は [Java Analyzer の Design Doc](../analyzers/java/DesignDoc.
 - CLI は Core だけに依存する。
 - Core から Analyzer へは、Analyzer SPI（Protocol の境界）だけを通す。Core は、Analyzer が使うライブラリと言語のランタイムを知らない。
 - Analyzer は Model（`MethodSymbol`、`CallEdge`、`SourceLocation`）のスキーマにだけ依存し、Core の内部の実装に依存しない。
-- Core から、特定の言語のランタイムと Analyzer の実装へ直接依存しない。2 つ目以降の Analyzer を足したときに、Core を変えずに済むようにするためである。
+- Core から、特定の言語のランタイムと Analyzer の実装へ直接依存しない。2 つ目以降の Analyzer を足したときに、Core の変更を `core/internal/protocol` の許す `language` の値の追加に限るためである。
   - 最初の Analyzer を入れたときの、言語によらない最初の配線は、この規則の対象外にする。
 - Output は、traversal の request と result の型を使うために Traversal に依存する。Traversal から Output へは依存しない。循環するためである。
 

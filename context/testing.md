@@ -122,7 +122,7 @@ Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture �
 ## Required Tests
 
 - リリースを判断する前に、caller の探索、callee の探索、各出力の形式の E2E を通す。
-- 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core を変えずに Analyzer を足せることを確かめるためである。
+- 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core の変更を `language` の値の追加に限って Analyzer を足せることを確かめるためである。
   - 最初の Analyzer を入れたときの、言語によらない最初の配線は対象外にする。
 - Gradle の multi-project と、解析の完全性にかかわる変更では、次の観点を確かめる。
   - Protocol contract
