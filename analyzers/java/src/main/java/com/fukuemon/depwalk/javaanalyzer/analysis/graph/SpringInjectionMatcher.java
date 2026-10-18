@@ -42,7 +42,7 @@ final class SpringInjectionMatcher {
      *
      * <p>receiver 宣言の {@code resolve()} は symbol solver の実コストがかかるため 1 回だけ行う。
      * {@code this.field} 形式は名前だけで注入点を引けるので、該当する注入点が無い場合は
-     * {@code resolve()} 自体を行わない (従来の評価順を維持する)。
+     * {@code resolve()} 自体を行わない。
      */
     SpringDiIndex.InjectionResolution resolutionFor(Node callNode, Node enclosingTypeNode) {
         if (enclosingTypeNode == null) {

@@ -18,13 +18,13 @@ public final class CallSiteOutcomeLedger {
     public enum OutcomeKind {
         /** edge を出力した。 */
         EMITTED,
-        /** 仕様上の根拠付きで明示除外した。 */
+        /** 決めた除外理由のどれかで明示除外した。 */
         EXCLUDED,
         /** primary diagnostic として終端した (完全性 gate の対象)。 */
         DIAGNOSTIC
     }
 
-    /** 仕様上の明示除外理由 (これ以外の excluded は許可しない)。 */
+    /** 呼び出し先が scope 外の外部の型である場合の除外理由。除外理由はこれと {@link #REASON_LIFT_EXCLUDED_PACKAGE} に限る。 */
     public static final String REASON_EXTERNAL_TARGET = "external-target";
     /** 帰属型が引き上げ除外 package ({@code LiftExcludePackages}) に属する場合の除外理由。 */
     public static final String REASON_LIFT_EXCLUDED_PACKAGE = "lift-excluded-package";
@@ -86,7 +86,7 @@ public final class CallSiteOutcomeLedger {
     }
 
     /**
-     * 仕様上の根拠付き明示除外を確定する。
+     * 明示除外を確定する。
      *
      * @param id inventory に登録済みの call site id
      * @param reason {@link #REASON_EXTERNAL_TARGET} または {@link #REASON_LIFT_EXCLUDED_PACKAGE}

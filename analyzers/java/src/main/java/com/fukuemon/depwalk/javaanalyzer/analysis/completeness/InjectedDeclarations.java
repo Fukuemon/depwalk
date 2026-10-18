@@ -18,7 +18,6 @@ public final class InjectedDeclarations {
     private InjectedDeclarations() {
     }
 
-    /** node が注入宣言なら true。 */
     public static boolean isInjected(Node node) {
         return node.containsData(KEY);
     }

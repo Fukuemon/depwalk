@@ -23,7 +23,7 @@ import java.util.TreeSet;
  *
  * <p>model 取得は task を実行しない。ただし {@code main.compileClasspath} の
  * file 解決は Gradle の dependency resolution として実行され、network /
- * cache 副作用が発生し得る (ADR-0006)。
+ * cache への副作用が起こり得る。
  */
 public class DepwalkModelBuilder implements ToolingModelBuilder {
 
@@ -65,7 +65,7 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
             projects.add(buildProjectModel(project, main));
         }
 
-        // composite / included build の project は本 model の対象外 (v1 scope)。
+        // composite / included build の project は本 model の対象外である。
         // 黙って脱落させず、Analyzer 側が warning と明示 override 案内を出せる
         // よう root directory だけを報告する。
         List<File> includedBuildRoots = new ArrayList<File>();
@@ -90,7 +90,7 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
                 new ArrayList<File>(main.getOutput().getClassesDirs().getFiles());
 
         // ProjectDependency.getDependencyProject() は Gradle 9.0 で削除された
-        // ため、7.6〜9.6 の全対象で安定する resolution result の
+        // ため、対応する 7.6.5〜9.7.x の全系列で使える resolution result の
         // ProjectComponentIdentifier から project 依存を収集する。
         List<String> projectDependencyPaths = new ArrayList<String>();
         Configuration configuration =
@@ -122,8 +122,7 @@ public class DepwalkModelBuilder implements ToolingModelBuilder {
 
     /**
      * source language level は {@code compileJava.options.release} を優先し、
-     * 未指定なら実効 {@code sourceCompatibility} を使用する
-     * (javaanalyzer/discovery/DesignDoc.md の4軸分離)。
+     * 未指定なら実効 {@code sourceCompatibility} を使用する。
      */
     private String sourceLanguageLevel(Project project, SourceSet main) {
         JavaCompile compileTask = compileJavaTask(project, main);

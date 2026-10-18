@@ -136,7 +136,7 @@ public final class PreflightValidator {
     }
 
     /**
-     * {@code allowIncompleteAnalysis} は key 不在なら既定値 false (完全性 gate は従来どおり fatal)。
+     * {@code allowIncompleteAnalysis} は key 不在なら既定値 false (完全性 gate の失敗を fatal にする)。
      * 指定時は要素 1 の {@code ["true"]} / {@code ["false"]} でなければ {@code JAVA_INVALID_REQUEST}
      * で fatal とする (javaPreview と同じ boolean flag 表現規約)。
      */

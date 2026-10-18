@@ -89,7 +89,7 @@ public final class SourceMethodIndex {
                     annotationFqnsByMethodId.putIfAbsent(methodId, annotationFqns);
                 }
             } catch (RuntimeException | LinkageError ignored) {
-                // CallGraphBuilder の既存 unresolved declaration 経路が second pass で診断する。
+                // 解決できない宣言は、CallGraphBuilder が second pass で unresolved declaration として診断する。
             }
         }
     }

@@ -35,7 +35,6 @@ public final class EntryPointIndex {
     public void accept(CompilationUnit unit) {
         for (AnnotationDeclaration declaration : unit.findAll(AnnotationDeclaration.class)) {
             if (!declaration.isTopLevelType()) {
-                // nested / local に宣言した合成アノテーションは検出対象外。
                 continue;
             }
             Set<String> carried = new TreeSet<>();

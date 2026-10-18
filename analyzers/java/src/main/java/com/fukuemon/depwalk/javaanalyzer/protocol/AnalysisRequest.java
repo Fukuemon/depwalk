@@ -24,7 +24,9 @@ import java.util.Map;
  * @param entrypoints   起点 method selector 配列 (任意)
  * @param analysisMode  {@code fullGraph} または {@code reachableFromEntrypoints} (任意)
  * @param metadata      言語固有 / Analyzer 固有の hint (任意)。Java 固有 key は
- *                      {@code classpath} (必須 key) / {@code liftExcludePackages} (任意)。
+ *                      {@code classpath} (明示 {@code sourceRoots} のとき必須) /
+ *                      {@code liftExcludePackages} / {@code allowIncompleteAnalysis} /
+ *                      {@code gradleJavaHome} / {@code javaLanguageLevel} / {@code javaPreview} (任意)。
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisRequest(

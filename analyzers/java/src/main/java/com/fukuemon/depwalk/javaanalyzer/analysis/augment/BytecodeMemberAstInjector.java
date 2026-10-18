@@ -126,8 +126,8 @@ public final class BytecodeMemberAstInjector {
             try {
                 injectCandidate(decl, candidate);
             } catch (RuntimeException e) {
-                // 注入は best-effort の解決補助であり、扱えない candidate は従来の
-                // 救済経路 (call site 側の bytecode rescue) に委ねる。candidate 単位で
+                // 注入は best-effort の解決補助であり、扱えない candidate は call site 側の
+                // bytecode rescue に委ねる。candidate 単位で
                 // 握るのは、1 件の失敗で class の他 member の注入まで落とさないため。
             }
         }
@@ -219,7 +219,7 @@ public final class BytecodeMemberAstInjector {
             try {
                 injectConstructor(decl, candidate);
             } catch (RuntimeException e) {
-                // member 注入と同じ best-effort。失敗した candidate は既存の
+                // member 注入と同じ best-effort。失敗した candidate は call site 側の
                 // constructor 救済経路に委ねる。
             }
         }

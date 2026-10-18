@@ -65,10 +65,10 @@ final class UnresolvedDiagnostics {
     }
 
     /**
-     * 診断 4 項目を streaming される {@code diagnostic} record へも付与するオーバーロード。
-     * ledger 経由の {@code error.details} (fatal 経路) だけに付与すると、
+     * 解決に失敗した call site を {@code diagnostic} として積み、診断 4 項目を metadata に付ける。
+     * 4 項目を ledger 経由の {@code error.details} (fatal 経路) だけに付けると、
      * {@code metadata.allowIncompleteAnalysis=true} で成功時に残る diagnostic
-     * から 4 項目が欠落するため。
+     * から 4 項目が欠落するため、streaming される diagnostic にも付ける。
      */
     void reportUnresolved(Node callNode, List<String> callerMethodIds, Map<String, Object> metadata) {
         accumulator.incrementUnresolved();

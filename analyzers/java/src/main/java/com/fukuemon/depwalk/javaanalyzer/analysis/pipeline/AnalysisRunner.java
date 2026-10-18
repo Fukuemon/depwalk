@@ -149,7 +149,6 @@ public final class AnalysisRunner {
             }
         }
 
-        // 各 classes output の所有 context (origin 判定用)。
         Map<Path, String> classesOutputOwners = new LinkedHashMap<>();
         for (SourceSetAnalysisContext context : contexts) {
             for (Path output : context.classesOutputs()) {
@@ -262,7 +261,6 @@ public final class AnalysisRunner {
 
         boolean reachableMode = ANALYSIS_MODE_REACHABLE.equals(request.analysisMode()) && hasEntrypoints(request);
 
-        // fullGraph (streaming) 用の「出力済み」進捗マーカー。reachableMode では未使用。
         StreamProgress progress = new StreamProgress();
 
         long analyzedFileCount = 0;
@@ -343,9 +341,9 @@ public final class AnalysisRunner {
             // external jar より先に登録し、同名 class は project bytecode を優先
             // する。member 救済の origin 検証にも同じ一覧を渡す。
             // 依存 project の output は classpath の形に依存せず model の project
-            // 依存関係から解決する (Gradle model は依存 project を jar
-            // として classpath へ返すことがあり、classpath 照合だけでは依存 output
-            // が external artifact 扱いになって cross-module 救済が拒否されていた)。
+            // 依存関係から解決する。classpath との照合だけで決める方法は採らない。
+            // 理由は、Gradle model が依存 project を jar として classpath へ返すことがあり、
+            // 依存 output が external artifact 扱いになって cross-module 救済が拒否されるため。
             // 登録順 (自 context の output → 依存 project の output → classpath 上の
             // project output) がそのまま SootUp の classpath 優先順になるため、
             // 重複排除しつつ挿入順を保つ set を使う。
@@ -455,7 +453,6 @@ public final class AnalysisRunner {
         try {
             result = parser.parse(file);
         } catch (IOException | ParseProblemException e) {
-            // pre-flight で全 file の parse 成功を確認済みのため、ここへの到達は内部エラー。
             throw new IllegalStateException("file failed to parse after a successful pre-flight: " + file, e);
         }
         if (!result.isSuccessful() || result.getResult().isEmpty()) {

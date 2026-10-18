@@ -90,7 +90,8 @@ final class AttributionSites {
     /**
      * declaringType が enclosingTypeNode 自身または、その継承階層 (supertype / interface) に含まれるか
      * を判定する。判定不能な場合 (enclosing の型解決失敗 / ancestor 列挙が unresolved symbol で失敗) は、
-     * 従来の「enclosing への引き上げ」挙動を壊さないよう保守的に {@code true} を返す。
+     * 保守的に {@code true} を返し、enclosing class を「参照した型」とする扱いに倒す。無修飾 static import
+     * 由来と誤って判定すると、宣言型が scope 外のときに出力を省略してしまうため。
      */
     private static boolean declaringTypeInEnclosingHierarchy(
             Node enclosingTypeNode, ResolvedReferenceTypeDeclaration declaringType) {

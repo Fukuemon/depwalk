@@ -208,16 +208,15 @@ public final class AugmentedJavaParserClassDeclaration extends JavaParserClassDe
         return getWrappedNode().hashCode();
     }
 
-    /** JavaParser の qualified name (nested は {@code .}) を binary name へ変換する。 */
+    /** wrappedNode の binary name を返す。nested class は AST 構造から {@code $} で連結する。 */
     private String binaryName() {
-        // AST 構造から nested を $ で連結する (BinaryNames と同じ規則)。
         return BinaryNames.forTypeLikeNode(getWrappedNode());
     }
 
     /**
      * erasure 済み binary name を参照型へ解決する。generic 宣言をそのまま
      * ReferenceTypeImpl 化すると型変数が自分自身へ写像され JavaParser の
-     * 型引数置換が無限再帰するため (実環境検証で StackOverflowError)、
+     * 型引数置換が無限再帰して StackOverflowError になるため、
      * 型引数は {@code Object} で埋めた erased 形にする。
      */
     private ResolvedType referenceType(String binaryName) {

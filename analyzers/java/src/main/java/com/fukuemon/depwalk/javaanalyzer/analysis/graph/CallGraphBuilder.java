@@ -192,7 +192,7 @@ public final class CallGraphBuilder {
             if (InjectedDeclarations.isInjected(md)) {
                 // 注入宣言を source 宣言として emit すると、生成 member が source 由来の
                 // methodSymbol (位置付き) を偽装する。caller として扱わず、呼び出し側の
-                // bytecode-only member 出力契約 (下の injected 分岐) だけに載せる。
+                // bytecode-only member 出力契約 (processMethodCall の bytecode-only 分岐) だけに載せる。
                 return;
             }
             walkCallableDeclaration(
@@ -352,10 +352,6 @@ public final class CallGraphBuilder {
                 || node.findFirst(MethodReferenceExpr.class).isPresent();
     }
 
-    // ------------------------------------------------------------------
-    // メソッド呼び出しの処理
-    // ------------------------------------------------------------------
-
     private void processMethodCall(MethodCallExpr mce, WalkContext ctx) {
         // event edge はこの call site の通常の終端への追加分: publishEvent 呼び出し自体は
         // 通常 external target として excluded 終端し、listener への edge は outcome
@@ -478,10 +474,6 @@ public final class CallGraphBuilder {
         MethodSymbol calleeSymbol = methodSymbols.buildConstructorSymbol(attribution, resolved);
         emitResolvedEdge(callNode, kind, ctx, calleeSymbol, CallEdgeMetadata.forCall(null, ctx.viaLambda()));
     }
-
-    // ------------------------------------------------------------------
-    // 呼び出し箇所ごとの結果台帳 (ledger)
-    // ------------------------------------------------------------------
 
     /** ledger 用の実効 caller (caller 不在の site は <clinit> / placeholder へ帰着)。 */
     private List<String> ledgerCallers(Node callNode, WalkContext ctx) {
@@ -644,10 +636,6 @@ public final class CallGraphBuilder {
             CallGraphBuilder.this.emitBytecodeOnlyCall(callNode, kind, ctx, rescue);
         }
     }
-
-    // ------------------------------------------------------------------
-    // bytecode-only member の出力
-    // ------------------------------------------------------------------
 
     /**
      * solver が合成した、または AST へ注入した bytecode-only member に解決した call site を、
