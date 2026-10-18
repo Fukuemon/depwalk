@@ -1,7 +1,5 @@
 package com.fukuemon.depwalk.javaanalyzer.analysis.graph;
 
-import com.fukuemon.depwalk.javaanalyzer.analysis.completeness.WorkspaceSourceDeclarationIndex;
-
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.MethodReferenceExpr;
@@ -14,42 +12,38 @@ import java.util.function.IntSupplier;
  * solver が resolve できなかった call site を、bytecode の member へ救済できるか、scope の外の
  * callee と根拠を持って言えるか、どちらでもないかに分類する。
  *
- * <p>個々の判定は {@link BytecodeRescue} が持ち、このクラスは呼び出しの種類ごとに判定を試す順を持つ。
- * 先に試した判定が結果を決めるので、順を入れ替えると edge と diagnostic の分類が変わる。
+ * <p>救済できるか、scope の外かの判定はすべて {@link BytecodeRescue} が持つ。このクラスは判定を持たず、
+ * 呼び出しの種類ごとに判定を試す順だけを持つ。先に試した判定が結果を決めるので、順を入れ替えると edge と
+ * diagnostic の分類が変わる。
  */
 final class UnresolvedCallClassifier {
 
     /** 分類の結果。 */
-    sealed interface Outcome permits Rescued, External, Unresolved {
+    sealed interface Classification permits Rescued, External, Unresolved {
     }
 
     /** bytecode 上の一意な member へ救済できた。 */
-    record Rescued(BytecodeRescue.Rescue rescue) implements Outcome {
+    record Rescued(BytecodeRescue.Rescue rescue) implements Classification {
     }
 
     /** callee が scope の外にあると classfile の根拠で言える。 */
-    record External() implements Outcome {
+    record External() implements Classification {
     }
 
     /** 救済も external の分類もできず、diagnostic に残す。 */
-    record Unresolved() implements Outcome {
+    record Unresolved() implements Classification {
     }
 
-    private static final Outcome EXTERNAL = new External();
-    private static final Outcome UNRESOLVED = new Unresolved();
+    private static final Classification EXTERNAL = new External();
+    private static final Classification UNRESOLVED = new Unresolved();
 
     private final BytecodeRescue bytecodeRescue;
-    private final WorkspaceSourceDeclarationIndex declIndex;
 
-    /**
-     * @param declIndex workspace の source 宣言の索引。owner の型がここに無ければ scope の外とみなす
-     */
-    UnresolvedCallClassifier(BytecodeRescue bytecodeRescue, WorkspaceSourceDeclarationIndex declIndex) {
+    UnresolvedCallClassifier(BytecodeRescue bytecodeRescue) {
         this.bytecodeRescue = bytecodeRescue;
-        this.declIndex = declIndex;
     }
 
-    Outcome classifyMethodCall(MethodCallExpr mce, Node enclosingTypeNode) {
+    Classification classifyMethodCall(MethodCallExpr mce, Node enclosingTypeNode) {
         BytecodeRescue.Rescue rescue = bytecodeRescue.methodRescue(mce, enclosingTypeNode);
         if (rescue != null) {
             return new Rescued(rescue);
@@ -57,7 +51,7 @@ final class UnresolvedCallClassifier {
         // receiver の型を、bytecode の field の型で補っても特定でき、その型が scope の中の source に
         // 無ければ、callee は scope の外にある。例: Lombok の @Slf4j が足す log field の Logger#info。
         String receiverOwner = bytecodeRescue.bytecodeRescueOwner(mce, enclosingTypeNode);
-        if (receiverOwner != null && isOutsideScope(receiverOwner)) {
+        if (receiverOwner != null && bytecodeRescue.isOutsideScope(receiverOwner)) {
             return EXTERNAL;
         }
         if (receiverOwner == null && mce.getScope().isPresent()) {
@@ -70,7 +64,7 @@ final class UnresolvedCallClassifier {
                 forwardOwner = bytecodeRescue.genericChainOwner(mce.getScope().get());
             }
             if (forwardOwner != null) {
-                if (isOutsideScope(forwardOwner)) {
+                if (bytecodeRescue.isOutsideScope(forwardOwner)) {
                     return EXTERNAL;
                 }
                 BytecodeRescue.Rescue forwardRescue = bytecodeRescue.methodRescueWithOwner(mce, forwardOwner);
@@ -90,19 +84,19 @@ final class UnresolvedCallClassifier {
         return UNRESOLVED;
     }
 
-    Outcome classifyObjectCreation(ObjectCreationExpr oce) {
+    Classification classifyObjectCreation(ObjectCreationExpr oce) {
         BytecodeRescue.Rescue rescue = bytecodeRescue.constructorRescue(oce);
         return rescue != null ? new Rescued(rescue) : UNRESOLVED;
     }
 
     /** {@code super(...)} は親の型、{@code this(...)} は囲みの型の constructor を探す。 */
-    Outcome classifyExplicitConstructorInvocation(ExplicitConstructorInvocationStmt ecis, Node enclosingTypeNode) {
+    Classification classifyExplicitConstructorInvocation(ExplicitConstructorInvocationStmt ecis, Node enclosingTypeNode) {
         BytecodeRescue.Rescue rescue = bytecodeRescue.explicitCtorRescue(ecis, enclosingTypeNode);
         if (rescue != null) {
             return new Rescued(rescue);
         }
         String ctorOwner = bytecodeRescue.explicitCtorOwner(ecis, enclosingTypeNode);
-        if (ctorOwner != null && isOutsideScope(ctorOwner)) {
+        if (ctorOwner != null && bytecodeRescue.isOutsideScope(ctorOwner)) {
             return EXTERNAL;
         }
         return UNRESOLVED;
@@ -111,19 +105,15 @@ final class UnresolvedCallClassifier {
     /**
      * @param samArity 参照先の functional interface の SAM の引数の数。救済の候補を選ぶときだけ評価する
      */
-    Outcome classifyMethodReference(MethodReferenceExpr mre, IntSupplier samArity) {
+    Classification classifyMethodReference(MethodReferenceExpr mre, IntSupplier samArity) {
         BytecodeRescue.Rescue rescue = bytecodeRescue.methodReferenceRescue(mre, samArity);
         if (rescue != null) {
             return new Rescued(rescue);
         }
         String referenceOwner = bytecodeRescue.methodReferenceOwner(mre);
-        if (referenceOwner != null && isOutsideScope(referenceOwner)) {
+        if (referenceOwner != null && bytecodeRescue.isOutsideScope(referenceOwner)) {
             return EXTERNAL;
         }
         return UNRESOLVED;
-    }
-
-    private boolean isOutsideScope(String ownerBinaryName) {
-        return declIndex.find(ownerBinaryName).isEmpty();
     }
 }
