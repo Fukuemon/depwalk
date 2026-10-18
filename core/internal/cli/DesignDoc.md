@@ -141,7 +141,7 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
   - harness の `buildCoreCLI` と `runCLI` を使い回す。
 - console と json は、どちらも golden file との完全一致で比べ、json は加えて Unmarshal できることを確かめる。
   - 出力の形式の成功条件を、CLI の水準で確かめる。
-- グラフの水準の E2E（`protocol.Runner` を直接呼び、record の単位で比べる層）と合わせて、2 層で確かめる。
+- グラフの水準の E2E（`protocol.Client` を直接呼び、record の単位で比べる層）と合わせて、2 層で確かめる。
   - 層ごとに保証する範囲は [context/testing.md](../../../context/testing.md#test-types-and-guarantees) にある。
 - method selector は、完全な signature、signature を省いた一意の一致、overload の曖昧さを確かめる。
   - 加えて、nested class の binary name（`Outer$Inner#method`）の回帰を確かめる。

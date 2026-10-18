@@ -69,91 +69,11 @@ func newAnalyzeCommand() *cobra.Command {
 			// usage 表示を抑止する。通常の error は Cobra が stderr へ出し、
 			// AnalyzerFailure は独自の描画を保つ。
 			cmd.SilenceUsage = true
-			workspaceRoot, err := resolveWorkspaceRoot(args)
+			input, err := validateAnalyzeFlags(cmd, args, flags)
 			if err != nil {
 				return err
 			}
-			if flags.language == "" {
-				return invalidInput("--language is required")
-			}
-			if flags.direction != string(graph.DirectionCaller) && flags.direction != string(graph.DirectionCallee) {
-				return invalidInput(
-					"invalid --direction %q: want %q or %q",
-					flags.direction,
-					graph.DirectionCaller,
-					graph.DirectionCallee,
-				)
-			}
-			registeredFormats := output.RegisteredFormats()
-			if !slices.Contains(registeredFormats, flags.format) {
-				return invalidInput(
-					"invalid --format %q: registered formats: %s",
-					flags.format,
-					strings.Join(registeredFormats, ", "),
-				)
-			}
-			if flags.maxDepth < 0 {
-				return invalidInput("invalid --max-depth %d: want >= 0", flags.maxDepth)
-			}
-			var maxDepth *int
-			if cmd.Flags().Changed("max-depth") {
-				maxDepth = &flags.maxDepth
-			}
-
-			command, err := resolveAnalyzerCommand(flags.analyzerCmd, os.Getenv)
-			if err != nil {
-				return err
-			}
-			argv, err := splitAnalyzerCommand(command)
-			if err != nil {
-				return err
-			}
-
-			runner := analyze.New(protocol.NewAdapter(analyzer.Command{
-				Path:   argv[0],
-				Args:   argv[1:],
-				Stderr: cmd.ErrOrStderr(),
-			}))
-			result, err := runner.Run(analyze.Options{
-				WorkspaceRoot: workspaceRoot,
-				SourceRoots:   flags.sourceRoots,
-				Language:      flags.language,
-				AnalyzerMeta:  flags.analyzerMeta,
-				Include:       flags.include,
-				Exclude:       flags.exclude,
-				Method:        flags.method,
-				Direction:     graph.Direction(flags.direction),
-				MaxDepth:      maxDepth,
-			})
-			if err != nil {
-				var failure *analyze.AnalyzerFailure
-				if errors.As(err, &failure) {
-					renderAnalyzerFailure(cmd.ErrOrStderr(), failure)
-					// サマリを先頭にした失敗の全文は描画済み。後続で cobra が
-					// 出す重複サマリと usage を抑止する。
-					cmd.SilenceErrors = true
-					cmd.SilenceUsage = true
-				}
-				return err
-			}
-
-			if result.MethodQuery != nil {
-				if err := output.Write(cmd.OutOrStdout(), output.Format(flags.format), output.Input{
-					Graph:   result.Graph,
-					Result:  result.MethodQuery.Result,
-					Request: result.MethodQuery.Request,
-				}); err != nil {
-					return fmt.Errorf("write %s output: %w", flags.format, err)
-				}
-			}
-
-			for _, diagnostic := range result.Diagnostics {
-				fmt.Fprintf(cmd.ErrOrStderr(), "diagnostic [%s] %s: %s\n", diagnostic.Severity, diagnostic.Code, diagnostic.Message)
-			}
-			if flags.method == "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "analyzed %d method(s), %d call edge(s)\n", result.MethodCount, result.CallEdgeCount)
-			}
-			return nil
+			return runAnalyze(cmd, input)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -175,6 +95,113 @@ func newAnalyzeCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&flags.exclude, "exclude", nil, "workspace-relative source path glob to exclude (repeatable)")
 
 	return cmd
+}
+
+// analyzeInput は検証を通った analyze コマンドの入力。
+type analyzeInput struct {
+	analyzerArgv []string
+	format       output.Format
+	options      analyze.Options
+}
+
+// validateAnalyzeFlags は位置引数と flag の値を検証し、use case への入力に変える。
+// 利用者の入力の誤りは入力エラーとして返す。
+func validateAnalyzeFlags(cmd *cobra.Command, args []string, flags *analyzeFlags) (analyzeInput, error) {
+	workspaceRoot, err := resolveWorkspaceRoot(args)
+	if err != nil {
+		return analyzeInput{}, err
+	}
+	if flags.language == "" {
+		return analyzeInput{}, invalidInput("--language is required")
+	}
+	if flags.direction != string(graph.DirectionCaller) && flags.direction != string(graph.DirectionCallee) {
+		return analyzeInput{}, invalidInput(
+			"invalid --direction %q: want %q or %q",
+			flags.direction,
+			graph.DirectionCaller,
+			graph.DirectionCallee,
+		)
+	}
+	registeredFormats := output.RegisteredFormats()
+	if !slices.Contains(registeredFormats, flags.format) {
+		return analyzeInput{}, invalidInput(
+			"invalid --format %q: registered formats: %s",
+			flags.format,
+			strings.Join(registeredFormats, ", "),
+		)
+	}
+	if flags.maxDepth < 0 {
+		return analyzeInput{}, invalidInput("invalid --max-depth %d: want >= 0", flags.maxDepth)
+	}
+	var maxDepth *int
+	if cmd.Flags().Changed("max-depth") {
+		depth := flags.maxDepth
+		maxDepth = &depth
+	}
+
+	command, err := resolveAnalyzerCommand(flags.analyzerCmd, os.Getenv)
+	if err != nil {
+		return analyzeInput{}, err
+	}
+	argv, err := splitAnalyzerCommand(command)
+	if err != nil {
+		return analyzeInput{}, err
+	}
+
+	return analyzeInput{
+		analyzerArgv: argv,
+		format:       output.Format(flags.format),
+		options: analyze.Options{
+			WorkspaceRoot: workspaceRoot,
+			SourceRoots:   flags.sourceRoots,
+			Language:      flags.language,
+			AnalyzerMeta:  flags.analyzerMeta,
+			Include:       flags.include,
+			Exclude:       flags.exclude,
+			Method:        flags.method,
+			Direction:     graph.Direction(flags.direction),
+			MaxDepth:      maxDepth,
+		},
+	}, nil
+}
+
+// runAnalyze は use case を組み立てて実行し、結果を stdout と stderr へ出す。
+func runAnalyze(cmd *cobra.Command, input analyzeInput) error {
+	useCase := analyze.New(protocol.NewAdapter(analyzer.Command{
+		Path:   input.analyzerArgv[0],
+		Args:   input.analyzerArgv[1:],
+		Stderr: cmd.ErrOrStderr(),
+	}))
+	result, err := useCase.Run(input.options)
+	if err != nil {
+		var failure *analyze.AnalyzerFailure
+		if errors.As(err, &failure) {
+			renderAnalyzerFailure(cmd.ErrOrStderr(), failure)
+			// サマリを先頭にした失敗の全文は描画済み。後続で cobra が
+			// 出す重複サマリと usage を抑止する。
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+		}
+		return err
+	}
+
+	if result.MethodQuery != nil {
+		if err := output.Write(cmd.OutOrStdout(), input.format, output.Input{
+			Graph:   result.Graph,
+			Result:  result.MethodQuery.Result,
+			Request: result.MethodQuery.Request,
+		}); err != nil {
+			return fmt.Errorf("write %s output: %w", input.format, err)
+		}
+	}
+
+	for _, diagnostic := range result.Diagnostics {
+		fmt.Fprintf(cmd.ErrOrStderr(), "diagnostic [%s] %s: %s\n", diagnostic.Severity, diagnostic.Code, diagnostic.Message)
+	}
+	if input.options.Method == "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "analyzed %d method(s), %d call edge(s)\n", result.MethodCount, result.CallEdgeCount)
+	}
+	return nil
 }
 
 // renderAnalyzerFailure は構造化された Analyzer の失敗を出力する。top-level の

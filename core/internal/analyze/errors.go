@@ -7,7 +7,7 @@ import (
 )
 
 // AnalyzerFailure は Analyzer が致命的な error record を報告したときに
-// [Runner.Run] が返す。
+// [UseCase.Run] が返す。
 //
 // 構造化された失敗をそのまま保つ (top-level の code / message / source location /
 // opaque metadata / 順序付きの details)。Analyzer 固有の code や metadata の key は
