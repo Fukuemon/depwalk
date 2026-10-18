@@ -14,10 +14,10 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 )
 
-// record 単位の Runner テスト。analyzer package は opaque な行を流すだけで、
+// record 単位の Client テスト。analyzer package は opaque な行を流すだけで、
 // record の parse と参照完全性は ACL である本 package が持つ。
 
-func TestRunnerScenarios(t *testing.T) {
+func TestClientScenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -41,13 +41,13 @@ func TestRunnerScenarios(t *testing.T) {
 
 			scenarioDir := scenarioFixturePath(tt.name)
 			request := readRequest(t, scenarioDir)
-			runner := NewRunner(analyzer.Command{
+			client := NewClient(analyzer.Command{
 				Path: os.Args[0],
 				Args: []string{"-test.run=TestProtocolHelperAnalyzerProcess", "--", "--protocol-helper-analyzer", scenarioDir},
 			})
 
 			var records []Record
-			result, err := runner.Run(request, func(record Record) { records = append(records, record) })
+			result, err := client.Run(request, func(record Record) { records = append(records, record) })
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
@@ -76,17 +76,17 @@ func TestRunnerScenarios(t *testing.T) {
 	}
 }
 
-func TestRunnerRejectsInvalidRequest(t *testing.T) {
+func TestClientRejectsInvalidRequest(t *testing.T) {
 	t.Parallel()
 
-	runner := NewRunner(analyzer.Command{Path: os.Args[0]})
-	_, err := runner.Run(AnalysisRequest{}, nil)
+	client := NewClient(analyzer.Command{Path: os.Args[0]})
+	_, err := client.Run(AnalysisRequest{}, nil)
 	if err == nil {
 		t.Fatal("Run() error = nil, want error")
 	}
 }
 
-// collectStdout は stdout を 1 行ずつ record collector へ渡す。[Runner.Run] が
+// collectStdout は stdout を 1 行ずつ record collector へ渡す。[Client.Run] が
 // analyzer package から行を受け取る流れをそのまま模す。
 func collectStdout(stdout string, onRecord func(Record)) RunResult {
 	collector := newRecordCollector(onRecord)
@@ -240,7 +240,7 @@ func callEdgeJSONL(edgeID, callerMethodID, calleeMethodID string) string {
 	)
 }
 
-// TestProtocolHelperAnalyzerProcess はテストではない。TestRunnerScenarios の
+// TestProtocolHelperAnalyzerProcess はテストではない。TestClientScenarios の
 // ために、fixture のシナリオを 1 つ fake Analyzer プロセスとして再生する。
 func TestProtocolHelperAnalyzerProcess(t *testing.T) {
 	args := os.Args

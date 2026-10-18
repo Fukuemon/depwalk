@@ -7,22 +7,22 @@ import (
 	"github.com/Fukuemon/depwalk/core/internal/analyzer"
 )
 
-// Runner は解析要求 1 件につき Analyzer process を 1 つ動かし、その
-// stdout as Analyzer Protocol records. Process control (spawn / stdio /
-// exit code) is delegated to the analyzer package, which treats the
-// payload as opaque lines; the protocol-aware half of the exchange lives
-// here.
-type Runner struct {
+// Client は Analyzer Protocol の Core 側の端点。解析要求 1 件につき Analyzer
+// process を 1 つ動かし、要求を JSONL で送って、stdout の record を受け取る。
+//
+// process の起動と stdio は analyzer package に任せ、そこでは行を opaque な
+// byte 列として扱う。record の parse と検証は本型が持つ。
+type Client struct {
 	command analyzer.Command
 }
 
-func NewRunner(command analyzer.Command) Runner {
-	return Runner{command: command}
+func NewClient(command analyzer.Command) Client {
+	return Client{command: command}
 }
 
 // RunResult は Analyzer 実行の protocol 単位の結果。
 //
-// methodSymbol / callEdge の record はここに溜めない。[Runner.Run] の onRecord へ
+// methodSymbol / callEdge の record はここに溜めない。[Client.Run] の onRecord へ
 // 届いた順に渡す。
 type RunResult struct {
 	Diagnostics     []Diagnostic
@@ -32,12 +32,11 @@ type RunResult struct {
 	Stderr          string
 }
 
-// Run は Analyzer process を起動し、analysisRequest の JSONL record を 1 件送り、
-// and parses stdout records until the process exits. Each valid
-// methodSymbol and callEdge record is passed to onRecord as it is
-// received; onRecord may be nil when the caller does not consume graph
-// records.
-func (r Runner) Run(request AnalysisRequest, onRecord func(Record)) (RunResult, error) {
+// Run は Analyzer process を起動し、analysisRequest の record を 1 件送り、
+// process が終わるまで stdout の record を parse する。正しい methodSymbol と
+// callEdge の record は、届いた順に onRecord へ渡す。graph の record を使わない
+// 呼び出し側は onRecord に nil を渡してよい。
+func (c Client) Run(request AnalysisRequest, onRecord func(Record)) (RunResult, error) {
 	if err := request.Validate(); err != nil {
 		return RunResult{}, err
 	}
@@ -48,7 +47,7 @@ func (r Runner) Run(request AnalysisRequest, onRecord func(Record)) (RunResult, 
 	requestLine = append(requestLine, '\n')
 
 	collector := newRecordCollector(onRecord)
-	procResult, runErr := analyzer.New(r.command).Run(requestLine, collector.addLine)
+	procResult, runErr := analyzer.New(c.command).Run(requestLine, collector.addLine)
 	result := collector.finalize(procResult.ReadError)
 	result.ExitCode = procResult.ExitCode
 	result.Stderr = procResult.Stderr
