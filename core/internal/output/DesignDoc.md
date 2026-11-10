@@ -355,7 +355,7 @@ sequenceDiagram
 この機能に固有の観点は次のとおり。
 
 - 各 formatter の出力を golden file と比べる unit test で保証する。
-  - golden の比較は、書式と決定性（同じ Result から同じバイト列）を同時に確かめる。
+  - golden の比較は、書式と決定性（同じ Result から同じバイト列）を同時に確認する。
 - fixture のケースは次のとおり。
   - 循環（self-loop、相互再帰、3 要素の SCC）
   - 合流（ダイヤモンド）
@@ -364,15 +364,15 @@ sequenceDiagram
   - `maxDepth=0`（`Edges` が空で `Cutoffs` が空でない）
   - `maxDepth=0` と起点の self-loop
   - `startNotFound`
-- Console は次を確かめる。
+- Console は次を確認する。
   - 3 要素の SCC で、すべての node が tree に現れること（`(cycle)` は back edge の先だけ）。
   - self-loop が `(既出)` でなく `(cycle)` になること。
   - root の self-loop で、部分木が二重に出ないこと。
   - `maxDepth=0` で `(呼び出し元なし)` を出さず、cutoff の行を出すこと。
   - 実際の Protocol と同じ完全な `signature` を入れても、`qualifiedName` と重ならず 1 回だけ表示され、`signature` が欠けるときの fallback が働くこと。
-- JSON は次を確かめる。
+- JSON は次を確認する。
   - `encoding/json` で parse できること。
-  - `targetMethodId` が `nodes[]` にない（dangling）ことを、caller と callee の両方の方向で確かめること。
+  - `targetMethodId` が `nodes[]` にない（dangling）ことを、caller と callee の両方の方向で確認すること。
   - `cycle: false` が省かれないこと。
-- エラーの境界では、未対応の format が出力を書き出す前に `error` になり、`startNotFound` と到達なしが `error` にならないことを確かめる。
-- 出力の形式の成功条件は、Output の層（この文書の unit と golden）と、E2E の CLI 層の 2 層で確かめる。呼び出し元と呼び出し先の列挙と同じ分け方である。
+- エラーの境界では、未対応の format が出力を書き出す前に `error` になり、`startNotFound` と到達なしが `error` にならないことを確認する。
+- 出力の形式の成功条件は、Output の層（この文書の unit と golden）と、E2E の CLI 層の 2 層で確認する。呼び出し元と呼び出し先の列挙と同じ分け方である。

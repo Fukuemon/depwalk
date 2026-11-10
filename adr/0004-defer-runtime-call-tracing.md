@@ -42,7 +42,7 @@ Java Analyzer の Protocol への写像: [DesignDoc.md](../analyzers/java/src/ma
 動的・未解決の call の全候補、理由、位置は Protocol 共通の `error.details` に決定順で保持し、Graph を破棄した後も観測可能にする。
 
 この gate には opt-in の緩和を持たせる。  
-`metadata.allowIncompleteAnalysis` の既定は `false` とする。  
+`metadata.allowIncompleteAnalysis` のデフォルトは `false` とする。  
 この値が `true` のとき、primary diagnostic が残っても request を fatal にせず、解決済みの edge と明示除外を含む graph を成功として公開する。  
 残った分は診断としてそのまま見え、`silentOmission == 0` を維持する。  
 根拠のない型推測や実行時の観測は一切追加しない。  

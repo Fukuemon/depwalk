@@ -21,7 +21,7 @@ verified_commit: unverified
 | 種類                   | 置き場                                                                           | 保証すること                                                                                                                           |
 | ---------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Go の unit             | `core/internal/...`                                                              | Graph、Traversal、Output のロジック。JSONL の parse と validate。循環と深さの上限による探索の打ち切り                                  |
-| Go の process contract | `core/internal/analyzer` と fake analyzer                                        | Core から見た Analyzer のプロセスとの境界。JVM を使わずに確かめる                                                                      |
+| Go の process contract | `core/internal/analyzer` と fake analyzer                                        | Core から見た Analyzer のプロセスとの境界。JVM を使わずに確認する                                                                      |
 | Protocol contract      | `testdata/analyzer-protocol/` と Core と Analyzer の contract テスト             | `analysisRequest`、`MethodSymbol`、`CallEdge`、`SourceLocation`、`diagnostic`、`error`、versioning、プロセスの契約がスキーマに従うこと |
 | Java の unit（JUnit）  | `analyzers/java/src/test`                                                        | Java Analyzer の解析の規則                                                                                                             |
 | E2E の Traversal 層    | `testdata/fixtures/traversal/` の graph の入力と期待する集合の JSON              | 到達する node と edge の集合                                                                                                           |
@@ -29,7 +29,7 @@ verified_commit: unverified
 
 - caller の探索、callee の探索、出力の形式の成功条件は、どれも E2E の CLI 層で期待する集合と比べて測る。
   - 成功条件と測り方は [PRD の Success Metrics](../PRD.md#success-metrics) にある。
-- 出力の形式は、Output の unit と golden による比較と、E2E の CLI 層での比較の 2 段で確かめる。
+- 出力の形式は、Output の unit と golden による比較と、E2E の CLI 層での比較の 2 段で確認する。
 - Analyzer の実装は、Core と Analyzer の間の JSONL の入出力を境界にした Protocol contract に対してテストする。
   - ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT の process SPI で結合する](../adr/0001-analyzer-protocol-jsonl-spi.md)
 - 公開する API だけを検証するテストは、black-box（`package <pkg>_test`）にする。非公開の関数や seam に触る必要があるときだけ、同じ package に置く。
@@ -47,9 +47,9 @@ verified_commit: unverified
   - `--analyzer-meta classpath=` と `--analyzer-meta javaLanguageLevel=<level>` を渡す。
   - metadata がそのまま出力に出ることを見るときは、`--format json` の `nodes[].metadata` と `edges[].metadata` を比べる。
 
-Gradle の model の取得（Tooling API、daemon、provider の配布）を、実際の Gradle を起動して確かめるテストは次の 4 つ。
+Gradle の model の取得（Tooling API、daemon、provider の配布）を、実際の Gradle を起動して確認するテストは次の 4 つ。
 
-| テスト                                                                                 | 層                               | 確かめること                                                                             | CI                 |
+| テスト                                                                                 | 層                               | 確認すること                                                                             | CI                 |
 | -------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- | ------------------ |
 | `TestGradleMultiProjectCLI`                                                            | E2E の CLI 層（`core/e2e/`）     | 実際の Core の CLI と Analyzer の jar の結合と、graph の全体の一致                       | E2E の job で動く  |
 | `MultiModuleFixtureEquivalenceTest`                                                    | Java の unit（`./gradlew test`） | fat jar を子のプロセスで起動し、自動 discovery と明示の override の graph が一致すること | Java の job で動く |
@@ -79,7 +79,7 @@ Gradle の model の取得（Tooling API、daemon、provider の配布）を、�
   (cd analyzers/java && ./gradlew shadowJar) && (cd core && DEPWALK_E2E_REQUIRED=1 go test ./e2e -run TestGradleMultiProjectCLI -count=1)
   ```
 
-- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換性の matrix を確かめる。`./gradlew test` には含まれず、CI でも動かない。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換性の matrix を確認する。`./gradlew test` には含まれず、CI でも動かない。
 
 ## Runtime Requirements
 
@@ -132,7 +132,7 @@ framework の本物の jar を fixture に持ち込むかは、fixture の種類
   - `spring-project/`: Spring Boot の autoconfigure、Spring Data Commons、MyBatis、Lombok
   - `multi-module-spring-project/`: Spring Context。中にある独立した build の `patterns/` は Spring に依存せず、`lib` だけが Lombok に依存する。
   - jar のバージョンは、各 fixture の build ファイルで固定する。
-  - この fixture で確かめる観点は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
+  - この fixture で確認する観点は [Java Analyzer の Design Doc の Verification](../analyzers/java/DesignDoc.md#verification) にある。
 
 Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture を compile するときは、`--release` を Analyzer の JDK と同じにする。
 
@@ -143,11 +143,11 @@ Java の unit テストが `ToolProvider.getSystemJavaCompiler()` で fixture �
 ## Required Tests
 
 - リリースを判断する前に、caller の探索、callee の探索、各出力の形式の E2E を通す。
-- 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core の変更を `language` の値の追加に限って Analyzer を足せることを確かめるためである。
+- 2 つ目以降の Analyzer を足すときは、Protocol contract テストを通す。Core の変更を `language` の値の追加に限って Analyzer を足せることを確認するためである。
   - 最初の Analyzer を入れたときの、言語によらない最初の配線は対象外にする。
-- Gradle の multi-project と、解析の完全性にかかわる変更では、次の Design Doc の Verification の観点を確かめる。
+- Gradle の multi-project と、解析の完全性にかかわる変更では、次の Design Doc の Verification の観点を確認する。
   - [Analyzer Protocol](../core/internal/protocol/DesignDoc.md#verification)、[Graph](../core/internal/graph/DesignDoc.md#verification)、[Java Analyzer](../analyzers/java/DesignDoc.md#verification)、[discovery](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification)
 - Gradle の対応範囲、Tooling API、custom model provider を変えるときは、手元で `gradleCompatibilityTest` を通す。CI では動かないためである。
-  - 確かめることは [tech-stack.md の Upgrade Checks](tech-stack.md#upgrade-checks) にある。
+  - 確認することは [tech-stack.md の Upgrade Checks](tech-stack.md#upgrade-checks) にある。
 - 性能は、[Java Analyzer の Design Doc の「性能の計測」](../analyzers/java/DesignDoc.md#性能の計測) の方法で測る。SLO は手動のリリースの目標で、テストの合否の条件にしない。
 - ほかの変更ごとに足すテストの種類は未定。

@@ -39,14 +39,14 @@ mise install
      --format json
    ```
 
-主な flag は次のとおり。全体は `./dist/depwalk analyze --help` で確かめる。
+主な flag は次のとおり。全体は `./dist/depwalk analyze --help` で確認する。
 
 | flag             | 意味                                                                            |
 | ---------------- | ------------------------------------------------------------------------------- |
 | `--language`     | 解析する言語。必須で、現在は `java` だけを受け付ける                            |
 | `--method`       | 起点のメソッド。`<binary-type>#<method>[(<argument-types>)]` の形で書く         |
 | `--direction`    | `caller`（既定）か `callee`                                                     |
-| `--max-depth`    | 辿る深さの上限。既定は上限なし                                                  |
+| `--max-depth`    | 辿る深さの上限。デフォルトは上限なし                                            |
 | `--format`       | `console`（既定）か `json`                                                      |
 | `--source-root`  | 解析する source root。`<workspace-root>` からの相対で書き、繰り返して指定できる |
 | `--analyzer-cmd` | Analyzer の起動のコマンド。環境変数 `DEPWALK_ANALYZER_CMD` でも渡せる           |

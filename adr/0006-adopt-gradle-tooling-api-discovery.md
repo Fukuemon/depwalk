@@ -51,7 +51,7 @@ Java Analyzer は、Gradle Tooling API を使い、対象の build の実効の 
 - classes output と workspace 内の project 依存の build output が未 build のときは、warning を出し、bytecode なしで source の解析を続ける。依存先の context の source root が型解決を補う。
 - 利用者が明示した classpath の entry と、model が解決した workspace の外の entry の欠落と読み取り不能は、fatal にする。
 
-### 5. 対応する Gradle のバージョンの範囲と daemon JVM の組を固定し、CI の anchor で確かめる
+### 5. 対応する Gradle のバージョンの範囲と daemon JVM の組を固定し、CI の anchor で確認する
 
 - provider は、対応する範囲の最も古い Gradle の API を baseline にして build する。
 - wrapper がない build は、同梱の Tooling API のバージョンで評価する。

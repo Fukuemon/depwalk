@@ -85,7 +85,7 @@ Core の規則は、golangci-lint の depguard でチェックする。
     - `unknown-internal-package`: 規則のない package から `internal` の全体を拒む。
 - `deny` の `pkg` は、末尾の `$` で完全一致にする。前方一致にすると、`analyze` の規則が `analyzer` まで巻き込む。また、black-box テストの package が自分の package を import できなくなる。
   - 規則のない package を拒む catch-all のルールだけは、`internal` の全体を禁じるために前方一致にする。
-- CI の Go の job は、`go list -deps ./...` に `github.com/Fukuemon/depwalk/analyzers/` が含まれないことを確かめ、Core が Analyzer に依存していないことを見る。設定は `.github/workflows/ci.yml` にある。
+- CI の Go の job は、`go list -deps ./...` に `github.com/Fukuemon/depwalk/analyzers/` が含まれないことを確認し、Core が Analyzer に依存していないことを見る。設定は `.github/workflows/ci.yml` にある。
 
 Java Analyzer が外部のライブラリを import してよい範囲は、次の 3 つ。  
 ArchUnit のテスト `ArchitectureTest` でチェックし、`./gradlew test` で実行される。

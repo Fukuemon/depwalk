@@ -33,7 +33,7 @@ Analyzer の起動コマンドを、Core が意味を解釈しない**言語非�
   - この判断のうち、Analyzer を足しても Core を変更しない範囲は [ADR-0017](0017-limit-core-change-to-language-value.md) で、Core が JVM を知らない範囲は [ADR-0019](0019-oom-hint-from-analyzer-stderr.md) で置き換えた。
 - metadata passthrough (`--analyzer-meta key=value`) も同じ原則に従う。
   - Core は `analysisRequest.metadata` へ素通しするだけで、key と value の意味 (例: Java の `classpath`) を解釈しない。
-- 規約の path による既定の解決 (binary の隣を探すなど) は Phase1 では導入しない。
+- 規約の path によるデフォルトの解決 (binary の隣を探すなど) は Phase1 では導入しない。
   - 必要になった時点で、validation error で拒否する段の前段として追加できる形にしておく。
 - shell-word 分割では、変数展開、glob 展開、コマンド置換を一切行わない。
 - 起動コマンドの解決は use case ではなくコンポジションルートの責務とする。

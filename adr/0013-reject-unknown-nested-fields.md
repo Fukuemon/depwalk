@@ -34,7 +34,7 @@ Core の parser は、次の object の中の未知の field を、invalid recor
 - `details[]` の各要素と、その要素の `sourceLocation`
 
 field 名の大文字と小文字だけが違う key も、未知の field として拒否する。  
-`metadata` の中身は opaque な値なので、Core は中の field を確かめない。  
+`metadata` の中身は opaque な値なので、Core は中の field を確認しない。  
 入れ子の object で未知の field を無視すると、Analyzer の field 名の誤りを Core が成功として扱うためである。
 
 `entrypoints[]` は `analysisRequest` にだけある field で、Core は `analysisRequest` の受信者にならない。  
