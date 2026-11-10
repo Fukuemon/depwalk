@@ -1,0 +1,56 @@
+name: 実装のタスク
+description: 要求を分解した、コードを変えるタスクを起票する。親の要求の sub-issue にする
+labels: [type:impl]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: 親の要求
+      description: 分解した元の要求の issue 番号
+      placeholder: "#12"
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: なぜこのタスクが要るか。親の要求のどの部分を担い、何ができるようになるか
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: 対応方針
+      description: どう対応するかを文で書く。根拠になる Design Doc や ADR のセクションは、文の直後にリンクで示す
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: 実施内容
+      description: 何を作るか、何を変えるか。対象のファイルやパッケージ
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了の条件
+      description: 確認できる形の箇条書き。コマンドと期待する結果まで書く。チェックボックスにしない
+      placeholder: |
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 検証の観点
+      description: マージの前に確認する動作を、条件と期待結果の表で書く。pull request の「検証とエビデンス」の表の同じ列に写す。動作を確認しないタスクでは空にする
+      placeholder: |
+        | # | 条件（WHEN / IF） | 期待結果（SHALL） |
+        | --- | --- | --- |
+        | 1 | <〇〇のとき、〇〇ならば> | <外から観測できる結果> |
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依存
+      description: 先に終わっている必要があるタスクの番号

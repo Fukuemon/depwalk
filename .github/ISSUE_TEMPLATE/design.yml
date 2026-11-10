@@ -1,0 +1,54 @@
+name: 設計のタスク
+description: 要求を分解した、設計を決めて Design Doc、ADR、spec に書くタスクを起票する。親の要求の sub-issue にする
+labels: [type:design]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: 親の要求
+      description: 分解した元の要求の issue 番号
+      placeholder: "#12"
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: なぜこのタスクが要るか。親の要求のどの部分を担い、何ができるようになるか
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: 決める論点
+      description: このタスクで決めること。論点ごとに、分かっている選択肢と、決めるのに要る事実を書く
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: 対応方針
+      description: どう対応するかを文で書く。根拠になる Design Doc や ADR のセクションは、文の直後にリンクで示す
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: 実施内容
+      description: 書く文書と、直す文書
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了の条件
+      description: 確認できる形の箇条書き。コマンドと期待する結果まで書く。チェックボックスにしない
+      placeholder: |
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依存
+      description: 先に終わっている必要があるタスクの番号

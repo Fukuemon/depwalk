@@ -1,0 +1,64 @@
+name: 検証のタスク
+description: 要求の受け入れの条件を、子の実装の pull request がマージされた後に確認するタスクを起票する。親の要求の sub-issue にする
+labels: [type:verify]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        上の欄から順に進める。起票のときは、親の要求と、確認する受け入れの条件だけを書けばよい。ほかの欄は、子の実装の pull request がそろってから書き足す。
+  - type: input
+    id: parent
+    attributes:
+      label: 親の要求
+      description: 受け入れの条件を確認する要求の issue 番号
+      placeholder: "#12"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 確認する受け入れの条件
+      description: 親の要求の受け入れの条件のうち、このタスクで確認するものを写す
+      placeholder: |
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: 子の pull request
+      description: この要求の子の実装の pull request。改修の内容と影響の範囲は、この差分から洗い出す
+      placeholder: |
+        - #34
+  - type: textarea
+    id: impact
+    attributes:
+      label: 改修の内容と影響の範囲
+      description: 子の pull request の差分から洗い出す。変わった振る舞い、変わったファイルとモジュール、呼び出し元と依存先、画面、API、データ
+  - type: textarea
+    id: verification-design
+    attributes:
+      label: 検証の設計
+      description: 受け入れの条件と、改修の内容と影響の範囲から観点を作る。観点は、画面ごと、機能ごと、権限、データ、回帰のような関心ごとにセクションを分ける。検証の設計の文書を検証の pull request に置くときは、その文書へのリンクにする
+      placeholder: |
+        ### <関心ごと>
+
+        | # | 条件（WHEN / IF） | 期待結果（SHALL） | 確認する受け入れの条件 |
+        | --- | --- | --- | --- |
+        | 1 | <〇〇のとき、〇〇ならば> | <外から観測できる結果> | <受け入れの条件> |
+  - type: textarea
+    id: execution
+    attributes:
+      label: 検証の pull request
+      description: 検証の設計の文書と、エビデンスを撮る手段を持つ pull request。エビデンスは、その pull request に添付する
+      placeholder: |
+        - #56
+  - type: markdown
+    attributes:
+      value: |
+        検証の pull request をマージしてこのタスクを閉じたら、親の要求の、確認した受け入れの条件にチェックを付ける。受け入れの条件がすべて確認できたら、親の要求を閉じる。
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依存
+      description: 先に終わっている必要がある、子の実装のタスクの番号
