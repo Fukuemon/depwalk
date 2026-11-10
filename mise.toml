@@ -6,4 +6,4 @@ node = "24"
 pnpm = "10.27.0"
 # apm は agent-harness のスキルとフックと、agent-playbooks の playbook を配置する
 uv = "0.12"
-"pipx:apm-cli" = "0.32.0"
+"pipx:apm-cli" = "0.35.0"
