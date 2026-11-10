@@ -120,7 +120,7 @@ How Might We: 言語を足しても、探索と出力の使い方を変えずに
 
 ## Proposed Solution / Feature Description
 
-### Landscape
+### System Context
 
 次の図は、利用者と CI が depwalk を実行し、depwalk が対象のリポジトリのソースを読んで呼び出し関係を返す関係を示す。
 
