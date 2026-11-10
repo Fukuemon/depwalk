@@ -27,7 +27,7 @@ CLI は、traversal、output、解析のパイプラインを、`analyze` コマ
 - CLI の層、analyze の use case、ACL の責務の配置
 - 起動コマンドの解決と分割、`--analyzer-meta` の合成
 - 終了コードの体系と出力先の規約
-- E2E の CLI 層で確かめる観点
+- E2E の CLI 層で確認する観点
 
 持たないものは次のとおり。
 
@@ -51,7 +51,7 @@ depwalk analyze [path] --language <lang> [--analyzer-cmd <cmd>] [--analyzer-meta
                 [--method <selector>] [--direction caller|callee] [--max-depth <n>] [--format console|json]
 ```
 
-| flag          | 型                           | 既定値                                    | 説明                                                                                                                    |
+| flag          | 型                           | デフォルト値                              | 説明                                                                                                                    |
 | ------------- | ---------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `--method`    | string                       | なし                                      | method selector。省くと、件数の要約と diagnostic だけを出す                                                             |
 | `--direction` | string（`caller`、`callee`） | `caller`                                  | 探索の方向（`graph.Direction` に対応）。不正な値は、許す値の一覧を添えてエラーにする                                    |
@@ -161,16 +161,16 @@ ADR-0003: [Analyzer の起動コマンドを、Core が解釈しない言語非�
 テストの共通の規約は [context/testing.md](../../../context/testing.md#test-types-and-guarantees) にある。  
 この機能に固有の観点は次のとおり。
 
-- `os/exec` で build した depwalk のバイナリを実際のプロセスとして起動し、stdout、stderr、終了コードを確かめる。
+- `os/exec` で build した depwalk のバイナリを実際のプロセスとして起動し、stdout、stderr、終了コードを確認する。
   - harness の `buildCoreCLI` と `runCLI` を使い回す。
-- console と json は、どちらも golden file との完全一致で比べ、json は加えて Unmarshal できることを確かめる。
-  - 出力の形式の成功条件を、CLI の水準で確かめる。
-- グラフの水準の E2E（`protocol.Client` を直接呼び、record の単位で比べる層）と合わせて、2 層で確かめる。
+- console と json は、どちらも golden file との完全一致で比べ、json は加えて Unmarshal できることを確認する。
+  - 出力の形式の成功条件を、CLI の水準で確認する。
+- グラフの水準の E2E（`protocol.Client` を直接呼び、record の単位で比べる層）と合わせて、2 層で確認する。
   - 層ごとに保証する範囲は [context/testing.md](../../../context/testing.md#test-types-and-guarantees) にある。
-- method selector は、完全な signature、signature を省いた一意の一致、overload の曖昧さを確かめる。
-  - 加えて、nested class の binary name（`Outer$Inner#method`）の回帰を確かめる。
+- method selector は、完全な signature、signature を省いた一意の一致、overload の曖昧さを確認する。
+  - 加えて、nested class の binary name（`Outer$Inner#method`）の回帰を確認する。
 
-Analyzer の起動の契約は、fake analyzer を使い、JVM なしで確かめる。
+Analyzer の起動の契約は、fake analyzer を使い、JVM なしで確認する。
 
 - `--analyzer-cmd` と `DEPWALK_ANALYZER_CMD` の解決の順と、どちらもない場合の実行の前の拒否
 - shell を介さない分割で exec されること

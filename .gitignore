@@ -44,7 +44,6 @@ apm_modules/
 
 node_modules/
 /.agents/skills/design-playbook/
-/.agents/skills/review-changes/
 /.agents/skills/run-playbook/
 /.claude/agents/review-architecture.md
 /.claude/agents/review-performance.md
@@ -52,10 +51,13 @@ node_modules/
 /.claude/agents/review-security.md
 /.claude/agents/review-spec.md
 /.claude/skills/design-playbook/
-/.claude/skills/review-changes/
 /.claude/skills/run-playbook/
 /.codex/agents/review-architecture.toml
 /.codex/agents/review-performance.toml
 /.codex/agents/review-quality.toml
 /.codex/agents/review-security.toml
 /.codex/agents/review-spec.toml
+/.agents/skills/review-by-viewpoints/
+/.agents/skills/run-session/
+/.claude/skills/review-by-viewpoints/
+/.claude/skills/run-session/

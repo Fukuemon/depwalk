@@ -58,7 +58,7 @@ ADR-0002: [Core を Go と Go modules で実装し、依存を Cobra と標準�
 
 ## Architecture
 
-誰が何のために使うかの L1 の図は [PRD の Landscape](../PRD.md#landscape) にある。  
+誰が何のために使うかの L1 の図は [PRD の System Context](../PRD.md#system-context) にある。  
 次の図は、Core と Analyzer が別のプロセスで動き、STDIN と STDOUT の上の JSONL で通信する構成を示す。
 
 ```mermaid

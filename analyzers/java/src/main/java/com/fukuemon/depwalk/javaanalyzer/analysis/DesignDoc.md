@@ -269,7 +269,7 @@ index は、generator に固有の annotation の名前に依存せず、compile
 - stderr の call-site summary（`callSiteSummary`）には、終端の種別と理由ごとの集計を常に出力する。
   - 集計は `emitted`、`excluded[...]`、`diagnostic[...]`、call site の外の欠けの `gap[...]` である。
 - `silentOmission == 0` の不変条件は、緩和したときも保つ。
-- 既定値は `false` にし、fatal にする挙動を既定に置く。
+- デフォルト値は `false` にし、fatal にする挙動をデフォルトに置く。
 
 この flag が変えるのは、完全性の gate の判定のタイミングだけである。  
 outcome ledger の分類のロジック、帰属の意味論、emit される edge の正しさ（推測による偽の edge の禁止）には影響しない。
@@ -499,4 +499,4 @@ lambda の本体の中の呼び出しそのものは、`viaLambda` の帰属で 
 
 テストの観点は、[Java Analyzer の Design Doc の Verification](../../../../../../../../DesignDoc.md#verification) にある。
 
-SootUp か Analyzer の JDK を上げるときに確かめることは、[tech-stack.md の Upgrade Checks](../../../../../../../../../../context/tech-stack.md#upgrade-checks) にある。
+SootUp か Analyzer の JDK を上げるときに確認することは、[tech-stack.md の Upgrade Checks](../../../../../../../../../../context/tech-stack.md#upgrade-checks) にある。

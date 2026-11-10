@@ -120,7 +120,7 @@ How Might We: 言語を足しても、探索と出力の使い方を変えずに
 
 ## Proposed Solution / Feature Description
 
-### Landscape
+### System Context
 
 次の図は、利用者と CI が depwalk を実行し、depwalk が対象のリポジトリのソースを読んで呼び出し関係を返す関係を示す。
 
@@ -166,7 +166,7 @@ interface を注入している箇所では、実装クラスのメソッドが�
 
 最初のバージョンは、Java と Spring Boot を対象に、呼び出し元と呼び出し先の探索、Spring の DI の解決、Console と JSON の出力を提供する。  
 最初のバージョンの後の段階は、Lower-Priority Goals に挙げた順で進める。  
-段階ごとに確かめる問いは未定。
+段階ごとに確認する問いは未定。
 
 ### Success Metrics
 
@@ -186,7 +186,7 @@ interface を注入している箇所では、実装クラスのメソッドが�
 
 ### Open Questions
 
-- 最初のバージョンの後の各段階で確かめる問いは未定である。
+- 最初のバージョンの後の各段階で確認する問いは未定である。
 
 ### Risks
 

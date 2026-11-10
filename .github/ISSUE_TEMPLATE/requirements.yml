@@ -2,6 +2,22 @@ name: 要求の起票
 description: 実現したいことを起票する。要件定義から検証までは、この issue の中で進める
 labels: [type:requirements]
 body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 種別
+      description: 要求の種別。context/project.yml の process.presets の種別で、行うプロセス、反映と分解の時点、レビューの範囲、子のタスクの種類が決まる
+      options:
+        - feature
+        - screen
+        - design-system
+        - bug
+        - refactoring
+        - maintenance
+        - docs
+        - prototype
+    validations:
+      required: true
   - type: textarea
     id: purpose
     attributes:
@@ -34,7 +50,7 @@ body:
     id: acceptance
     attributes:
       label: 受け入れ条件
-      description: 満たされたと言える条件を、確かめられる形の箇条書きで書く
+      description: 満たされたと言える条件を、確認できる形の箇条書きで書く
       placeholder: |
         - [ ] ...
     validations:
@@ -53,4 +69,4 @@ body:
     id: process
     attributes:
       label: 進め方
-      description: context/project.yml の既定と違うときだけ書く。行うプロセス、レビューの範囲、spec を置くかどうか
+      description: 選んだ種別のプリセットと違うときだけ書く。行うプロセス、レビューの範囲、spec を置くかどうか

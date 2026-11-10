@@ -99,7 +99,7 @@ staging Graph と diagnostic を公開するのは、次の 3 つがすべて揃
 
 参照の完全性の確認と公開の判断は、担当が分かれる。
 
-- stream の参照の完全性は、ACL（`protocol`）が確かめる。wire の record を見る責務であり、結果は port の outcome として返す。
+- stream の参照の完全性は、ACL（`protocol`）が確認する。wire の record を見る責務であり、結果は port の outcome として返す。
 - その結果とプロセスの状態から公開するかを決めるのは、Analyze Use Case である。
   - ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェックで固定し、Core はフラットな package 構成のまま保つ](../../../adr/0007-layered-architecture-refactor.md)
 
@@ -124,7 +124,7 @@ flowchart TD
 ### 構築の流れ
 
 構築は、wire の record の受け取り、値型への変換、非公開の staging Graph への登録を、1 回の走査で行う。  
-公開するのは、プロセスの成功と参照の完全性を確かめた後だけである。  
+公開するのは、プロセスの成功と参照の完全性を確認した後だけである。  
 Protocol の詳しい検証は Analyzer Protocol の Design Doc が持つ。
 
 次の図は、wire の record を受け取ってから Graph を公開するか捨てるかまでの流れを示す。

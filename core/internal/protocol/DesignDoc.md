@@ -30,7 +30,7 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
 - `SourceLocation` の value object、`methodId` と `edgeId` の安定性、`metadata` の扱い
 - Analyzer のプロセスの起動、stdin、stdout、stderr、終了コードの契約
 - `schemaVersion`、未知の field、互換性を壊す変更の方針
-- Protocol contract test で確かめる観点
+- Protocol contract test で確認する観点
 
 持たないものは次のとおり。
 
@@ -305,7 +305,7 @@ ADR-0001: [Core と Analyzer を別プロセスにし、JSONL over STDIN/STDOUT 
 
 入れ子の object は、`sourceLocation`、`callSite`、`details[]` の各要素とその `sourceLocation` を指す。  
 Core は、これらの object の中で、field 名の大文字と小文字だけが違う key も未知の field として拒否する。  
-`metadata` の中身は opaque な値なので、Core は中の field を確かめない。  
+`metadata` の中身は opaque な値なので、Core は中の field を確認しない。  
 `entrypoints[]` は `analysisRequest` にだけあり、受信者の Analyzer は中の未知の field も無視する。  
 Core の parser は `entrypoints[]` の各要素の未知の field も拒否するが、これは Core 自身の検証のためで、互換性の規則に含めない。  
 ADR-0013: [Core は record の最上位の未知の field を無視し、入れ子の object の未知の field を invalid にする](../../../adr/0013-reject-unknown-nested-fields.md)
@@ -315,7 +315,7 @@ ADR-0013: [Core は record の最上位の未知の field を無視し、入れ�
 ### 置くファイル
 
 - `core/internal/protocol/types.go`、`validate.go`、`parser.go`: record の型、検証、厳格な JSONL の parse
-- `core/internal/protocol/client.go`: Analyzer を 1 回動かし、record を集めて参照の完全性を確かめる
+- `core/internal/protocol/client.go`: Analyzer を 1 回動かし、record を集めて参照の完全性を確認する
 - `core/internal/protocol/translate.go`: wire の record を graph の値へ変換する
 - `core/internal/protocol/adapter.go`: `analyze` の port を実装する
 - `core/internal/analyzer/runner.go`: プロセスの起動、stdin、stdout、stderr、終了コード
@@ -326,7 +326,7 @@ ADR-0013: [Core は record の最上位の未知の field を無視し、入れ�
 ## Verification
 
 テストの共通の規約は [context/testing.md](../../../context/testing.md#test-types-and-guarantees) にある。  
-この機能の contract test は、少なくとも次を確かめる。
+この機能の contract test は、少なくとも次を確認する。
 
 - 正しい `analysisRequest` の record を Analyzer が受け取れること。
 - `sourceRoots` の未指定と 1 件以上の指定を区別し、空の配列、絶対 path、空文字、`..` を拒否し、`.` を許すこと。

@@ -27,7 +27,7 @@ ADR-0007: [Core と Java Analyzer の依存境界を ACL と機械のチェッ�
 - `analysis` の下の package が import する `discovery` の型は、`discovery.model` の `DepwalkGradleModel` と `DepwalkProjectModel` だけである。
   - `GradleModelDiscovery` と `DiscoveryFailure` を import するのは `Main` だけである。
 
-ArchUnit のテストが確かめるのは外部のライブラリの 3 段の隔離だけで、実行の順の持ち主は確かめない。  
+ArchUnit のテストが確認するのは外部のライブラリの 3 段の隔離だけで、実行の順の持ち主は確認しない。  
 出典: [ArchitectureTest.java](https://github.com/Fukuemon/depwalk/blob/8e5f43e8bb2fb2ea267bd5eeb27d691cfc255333/analyzers/java/src/test/java/com/fukuemon/depwalk/javaanalyzer/ArchitectureTest.java#L32-L66)
 
 ## Decision
@@ -68,5 +68,5 @@ ADR-0007 のほかの決定（package の構成、外部のライブラリの 3 
 ### Negative
 
 - 実行の全体の順を知るには、`Main` と `AnalysisRunner` の 2 か所を読む必要がある。
-- ArchUnit のテストは、実行の順の持ち主を確かめない。
+- ArchUnit のテストは、実行の順の持ち主を確認しない。
   - `Main` が解析の段（scope の列挙から完全性の gate まで）を直接呼ぶ変更は、レビューで止める。

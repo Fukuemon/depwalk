@@ -42,7 +42,7 @@ Core（`core/`）のツールの役割は次のとおり。
 - Go の標準のコマンド: build、test、vet、fmt をタスクとして実行する。make のようなラッパーは置かない。置く条件は [conventions.md](conventions.md#shared-configuration) にある。
 - `github.com/spf13/cobra`: CLI のコマンドと flag を組み立てる。
 - `go vet`: Go の静的なチェックを行う。
-- golangci-lint: depguard と、revive の exported のルールだけを有効にする。depguard は package の依存の向きを、revive は export した識別子の doc の有無を確かめる。依存の規則は [codebase.md](codebase.md#dependency-rules) にある。
+- golangci-lint: depguard と、revive の exported のルールだけを有効にする。depguard は package の依存の向きを、revive は export した識別子の doc の有無を確認する。依存の規則は [codebase.md](codebase.md#dependency-rules) にある。
 - `gofmt`: Go のコードを整形する。Go の標準の formatter を正とする。
 - Go の標準の `testing`: unit テスト、contract テスト、E2E を実行する。E2E は `core/e2e` にある。
 
@@ -63,14 +63,14 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - Jackson（jackson-databind）: Protocol の JSONL の request を読み、record を書く。
 - custom model provider（`analyzers/java/model-provider`）: Gradle の daemon の上で読み込まれ、build の model を返す。古い Gradle の daemon でも読み込めるよう、Java 8 の classfile にする。
 - JUnit: Java Analyzer の unit テストを実行する。
-- Lombok: テストの中で、Lombok が生成する member の解決を確かめるために使う。
+- Lombok: テストの中で、Lombok が生成する member の解決を確認するために使う。
 - ArchUnit: Java Analyzer の package が外部のライブラリを import してよい範囲をチェックする。
 
 リポジトリのルートのツールの役割は次のとおり。
 
 - mise: ランタイムとツールのバージョンを `mise.toml` で固定する。
 - pnpm: ルートの `package.json` のツールを入れる。ルートの `package.json` は、文書の整形とチェック、コミットのメッセージのチェック、Git のフックのツールだけを持つ。
-- lefthook: Git のフックからチェックを実行する。確かめる内容は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。
+- lefthook: Git のフックからチェックを実行する。確認する内容は [CONTRIBUTING.md](../CONTRIBUTING.md#コミットするとき) にある。
 - prettier、textlint、commitlint: Markdown と設定ファイルを整形し、文書とコミットのメッセージをチェックする。
 - apm: agent-harness のスキルとフックと、agent-playbooks の playbook のスキルとレビューのサブエージェントを配置する。
 
@@ -92,10 +92,10 @@ Java Analyzer（`analyzers/java/`）のツールの役割は次のとおり。
 - `cd core && go build ./...`: Core を build する。実行ファイルは書き出さない。
 - `cd core && go build -o ../dist/depwalk ./cmd/depwalk`: CLI の実行ファイルを `dist/depwalk` に作る。
 - `cd core && go vet ./...`: Core に `go vet` を掛ける。
-- `cd core && go fmt ./...`: Core を整形する。整形済みかは `cd core && test -z "$(gofmt -l .)"` で確かめる。
+- `cd core && go fmt ./...`: Core を整形する。整形済みかは `cd core && test -z "$(gofmt -l .)"` で確認する。
 - `cd core && go mod tidy`: Core の依存を整理する。
 - `cd core && go get <module>@<version>`: Core に依存を足す。
-- `scripts/golangci-lint.sh ./...`: Core の依存の向きと、export した識別子の doc の有無を確かめる。
+- `scripts/golangci-lint.sh ./...`: Core の依存の向きと、export した識別子の doc の有無を確認する。
 - `cd analyzers/java && ./gradlew shadowJar`: Java Analyzer の fat jar を `analyzers/java/build/libs/java-analyzer.jar` に作る。
 - `pnpm exec lefthook run pre-commit`: コミットの前のチェックをまとめて実行する。lefthook は `package.json` の devDependencies で入る。
 
@@ -116,7 +116,7 @@ flag の体系は [CLI の Design Doc](../core/internal/cli/DesignDoc.md) にあ
 
 ## Upgrade Checks
 
-Gradle の対応範囲、Tooling API、custom model provider のバージョンを変えるときは、次を確かめる。
+Gradle の対応範囲、Tooling API、custom model provider のバージョンを変えるときは、次を確認する。
 
 - 対象の Gradle の範囲は、次を同時に直す。ADR-0006 は直さない。
   - [discovery の Design Doc](../analyzers/java/src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md)
@@ -126,26 +126,26 @@ Gradle の対応範囲、Tooling API、custom model provider のバージョン�
   - `analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の `matrixJdkMajors` と `description`
   - `analyzers/java/build.gradle.kts` の `gradle-tooling-api` のバージョン。`BUNDLED_GRADLE_VERSION` と同じ値にする。
 - ADR は決定した時点の記録で、現在の対象の範囲は Design Doc が持つ。
-- `cd analyzers/java && ./gradlew gradleCompatibilityTest` で、anchor ごとの Gradle と daemon の JVM の組み合わせを確かめる。
-  - 確かめる観点は、provider が読み込めること、model のフィールド、task を実行しないこと、出力の隔離、固定した Graph である。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest` で、anchor ごとの Gradle と daemon の JVM の組み合わせを確認する。
+  - 確認する観点は、provider が読み込めること、model のフィールド、task を実行しないこと、出力の隔離、固定した Graph である。
 - provider が呼んでよい Gradle API は、対応範囲の下限の Gradle に存在し、上限までの Gradle で削除されていないものに限る。
   - provider は下限の Gradle API で compile するが、実行するのは対象の build の daemon である。compile が通っても、実行時に `NoSuchMethodError` になる。
   - 例: `ProjectDependency.getDependencyProject()` は Gradle 9.0 で削除され、代わりの `ProjectDependency.getPath()` は 8.11 で追加されたため 7.6 にない。project の依存は、両方の系列にある `ResolutionResult` の `ProjectComponentIdentifier#getProjectPath()` から集める。
-  - provider に API の呼び出しを足すときは、下限と上限の両方の Gradle の Javadoc で存在を確かめる。
+  - provider に API の呼び出しを足すときは、下限と上限の両方の Gradle の Javadoc で存在を確認する。
 
-SootUp か、Analyzer が動く JDK のバージョンを変えるときは、次を確かめる。
+SootUp か、Analyzer が動く JDK のバージョンを変えるときは、次を確認する。
 
-- SootUp が読める classfile の major は、SootUp が依存する ASM のバージョンで決まる。ASM は SootUp の jar に含まれず、推移的な依存として fat jar に入る。Analyzer の JDK の classfile の major を、その ASM が読めるかを確かめる。
+- SootUp が読める classfile の major は、SootUp が依存する ASM のバージョンで決まる。ASM は SootUp の jar に含まれず、推移的な依存として fat jar に入る。Analyzer の JDK の classfile の major を、その ASM が読めるかを確認する。
   - 読めない major に当たると、`guardQuery` が `unavailable` を返す。bytecode による型の階層の補完と、bytecode にだけある member の救済が、例外を出さずに無効になる。
-  - 失敗が diagnostic に出ないため、原因の分からない `JAVA_INCOMPLETE_ANALYSIS` や候補の edge の欠落を見たら、まず classes output の classfile のバージョンを確かめる。
+  - 失敗が diagnostic に出ないため、原因の分からない `JAVA_INCOMPLETE_ANALYSIS` や候補の edge の欠落を見たら、まず classes output の classfile のバージョンを確認する。
   - この回帰をテストで検出する設定は [testing.md](testing.md#mocking-and-test-data) にある。
-- SootUp を上げるときは、型の階層の API の挙動を先に確かめる。
+- SootUp を上げるときは、型の階層の API の挙動を先に確認する。
   - 解析の結果の edge の数が変わるため、E2E の fixture で上げる前と後の edge の数を比べる。
-- JDK を上げたときは、JVM が Analyzer の stderr に警告を出さないかを確かめる。
+- JDK を上げたときは、JVM が Analyzer の stderr に警告を出さないかを確認する。
   - JDK 24 以降の JVM は、Tooling API が native-platform を読み込むときに、stderr に警告を出す。
     - 警告の文は `WARNING: A restricted method in java.lang.System has been called` 系である。
   - fat jar の manifest に `Enable-Native-Access: ALL-UNNAMED` を設定して警告を抑えている。設定は `analyzers/java/build.gradle.kts` の `shadowJar` にある。
-  - E2E の CLI 層の `TestGradleMultiProjectCLI` が、stderr が depwalk の固定の行だけであることを確かめ、この回帰を検出する。
+  - E2E の CLI 層の `TestGradleMultiProjectCLI` が、stderr が depwalk の固定の行だけであることを確認し、この回帰を検出する。
 
 Go を上げるときは、`encoding/json/v2` と `encoding/json/jsontext` を使えるかを見直す。
 

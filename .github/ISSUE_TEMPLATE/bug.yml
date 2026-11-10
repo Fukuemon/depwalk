@@ -30,6 +30,15 @@ body:
     validations:
       required: true
   - type: textarea
+    id: verification
+    attributes:
+      label: 検証の観点
+      description: 直した後に確認する動作を、条件と期待結果の表で書く。pull request の「検証とエビデンス」の表の同じ列に写す
+      placeholder: |
+        | # | 条件（WHEN / IF） | 期待結果（SHALL） |
+        | --- | --- | --- |
+        | 1 | <〇〇のとき、〇〇ならば> | <外から観測できる結果> |
+  - type: textarea
     id: environment
     attributes:
       label: 環境

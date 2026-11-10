@@ -161,8 +161,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # agent-harness は private なので、GitHub App のトークンで取得する
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: app
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent-harness
+
       # docs のチェックは apm の配置先にあり、Git で追跡しない
       - run: apm install --frozen
+        env:
+          GITHUB_APM_PAT: ${{ steps.app.outputs.token }}
 
       # prh.yml に規則を足すと、変えていない文書にも指摘が出る。全文書を見る
       - name: textlint

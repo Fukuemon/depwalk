@@ -450,8 +450,8 @@ Java に固有の key は [Protocol への写像の文書](src/main/java/com/fuk
 ### チェック
 
 - `cd analyzers/java && ./gradlew test`: Java の unit テストと、依存の境界をチェックする ArchUnit のテストを実行する。
-- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換の matrix を確かめる。
-  - 確かめる観点は [discovery の文書の Verification](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification) にある。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: Gradle と daemon の JVM の互換の matrix を確認する。
+  - 確認する観点は [discovery の文書の Verification](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification) にある。
 - テストのコマンドと実行の前提は [context/testing.md](../../context/testing.md) にある。
 
 ## Verification
@@ -462,9 +462,9 @@ Java Analyzer は、Java の unit、Go の fake analyzer、実際の jar によ�
 曖昧さと解決の根拠の観測は、Analyzer の JSONL（`callEdge.metadata` と `diagnostic`）までを Java Analyzer の責務にする。  
 CLI の出力への edge 単位の metadata の表出は、[CLI の Design Doc](../../core/internal/cli/DesignDoc.md) が定める。
 
-### Java の unit テストで確かめること
+### Java の unit テストで確認すること
 
-JUnit で、`analyzers/java/` の中で確かめる。
+JUnit で、`analyzers/java/` の中で確認する。
 
 - signature と `methodId` の正規化
   - overload、generics の erasure、varargs、nested class（`$`）
@@ -474,7 +474,7 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - lambda の中の呼び出しが囲みメソッドに帰属し、`viaLambda: true` が立つこと
 - 帰属型の決定規則
   - 宣言サイトが scope の中（override あり、なし）、scope の外の宣言の引き上げ
-  - 引き上げから外す package（既定値と `liftExcludePackages` による置き換え、segment 単位の prefix 一致）
+  - 引き上げから外す package（デフォルト値と `liftExcludePackages` による置き換え、segment 単位の prefix 一致）
   - `this`、`super`、static、`new` の各形、`metadata.dispatch` の値
 - `diagnostic` と `error` の code と severity の対応と、pre-flight のチェックが解析の開始の前に fatal になること
   - `language != "java"`、`workspaceRoot` が存在しないか directory でない
@@ -508,16 +508,16 @@ JUnit で、`analyzers/java/` の中で確かめる。
   - in-memory の fake の build model から、本番の context の構築（`discoveredContexts`）を通し、`AnalysisRunner` を直接動かす。
   - build model は、Tooling API が構造的に adapt する interface である。
     - そのため fake でも、root の検証と依存する context の id の導出は本番のコードが行う。
-  - model の取得（Tooling API、Gradle の daemon、provider の配布）を実際の Gradle で確かめるテストは、[context/testing.md](../../context/testing.md#test-types-and-guarantees) にある。
+  - model の取得（Tooling API、Gradle の daemon、provider の配布）を実際の Gradle で確認するテストは、[context/testing.md](../../context/testing.md#test-types-and-guarantees) にある。
 - Gradle の output の破棄と、negative fixture の非漏洩
-  - `CredentialIsolationTest` は、実際の Gradle で build logic が出した credential 相当の marker が、Protocol、stderr、生成物に現れないことを確かめる。
-  - Gradle の失敗の message の URL が出力に現れないことは、fake の Tooling API で確かめる。
-  - Gradle と daemon の JVM の anchor の matrix は、`gradleCompatibilityTest` で確かめる。
+  - `CredentialIsolationTest` は、実際の Gradle で build logic が出した credential 相当の marker が、Protocol、stderr、生成物に現れないことを確認する。
+  - Gradle の失敗の message の URL が出力に現れないことは、fake の Tooling API で確認する。
+  - Gradle と daemon の JVM の anchor の matrix は、`gradleCompatibilityTest` で確認する。
   - 観点は [discovery の文書の Verification](src/main/java/com/fukuemon/depwalk/javaanalyzer/discovery/DesignDoc.md#verification) にある。
 
-起動のコマンドの解決と `--analyzer-meta` の合成を、fake analyzer で確かめる観点は [CLI の Design Doc の Verification](../../core/internal/cli/DesignDoc.md#verification) にある。
+起動のコマンドの解決と `--analyzer-meta` の合成を、fake analyzer で確認する観点は [CLI の Design Doc の Verification](../../core/internal/cli/DesignDoc.md#verification) にある。
 
-### E2E で確かめること
+### E2E で確認すること
 
 実際の jar と `testdata/fixtures/java/` を使う。
 

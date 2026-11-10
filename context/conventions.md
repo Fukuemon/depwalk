@@ -78,7 +78,7 @@ JUnit のテストには、日本語の `@DisplayName` を付ける。
 この節の規約は、スキル write-comments より優先する。スキルとの違いは次の 3 つ。
 
 - write-comments は残してよい実装のコメントを 3 種類に限る。このリポジトリでは、採らなかった方法とその理由、冗長に見える処理が要る理由、破ると動かなくなる不変条件も書いてよい。
-- write-comments は文書コメントの有無を lint で確かめるとする。このリポジトリでは、Go は revive の exported で確かめるが、Java には Checkstyle を入れていない。
+- write-comments は文書コメントの有無を lint で確認するとする。このリポジトリでは、Go は revive の exported で確認するが、Java には Checkstyle を入れていない。
 - write-comments は外部の制約のコメントに issue や仕様へのリンクを添えるとするが、このリポジトリでは添えない。
 
 ## Documents
@@ -134,9 +134,9 @@ lefthook の `run` は `sh -c` で動き `set -e` が働かないので、複数
 - `list-drift.mjs` による文書の鮮度のチェックは、CI で一覧を出すだけにし、失敗にしない。
   - `governs` の範囲が変わっても文書が正しいままのことはよくある。失敗にすると、内容を読まずに `verified_commit` だけを進めて通すことになる。
   - コミットをまたいで初めて意味を持つチェックなので、コミットの前のフックには入れない。
-- `scripts/check-specs-residue.sh` は、閉じた issue の spec が残っていないかを確かめる。pull request のチェックにはしない。
+- `scripts/check-specs-residue.sh` は、閉じた issue の spec が残っていないかを確認する。pull request のチェックにはしない。
   - issue を閉じてから spec を消す pull request を取り込むまでの間、関係のない pull request が失敗するためである。
-  - CI の `spec-residue.yml` が、既定のブランチへの push と週ごとの schedule で実行する。
+  - CI の `spec-residue.yml` が、デフォルトのブランチへの push と週ごとの schedule で実行する。
 - prettier は、`.prettierignore` で次を除く。
   - apm が配置して書き換えるファイルと、pnpm が書き換える `pnpm-lock.yaml`。整形すると、次の `apm install` か `pnpm install` で差分が出る。
   - Gradle の fixture の build の生成物

@@ -22,4 +22,72 @@ process:
     reflect_at: design
     breakdown_at: design
     review: [requirements, design, integration]
+  # 要求の種別。要求の雛形の「種別」の選択肢と同じ名前にする
+  presets:
+    feature:
+      processes:
+        [
+          requirements,
+          design,
+          implementation,
+          verification-design,
+          verification,
+          integration,
+          release,
+        ]
+      reflect_at: design
+      breakdown_at: design
+      review: [requirements, design, integration]
+      tasks: [design, impl, verify, docs]
+    screen:
+      processes:
+        [
+          requirements,
+          design,
+          implementation,
+          verification-design,
+          verification,
+          integration,
+          release,
+        ]
+      reflect_at: design
+      breakdown_at: design
+      review: [requirements, design, integration]
+      tasks: [design, impl, verify]
+    design-system:
+      processes: [requirements, design, implementation, integration]
+      reflect_at: design
+      breakdown_at: design
+      review: [requirements, design, integration]
+      tasks: [design, impl, docs]
+    bug:
+      processes: [implementation, verification, integration]
+      reflect_at: none
+      breakdown_at: none
+      review: [integration]
+      tasks: []
+    refactoring:
+      processes: [design, implementation, verification, integration]
+      reflect_at: design
+      breakdown_at: design
+      review: [design, integration]
+      tasks: [impl]
+    maintenance:
+      processes: [implementation, integration]
+      reflect_at: none
+      breakdown_at: none
+      review: [integration]
+      tasks: []
+    docs:
+      processes: [implementation, integration]
+      reflect_at: none
+      breakdown_at: none
+      review: [integration]
+      tasks: []
+    prototype:
+      processes: [design]
+      reflect_at: none
+      breakdown_at: none
+      review: [design]
+      tasks: []
   additional: []

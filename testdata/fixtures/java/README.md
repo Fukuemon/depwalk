@@ -2,7 +2,7 @@
 
 `core/e2e` の Go の E2E は、ここにある fixture に対して、実際の `analyzers/java` の fat jar を動かし、出力を期待値と比べる。どの fixture も Analyzer の解析の対象として作ったもので、動くアプリケーションではない。業務のロジックを足さない。
 
-| fixture                        | 使うテスト                                                                                          | 確かめること                                                                                                       |
+| fixture                        | 使うテスト                                                                                          | 確認すること                                                                                                       |
 | ------------------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `project/`                     | `java_fixture_test.go`                                                                              | interface、継承、jar の型の引き上げ、lambda の 4 つの場面の caller と callee                                       |
 | `spring-project/`              | `java_spring_fixture_test.go`                                                                       | Spring の DI と framework の暗黙の呼び出しを、実際の framework の jar を classpath にして解く                      |
@@ -19,11 +19,11 @@
 | jar の型のメソッドを、範囲の中の子へ引き上げる | `project/.../WidgetUsingLib.java` と `lib/fixture-lib.jar`                |
 | lambda の中の呼び出し（`viaLambda: true`）     | `project/.../LambdaUser.java`                                             |
 
-期待値は `expected/call-edges.json` と `expected/diagnostics.json` にある。テストは、期待値の edge と diagnostic が出力に含まれるかだけを確かめ、graph の全体が一致するかは確かめない。呼ばれないメソッドの宣言は、この fixture が確かめる対象ではないからである。
+期待値は `expected/call-edges.json` と `expected/diagnostics.json` にある。テストは、期待値の edge と diagnostic が出力に含まれるかだけを確認し、graph の全体が一致するかは確認しない。呼ばれないメソッドの宣言は、この fixture が確認する対象ではないからである。
 
-`expected/diagnostics.json` には、`JAVA_SOOTUP_UNAVAILABLE` の warning が 1 件ある。明示の source root で解析すると、classpath に classes の directory がないので、Analyzer は source だけで解析を続け、この warning を出す。テストは、Core がこの diagnostic を成功の結果へ渡すことを確かめる。
+`expected/diagnostics.json` には、`JAVA_SOOTUP_UNAVAILABLE` の warning が 1 件ある。明示の source root で解析すると、classpath に classes の directory がないので、Analyzer は source だけで解析を続け、この warning を出す。テストは、Core がこの diagnostic を成功の結果へ渡すことを確認する。
 
-parse できないファイルと、範囲の中の解決できない呼び出しは、この fixture に置かない。どちらも request の全体を失敗にする（`JAVA_PARSE_ERROR`、`JAVA_INCOMPLETE_ANALYSIS`）。この 2 つの失敗は、Java Analyzer の unit テストが確かめる。
+parse できないファイルと、範囲の中の解決できない呼び出しは、この fixture に置かない。どちらも request の全体を失敗にする（`JAVA_PARSE_ERROR`、`JAVA_INCOMPLETE_ANALYSIS`）。この 2 つの失敗は、Java Analyzer の unit テストが確認する。
 
 ### classpath
 
@@ -70,4 +70,4 @@ root と 3 つの subproject（`:app`、`:service`、`:repository`）を持つ G
 
 classes の出力と classpath の manifest は、テストが `writeDepwalkClasspath` で作る。manifest がすでにあれば、作り直さない。
 
-`patterns/` は、root の `settings.gradle` に含めない別の build である。かつて解決できなかった 5 つの呼び出しの型を、最小の形で再現する。5 つは fluent chain、method reference、明示の `super` の呼び出し、generics 付きの `var`、module をまたぐ Lombok の member である。`hard_to_resolve_call_patterns_cli_test.go` が自動 discovery で解析し、5 つがすべて bytecode-only の member への edge として救済されることを確かめる。classes の出力がないときは、テストが `writeDepwalkClasspath` で作る。
+`patterns/` は、root の `settings.gradle` に含めない別の build である。かつて解決できなかった 5 つの呼び出しの型を、最小の形で再現する。5 つは fluent chain、method reference、明示の `super` の呼び出し、generics 付きの `var`、module をまたぐ Lombok の member である。`hard_to_resolve_call_patterns_cli_test.go` が自動 discovery で解析し、5 つがすべて bytecode-only の member への edge として救済されることを確認する。classes の出力がないときは、テストが `writeDepwalkClasspath` で作る。

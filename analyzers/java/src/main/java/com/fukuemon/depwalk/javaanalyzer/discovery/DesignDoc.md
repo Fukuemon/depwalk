@@ -204,19 +204,19 @@ model が source root を返した後に、除外と検証を経て有効な roo
 
 ### チェック
 
-- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: 下の Verification の anchor を確かめる。
+- `cd analyzers/java && ./gradlew gradleCompatibilityTest`: 下の Verification の anchor を確認する。
   - `./gradlew test` は、tag `gradle-compat` のテストを除くため、この matrix を実行しない。
 
 ## Verification
 
-Gradle と daemon の JVM の互換は、`analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の task が、次の 3 つの anchor で確かめる。
+Gradle と daemon の JVM の互換は、`analyzers/java/build.gradle.kts` の `gradleCompatibilityTest` の task が、次の 3 つの anchor で確認する。
 
 - Gradle `7.6.5` と daemon の JDK 8
-  - この anchor は、`gradleJavaHome` の方式で daemon の JVM を固定し、override が `gradle.properties` と同じく働くことを確かめる。
+  - この anchor は、`gradleJavaHome` の方式で daemon の JVM を固定し、override が `gradle.properties` と同じく働くことを確認する。
 - Gradle `8.14.5` と daemon の JDK 17
 - Gradle `9.7.1` と daemon の JDK 25
 
-anchor ごとに、同じ fixture に対して次を確かめる。
+anchor ごとに、同じ fixture に対して次を確認する。
 
 - provider を load できること
 - model の field（project の数、source root、language level、project の依存）が一致すること
@@ -224,5 +224,5 @@ anchor ごとに、同じ fixture に対して次を確かめる。
 - 出力を隔離すること。
   - stderr は depwalk の固定の行だけである。
 
-範囲の外の Gradle を実際の daemon で使ったときに、`unsupported-gradle-version` と明示の override の案内で失敗することも確かめる。  
+範囲の外の Gradle を実際の daemon で使ったときに、`unsupported-gradle-version` と明示の override の案内で失敗することも確認する。  
 daemon の JDK を用意する方法と、解決できないときに失敗させる契約は [testing.md の Runtime Requirements](../../../../../../../../../../context/testing.md#runtime-requirements) にある。

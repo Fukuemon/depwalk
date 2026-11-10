@@ -1,6 +1,6 @@
 # context の目次
 
-作業の中で参照する、このリポジトリの規約と事実。変更を取り込むまでの手順は [CONTRIBUTING.md](../CONTRIBUTING.md) にある。
+作業の中で参照する、このリポジトリの規約と事実。変更をマージするまでの手順は [CONTRIBUTING.md](../CONTRIBUTING.md) にある。
 
 - [コードベースの構造](codebase.md) — Core と Analyzer の境界、Core の package の依存の向き、Java Analyzer の import の範囲、staging Graph とエラーの分類の置き場。コードから読み取れる構造は書かない
 - [コードと文書の規約](conventions.md) — Go と JUnit のテストの命名、コメントに書くこと、文書の置き場と frontmatter、golangci-lint と lefthook の設定、チェックの除外。lint で検出できる規則は書かない

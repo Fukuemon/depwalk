@@ -41,7 +41,7 @@ Java の source root を自動で discovery するときは、利用者の環境
 
 実際の環境のプロジェクトを解析するときは、次を設定する。
 
-- 中規模の multi-project（目安は call site が 5 万件）では、既定の heap だと Analyzer が `OutOfMemoryError` になりうる。`--analyzer-cmd`（または `DEPWALK_ANALYZER_CMD`）の java の起動に `-Xmx` を明示する。
+- 中規模の multi-project（目安は call site が 5 万件）では、デフォルトの heap だと Analyzer が `OutOfMemoryError` になりうる。`--analyzer-cmd`（または `DEPWALK_ANALYZER_CMD`）の java の起動に `-Xmx` を明示する。
   - 測った例では、`-Xmx8g` で 7 つの project、52,411 件の call site を解析できた。
   - OOM を検知したときに Core が返すエラーと終了コードは [CLI の Design Doc](../core/internal/cli/DesignDoc.md) にある。
 - discovery が `JAVA_GRADLE_MODEL_ERROR`（`daemon-jvm-incompatible`）で失敗したら、daemon の JVM を指定して避ける。
@@ -71,7 +71,7 @@ Core と Analyzer の間の JSONL はテキストなので、そのまま読め�
 
 ## Secrets
 
-depwalk は、秘密情報を入力として受け取らず、保存しない。
+depwalk は、シークレットを入力として受け取らず、保存しない。
 
 - 自動 discovery では、Gradle が既存の credential provider を使うことがある。depwalk は、その credential を入力として受け取らず、保存しない。
 - 解析の対象は利用者のソースコードで、depwalk は解析した内容を外部のサービスへ送らない。
